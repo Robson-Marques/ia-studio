@@ -9,11 +9,12 @@ import { LimitsService } from './limits.service';
 import { UsageService } from './usage.service';
 import { PlansController } from './plans.controller';
 import { LicensesController } from './licenses.controller';
+import { UsageController } from './usage.controller';
 import { AccountController } from './account.controller';
 
 @Global()
 @Module({
-  controllers: [PlansController, LicensesController, AccountController],
+  controllers: [PlansController, LicensesController, UsageController, AccountController],
   providers: [LicensingRepository, PlansService, LicensesService, LimitsService, UsageService],
   exports: [LicensingRepository, PlansService, LicensesService, LimitsService, UsageService],
 })

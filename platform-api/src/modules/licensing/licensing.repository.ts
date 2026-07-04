@@ -89,6 +89,19 @@ export class LicensingRepository {
     });
   }
 
+  // Consumo GLOBAL (Console) — todas as orgs num periodo. organizationId
+  // opcional filtra por uma org (aba "Uso do mes" do detalhe do cliente).
+  findAllUsageForPeriod(period: string, organizationId?: string) {
+    return this.prisma.usageRecord.findMany({
+      where: { period, ...(organizationId ? { organization_id: organizationId } : {}) },
+      orderBy: [{ organization_id: 'asc' }, { metric: 'asc' }],
+    });
+  }
+
+  listOrganizationsBasic() {
+    return this.prisma.organization.findMany({ select: { id: true, name: true, slug: true } });
+  }
+
   async sumUsage(organizationId: string, metric: string, period: string): Promise<bigint> {
     const agg = await this.prisma.usageRecord.aggregate({
       where: { organization_id: organizationId, metric, period },

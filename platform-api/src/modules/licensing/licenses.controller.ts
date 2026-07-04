@@ -8,7 +8,7 @@ import { UpdateLicenseDto } from './dto/update-license.dto';
 @ApiTags('Console — Licensing')
 @ApiBearerAuth()
 @PlatformAdminOnly()
-@Controller('console/licensing/licenses')
+@Controller('console/licenses')
 export class LicensesController {
   constructor(private readonly licenses: LicensesService) {}
 

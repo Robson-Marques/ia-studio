@@ -58,4 +58,24 @@ export class UsageService {
       value: Number(r.value),
     }));
   }
+
+  /**
+   * Consumo GLOBAL do Console: todas as orgs (ou uma, se organizationId) num
+   * periodo, com o nome da org resolvido. BigInt -> number.
+   */
+  async getGlobalUsage(period = currentPeriod(), organizationId?: string) {
+    const [rows, orgs] = await Promise.all([
+      this.repository.findAllUsageForPeriod(period, organizationId),
+      this.repository.listOrganizationsBasic(),
+    ]);
+    const nameById = new Map(orgs.map((o) => [o.id, o.name]));
+    return rows.map((r) => ({
+      organization_id: r.organization_id,
+      organization_name: nameById.get(r.organization_id) ?? r.organization_id,
+      metric: r.metric,
+      period: r.period,
+      workspace_id: r.workspace_id === '' ? null : r.workspace_id,
+      value: Number(r.value),
+    }));
+  }
 }

@@ -10,7 +10,7 @@ import { UpdatePlanDto } from './dto/update-plan.dto';
 @ApiTags('Console — Licensing')
 @ApiBearerAuth()
 @PlatformAdminOnly()
-@Controller('console/licensing/plans')
+@Controller('console/plans')
 export class PlansController {
   constructor(private readonly plans: PlansService) {}
 

@@ -93,15 +93,15 @@ const NAV = [
 export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }) {
   const { can } = usePermissions();
   const location = useLocation();
-  const [openGroups, setOpenGroups] = useState(() => new Set(NAV.filter((i) => i.children).map((i) => i.label)));
+  // Accordion de um grupo só: abre um, fecha o outro. Comeca no grupo da rota
+  // atual (ou nenhum) — nao mais "tudo aberto".
+  const [openGroup, setOpenGroup] = useState(() => {
+    const active = NAV.find((i) => i.children?.some((c) => location.pathname.startsWith(c.path)));
+    return active ? active.label : null;
+  });
 
   function toggleGroup(label) {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
-      return next;
-    });
+    setOpenGroup((prev) => (prev === label ? null : label));
   }
 
   // perm string OU array (OR) — ex.: Conversas exige qualquer view.* do WhatsApp.
@@ -157,7 +157,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }) {
               </NavLink>
             );
           }
-          const open = openGroups.has(item.label);
+          const open = openGroup === item.label;
           const groupActive = item.children.some((c) => location.pathname.startsWith(c.path));
           return (
             <div key={item.label}>
