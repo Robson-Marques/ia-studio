@@ -87,7 +87,7 @@ export class ResourceRepository {
         organization_id_provider_key_connection_id_resource_type_source_operation: {
           organization_id: organizationId,
           provider_key: providerKey,
-          connection_id: connectionId,
+          connection_id: connectionId ?? '',
           resource_type: resourceType,
           source_operation: sourceOperation,
         },
@@ -95,7 +95,7 @@ export class ResourceRepository {
       create: {
         organization_id: organizationId,
         provider_key: providerKey,
-        connection_id: connectionId,
+        connection_id: connectionId ?? '',
         resource_type: resourceType,
         source_operation: sourceOperation,
         ...data,

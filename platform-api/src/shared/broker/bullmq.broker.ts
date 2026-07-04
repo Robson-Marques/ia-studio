@@ -10,7 +10,7 @@
 // Retry: attempts (default 3) com backoff exponencial; job que esgota as
 // tentativas e copiado pra fila <queue>:dlq (dead-letter).
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { Queue, Worker, Job } from 'bullmq';
+import { Queue, Worker, Job, ConnectionOptions } from 'bullmq';
 import IORedis from 'ioredis';
 import {
   BrokerHandler,
@@ -79,7 +79,9 @@ export class BullMqBroker implements IMessageBroker, OnModuleDestroy {
           });
         },
         {
-          connection: this.connection,
+          // Cast: bullmq empacota sua propria copia do ioredis; a instancia
+          // vem do ioredis de topo. Mesmo objeto em runtime.
+          connection: this.connection as unknown as ConnectionOptions,
           prefix: PREFIX,
           concurrency: opts.concurrency ?? 5,
         },
@@ -147,7 +149,7 @@ export class BullMqBroker implements IMessageBroker, OnModuleDestroy {
     let q = this.queues.get(name);
     if (!q) {
       if (!this.connection) throw new Error('Broker sem conexão Redis.');
-      q = new Queue(name, { connection: this.connection, prefix: PREFIX });
+      q = new Queue(name, { connection: this.connection as unknown as ConnectionOptions, prefix: PREFIX });
       this.queues.set(name, q);
     }
     return q;

@@ -23,7 +23,10 @@ async function bootstrap(): Promise<void> {
   // upload responde 400 informando que o multipart esta indisponivel.
   try {
     const multipart = (await import('@fastify/multipart')).default;
-    await app.register(multipart, {
+    // Cast: @fastify/multipart tipa contra o fastify de topo, e o Nest usa o
+    // fastify embutido no @nestjs/platform-fastify (versoes diferentes). Em
+    // runtime e o mesmo plugin — o cast so silencia o conflito de tipos.
+    await app.register(multipart as any, {
       limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB
     });
     logger.log('Plugin @fastify/multipart registrado (upload de backups).');

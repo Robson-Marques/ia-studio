@@ -1696,7 +1696,10 @@ model ResourceMapping {
   workspace_id    String?
   environment_id  String?
   provider_key    String
-  connection_id   String?
+  // Faz parte do @@unique abaixo — precisa ser NOT NULL (Prisma tipa campo
+  // nullable em unique-composto como string e null nao faz upsert confiavel).
+  // "" (vazio) = mapeamento sem conexao especifica (nivel do provider).
+  connection_id   String   @default("")
   resource_type   String
   source_operation String
   field_map       Json     @default("{}")
