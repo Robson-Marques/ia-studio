@@ -1,0 +1,40 @@
+# ─── Dependências ───────────────────────────────
+node_modules/
+**/node_modules/
+
+# ─── Builds ─────────────────────────────────────
+dist/
+**/dist/
+build/
+.vite/
+
+# ─── Segredos / ambiente (NUNCA versionar) ──────
+.env
+**/.env
+.env.*
+!**/.env.example
+ecosystem.config.js
+**/ecosystem.config.js
+
+# ─── Prisma ─────────────────────────────────────
+# (o schema.prisma É versionado; o client gerado não)
+**/generated/
+
+# ─── Logs / temporários ─────────────────────────
+*.log
+**/*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# ─── Backups / pacotes ──────────────────────────
+*.tar.gz
+*.sql
+*.sql.gz
+backups/
+/opt/
+
+# ─── Editor ─────────────────────────────────────
+.idea/
+.vscode/
+*.swp

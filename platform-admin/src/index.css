@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────
+   CSS VARIABLES — Light theme (default)
+───────────────────────────────────────────────────────────────── */
+:root {
+  --ap-bg:           #f1f5f9;
+  --ap-bg-page:      #e8edf4;
+  --ap-surface:      #ffffff;
+  --ap-surface-2:    #f8fafc;
+  --ap-surface-3:    #f1f5f9;
+  --ap-border:       #e2e8f0;
+  --ap-border-sub:   rgba(226, 232, 240, 0.6);
+  --ap-sidebar:      #ffffff;
+  --ap-header:       #ffffff;
+  --ap-input-bg:     #f8fafc;
+  --ap-text-1:       #0f172a;
+  --ap-text-2:       #334155;
+  --ap-text-3:       #475569;
+  --ap-text-4:       #64748b;
+  --ap-text-5:       #94a3b8;
+  --ap-scroll-track: #f1f5f9;
+  --ap-scroll-thumb: #cbd5e1;
+  --ap-scroll-hover: #94a3b8;
+  --ap-table-head:   rgba(241, 245, 249, 0.8);
+  --ap-hover:        rgba(241, 245, 249, 0.9);
+  --ap-accent:       #6366f1;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   CSS VARIABLES — Dark theme
+───────────────────────────────────────────────────────────────── */
+html.dark {
+  --ap-bg:           #111827;
+  --ap-bg-page:      #0a0f1a;
+  --ap-surface:      #1e293b;
+  --ap-surface-2:    #0f172a;
+  --ap-surface-3:    #0d1117;
+  --ap-border:       rgba(51, 65, 85, 0.6);
+  --ap-border-sub:   rgba(51, 65, 85, 0.3);
+  --ap-sidebar:      #0f172a;
+  --ap-header:       #0f172a;
+  --ap-input-bg:     #0f172a;
+  --ap-text-1:       #e2e8f0;
+  --ap-text-2:       #cbd5e1;
+  --ap-text-3:       #94a3b8;
+  --ap-text-4:       #64748b;
+  --ap-text-5:       #475569;
+  --ap-scroll-track: #1e293b;
+  --ap-scroll-thumb: #334155;
+  --ap-scroll-hover: #475569;
+  --ap-table-head:   rgba(30, 41, 59, 0.4);
+  --ap-hover:        rgba(51, 65, 85, 0.3);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   BASE
+───────────────────────────────────────────────────────────────── */
+@layer base {
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    /* --ap-bg-page (mesmo tom do <main>) evita "degrau" de cor na safe-area
+       do iPhone em PWA standalone. */
+    background-color: var(--ap-bg-page);
+    color: var(--ap-text-1);
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    overscroll-behavior: none;
+  }
+
+  html {
+    overscroll-behavior: none;
+    background-color: var(--ap-bg-page);
+  }
+
+  .overflow-y-auto, .overflow-auto, .overflow-y-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--ap-scroll-track); }
+  ::-webkit-scrollbar-thumb { background: var(--ap-scroll-thumb); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ap-scroll-hover); }
+
+  /* iOS Safari auto-zoom em inputs com font-size < 16px. */
+  @media (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important;
+    }
+    input[type="date"], input[type="datetime-local"], input[type="time"] {
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      -webkit-min-logical-width: 0 !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      display: block !important;
+      text-align: left !important;
+      min-height: 2.625rem !important;
+      line-height: 1.5 !important;
+    }
+    .grid > *, .flex > * {
+      min-width: 0;
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   COMPONENT CLASSES
+───────────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* Card */
+  .card {
+    background-color: var(--ap-surface);
+    border: 1px solid var(--ap-border);
+    @apply rounded-xl transition-colors;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white
+           font-medium text-sm hover:bg-brand-dark transition-colors;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors;
+    background-color: var(--ap-surface-3);
+    color: var(--ap-text-2);
+  }
+  .btn-secondary:hover { background-color: var(--ap-border); }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors;
+    color: var(--ap-text-4);
+  }
+  .btn-ghost:hover {
+    background-color: var(--ap-surface-3);
+    color: var(--ap-text-2);
+  }
+
+  /* Inputs */
+  .input {
+    @apply w-full rounded-lg px-3 py-2 text-sm transition-colors
+           focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30;
+    background-color: var(--ap-input-bg);
+    border: 1px solid var(--ap-border);
+    color: var(--ap-text-1);
+  }
+  .input::placeholder { color: var(--ap-text-5); }
+
+  .select {
+    @apply w-full rounded-lg px-3 py-2 text-sm transition-colors appearance-none
+           focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30;
+    background-color: var(--ap-input-bg);
+    border: 1px solid var(--ap-border);
+    color: var(--ap-text-1);
+  }
+
+  /* Badges */
+  .badge-green  { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200; }
+  .badge-yellow { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100  text-amber-700  border border-amber-200; }
+  .badge-red    { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100    text-red-700    border border-red-200; }
+  .badge-blue   { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100   text-blue-700   border border-blue-200; }
+  .badge-purple { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 border border-violet-200; }
+  .badge-gray   { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border; background-color: var(--ap-surface-3); color: var(--ap-text-4); border-color: var(--ap-border); }
+  .badge-orange { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200; }
+
+  html.dark .badge-green  { @apply bg-emerald-900/60 text-emerald-400 border-emerald-700/40; }
+  html.dark .badge-yellow { @apply bg-amber-900/60  text-amber-400  border-amber-700/40; }
+  html.dark .badge-red    { @apply bg-red-900/60    text-red-400    border-red-700/40; }
+  html.dark .badge-blue   { @apply bg-blue-900/60   text-blue-400   border-blue-700/40; }
+  html.dark .badge-purple { @apply bg-violet-900/60 text-violet-400 border-violet-700/40; }
+  html.dark .badge-gray   { @apply bg-slate-700 text-slate-400 border-slate-600; }
+  html.dark .badge-orange { @apply bg-orange-900/60 text-orange-400 border-orange-700/40; }
+
+  /* Table */
+  .table-row {
+    @apply transition-colors;
+    border-bottom: 1px solid var(--ap-border-sub);
+  }
+  .table-row:hover { background-color: var(--ap-hover); }
+
+  .table-th {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider;
+    color: var(--ap-text-4);
+  }
+  .table-td {
+    @apply px-4 py-3 text-sm;
+    color: var(--ap-text-2);
+  }
+
+  /* Sidebar items */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer text-sm font-medium;
+    color: var(--ap-text-4);
+  }
+  .sidebar-item:hover {
+    background-color: var(--ap-surface-3);
+    color: var(--ap-text-1);
+  }
+  .sidebar-item.active {
+    @apply bg-brand/15 text-brand border border-brand/20;
+  }
+
+  .sidebar-sub {
+    @apply flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg transition-all cursor-pointer text-sm;
+    color: var(--ap-text-5);
+  }
+  .sidebar-sub:hover {
+    background-color: var(--ap-surface-3);
+    color: var(--ap-text-3);
+  }
+  .sidebar-sub.active { @apply text-brand bg-brand/10; }
+}

@@ -1,0 +1,457 @@
+// AgentRunnerService — LOOP de tool-calling (porta do Aquapark, adaptado ao
+// multi-tenant e a Connections AI). Fluxo:
+//   1) carrega agente (versao publicada) + resolve provider (connection fixa OU
+//      orchestrator);
+//   2) compila system prompt (base + persona + RAG + memoria);
+//   3) resolve tools (allowed_tools do catalogo → LlmTool);
+//   4) cria AiAgentRun (RUNNING) e itera ate max_steps:
+//        chat → acumula tokens/custo → se toolCalls: executa via ToolRuntime
+//        (gate de aprovacao pode pausar o run) → anexa resultado → continua;
+//        senao resposta final → fim;
+//   5) persiste transcript/tokens/cost; CostsService.record; UsageService
+//      ai_tokens; emite evento ai.agent.run.completed.
+//   6) resume(runId): retoma o loop apos aprovacao.
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { AiAgent, AiProviderKind, AiRunStatus, Prisma } from '@prisma/client';
+import { AgentsRepository } from './agents.repository';
+import { compilePersona } from './agent-persona';
+import { PromptSecurityService } from './prompt-security.service';
+import { LlmProviderService, ResolvedLlmConnection } from '../providers/llm-provider.service';
+import { AiOrchestratorService } from '../orchestrator/ai-orchestrator.service';
+import { ToolsService } from '../tools/tools.service';
+import { ToolRuntimeService } from '../tools/tool-runtime.service';
+import { ToolExecutionContext } from '../tools/tool-registry.service';
+import { KnowledgeService } from '../knowledge/knowledge.service';
+import { CostsService } from '../costs/costs.service';
+import { CollaborationService } from '../collaboration/collaboration.service';
+import { UsageService } from '../../licensing/usage.service';
+import { EventBusService } from '../../../shared/events/event-bus.service';
+import { LlmMessage, LlmTool } from '../providers/llm.interface';
+
+export interface RunAgentParams {
+  agentId: string;
+  input: string;
+  executionId?: string | null;
+  traceId?: string;
+  scopeKeys?: Record<string, string>;
+  dryRun?: boolean;
+  createdBy?: string | null;
+}
+
+export interface RunAgentOutput {
+  runId: string;
+  status: AiRunStatus;
+  output: string;
+  totalTokens: number;
+  costUsd: number;
+  approvalId?: string;
+}
+
+interface Guardrails {
+  max_cost_usd_per_run?: number;
+  blocked_words?: string[];
+  pii_redact?: boolean;
+}
+
+@Injectable()
+export class AgentRunnerService {
+  private readonly logger = new Logger(AgentRunnerService.name);
+
+  constructor(
+    private readonly repository: AgentsRepository,
+    private readonly llm: LlmProviderService,
+    private readonly orchestrator: AiOrchestratorService,
+    private readonly tools: ToolsService,
+    private readonly toolRuntime: ToolRuntimeService,
+    private readonly knowledge: KnowledgeService,
+    private readonly costs: CostsService,
+    private readonly collaboration: CollaborationService,
+    private readonly usage: UsageService,
+    private readonly eventBus: EventBusService,
+    private readonly promptSecurity: PromptSecurityService,
+  ) {}
+
+  async run(params: RunAgentParams): Promise<RunAgentOutput> {
+    const agent = await this.repository.findById(params.agentId);
+    if (!agent) throw new NotFoundException('Agente não encontrado.');
+    if (!agent.is_active) throw new BadRequestException('Agente inativo.');
+
+    const traceId = params.traceId ?? randomUUID();
+    const dryRun = params.dryRun ?? false;
+
+    // Bloqueio por orcamento (diretriz 17) — antes de gastar tokens.
+    if (!dryRun && agent.workspace_id) {
+      const blocked = await this.costs.isBlocked(agent.organization_id, agent.workspace_id).catch(() => false);
+      if (blocked) {
+        throw new BadRequestException('Orçamento de IA excedido — execução bloqueada pela política ativa.');
+      }
+    }
+
+    const resolved = await this.resolveProvider(agent);
+    const guardrails = this.parseGuardrails(agent.guardrails);
+
+    // Seguranca: inspeciona o input do usuario (loga alerta; nao bloqueia).
+    this.promptSecurity.inspect(params.input);
+
+    const systemPrompt = await this.buildSystemPrompt(agent, params.input, traceId);
+    const llmTools = await this.buildTools(agent);
+
+    const messages: LlmMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: params.input },
+    ];
+
+    const run = await this.repository.createRun({
+      organization_id: agent.organization_id,
+      workspace_id: agent.workspace_id,
+      environment_id: agent.environment_id,
+      agent_id: agent.id,
+      execution_id: params.executionId ?? null,
+      trace_id: traceId,
+      status: AiRunStatus.RUNNING,
+      input: { text: params.input } as Prisma.InputJsonValue,
+      model: agent.model,
+      provider_kind: resolved.kind,
+      created_by: params.createdBy ?? null,
+      started_at: new Date(),
+    });
+
+    return this.loop(agent, run.id, resolved, messages, llmTools, guardrails, {
+      traceId,
+      dryRun,
+      scopeKeys: params.scopeKeys,
+      executionId: params.executionId ?? null,
+    });
+  }
+
+  /** Retoma um run pausado por aprovacao (apos decisao concedida). */
+  async resume(organizationId: string, runId: string): Promise<RunAgentOutput> {
+    const run = await this.repository.findRunById(runId);
+    if (!run || run.organization_id !== organizationId) throw new NotFoundException('Execução não encontrada.');
+    if (run.status !== AiRunStatus.AWAITING_APPROVAL) {
+      throw new BadRequestException('Execução não está aguardando aprovação.');
+    }
+    const agent = await this.repository.findById(run.agent_id);
+    if (!agent) throw new NotFoundException('Agente não encontrado.');
+
+    const resolved = await this.resolveProvider(agent);
+    const guardrails = this.parseGuardrails(agent.guardrails);
+    const messages = this.parseMessages(run.messages);
+    const llmTools = await this.buildTools(agent);
+
+    await this.repository.updateRun(runId, { status: AiRunStatus.RUNNING });
+    return this.loop(agent, runId, resolved, messages, llmTools, guardrails, {
+      traceId: run.trace_id,
+      dryRun: false,
+      scopeKeys: {},
+      executionId: run.execution_id,
+    });
+  }
+
+  // ─── Loop principal ─────────────────────────────────
+
+  private async loop(
+    agent: AiAgent,
+    runId: string,
+    resolved: ResolvedLlmConnection,
+    messages: LlmMessage[],
+    llmTools: LlmTool[],
+    guardrails: Guardrails,
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+  ): Promise<RunAgentOutput> {
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let costUsd = 0;
+    let finalOutput = '';
+    let providerKind: AiProviderKind = resolved.kind;
+
+    try {
+      for (let step = 0; step < agent.max_steps; step += 1) {
+        const result = await this.llm.chat(resolved, {
+          model: agent.model,
+          messages,
+          tools: llmTools.length > 0 ? llmTools : undefined,
+          temperature: agent.temperature,
+          maxTokens: agent.max_tokens ?? undefined,
+        });
+        promptTokens += result.usage.promptTokens;
+        completionTokens += result.usage.completionTokens;
+        costUsd += result.costUsd;
+        providerKind = result.providerKind;
+
+        // Guardrail de custo por run.
+        if (guardrails.max_cost_usd_per_run && costUsd > guardrails.max_cost_usd_per_run) {
+          return this.finishRun(agent, runId, {
+            status: AiRunStatus.ERROR,
+            output: '',
+            error: `Custo por execução excedeu o limite (${guardrails.max_cost_usd_per_run} USD).`,
+            messages,
+            promptTokens,
+            completionTokens,
+            costUsd,
+            providerKind,
+            traceId: ctx.traceId,
+          });
+        }
+
+        if (result.toolCalls.length === 0) {
+          finalOutput = this.applyOutputGuardrails(result.content, guardrails);
+          messages.push({ role: 'assistant', content: finalOutput });
+          return this.finishRun(agent, runId, {
+            status: AiRunStatus.COMPLETED,
+            output: finalOutput,
+            messages,
+            promptTokens,
+            completionTokens,
+            costUsd,
+            providerKind,
+            traceId: ctx.traceId,
+          });
+        }
+
+        // Registra o passo do assistente com as tool_calls.
+        messages.push({ role: 'assistant', content: result.content, tool_calls: result.toolCalls });
+
+        // Executa cada tool call.
+        for (const call of result.toolCalls) {
+          const toolCtx = this.buildToolContext(agent, runId, ctx);
+          const exec = await this.toolRuntime.executeTool(call.name, call.arguments, toolCtx);
+
+          if (exec.status === 'awaiting_approval') {
+            // Pausa: persiste estado e sinaliza aprovacao pendente.
+            await this.repository.updateRun(runId, {
+              status: AiRunStatus.AWAITING_APPROVAL,
+              messages: messages as unknown as Prisma.InputJsonValue,
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+              total_tokens: promptTokens + completionTokens,
+              cost_usd: costUsd,
+            });
+            return {
+              runId,
+              status: AiRunStatus.AWAITING_APPROVAL,
+              output: '',
+              totalTokens: promptTokens + completionTokens,
+              costUsd,
+              approvalId: exec.approvalId,
+            };
+          }
+
+          const payload = exec.status === 'ok' ? exec.output : { error: exec.error };
+          messages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            name: call.name,
+            content: JSON.stringify(payload ?? null),
+          });
+        }
+      }
+
+      // Estourou max_steps sem resposta final.
+      finalOutput = 'Limite de passos atingido sem conclusão.';
+      return this.finishRun(agent, runId, {
+        status: AiRunStatus.COMPLETED,
+        output: finalOutput,
+        messages,
+        promptTokens,
+        completionTokens,
+        costUsd,
+        providerKind,
+        traceId: ctx.traceId,
+      });
+    } catch (e) {
+      return this.finishRun(agent, runId, {
+        status: AiRunStatus.ERROR,
+        output: '',
+        error: (e as Error).message,
+        messages,
+        promptTokens,
+        completionTokens,
+        costUsd,
+        providerKind,
+        traceId: ctx.traceId,
+      });
+    }
+  }
+
+  private async finishRun(
+    agent: AiAgent,
+    runId: string,
+    data: {
+      status: AiRunStatus;
+      output: string;
+      error?: string;
+      messages: LlmMessage[];
+      promptTokens: number;
+      completionTokens: number;
+      costUsd: number;
+      providerKind: AiProviderKind;
+      traceId: string;
+    },
+  ): Promise<RunAgentOutput> {
+    const totalTokens = data.promptTokens + data.completionTokens;
+    await this.repository.updateRun(runId, {
+      status: data.status,
+      output: data.output || null,
+      error: data.error ?? null,
+      messages: data.messages as unknown as Prisma.InputJsonValue,
+      prompt_tokens: data.promptTokens,
+      completion_tokens: data.completionTokens,
+      total_tokens: totalTokens,
+      cost_usd: data.costUsd,
+      provider_kind: data.providerKind,
+      finished_at: new Date(),
+    });
+
+    // Custo agregado (diretriz 17) + metering de tokens (diretriz 40).
+    await this.costs.record({
+      organizationId: agent.organization_id,
+      workspaceId: agent.workspace_id,
+      environmentId: agent.environment_id,
+      agentId: agent.id,
+      providerKind: data.providerKind,
+      model: agent.model,
+      promptTokens: data.promptTokens,
+      completionTokens: data.completionTokens,
+      costUsd: data.costUsd,
+      traceId: data.traceId,
+    });
+    if (totalTokens > 0) {
+      await this.usage.increment(agent.organization_id, agent.workspace_id, 'ai_tokens', totalTokens);
+    }
+
+    // Evento no Event Bus (diretriz 7).
+    await this.eventBus
+      .publish({
+        event: 'ai.agent.run.completed',
+        organization_id: agent.organization_id,
+        workspace_id: agent.workspace_id,
+        environment_id: agent.environment_id,
+        trace_id: data.traceId,
+        source_event_id: `ai-run:${runId}`,
+        occurred_at: new Date().toISOString(),
+        payload: { run_id: runId, agent_id: agent.id, status: data.status, total_tokens: totalTokens },
+      })
+      .catch((e) => this.logger.warn(`Falha ao publicar evento do run ${runId}: ${(e as Error).message}`));
+
+    return { runId, status: data.status, output: data.output, totalTokens, costUsd: data.costUsd };
+  }
+
+  // ─── Montagem de prompt/tools/provider ──────────────
+
+  private async resolveProvider(agent: AiAgent): Promise<ResolvedLlmConnection> {
+    if (agent.connection_id) {
+      return this.llm.resolveConnection(agent.organization_id, agent.connection_id);
+    }
+    return this.orchestrator.resolve(
+      {
+        organizationId: agent.organization_id,
+        workspaceId: agent.workspace_id,
+        environmentId: agent.environment_id,
+      },
+      agent.model,
+    );
+  }
+
+  private async buildSystemPrompt(agent: AiAgent, userInput: string, traceId: string): Promise<string> {
+    const parts: string[] = [];
+    if (agent.system_prompt) parts.push(agent.system_prompt);
+    if (agent.goal) parts.push(`\n\n## Objetivo\n${agent.goal}`);
+    parts.push(compilePersona(agent.persona));
+
+    // Contexto RAG: consulta as bases habilitadas com o input do usuario.
+    if (agent.knowledge_base_ids.length > 0) {
+      try {
+        const rag = await this.knowledge.queryMulti(
+          agent.organization_id,
+          agent.knowledge_base_ids,
+          userInput,
+          5,
+          { traceId, agentId: agent.id },
+        );
+        if (rag.chunks.length > 0) {
+          const context = rag.chunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n');
+          parts.push(`\n\n## Base de conhecimento (use quando relevante)\n${context}`);
+        }
+      } catch (e) {
+        this.logger.warn(`RAG no prompt falhou: ${(e as Error).message}`);
+      }
+    }
+    return parts.filter(Boolean).join('');
+  }
+
+  private async buildTools(agent: AiAgent): Promise<LlmTool[]> {
+    if (agent.allowed_tools.length === 0) return [];
+    const catalog = await this.tools.resolveForAgent(agent.organization_id, agent.allowed_tools);
+    return catalog.map((t) => ({
+      name: t.key,
+      description: t.description,
+      parameters: (t.input_schema ?? { type: 'object', properties: {} }) as Record<string, unknown>,
+    }));
+  }
+
+  private buildToolContext(
+    agent: AiAgent,
+    runId: string,
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+  ): ToolExecutionContext {
+    return {
+      organizationId: agent.organization_id,
+      workspaceId: agent.workspace_id,
+      environmentId: agent.environment_id,
+      agentId: agent.id,
+      agentRunId: runId,
+      traceId: ctx.traceId,
+      executionId: ctx.executionId,
+      scopeKeys: ctx.scopeKeys,
+      knowledgeBaseIds: agent.knowledge_base_ids,
+      memoryProfileIds: agent.memory_profile_ids,
+      dryRun: ctx.dryRun,
+      runAgent: async (a) => {
+        const res = await this.collaboration.consult({
+          organizationId: agent.organization_id,
+          principalAgentId: agent.id,
+          query: a.input,
+          traceId: a.traceId,
+          executionId: a.executionId,
+          runAgent: async (inner) => {
+            const out = await this.run({
+              agentId: inner.agentId,
+              input: inner.input,
+              traceId: inner.traceId,
+              executionId: inner.executionId,
+            });
+            return { output: out.output };
+          },
+        });
+        const combined = res.consulted.map((c) => `${c.label ?? c.agent_id}: ${c.answer}`).join('\n');
+        return { output: combined || 'Nenhum especialista respondeu.' };
+      },
+    };
+  }
+
+  private applyOutputGuardrails(text: string, guardrails: Guardrails): string {
+    if (guardrails.blocked_words && guardrails.blocked_words.length > 0) {
+      return this.promptSecurity.redactBlockedWords(text, guardrails.blocked_words);
+    }
+    return text;
+  }
+
+  private parseGuardrails(raw: unknown): Guardrails {
+    if (!raw || typeof raw !== 'object') return {};
+    const g = raw as Record<string, unknown>;
+    return {
+      max_cost_usd_per_run: typeof g['max_cost_usd_per_run'] === 'number' ? (g['max_cost_usd_per_run'] as number) : undefined,
+      blocked_words: Array.isArray(g['blocked_words'])
+        ? (g['blocked_words'] as unknown[]).filter((x): x is string => typeof x === 'string')
+        : undefined,
+      pii_redact: typeof g['pii_redact'] === 'boolean' ? (g['pii_redact'] as boolean) : undefined,
+    };
+  }
+
+  private parseMessages(raw: unknown): LlmMessage[] {
+    if (!Array.isArray(raw)) return [];
+    return raw as unknown as LlmMessage[];
+  }
+}

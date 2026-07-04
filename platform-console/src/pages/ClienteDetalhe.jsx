@@ -1,0 +1,402 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowLeft, Building2, Boxes, KeyRound, Gauge, Pencil, Loader2, Copy, RefreshCw,
+} from 'lucide-react';
+import Tabs from '../components/ui/Tabs';
+import Modal from '../components/ui/Modal';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import EmptyState from '../components/ui/EmptyState';
+import { Badge } from '../components/ui/Table';
+import { FormField, TextInput, Select } from '../components/ui/FormField';
+import { getOrganization, updateOrganization } from '../services/organizations';
+import { getLicense, updateLicense } from '../services/licenses';
+import { listPlans } from '../services/plans';
+import { usePermissions } from '../hooks/usePermissions';
+import { formatDate, formatNumber, formatLimit } from '../lib/format';
+import { licenseBadge, LICENSE_BADGE } from './Clientes';
+import { toast } from '../lib/toast';
+
+const TABS = [
+  { id: 'dados',      label: 'Dados',      Icon: Building2 },
+  { id: 'workspaces', label: 'Workspaces', Icon: Boxes },
+  { id: 'licenca',    label: 'Licença',    Icon: KeyRound },
+  { id: 'uso',        label: 'Uso do mês', Icon: Gauge },
+];
+
+const METRIC_LABELS = {
+  users: 'Usuários', workspaces: 'Workspaces', agents: 'Agentes', flows: 'Fluxos',
+  executions: 'Execuções (mês)', tokens: 'Tokens (mês)', whatsapp_numbers: 'Números WhatsApp',
+  google_accounts: 'Contas Google', connections: 'Conexões',
+};
+
+export default function ClienteDetalhe() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [tab, setTab] = useState('dados');
+  const [org, setOrg] = useState(null);
+  const [license, setLicense] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [orgData, lic, { items: pls }] = await Promise.all([
+        getOrganization(id),
+        getLicense(id).catch(() => null),
+        listPlans().catch(() => ({ items: [] })),
+      ]);
+      setOrg(orgData);
+      setLicense(lic);
+      setPlans(pls);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} />
+      </div>
+    );
+  }
+
+  if (!org) {
+    return <EmptyState icon={Building2} title="Cliente não encontrado" />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <button className="btn-ghost" onClick={() => navigate('/clientes')}>
+          <ArrowLeft size={16} /> Voltar
+        </button>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg font-bold truncate" style={{ color: 'var(--ap-text-1)' }}>{org.name}</h1>
+          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+            <code>{org.slug}</code> · criado em {formatDate(org.created_at)}
+          </p>
+        </div>
+        {licenseBadge(license?.status || org.license_status)}
+      </div>
+
+      <div className="card px-5 pt-4 pb-5">
+        <Tabs items={TABS} active={tab} onChange={setTab} />
+        {tab === 'dados'      && <TabDados org={org} onSaved={load} />}
+        {tab === 'workspaces' && <TabWorkspaces org={org} />}
+        {tab === 'licenca'    && <TabLicenca orgId={id} license={license} plans={plans} onChanged={load} />}
+        {tab === 'uso'        && <TabUso license={license} />}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── Dados ───────────────────────── */
+
+function TabDados({ org, onSaved }) {
+  const { can } = usePermissions();
+  const [editOpen, setEditOpen] = useState(false);
+  const [name, setName] = useState(org.name);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (editOpen) setName(org.name); }, [editOpen, org.name]);
+
+  async function handleSave() {
+    if (!name.trim()) { toast.error('Nome obrigatório.'); return; }
+    setSaving(true);
+    try {
+      await updateOrganization(org.id, { name: name.trim() });
+      toast.success('Cliente atualizado.');
+      setEditOpen(false);
+      onSaved();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const rows = [
+    ['Nome', org.name],
+    ['Slug', org.slug],
+    ['Status', org.is_active === false ? 'Inativo' : 'Ativo'],
+    ['Criado em', formatDate(org.created_at)],
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {rows.map(([label, value]) => (
+          <div key={label} className="px-3 py-2.5 rounded-lg" style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border-sub)' }}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-5)' }}>{label}</p>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--ap-text-1)' }}>{value ?? '—'}</p>
+          </div>
+        ))}
+      </div>
+      {can('console.organizations.update') && (
+        <button className="btn-secondary" onClick={() => setEditOpen(true)} title="Editar dados do cliente">
+          <Pencil size={14} className="text-brand" /> Editar
+        </button>
+      )}
+
+      <Modal
+        open={editOpen}
+        onClose={saving ? undefined : () => setEditOpen(false)}
+        dismissable={!saving}
+        title="Editar cliente"
+        size="sm"
+        footer={
+          <>
+            <button className="btn-secondary disabled:opacity-60" onClick={() => setEditOpen(false)} disabled={saving}>Cancelar</button>
+            <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 size={14} className="animate-spin" />} Salvar
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--ap-surface-3)', color: 'var(--ap-text-4)' }}>
+            O slug não pode ser alterado após a criação.
+          </p>
+          <FormField label="Nome" required>
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+          </FormField>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ─────────────────────── Workspaces ─────────────────────── */
+
+function TabWorkspaces({ org }) {
+  const workspaces = org.workspaces || [];
+  if (!workspaces.length) {
+    return <EmptyState icon={Boxes} title="Nenhum workspace" description="O cliente ainda não criou workspaces." />;
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {workspaces.map((ws) => (
+        <div key={ws.id} className="px-4 py-3 rounded-lg flex items-center gap-3" style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border-sub)' }}>
+          <Boxes size={16} className="text-brand shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{ws.name}</p>
+            <p className="text-[11px]" style={{ color: 'var(--ap-text-5)' }}>
+              {(ws.environments || []).length} ambiente(s)
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ───────────────────────── Licença ───────────────────────── */
+
+function TabLicenca({ orgId, license, plans, onChanged }) {
+  const { can } = usePermissions();
+  const [planId, setPlanId] = useState('');
+  const [status, setStatus] = useState('');
+  const [confirm, setConfirm] = useState(null); // { type: 'plan'|'status'|'key' }
+  const [acting, setActing] = useState(false);
+
+  useEffect(() => {
+    setPlanId(license?.plan?.id || license?.plan_id || '');
+    setStatus(license?.status || '');
+  }, [license]);
+
+  if (!license) {
+    return <EmptyState icon={KeyRound} title="Sem licença" description="Este cliente não possui licença registrada." />;
+  }
+
+  const key = license.key || license.license_key || '';
+  const currentPlanId = license.plan?.id || license.plan_id || '';
+
+  async function copyKey() {
+    try {
+      await navigator.clipboard.writeText(key);
+      toast.success('Chave copiada.');
+    } catch {
+      toast.error('Não foi possível copiar a chave.');
+    }
+  }
+
+  async function handleConfirm() {
+    setActing(true);
+    try {
+      if (confirm.type === 'plan') {
+        await updateLicense(orgId, { plan_id: planId });
+        toast.success('Plano da licença alterado.');
+      } else if (confirm.type === 'status') {
+        await updateLicense(orgId, { status });
+        toast.success('Status da licença alterado.');
+      } else {
+        await updateLicense(orgId, { regenerate_key: true });
+        toast.success('Nova chave gerada.');
+      }
+      setConfirm(null);
+      onChanged();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActing(false);
+    }
+  }
+
+  const confirmContent = {
+    plan: {
+      title: 'Trocar plano',
+      message: `Trocar o plano desta licença para "${plans.find((p) => p.id === planId)?.name || planId}"? Limites e recursos passam a valer imediatamente.`,
+      danger: false,
+      label: 'Trocar plano',
+    },
+    status: {
+      title: 'Alterar status da licença',
+      message: `Alterar o status da licença para "${LICENSE_BADGE[status]?.label || status}"? Isso afeta o acesso do cliente imediatamente.`,
+      danger: status === 'SUSPENDED' || status === 'CANCELLED' || status === 'RESTRICTED',
+      label: 'Alterar status',
+    },
+    key: {
+      title: 'Gerar nova chave',
+      message: 'Gerar uma nova chave de licença? A chave atual deixa de valer imediatamente — integrações que a utilizam precisarão ser atualizadas.',
+      danger: true,
+      label: 'Gerar nova chave',
+    },
+  };
+
+  return (
+    <div className="space-y-5">
+      <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+        Mudanças aqui afetam o cliente imediatamente — plano define limites e recursos; status controla o acesso.
+      </p>
+
+      {/* Chave */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--ap-text-5)' }}>
+          Chave da licença
+        </p>
+        <div className="flex items-center gap-2">
+          <div
+            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg font-mono text-xs truncate"
+            style={{ backgroundColor: 'var(--ap-surface-3)', border: '1px solid var(--ap-border)', color: 'var(--ap-text-2)' }}
+          >
+            <KeyRound size={13} className="shrink-0" style={{ color: 'var(--ap-text-4)' }} />
+            <span className="truncate">{key || '—'}</span>
+          </div>
+          <button className="btn-secondary shrink-0" onClick={copyKey} title="Copiar chave">
+            <Copy size={15} />
+          </button>
+          {can('console.licenses.update') && (
+            <button
+              className="btn-secondary shrink-0"
+              onClick={() => setConfirm({ type: 'key' })}
+              title="Gerar nova chave (invalida a atual)"
+            >
+              <RefreshCw size={15} className="text-red-500" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Plano */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <FormField label="Plano">
+            <Select value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={!can('console.licenses.update')}>
+              <option value="">Selecione…</option>
+              {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </Select>
+          </FormField>
+          {can('console.licenses.update') && (
+            <button
+              className="btn-primary disabled:opacity-50"
+              disabled={!planId || planId === currentPlanId}
+              onClick={() => setConfirm({ type: 'plan' })}
+              title="Aplicar o plano selecionado a esta licença"
+            >
+              Trocar plano
+            </button>
+          )}
+        </div>
+
+        {/* Status */}
+        <div className="space-y-2">
+          <FormField label="Status">
+            <Select value={status} onChange={(e) => setStatus(e.target.value)} disabled={!can('console.licenses.update')}>
+              {Object.entries(LICENSE_BADGE).map(([value, info]) => (
+                <option key={value} value={value}>{info.label}</option>
+              ))}
+            </Select>
+          </FormField>
+          {can('console.licenses.update') && (
+            <button
+              className="btn-primary disabled:opacity-50"
+              disabled={!status || status === license.status}
+              onClick={() => setConfirm({ type: 'status' })}
+              title="Aplicar o status selecionado a esta licença"
+            >
+              Alterar status
+            </button>
+          )}
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        danger={confirm ? confirmContent[confirm.type].danger : false}
+        loading={acting}
+        title={confirm ? confirmContent[confirm.type].title : ''}
+        message={confirm ? confirmContent[confirm.type].message : ''}
+        confirmLabel={confirm ? confirmContent[confirm.type].label : 'Confirmar'}
+        onClose={() => !acting && setConfirm(null)}
+        onConfirm={handleConfirm}
+      />
+    </div>
+  );
+}
+
+/* ───────────────────────── Uso ───────────────────────── */
+
+function TabUso({ license }) {
+  const usage  = license?.usage  || {};
+  const limits = license?.limits || {};
+  const keys = Object.keys(METRIC_LABELS).filter((k) => k in usage || k in limits);
+
+  if (!keys.length) {
+    return <EmptyState icon={Gauge} title="Sem consumo" description="Nenhuma métrica registrada no mês corrente." />;
+  }
+
+  return (
+    <div className="space-y-4">
+      {keys.map((k) => {
+        const used = usage[k] ?? 0;
+        const limit = limits[k];
+        const unlimited = limit == null;
+        const pct = unlimited ? 0 : Math.min(100, (used / (limit || 1)) * 100);
+        const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : 'var(--ap-accent)';
+        return (
+          <div key={k}>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-medium" style={{ color: 'var(--ap-text-2)' }}>{METRIC_LABELS[k]}</p>
+              <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+                {formatNumber(used)} / {formatLimit(limit)}
+              </p>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--ap-surface-3)' }}>
+              <div
+                className="h-full rounded-full transition-all"
+                style={{ width: unlimited ? '4%' : `${pct}%`, backgroundColor: unlimited ? 'var(--ap-text-5)' : barColor }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

@@ -1,0 +1,78 @@
+// Carrega .env ANTES de qualquer import que dependa de process.env.
+import 'dotenv/config';
+
+import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './app.module';
+
+async function bootstrap(): Promise<void> {
+  const logger = new Logger('IAStudioAPI');
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter({ ignoreTrailingSlash: true, bodyLimit: 10 * 1024 * 1024 }),
+    // rawBody: necessario pra validar HMAC (x-hub-signature-256) do webhook
+    // WhatsApp Meta (Fase 3) sobre o corpo bruto, byte a byte.
+    { rawBody: true },
+  );
+
+  // Fase 8: upload de pacotes de backup (multipart/form-data) no Console.
+  // Registrado no Fastify subjacente; limite generoso (backups grandes).
+  // Se o plugin nao estiver instalado, apenas loga um aviso — o endpoint de
+  // upload responde 400 informando que o multipart esta indisponivel.
+  try {
+    const multipart = (await import('@fastify/multipart')).default;
+    await app.register(multipart, {
+      limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB
+    });
+    logger.log('Plugin @fastify/multipart registrado (upload de backups).');
+  } catch (e) {
+    logger.warn(`@fastify/multipart indisponível — upload de backup desabilitado: ${(e as Error).message}`);
+  }
+
+  // API publica versionada desde a Fase 1 (diretriz 14): prefixo api + /v1.
+  app.setGlobalPrefix('api');
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  // CORS por env (paineis platform-admin e platform-console em dev).
+  const isProd = process.env['NODE_ENV'] === 'production';
+  const corsEnv = (process.env['CORS_ORIGINS'] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const corsOrigins: Array<string | RegExp> = corsEnv.length
+    ? corsEnv
+    : isProd
+      ? []
+      : [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/];
+  app.enableCors({
+    origin: corsOrigins.length === 0 && isProd ? false : corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  // OpenAPI/Swagger gerado desde a Fase 1 (diretriz 14).
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('IA Studio API')
+    .setDescription('API da plataforma IA Studio (SaaS multi-tenant) — Fase 1: Core, Licensing e Billing')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
+  logger.log('Swagger UI disponível em /api/docs');
+
+  const port = Number(process.env['PORT'] ?? 3000);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`IA Studio API rodando na porta ${port}`);
+}
+bootstrap();

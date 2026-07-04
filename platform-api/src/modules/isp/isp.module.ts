@@ -1,0 +1,42 @@
+// Solucao vertical ISP (Fase 6) — Manutencao/Incidentes + tools do agente ISP.
+// "Nada de ISP no core": tudo mora aqui, no AltaredeProvider (Integration) e nas
+// tools ISP (registradas no registry exportado pelo AiModule).
+//
+// Sem ciclo de modulo: IspModule importa AiModule (pega ToolRegistryService),
+// mas o AiModule NUNCA importa o IspModule. As tools ISP se registram no mesmo
+// registry das builtin (IspTools.onModuleInit) e sao semeadas no catalogo
+// ai_tools pelo seed da Fase 5 (AiProvidersSeedService itera toolRegistry.all()).
+// Ver README.md deste diretorio.
+import { Module } from '@nestjs/common';
+import { IntegrationModule } from '../integration/integration.module';
+import { CommModule } from '../comm/comm.module';
+import { AutomationModule } from '../automation/automation.module';
+import { AiModule } from '../ai/ai.module';
+
+import { IspRepository } from './isp.repository';
+import { IspConnectionResolver } from './isp-connection.resolver';
+import { IspConnectivityService } from './isp-connectivity.service';
+import { IncidentLookupService } from './incident-lookup.service';
+import { IspDispatchService } from './isp-dispatch.service';
+import { IspIncidentsService } from './isp-incidents.service';
+import { IspOutageDetectionCron } from './isp-outage-detection.cron';
+import { IspTools } from './isp-tools';
+import { IspController } from './isp.controller';
+
+@Module({
+  imports: [IntegrationModule, CommModule, AutomationModule, AiModule],
+  controllers: [IspController],
+  providers: [
+    IspRepository,
+    IspConnectionResolver,
+    IspConnectivityService,
+    IncidentLookupService,
+    IspDispatchService,
+    IspIncidentsService,
+    IspOutageDetectionCron,
+    IspTools,
+  ],
+  // IncidentLookupService exportado pra futura reuso (nos de automacao ISP).
+  exports: [IncidentLookupService],
+})
+export class IspModule {}
