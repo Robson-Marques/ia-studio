@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.9.1 - 2026-07-04 (primeiro deploy em produção + correções)
+
+Primeira instalação real (Debian 13, `studio.nivoo.dev.br`) e a rodada de ajustes de primeiro-deploy:
+
+- **Scripts:** `install.sh` detecta a porta real do cluster PostgreSQL (não assume 5432) e restaura `/etc/nginx/nginx.conf` ausente (conffile removido por purge anterior). `SEED_DEMO` gate (produção sem org Demo). Endpoint público `GET /api/v1/health`. Console com `basename` (serve em `/console/` no modo single).
+- **Build (gate no servidor):** correções de tipo que só apareceram no `nest build` real — `@fastify/multipart` cast; `ResourceMapping.connection_id` `String?`→`String @default("")` (não pode ser nullable em `@@unique`) + sentinela `''` no service/seed/repo; `bullmq` connection cast (skew de ioredis).
+- **Login:** os dois painéis liam `data.token`, mas o backend retorna `access_token` — corrigido (o login não funcionava).
+- **Console:** rotas corrigidas — `console/plans` e `console/licenses` (antes `console/licensing/*`, davam 404); endpoint `GET /console/usage` (consumo global) criado; **licença agora resolvida por organização** (o Console passa o org_id, não o license_id) — a aba Licença carrega e os botões de ação renderizam.
+- **Console — Usuários do cliente (novo):** aba "Usuários" no detalhe do cliente para o operador editar nome/e-mail e **resetar a senha** de um usuário do tenant (reset revoga sessões).
+- **UX:** sidebar do Painel do Cliente vira accordion de um grupo só (abre um, fecha o outro) em vez de tudo aberto.
+
 ## v0.9.0 - 2026-07-03 (Fases 3-8)
 
 > ⚠️ **Fases 5-8 ainda sem verificação estática executada** (`prisma generate` + `tsc --noEmit` + `vite build`): o mount do workspace↔sandbox não serviu conteúdo de arquivos nesta sessão, impedindo o build. Código escrito e revisado estaticamente (seams de integração conferidos), mas o gate de 0 erros roda no servidor via `scripts/install.sh` (primeira instalação) ou `scripts/upgrade.sh` (atualização). `db push` das Fases 5-8 é destrutivo; a Fase 5 exige `CREATE EXTENSION IF NOT EXISTS vector;` (o `install.sh` já cria); a Fase 7 exige envs `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_OAUTH_REDIRECT` (Gmail OAuth).
