@@ -22,6 +22,31 @@ export class LicensesService {
     return license;
   }
 
+  // ─── Por ORGANIZATION (o Console passa o org_id, nao o license_id) ───
+  async findByOrg(organizationId: string) {
+    const license = await this.repository.findLicenseByOrg(organizationId);
+    if (!license) throw new NotFoundException('Licença não encontrada para esta organização.');
+    return license;
+  }
+
+  private async licenseIdByOrg(organizationId: string): Promise<string> {
+    const license = await this.repository.findLicenseByOrg(organizationId);
+    if (!license) throw new NotFoundException('Licença não encontrada para esta organização.');
+    return license.id;
+  }
+
+  async activateByOrg(organizationId: string) {
+    return this.activate(await this.licenseIdByOrg(organizationId));
+  }
+
+  async updateByOrg(organizationId: string, dto: UpdateLicenseDto) {
+    return this.update(await this.licenseIdByOrg(organizationId), dto);
+  }
+
+  async regenerateKeyByOrg(organizationId: string) {
+    return this.regenerateKey(await this.licenseIdByOrg(organizationId));
+  }
+
   /** Ativa a licenca: status ACTIVE + activated_at agora. */
   async activate(id: string) {
     const before = await this.findById(id);

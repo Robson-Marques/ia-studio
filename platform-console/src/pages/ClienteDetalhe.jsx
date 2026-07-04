@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Boxes, KeyRound, Gauge, Pencil, Loader2, Copy, RefreshCw,
+  Users, ShieldCheck, KeySquare,
 } from 'lucide-react';
 import Tabs from '../components/ui/Tabs';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import EmptyState from '../components/ui/EmptyState';
-import { Badge } from '../components/ui/Table';
+import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../components/ui/Table';
 import { FormField, TextInput, Select } from '../components/ui/FormField';
 import { getOrganization, updateOrganization } from '../services/organizations';
+import { listOrgUsers, updateOrgUser, resetOrgUserPassword } from '../services/orgUsers';
 import { getLicense, updateLicense } from '../services/licenses';
 import { listPlans } from '../services/plans';
 import { usePermissions } from '../hooks/usePermissions';
@@ -19,6 +21,7 @@ import { toast } from '../lib/toast';
 
 const TABS = [
   { id: 'dados',      label: 'Dados',      Icon: Building2 },
+  { id: 'usuarios',   label: 'Usuários',   Icon: Users },
   { id: 'workspaces', label: 'Workspaces', Icon: Boxes },
   { id: 'licenca',    label: 'Licença',    Icon: KeyRound },
   { id: 'uso',        label: 'Uso do mês', Icon: Gauge },
@@ -89,6 +92,7 @@ export default function ClienteDetalhe() {
       <div className="card px-5 pt-4 pb-5">
         <Tabs items={TABS} active={tab} onChange={setTab} />
         {tab === 'dados'      && <TabDados org={org} onSaved={load} />}
+        {tab === 'usuarios'   && <TabUsuarios orgId={id} />}
         {tab === 'workspaces' && <TabWorkspaces org={org} />}
         {tab === 'licenca'    && <TabLicenca orgId={id} license={license} plans={plans} onChanged={load} />}
         {tab === 'uso'        && <TabUso license={license} />}
@@ -194,6 +198,267 @@ function TabWorkspaces({ org }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/* ───────────────────────── Usuários ───────────────────────── */
+
+function TabUsuarios({ orgId }) {
+  const { can } = usePermissions();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null);   // usuario em edicao (nome/e-mail)
+  const [resetting, setResetting] = useState(null); // usuario em reset de senha
+
+  async function load() {
+    setLoading(true);
+    try {
+      const { items } = await listOrgUsers(orgId);
+      setUsers(items);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} />
+      </div>
+    );
+  }
+
+  if (!users.length) {
+    return (
+      <EmptyState
+        icon={Users}
+        title="Nenhum usuário"
+        description="Este cliente ainda não possui usuários ativos cadastrados."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+        Gestão dos usuários deste cliente. Você pode ajustar nome/e-mail e redefinir a senha —
+        o reset de senha desconecta o usuário das sessões atuais.
+      </p>
+
+      {/* Desktop */}
+      <div className="hidden md:block">
+        <Table>
+          <Thead>
+            <Th>Usuário</Th>
+            <Th>E-mail</Th>
+            <Th>Status</Th>
+            <Th className="text-right">Ações</Th>
+          </Thead>
+          <Tbody>
+            {users.map((u) => (
+              <Tr key={u.id}>
+                <Td>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium" style={{ color: 'var(--ap-text-1)' }}>{u.name}</span>
+                    {u.is_platform_admin && (
+                      <span title="Administrador da plataforma">
+                        <ShieldCheck size={13} className="text-brand" />
+                      </span>
+                    )}
+                  </div>
+                </Td>
+                <Td><span className="text-sm" style={{ color: 'var(--ap-text-2)' }}>{u.email}</span></Td>
+                <Td>
+                  <Badge variant={u.is_active ? 'green' : 'gray'}>
+                    {u.is_active ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </Td>
+                <Td className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    {can('console.organizations.update') && (
+                      <button
+                        className="btn-ghost !px-2 !py-1.5"
+                        onClick={() => setEditing(u)}
+                        title="Editar nome e e-mail"
+                      >
+                        <Pencil size={14} className="text-brand" />
+                      </button>
+                    )}
+                    {can('console.organizations.update') && (
+                      <button
+                        className="btn-ghost !px-2 !py-1.5"
+                        onClick={() => setResetting(u)}
+                        title="Redefinir a senha deste usuário"
+                      >
+                        <KeySquare size={14} className="text-amber-500" />
+                      </button>
+                    )}
+                  </div>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      </div>
+
+      {/* Mobile */}
+      <div className="md:hidden divide-y" style={{ borderColor: 'var(--ap-border)' }}>
+        {users.map((u) => (
+          <div key={u.id} className="py-3 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{u.name}</p>
+                  {u.is_platform_admin && <ShieldCheck size={13} className="text-brand shrink-0" />}
+                </div>
+                <p className="text-xs truncate" style={{ color: 'var(--ap-text-4)' }}>{u.email}</p>
+              </div>
+              <Badge variant={u.is_active ? 'green' : 'gray'}>{u.is_active ? 'Ativo' : 'Inativo'}</Badge>
+            </div>
+            {can('console.organizations.update') && (
+              <div className="flex items-center gap-2">
+                <button className="btn-secondary flex-1" onClick={() => setEditing(u)} title="Editar nome e e-mail">
+                  <Pencil size={13} className="text-brand" /> Editar
+                </button>
+                <button className="btn-secondary flex-1" onClick={() => setResetting(u)} title="Redefinir a senha deste usuário">
+                  <KeySquare size={13} className="text-amber-500" /> Senha
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {editing && (
+        <EditUserModal
+          orgId={orgId}
+          user={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); }}
+        />
+      )}
+      {resetting && (
+        <ResetPasswordModal
+          orgId={orgId}
+          user={resetting}
+          onClose={() => setResetting(null)}
+          onDone={() => setResetting(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditUserModal({ orgId, user, onClose, onSaved }) {
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!name.trim()) { toast.error('Nome obrigatório.'); return; }
+    if (!email.trim()) { toast.error('E-mail obrigatório.'); return; }
+    const body = {};
+    if (name.trim() !== user.name) body.name = name.trim();
+    if (email.trim() !== user.email) body.email = email.trim();
+    if (!Object.keys(body).length) { toast.info('Nenhuma alteração para salvar.'); onClose(); return; }
+    setSaving(true);
+    try {
+      await updateOrgUser(orgId, user.id, body);
+      toast.success('Usuário atualizado.');
+      onSaved();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={saving ? undefined : onClose}
+      dismissable={!saving}
+      title="Editar usuário"
+      size="sm"
+      footer={
+        <>
+          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 size={14} className="animate-spin" />} Salvar
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <FormField label="Nome" required>
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+        </FormField>
+        <FormField label="E-mail" required>
+          <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </FormField>
+      </div>
+    </Modal>
+  );
+}
+
+function ResetPasswordModal({ orgId, user, onClose, onDone }) {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleReset() {
+    if (password.length < 8) { toast.error('A senha deve ter ao menos 8 caracteres.'); return; }
+    if (password !== confirmPassword) { toast.error('As senhas não coincidem.'); return; }
+    setSaving(true);
+    try {
+      await resetOrgUserPassword(orgId, user.id, password);
+      toast.success('Senha redefinida. O usuário precisará entrar novamente.');
+      onDone();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={saving ? undefined : onClose}
+      dismissable={!saving}
+      title="Redefinir senha"
+      size="sm"
+      footer={
+        <>
+          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button
+            className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-500 disabled:opacity-60"
+            onClick={handleReset}
+            disabled={saving}
+            title="Grava a nova senha e desconecta as sessões atuais do usuário"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />} Redefinir senha
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-xs rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--ap-surface-3)', color: 'var(--ap-text-4)' }}>
+          Ação administrativa: define uma nova senha para <b style={{ color: 'var(--ap-text-2)' }}>{user.name}</b> ({user.email}) e
+          encerra as sessões ativas. Informe a nova senha ao usuário por um canal seguro.
+        </p>
+        <FormField label="Nova senha" required hint="Mínimo de 8 caracteres.">
+          <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+        </FormField>
+        <FormField label="Confirmar nova senha" required>
+          <TextInput type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
+        </FormField>
+      </div>
+    </Modal>
   );
 }
 

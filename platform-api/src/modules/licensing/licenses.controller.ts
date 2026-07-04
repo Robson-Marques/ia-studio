@@ -17,23 +17,25 @@ export class LicensesController {
     return this.licenses.findAll();
   }
 
-  @Get(':id')
-  findById(@Param('id') id: string) {
-    return this.licenses.findById(id);
+  // O Console passa o id da ORGANIZATION (tem o org na tela de detalhe do
+  // cliente, nao o id da licenca) — os endpoints resolvem a licenca pela org.
+  @Get(':orgId')
+  findByOrg(@Param('orgId') orgId: string) {
+    return this.licenses.findByOrg(orgId);
   }
 
-  @Post(':id/activate')
-  activate(@Param('id') id: string) {
-    return this.licenses.activate(id);
+  @Post(':orgId/activate')
+  activate(@Param('orgId') orgId: string) {
+    return this.licenses.activateByOrg(orgId);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateLicenseDto) {
-    return this.licenses.update(id, dto);
+  @Patch(':orgId')
+  update(@Param('orgId') orgId: string, @Body() dto: UpdateLicenseDto) {
+    return this.licenses.updateByOrg(orgId, dto);
   }
 
-  @Post(':id/regenerate-key')
-  regenerateKey(@Param('id') id: string) {
-    return this.licenses.regenerateKey(id);
+  @Post(':orgId/regenerate-key')
+  regenerateKey(@Param('orgId') orgId: string) {
+    return this.licenses.regenerateKeyByOrg(orgId);
   }
 }
