@@ -322,7 +322,12 @@ npx prisma generate
 log_ok "Deps + Prisma client"
 
 log_step "8" "Gerando .env da API"
-DATABASE_URL="postgresql://${PG_USER}:${PG_PASS}@localhost:5432/${PG_DB}"
+# Detecta a porta REAL do cluster (Debian pode subir o PG em 5433 se a 5432 ja
+# estiver ocupada por outro cluster). Nao assumir 5432 fixo.
+PG_PORT=$(pg_lsclusters -h 2>/dev/null | awk -v v="${PG_VERSION}" '$1==v && $2=="main"{print $3}' | head -1)
+[ -z "${PG_PORT}" ] && PG_PORT="5432"
+log "  Porta do cluster PostgreSQL: ${PG_PORT}"
+DATABASE_URL="postgresql://${PG_USER}:${PG_PASS}@localhost:${PG_PORT}/${PG_DB}"
 if [ "${MODE}" = "single" ]; then
   CORS="https://${DOMAIN}"
   GOOGLE_REDIRECT="https://${DOMAIN}/api/integrations/oauth/google/callback"
@@ -590,6 +595,7 @@ DOMAIN_API=${DOMAIN_API}
 DATABASE_URL=${DATABASE_URL}
 PG_USER=${PG_USER}
 PG_PASS=${PG_PASS}
+PG_PORT=${PG_PORT}
 JWT_SECRET=${JWT_SECRET}
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 ADMIN_EMAIL=${ADMIN_EMAIL}
