@@ -62,7 +62,9 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      const { token: accessToken, user: u } = data || {};
+      // O backend retorna { access_token, token_type, user }.
+      const accessToken = data?.access_token || data?.token;
+      const u = data?.user;
       if (!accessToken) throw new Error('Resposta de login inválida');
       setToken(accessToken);
       setTokenState(accessToken);
