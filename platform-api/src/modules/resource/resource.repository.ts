@@ -57,7 +57,8 @@ export class ResourceRepository {
       where: {
         organization_id: organizationId,
         provider_key: providerKey,
-        connection_id: null,
+        // "" = mapeamento de nivel do provider (sem conexao especifica).
+        connection_id: '',
         resource_type: resourceType,
         is_active: true,
       },

@@ -48,7 +48,7 @@ export class ResourceMappingsService {
       workspace_id: dto.workspace_id ?? null,
       environment_id: dto.environment_id ?? null,
       provider_key: dto.provider_key,
-      connection_id: dto.connection_id ?? null,
+      connection_id: dto.connection_id ?? '',
       resource_type: dto.resource_type,
       source_operation: dto.source_operation,
       field_map: (dto.field_map ?? {}) as Prisma.InputJsonValue,
