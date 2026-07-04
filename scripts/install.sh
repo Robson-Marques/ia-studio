@@ -455,6 +455,15 @@ if [ "${KEEP_DEPS}" = "1" ] && command -v nginx &>/dev/null; then
 else
   apt-get install -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confmiss" nginx
 fi
+# Servidor reusado pode estar com /etc/nginx/nginx.conf apagado (conffile removido
+# por um purge anterior). Sem ele o nginx nao sobe — reinstala forcando restaurar
+# os conffiles ausentes (--force-confmiss).
+if [ ! -f /etc/nginx/nginx.conf ]; then
+  log "  /etc/nginx/nginx.conf ausente — restaurando via reinstall do nginx-common"
+  apt-get install --reinstall -y \
+    -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confold" \
+    nginx-common nginx
+fi
 systemctl enable nginx --now 2>/dev/null || true
 rm -f /etc/nginx/sites-enabled/default
 mkdir -p /etc/nginx/snippets
