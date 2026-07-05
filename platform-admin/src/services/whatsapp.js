@@ -66,6 +66,31 @@ export async function sendChatMessage(id, body) {
   }
 }
 
+// Upload real do aparelho (arquivo ou audio gravado). Repassa o 409 de takeover
+// (NEEDS_TAKEOVER_CONFIRMATION) cru pro composer decidir, igual sendChatMessage.
+export async function uploadChatMedia(chatId, file, kind, opts = {}) {
+  try {
+    const form = new FormData();
+    // Campos ANTES do arquivo: com @fastify/multipart, req.file() só enxerga
+    // os campos que vieram antes da parte de arquivo no stream multipart.
+    form.append('kind', kind);
+    if (opts.caption) form.append('caption', opts.caption);
+    if (opts.confirm_takeover) form.append('confirm_takeover', 'true');
+    form.append('file', file, file.name || `${kind}-${Date.now()}`);
+    const { data } = await api.post(`/comm/whatsapp/chats/${chatId}/media/upload`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000, // upload de midia pode ser maior que o timeout padrao
+    });
+    return data;
+  } catch (err) {
+    const code = err?.response?.data?.error;
+    const e = new Error(extractErrorMessage(err, 'Erro ao enviar mídia'));
+    e.code = code;
+    e.status = err?.response?.status;
+    throw e;
+  }
+}
+
 export async function downloadChatMedia(chatId, mediaId) {
   try {
     const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media/${mediaId}`);

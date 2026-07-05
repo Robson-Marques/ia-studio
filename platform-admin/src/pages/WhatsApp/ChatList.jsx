@@ -105,34 +105,40 @@ export default function ChatList({
               key={chat.id}
               type="button"
               onClick={() => onSelect(chat)}
-              className={clsx('w-full text-left px-3 py-2.5 transition-colors', selectedId === chat.id && 'bg-brand/10')}
+              className={clsx('w-full text-left px-3 py-2.5 transition-colors flex items-start gap-2.5', selectedId === chat.id && 'bg-brand/10')}
               style={{ minHeight: 44 }}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>
-                  {chat.contact_name || formatPhone(chat.phone)}
-                </span>
-                <span className="text-[10px] shrink-0" style={{ color: 'var(--ap-text-4)' }}>
-                  {timeLabel(chat.last_message_at)}
-                </span>
+              {/* Avatar estilo WhatsApp: bolinha verde com a inicial do contato. */}
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                {(chat.contact_name || chat.phone || '?').slice(0, 1).toUpperCase()}
               </div>
-              <div className="flex items-center justify-between gap-2 mt-0.5">
-                <span className="text-xs truncate" style={{ color: 'var(--ap-text-4)' }}>
-                  {chat.last_message || '—'}
-                </span>
-                {chat.unread_count > 0 && (
-                  <span className="shrink-0 text-[10px] font-bold text-white bg-brand rounded-full px-1.5 py-0.5">
-                    {chat.unread_count}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>
+                    {chat.contact_name || formatPhone(chat.phone)}
                   </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant={st.variant}>{st.label}</Badge>
-                {chat.current_handler_name && (
-                  <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: 'var(--ap-text-4)' }}>
-                    <User size={10} /> {chat.current_handler_name}
+                  <span className="text-[10px] shrink-0" style={{ color: 'var(--ap-text-4)' }}>
+                    {timeLabel(chat.last_message_at)}
                   </span>
-                )}
+                </div>
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <span className="text-xs truncate" style={{ color: 'var(--ap-text-4)' }}>
+                    {chat.last_message || '—'}
+                  </span>
+                  {chat.unread_count > 0 && (
+                    <span className="shrink-0 text-[10px] font-bold text-white bg-brand rounded-full px-1.5 py-0.5">
+                      {chat.unread_count}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant={st.variant}>{st.label}</Badge>
+                  {chat.current_handler_name && (
+                    <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: 'var(--ap-text-4)' }}>
+                      <User size={10} /> {chat.current_handler_name}
+                    </span>
+                  )}
+                </div>
               </div>
             </button>
           );

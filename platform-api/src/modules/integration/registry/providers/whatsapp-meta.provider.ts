@@ -24,6 +24,7 @@ import {
   listWabaTemplates,
   sendMessage,
   subscribeAppToWaba,
+  uploadMedia,
 } from '../../../../shared/integration/meta-graph.client';
 import { RichMessage, TemplateVariables } from '../../../../shared/integration/whatsapp.types';
 
@@ -51,6 +52,7 @@ export class WhatsappMetaProvider extends BaseProvider {
         'execute:sendText',
         'execute:sendTemplate',
         'execute:sendMedia',
+        'execute:uploadMedia',
         'execute:sendRich',
         'execute:listTemplates',
         'execute:createTemplate',
@@ -217,16 +219,28 @@ export class WhatsappMetaProvider extends BaseProvider {
       case 'sendMedia': {
         const to = String(p['to'] ?? '');
         const kind = String(p['kind'] ?? '');
-        const url = String(p['url'] ?? '');
-        if (!to || !url || !['image', 'audio', 'video', 'document'].includes(kind)) {
-          throw new BadRequestException('sendMedia exige "to", "url" e "kind" (image/audio/video/document).');
+        const url = typeof p['url'] === 'string' ? (p['url'] as string) : '';
+        const mediaId = typeof p['media_id'] === 'string' ? (p['media_id'] as string) : '';
+        if (!to || (!url && !mediaId) || !['image', 'audio', 'video', 'document'].includes(kind)) {
+          throw new BadRequestException('sendMedia exige "to", "kind" (image/audio/video/document) e "url" ou "media_id".');
         }
         return sendMessage(token, phoneNumberId, to, {
           kind: kind as 'image' | 'audio' | 'video' | 'document',
-          url,
+          url: url || undefined,
+          mediaId: mediaId || undefined,
           caption: typeof p['caption'] === 'string' ? (p['caption'] as string) : undefined,
           filename: typeof p['filename'] === 'string' ? (p['filename'] as string) : undefined,
         });
+      }
+      case 'uploadMedia': {
+        const mime = String(p['mime_type'] ?? '');
+        const filename = String(p['filename'] ?? 'arquivo');
+        const data = p['data'];
+        if (!mime || !Buffer.isBuffer(data)) {
+          throw new BadRequestException('uploadMedia exige "data" (Buffer), "mime_type" e "filename".');
+        }
+        const mediaId = await uploadMedia(token, phoneNumberId, { data, mimeType: mime, filename });
+        return { media_id: mediaId };
       }
       case 'sendRich': {
         const to = String(p['to'] ?? '');

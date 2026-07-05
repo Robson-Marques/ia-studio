@@ -144,7 +144,14 @@ export class WhatsappOrchestratorService {
       type: message.kind === 'template' ? 'template' : message.kind === 'text' ? 'text' : message.kind,
       content: this.preview(message),
       media: ['image', 'audio', 'video', 'document'].includes(message.kind)
-        ? { url: (message as { url?: string }).url, caption: (message as { caption?: string }).caption }
+        ? {
+            // media_id (upload direto) permite a UI baixar o outbound por base64;
+            // url fica pro caso legado de link publico.
+            media_id: (message as { mediaId?: string }).mediaId,
+            url: (message as { url?: string }).url,
+            caption: (message as { caption?: string }).caption,
+            filename: (message as { filename?: string }).filename,
+          }
         : undefined,
       status: 'sent',
     });
@@ -179,7 +186,14 @@ export class WhatsappOrchestratorService {
       case 'document':
         return {
           operation: 'sendMedia',
-          params: { to: phone, kind: message.kind, url: message.url, caption: message.caption, filename: message.filename },
+          params: {
+            to: phone,
+            kind: message.kind,
+            url: message.url,
+            media_id: message.mediaId,
+            caption: message.caption,
+            filename: message.filename,
+          },
         };
       default:
         return { operation: 'sendRich', params: { to: phone, message } };

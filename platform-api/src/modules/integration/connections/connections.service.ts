@@ -336,6 +336,57 @@ export class ConnectionsService {
     }
   }
 
+  /**
+   * Upload de midia binaria pra Meta (retorna media_id). Caminho SEPARADO do
+   * execute() porque o binario NAO pode ir pro log de integracao (redactSensitive
+   * serializaria o Buffer inteiro) — aqui logamos so metadados (mime/filename/tamanho).
+   * O provider whatsapp-meta expoe a operacao 'uploadMedia'.
+   */
+  async uploadMedia(
+    organizationId: string,
+    id: string,
+    file: { data: Buffer; mimeType: string; filename: string },
+  ): Promise<{ media_id: string }> {
+    const connection = await this.findById(organizationId, id);
+    if (connection.status !== 'ACTIVE') {
+      throw new ConflictException('Conexão não está ativa — teste/reative antes de enviar mídia.');
+    }
+    const provider = this.registry.get(connection.provider_key);
+    const ctx = this.buildContext(connection);
+    const startedAt = Date.now();
+    try {
+      const result = (await provider.execute(ctx, 'uploadMedia', file)) as { media_id?: string };
+      await this.repository.update(id, { last_used_at: new Date() });
+      await this.integrationLogs.record({
+        organizationId,
+        connectionId: id,
+        direction: IntegrationDirection.OUTBOUND,
+        operation: 'uploadMedia',
+        status: IntegrationLogStatus.SUCCESS,
+        durationMs: Date.now() - startedAt,
+        // So metadados — nunca o binario.
+        requestMeta: { mime_type: file.mimeType, filename: file.filename, size: file.data.length },
+        responseMeta: { media_id: result?.media_id ?? null },
+        traceId: getRequestStore()?.traceId ?? null,
+      });
+      if (!result?.media_id) throw new BadRequestException('Falha ao subir a mídia (sem media_id).');
+      return { media_id: result.media_id };
+    } catch (e) {
+      await this.integrationLogs.record({
+        organizationId,
+        connectionId: id,
+        direction: IntegrationDirection.OUTBOUND,
+        operation: 'uploadMedia',
+        status: IntegrationLogStatus.FAILURE,
+        durationMs: Date.now() - startedAt,
+        requestMeta: { mime_type: file.mimeType, filename: file.filename, size: file.data.length },
+        error: (e as Error).message,
+        traceId: getRequestStore()?.traceId ?? null,
+      });
+      throw e;
+    }
+  }
+
   // ─── OAuth (Google Workspace — Fase 7) ──────────────
 
   /**

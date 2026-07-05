@@ -159,6 +159,57 @@ export async function downloadMedia(
   }
 }
 
+// ─── Upload de midia (aparelho → Meta, retorna media_id) ────────────────
+
+/** Limites de tamanho da Cloud API por tipo (bytes). */
+export const META_MEDIA_LIMITS: Record<'image' | 'audio' | 'video' | 'document', number> = {
+  image: 5 * 1024 * 1024,
+  audio: 16 * 1024 * 1024,
+  video: 16 * 1024 * 1024,
+  document: 100 * 1024 * 1024,
+};
+
+/**
+ * Sobe o binario pra Meta (POST /{phone_number_id}/media) e devolve o media_id.
+ * Usa FormData/Blob/fetch nativos do Node 20 (sem lib de multipart). O media_id
+ * e reutilizavel no envio por id ({ "<type>": { "id": mediaId } }) e expira em ~30 dias.
+ */
+export async function uploadMedia(
+  token: string,
+  phoneNumberId: string,
+  file: { data: Buffer; mimeType: string; filename: string },
+): Promise<string> {
+  const form = new FormData();
+  form.append('messaging_product', 'whatsapp');
+  form.append('type', file.mimeType);
+  // Uint8Array a partir do Buffer (evita passar Buffer direto ao Blob).
+  const blob = new Blob([new Uint8Array(file.data)], { type: file.mimeType });
+  form.append('file', blob, file.filename);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const res = await fetch(`${META_GRAPH_BASE}/${phoneNumberId}/media`, {
+      method: 'POST',
+      headers: auth(token), // NAO setar Content-Type: fetch gera o boundary do multipart
+      body: form,
+      signal: controller.signal,
+    });
+    let data: unknown = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+    throwIfError(res.status, res.ok, data, 'subir mídia');
+    const id = (data as { id?: string })?.id;
+    if (!id) throw new MetaApiError('Meta Cloud API — subir mídia: resposta sem media_id.', null, res.status);
+    return id;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ─── Envio de mensagens ─────────────────────────────────────────────────
 
 /** Monta as variaveis posicionais do BODY de um template. */
@@ -192,16 +243,23 @@ export function buildMessagePayload(to: string, message: RichMessage): Record<st
     case 'text':
       return { ...base, type: 'text', text: { body: message.body, preview_url: true } };
     case 'image':
-    case 'video':
-      return { ...base, type: message.kind, [message.kind]: { link: message.url, caption: message.caption } };
-    case 'audio':
-      return { ...base, type: 'audio', audio: { link: message.url } };
-    case 'document':
+    case 'video': {
+      // media_id (upload direto) tem precedencia; senao link publico.
+      const ref = message.mediaId ? { id: message.mediaId } : { link: message.url };
+      return { ...base, type: message.kind, [message.kind]: { ...ref, caption: message.caption } };
+    }
+    case 'audio': {
+      const ref = message.mediaId ? { id: message.mediaId } : { link: message.url };
+      return { ...base, type: 'audio', audio: ref };
+    }
+    case 'document': {
+      const ref = message.mediaId ? { id: message.mediaId } : { link: message.url };
       return {
         ...base,
         type: 'document',
-        document: { link: message.url, caption: message.caption, filename: message.filename ?? 'documento.pdf' },
+        document: { ...ref, caption: message.caption, filename: message.filename ?? 'documento.pdf' },
       };
+    }
     case 'template':
       return {
         ...base,

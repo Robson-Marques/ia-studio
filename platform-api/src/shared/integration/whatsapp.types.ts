@@ -57,8 +57,14 @@ export interface RichText {
 
 export interface RichMedia {
   kind: 'image' | 'audio' | 'video' | 'document';
-  /** URL publica da midia (Meta baixa por link nesta fase). */
-  url: string;
+  /**
+   * URL publica da midia (Meta baixa por link) OU media_id ja carregado na
+   * Meta (upload direto do aparelho). Ao menos um dos dois e obrigatorio;
+   * quando ha mediaId, ele tem precedencia sobre url no payload da Cloud API.
+   */
+  url?: string;
+  /** media_id retornado pelo POST /{phone_number_id}/media (upload direto). */
+  mediaId?: string;
   caption?: string;
   filename?: string;
 }

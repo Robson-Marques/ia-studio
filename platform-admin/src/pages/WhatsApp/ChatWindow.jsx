@@ -12,6 +12,7 @@ import {
 } from '../../services/whatsapp';
 import { ATTENDANCE_STATUS, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
+import AudioPlayer from './AudioPlayer';
 
 // Ticks estilo WhatsApp (sempre sobre balão claro): cinza p/ enviado/entregue,
 // azul p/ lido, vermelho p/ falha.
@@ -23,9 +24,12 @@ function StatusTicks({ status }) {
   return <Clock size={13} style={{ color: '#8696a0' }} />;
 }
 
-// Mídia inbound: baixa da Meta sob demanda (proxy base64 do backend).
-function InboundMedia({ chatId, message }) {
+// Mídia (inbound ou outbound): baixa da Meta sob demanda (proxy base64 do
+// backend). Serve tanto pra mídia recebida quanto pra mídia enviada por upload
+// do aparelho (persistida com media_id) — o download por media_id é direção-agnóstico.
+function ChatMedia({ chatId, message }) {
   const media = message.media || {};
+  const outgoing = message.direction === 'OUTGOING';
   const [data, setData] = useState(media.url ? { src: media.url, mime: media.mime_type } : null);
   const [loading, setLoading] = useState(false);
 
@@ -42,11 +46,18 @@ function InboundMedia({ chatId, message }) {
     }
   }
 
+  // Mídia que o próprio atendente enviou: carrega sozinha (a bolha já é dele).
+  // Inbound continua sob demanda (evita baixar tudo ao abrir a conversa).
+  useEffect(() => {
+    if (outgoing && !data && media.media_id) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media.media_id]);
+
   if (!data) {
     return (
       <button type="button" onClick={load} disabled={loading}
         className="inline-flex items-center gap-1.5 text-xs underline disabled:opacity-60"
-        style={{ color: 'var(--ap-text-2)', minHeight: 32 }}>
+        style={{ color: '#027eb5', minHeight: 32 }}>
         {loading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
         Carregar {message.type === 'image' ? 'imagem' : message.type === 'audio' ? 'áudio' : message.type === 'video' ? 'vídeo' : 'arquivo'}
       </button>
@@ -54,16 +65,18 @@ function InboundMedia({ chatId, message }) {
   }
   const mime = data.mime || media.mime_type || '';
   if (message.type === 'image' || mime.startsWith('image/')) {
-    return <img src={data.src} alt="Imagem recebida" className="rounded-lg max-w-full max-h-64" />;
+    return <img src={data.src} alt="Imagem" className="rounded-lg max-w-full max-h-64" />;
   }
   if (message.type === 'audio' || mime.startsWith('audio/')) {
-    return <audio controls src={data.src} className="max-w-full" style={{ minHeight: 36 }} />;
+    // Player custom (portado do Aquapark) — resolve duração de blob/opus da Meta,
+    // que o <audio> nativo não consegue. `light` = variante pra balão claro.
+    return <AudioPlayer src={data.src} light={true} />;
   }
   if (message.type === 'video' || mime.startsWith('video/')) {
     return <video controls src={data.src} className="rounded-lg max-w-full max-h-64" />;
   }
   return (
-    <a href={data.src} download={media.filename || 'arquivo'} className="inline-flex items-center gap-1.5 text-xs underline" style={{ color: 'var(--ap-text-2)' }}>
+    <a href={data.src} download={media.filename || 'arquivo'} className="inline-flex items-center gap-1.5 text-xs underline" style={{ color: '#027eb5' }}>
       <Download size={13} /> {media.filename || 'Baixar arquivo'}
     </a>
   );
@@ -85,9 +98,11 @@ function Bubble({ chatId, message }) {
         }}
       >
         {(message.media && (message.media.media_id || message.media.url)) && (
-          outgoing
-            ? (message.media.url && <a className="text-xs underline break-all" href={message.media.url} target="_blank" rel="noreferrer" style={{ color: '#027eb5' }}>{message.media.url}</a>)
-            : <InboundMedia chatId={chatId} message={message} />
+          // Com media_id (upload real ou inbound): player/imagem via download por
+          // base64. Sem media_id mas com url (outbound legado por link): só o link.
+          message.media.media_id
+            ? <ChatMedia chatId={chatId} message={message} />
+            : (message.media.url && <a className="text-xs underline break-all" href={message.media.url} target="_blank" rel="noreferrer" style={{ color: '#027eb5' }}>{message.media.url}</a>)
         )}
         {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
         <div className="flex items-center gap-1 justify-end text-[10px]" style={{ color: '#667781' }}>
@@ -140,6 +155,10 @@ export default function ChatWindow({
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--ap-border)' }}>
+        {/* Avatar estilo WhatsApp: bolinha verde com a inicial do contato. */}
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
+          {(chat.contact_name || chat.phone || '?').slice(0, 1).toUpperCase()}
+        </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold truncate" style={{ color: 'var(--ap-text-1)' }}>
             {chat.contact_name || formatPhone(chat.phone)}

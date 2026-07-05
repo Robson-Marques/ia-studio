@@ -1,14 +1,15 @@
 // Conversas WhatsApp — listagem/mensagens/envio/janela/midia + envio pelo
 // Meta Orchestrator (criterios; sem numero). ACL granular por endpoint.
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { FastifyRequest } from 'fastify';
 import { CommChatStatus } from '@prisma/client';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
-import { WhatsappInboxService, ChatTab } from './whatsapp-inbox.service';
+import { WhatsappInboxService, ChatTab, MediaKind } from './whatsapp-inbox.service';
 import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
 import { SendChatMessageDto } from '../dto/send-chat-message.dto';
 import { OrchestratorSendDto } from '../dto/orchestrator-send.dto';
@@ -144,6 +145,65 @@ export class WhatsappInboxController {
     @Query('organization_id') orgQuery?: string,
   ) {
     return this.inbox.send(resolveOrganizationId(user, orgQuery), user, id, dto);
+  }
+
+  /**
+   * Upload real de arquivo/audio gravado no aparelho (multipart/form-data):
+   * campos `file` + `kind` (image|audio|video|document) + `caption?` +
+   * `confirm_takeover?`. O binario sobe pra Meta (media_id) e a mensagem sai
+   * pela MESMA porta do /send (reply gate + janela de 24h + takeover 409).
+   */
+  @Post('chats/:id/media/upload')
+  @RequirePermissions(...ANY_REPLY)
+  @ApiOperation({ summary: 'Envia mídia por upload do aparelho (multipart/form-data)' })
+  async uploadMedia(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Req() req: FastifyRequest,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    // @fastify/multipart registrado no bootstrap. Le o arquivo + campos anexos.
+    const reqAny = req as FastifyRequest & {
+      isMultipart?: () => boolean;
+      file?: () => Promise<
+        | {
+            filename: string;
+            mimetype: string;
+            toBuffer: () => Promise<Buffer>;
+            fields?: Record<string, { value?: string } | Array<{ value?: string }>>;
+          }
+        | undefined
+      >;
+    };
+    if (typeof reqAny.isMultipart === 'function' && !reqAny.isMultipart()) {
+      throw new BadRequestException('Envie o arquivo como multipart/form-data.');
+    }
+    if (typeof reqAny.file !== 'function') {
+      throw new BadRequestException('Upload multipart indisponível (plugin não registrado).');
+    }
+    const data = await reqAny.file();
+    if (!data) throw new BadRequestException('Nenhum arquivo recebido.');
+
+    const readField = (name: string): string | undefined => {
+      const f = data.fields?.[name];
+      const single = Array.isArray(f) ? f[0] : f;
+      return typeof single?.value === 'string' ? single.value : undefined;
+    };
+    const rawKind = (readField('kind') ?? '').trim();
+    const validKinds: MediaKind[] = ['image', 'audio', 'video', 'document'];
+    if (!validKinds.includes(rawKind as MediaKind)) {
+      throw new BadRequestException('Campo "kind" inválido (use image, audio, video ou document).');
+    }
+    const buffer = await data.toBuffer();
+
+    return this.inbox.uploadAndSendMedia(resolveOrganizationId(user, orgQuery), user, id, {
+      kind: rawKind as MediaKind,
+      data: buffer,
+      mimeType: data.mimetype || 'application/octet-stream',
+      filename: data.filename || 'arquivo',
+      caption: readField('caption'),
+      confirmTakeover: readField('confirm_takeover') === 'true',
+    });
   }
 
   @Get('chats/:id/media/:mediaId')
