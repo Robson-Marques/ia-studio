@@ -65,6 +65,15 @@ export async function metaPost(
   return (res.data ?? {}) as Record<string, unknown>;
 }
 
+/**
+ * Inscreve o app (dono do token) na WABA — PRE-REQUISITO pra RECEBER webhooks
+ * de mensagem. Sem isso, a Meta verifica a URL mas nao encaminha os eventos
+ * reais. Idempotente (chamar de novo devolve success). POST /{waba}/subscribed_apps.
+ */
+export async function subscribeAppToWaba(token: string, wabaId: string): Promise<void> {
+  await metaPost(token, `${wabaId}/subscribed_apps`, {}, 'inscrever app na WABA (webhooks)');
+}
+
 // ─── Numero / WABA ──────────────────────────────────────────────────────
 
 export interface MetaPhoneNumberInfo {

@@ -23,6 +23,7 @@ import {
   listWabaPhoneNumbers,
   listWabaTemplates,
   sendMessage,
+  subscribeAppToWaba,
 } from '../../../../shared/integration/meta-graph.client';
 import { RichMessage, TemplateVariables } from '../../../../shared/integration/whatsapp.types';
 
@@ -149,8 +150,19 @@ export class WhatsappMetaProvider extends BaseProvider {
   override async connect(ctx: ProviderContext, _config: Record<string, unknown>): Promise<ConnectResult> {
     // Valida token consultando o proprio numero (GET phone number).
     try {
-      const { token, phoneNumberId } = await this.refs(ctx);
+      const { token, phoneNumberId, wabaId } = await this.refs(ctx);
       const info = await getPhoneNumberInfo(token, phoneNumberId);
+      // Inscreve a WABA no app — SEM isto a Meta nao encaminha mensagens
+      // recebidas (o cliente teria que rodar subscribed_apps na mao). Best-effort:
+      // se falhar (ex.: token sem whatsapp_business_management), a conexao ainda
+      // vale pro envio; o recebimento pode ser inscrito manualmente depois.
+      if (wabaId) {
+        try {
+          await subscribeAppToWaba(token, wabaId);
+        } catch (e) {
+          ctx.logger.warn(`WhatsApp: não foi possível inscrever a WABA no app automaticamente: ${(e as Error).message}`);
+        }
+      }
       return { ok: true, detail: `Número validado: ${info.display_phone_number ?? phoneNumberId}` };
     } catch (e) {
       return { ok: false, detail: (e as Error).message };
