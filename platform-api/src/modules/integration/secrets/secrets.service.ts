@@ -73,6 +73,19 @@ export class SecretsService {
     return this.toView(row);
   }
 
+  /**
+   * Merge de campos: sobrescreve APENAS as chaves informadas (mantem as
+   * demais). Uso interno da edicao de conexao — chave nao enviada continua
+   * como esta. Marca rotated_at (o valor cifrado mudou). Sem audit de rotacao
+   * manual (a auditoria fica na conexao que chamou).
+   */
+  async mergeValues(secretId: string, values: Record<string, string>): Promise<void> {
+    if (!Object.keys(values).length) return;
+    const current = await this.getDecryptedMap(secretId);
+    const merged = { ...current, ...values };
+    await this.repository.rotate(secretId, encrypt(JSON.stringify(merged)));
+  }
+
   /** Rotacao: substitui o valor cifrado inteiro e marca rotated_at. */
   async rotate(organizationId: string, id: string, values: Record<string, string>): Promise<SecretView> {
     const before = await this.getOwned(organizationId, id);

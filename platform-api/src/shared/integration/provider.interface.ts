@@ -26,6 +26,9 @@ export interface WizardField {
   placeholder?: string;
   options?: WizardFieldOption[];
   default?: string | number;
+  /** true = o front mostra um botao "Gerar" que preenche um token aleatorio
+   *  (ex.: verify_token do webhook). */
+  generatable?: boolean;
 }
 
 export interface WizardStep {
@@ -39,6 +42,9 @@ export interface WizardSchema {
   steps: WizardStep[];
   /** true = wizard exibe o passo final "Testar e salvar" (health check). */
   testable: boolean;
+  /** Caminho do webhook deste provider (ex.: '/api/webhooks/whatsapp'). O front
+   *  mostra a URL completa (origin + path) com botao copiar pra colar na Meta. */
+  webhookPath?: string;
 }
 
 // ─── Metadata / resultados ──────────────────────────────────────────────

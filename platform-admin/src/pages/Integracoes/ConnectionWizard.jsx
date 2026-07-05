@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ChevronLeft, ChevronRight, Loader2, PlugZap, XCircle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
-import { FormField, TextInput, Select } from '../../components/ui/FormField';
+import { FormField, TextInput } from '../../components/ui/FormField';
+import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
 import { createConnection } from '../../services/integrations';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { toast } from '../../lib/toast';
@@ -161,32 +162,19 @@ export default function ConnectionWizard({ open, provider, onClose, onCreated })
             <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>{currentStep.description}</p>
           )}
           {(currentStep.fields || []).map((field) => (
-            <FormField key={field.key} label={field.label} required={field.required} hint={field.help}>
-              {field.type === 'select' ? (
-                <Select value={values[field.key] ?? ''} onChange={(e) => setValue(field.key, e.target.value)}>
-                  <option value="">Selecione…</option>
-                  {(field.options || []).map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </Select>
-              ) : (
-                <TextInput
-                  type={field.secret || field.type === 'password' ? 'password' : field.type === 'number' ? 'number' : 'text'}
-                  name={`wiz-${provider.key}-${field.key}`}
-                  value={values[field.key] ?? ''}
-                  onChange={(e) => setValue(field.key, e.target.value)}
-                  placeholder={field.placeholder}
-                  // Bloqueia autofill do navegador (Firefox tratava o form como
-                  // login e jogava e-mail/senha nos campos). new-password nos
-                  // secretos + off nos demais é o combo confiavel.
-                  autoComplete={field.secret || field.type === 'password' ? 'new-password' : 'off'}
-                  data-lpignore="true"
-                  data-1p-ignore="true"
-                  data-form-type="other"
-                />
-              )}
-            </FormField>
+            <ConnectionField
+              key={field.key}
+              field={field}
+              value={values[field.key]}
+              onChange={(v) => setValue(field.key, v)}
+              namePrefix={`wiz-${provider.key}`}
+            />
           ))}
+          {/* Se o passo tem campo generatable e o provider expõe webhookPath,
+              mostra a URL do webhook pra colar na Meta. */}
+          {schema.webhookPath && (currentStep.fields || []).some((f) => f.generatable) && (
+            <WebhookUrlBox webhookPath={schema.webhookPath} />
+          )}
         </div>
       )}
 

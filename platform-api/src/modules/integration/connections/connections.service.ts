@@ -172,21 +172,65 @@ export class ConnectionsService {
     return connection;
   }
 
-  // ─── Atualizacao (nome/tags/prioridade) ─────────────
+  // ─── Atualizacao (nome/tags/prioridade + credenciais) ─
+  // provider_key/workspace/environment NUNCA mudam aqui. config faz merge
+  // shallow no atual; secrets grava so as chaves nao-vazias (mantem o resto).
   async update(organizationId: string, id: string, dto: UpdateConnectionDto) {
     const before = await this.findById(organizationId, id);
     const data: Prisma.ConnectionUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.tags !== undefined) data.tags = dto.tags;
     if (dto.priority !== undefined) data.priority = dto.priority;
+
+    // Config: merge shallow (novos valores sobrescrevem, mantem os nao
+    // enviados). Higiene: remove qualquer campo secreto que tenha vazado.
+    if (dto.config !== undefined) {
+      const definition = await this.marketplace.assertInstalled(organizationId, before.provider_key);
+      const incoming = this.stripSecretFields(dto.config, definition);
+      const currentConfig = (before.config ?? {}) as Record<string, unknown>;
+      data.config = { ...currentConfig, ...incoming } as Prisma.InputJsonValue;
+    }
+
     const connection = await this.repository.update(id, data);
+
+    // Secrets: so as chaves com valor nao-vazio. Chave ausente/vazia MANTEM
+    // o segredo atual (nunca apaga). Cria o Secret se a conexao ainda nao tem.
+    if (dto.secrets) {
+      const provided: Record<string, string> = {};
+      for (const [k, v] of Object.entries(dto.secrets)) {
+        if (typeof v === 'string' && v.trim() !== '') provided[k] = v;
+      }
+      if (Object.keys(provided).length > 0) {
+        if (before.secret_id) {
+          await this.secrets.mergeValues(before.secret_id, provided);
+        } else {
+          const created = await this.secrets.create({
+            organizationId,
+            workspaceId: before.workspace_id,
+            environmentId: before.environment_id,
+            name: `${before.name} — credenciais (${before.provider_key})`,
+            kind: this.resolveSecretKind(before.provider_key),
+            values: provided,
+            createdBy: before.created_by,
+          });
+          await this.repository.update(id, { secret_id: created.id });
+        }
+      }
+    }
+
     await this.audit.record({
       action: 'integration.connection.update',
       entityType: 'Connection',
       entityId: id,
       organizationId,
       oldValue: { name: before.name, tags: before.tags, priority: before.priority },
-      newValue: { name: connection.name, tags: connection.tags, priority: connection.priority },
+      newValue: {
+        name: connection.name,
+        tags: connection.tags,
+        priority: connection.priority,
+        config_changed: dto.config !== undefined,
+        secrets_changed: dto.secrets ? Object.keys(dto.secrets) : undefined,
+      },
     });
     return connection;
   }

@@ -58,6 +58,7 @@ export class WhatsappMetaProvider extends BaseProvider {
       ],
       wizardSchema: {
         testable: true,
+        webhookPath: '/api/webhooks/whatsapp',
         steps: [
           {
             id: 'official-flow',
@@ -92,10 +93,11 @@ export class WhatsappMetaProvider extends BaseProvider {
               {
                 key: 'verify_token',
                 label: 'Verify Token',
-                type: 'password',
+                type: 'text',
                 secret: true,
                 required: true,
-                help: 'Token de verificação configurado no webhook do App Meta.',
+                generatable: true,
+                help: 'Clique em "Gerar", copie e cole no webhook do App Meta (mesmo valor nos dois lados).',
               },
             ],
           },

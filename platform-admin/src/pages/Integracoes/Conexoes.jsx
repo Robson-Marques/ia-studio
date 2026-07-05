@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Activity, CheckCircle2, Loader2, Pause, Play, Plug, Plus, ScrollText, Wrench, XCircle,
+  Activity, CheckCircle2, Loader2, Pause, Pencil, Play, Plug, Plus, ScrollText, Wrench, XCircle,
 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Tabs from '../../components/ui/Tabs';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
-import { FormField, Select } from '../../components/ui/FormField';
+import { FormField, Select, TextInput, NumberInput } from '../../components/ui/FormField';
 import {
   listConnections, changeConnectionState, testConnection, listConnectionLogs, getMarketplace,
+  updateConnection,
 } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -17,6 +18,7 @@ import { formatDateTime } from '../../lib/format';
 import { toast } from '../../lib/toast';
 import { statusMeta } from './integration.constants';
 import ConnectionWizard from './ConnectionWizard';
+import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
 import GoogleOAuthButton from './GoogleOAuthButton';
 
 // Conexões (Instances — diretriz 52): tabela + testar + ativar/desativar/
@@ -30,6 +32,7 @@ export default function Conexoes() {
   const [stateAction, setStateAction] = useState(null); // { connection, action }
   const [acting, setActing] = useState(false);
   const [detail, setDetail] = useState(null); // conexão do modal de detalhe
+  const [editing, setEditing] = useState(null); // conexão sendo editada
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wizardFor, setWizardFor] = useState(null);
 
@@ -166,6 +169,15 @@ export default function Conexoes() {
                           )}
                         {can('integrations.connections.write') && (
                           <button
+                            className="btn-ghost p-1.5"
+                            title="Editar conexão (nome, tags, credenciais)"
+                            onClick={(e) => { e.stopPropagation(); setEditing(c); }}
+                          >
+                            <Pencil size={14} className="text-brand" />
+                          </button>
+                        )}
+                        {can('integrations.connections.write') && (
+                          <button
                             className="btn-ghost p-1.5 disabled:opacity-60"
                             title="Testar conexão (health check)"
                             disabled={testing === c.id}
@@ -228,6 +240,12 @@ export default function Conexoes() {
         connection={detail}
         scopeName={scopeName}
         onClose={() => setDetail(null)}
+      />
+
+      <EditConnectionModal
+        connection={editing}
+        onClose={() => setEditing(null)}
+        onSaved={() => { setEditing(null); load(); }}
       />
 
       <NewConnectionPicker
@@ -334,6 +352,132 @@ function ConnectionDetailModal({ connection, scopeName, onClose }) {
                   <span className="shrink-0" style={{ color: 'var(--ap-text-5)' }}>{formatDateTime(log.created_at)}</span>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// Edição de conexão — nome/tags/prioridade + credenciais (config não-sensível
+// pré-preenchido; secretos em branco = mantém o atual). Reaproveita o
+// renderizador de campos do wizard (ConnectionField/WebhookUrlBox).
+function EditConnectionModal({ connection, onClose, onSaved }) {
+  const [schema, setSchema] = useState(null);
+  const [loadingSchema, setLoadingSchema] = useState(false);
+  const [name, setName] = useState('');
+  const [tagsText, setTagsText] = useState('');
+  const [priority, setPriority] = useState(0);
+  const [values, setValues] = useState({}); // campos do wizard (config + secrets)
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!connection) return;
+    setName(connection.name || '');
+    setTagsText((connection.tags || []).join(', '));
+    setPriority(connection.priority ?? 0);
+    setSchema(null);
+    // Pré-preenche APENAS os não-secretos com o config atual; secretos em branco.
+    setValues({ ...(connection.config || {}) });
+    (async () => {
+      setLoadingSchema(true);
+      try {
+        const { items } = await getMarketplace();
+        const provider = items.find((i) => i.key === connection.provider_key);
+        setSchema(provider?.wizard_schema || { steps: [] });
+      } catch (err) {
+        toast.error(err.message);
+        setSchema({ steps: [] });
+      } finally {
+        setLoadingSchema(false);
+      }
+    })();
+  }, [connection?.id]);
+
+  const steps = schema?.steps || [];
+  const fields = useMemo(() => steps.flatMap((s) => s.fields || []), [steps]);
+  const hasGeneratable = fields.some((f) => f.generatable);
+
+  function setValue(key, value) {
+    setValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSave() {
+    if (!name.trim()) { toast.error('Dê um nome para a conexão.'); return; }
+    setSaving(true);
+    try {
+      const config = {};
+      const secrets = {};
+      fields.forEach((f) => {
+        const raw = values[f.key];
+        const isSecret = f.secret || f.type === 'password';
+        if (isSecret) {
+          // Só envia secreto preenchido (não-vazio) — vazio mantém o atual.
+          if (raw !== undefined && String(raw).trim() !== '') secrets[f.key] = String(raw);
+        } else if (raw !== undefined) {
+          config[f.key] = f.type === 'number' && raw !== '' ? Number(raw) : raw;
+        }
+      });
+      const tags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
+      const body = { name: name.trim(), tags, priority: Number(priority) || 0, config };
+      if (Object.keys(secrets).length) body.secrets = secrets;
+      await updateConnection(connection.id, body);
+      toast.success('Conexão atualizada. Use "Testar" na lista para validar as credenciais.');
+      onSaved?.();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!connection) return null;
+
+  return (
+    <Modal
+      open={Boolean(connection)}
+      onClose={saving ? undefined : onClose}
+      dismissable={false}
+      title={`Editar conexão — ${connection.name}`}
+      size="lg"
+      footer={
+        <>
+          <button className="btn-secondary disabled:opacity-60" disabled={saving} onClick={onClose}>Cancelar</button>
+          <button className="btn-primary disabled:opacity-60" disabled={saving || loadingSchema} onClick={handleSave}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : null} Salvar
+          </button>
+        </>
+      }
+    >
+      {loadingSchema ? (
+        <div className="flex justify-center py-10"><Loader2 size={22} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
+      ) : (
+        <div className="space-y-3">
+          <FormField label="Nome da conexão" required>
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} autoFocus name="edit-conn-name" autoComplete="off" />
+          </FormField>
+          <FormField label="Tags" hint="Separadas por vírgula. Ex.: Financeiro, Comercial">
+            <TextInput value={tagsText} onChange={(e) => setTagsText(e.target.value)} name="edit-conn-tags" autoComplete="off" />
+          </FormField>
+          <FormField label="Prioridade" hint="Maior = usada primeiro quando há várias conexões do mesmo tipo.">
+            <NumberInput value={priority} onChange={setPriority} min={0} step={1} />
+          </FormField>
+
+          {fields.length > 0 && (
+            <div className="pt-1 space-y-3 border-t" style={{ borderColor: 'var(--ap-border-sub)' }}>
+              <p className="text-xs font-semibold pt-2" style={{ color: 'var(--ap-text-2)' }}>Credenciais</p>
+              {fields.map((field) => (
+                <ConnectionField
+                  key={field.key}
+                  field={field}
+                  value={values[field.key]}
+                  onChange={(v) => setValue(field.key, v)}
+                  namePrefix={`edit-${connection.provider_key}`}
+                  editing
+                />
+              ))}
+              {schema?.webhookPath && hasGeneratable && <WebhookUrlBox webhookPath={schema.webhookPath} />}
             </div>
           )}
         </div>
