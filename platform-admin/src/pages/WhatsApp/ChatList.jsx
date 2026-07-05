@@ -18,9 +18,27 @@ function timeLabel(iso) {
 
 // Lista de conversas com abas (Minhas/Não atribuídas/Minha equipe/Todas)
 // derivadas do escopo de permissões + busca + filtro de status.
+// Bolinha com a contagem de conversas da aba (esconde quando 0). Na aba ativa
+// inverte a cor pra contrastar com o fundo accent da pill.
+function TabBadge({ count, active }) {
+  if (!count) return null;
+  return (
+    <span
+      className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold leading-none"
+      style={
+        active
+          ? { background: 'rgba(255,255,255,0.25)', color: '#fff' }
+          : { background: 'var(--ap-surface-3, var(--ap-surface))', color: 'var(--ap-text-2)' }
+      }
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
 export default function ChatList({
   scope, tab, onTab, status, onStatus, search, onSearch,
-  chats, loading, selectedId, onSelect,
+  chats, loading, counts = {}, selectedId, onSelect,
 }) {
   const visibleTabs = CHAT_TABS.filter((t) => {
     if (!scope) return t.id === 'mine';
@@ -35,7 +53,15 @@ export default function ChatList({
     <div className="flex flex-col h-full min-h-0">
       <div className="px-3 pt-3">
         <Tabs
-          items={visibleTabs.map((t) => ({ id: t.id, label: t.label }))}
+          items={visibleTabs.map((t) => ({
+            id: t.id,
+            label: (
+              <span className="inline-flex items-center">
+                {t.label}
+                <TabBadge count={counts[t.id]} active={tab === t.id} />
+              </span>
+            ),
+          }))}
           active={tab}
           onChange={onTab}
           variant="pills"

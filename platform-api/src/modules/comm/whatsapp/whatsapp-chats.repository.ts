@@ -75,6 +75,29 @@ export class WhatsappChatsRepository {
     return { items, total };
   }
 
+  /**
+   * Contagem de chats sob os mesmos filtros base (org/status/search/conexao)
+   * + um WHERE de visibilidade especifico (o recorte de cada aba). Usa a mesma
+   * composicao de WHERE do listChats — sem inventar regra nova.
+   */
+  countChats(filters: ChatListFilters): Promise<number> {
+    const where: Prisma.WhatsappChatWhereInput = { organization_id: filters.organizationId };
+    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
+    if (filters.environmentId) where.environment_id = filters.environmentId;
+    if (filters.status) where.attendance_status = filters.status;
+    if (filters.connectionId) where.connection_id = filters.connectionId;
+    if (filters.search) {
+      where.OR = [
+        { phone: { contains: filters.search } },
+        { contact_name: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+    const and: Prisma.WhatsappChatWhereInput[] = [where];
+    if (filters.visibilityWhere) and.push(filters.visibilityWhere);
+    const finalWhere: Prisma.WhatsappChatWhereInput = and.length > 1 ? { AND: and } : where;
+    return this.prisma.whatsappChat.count({ where: finalWhere });
+  }
+
   /** Upsert do chat no envio/recebimento — atualiza resumo e janela de 24h. */
   async upsertChat(input: UpsertChatInput): Promise<WhatsappChat> {
     const now = new Date();

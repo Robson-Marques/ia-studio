@@ -17,6 +17,13 @@ export async function listChats(params = {}) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar conversas')); }
 }
 
+export async function getChatCounts(params = {}) {
+  try {
+    const { data } = await api.get('/comm/whatsapp/chats/counts', { params });
+    return data; // { mine, unassigned, team, all }
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar contagem de conversas')); }
+}
+
 export async function getChat(id) {
   try {
     const { data } = await api.get(`/comm/whatsapp/chats/${id}`);

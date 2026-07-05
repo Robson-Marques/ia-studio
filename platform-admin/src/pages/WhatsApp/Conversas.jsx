@@ -4,7 +4,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from '../../lib/toast';
 import {
-  getChat, getChatWindow, getWhatsappScope, listChats, listMessages,
+  getChat, getChatCounts, getChatWindow, getWhatsappScope, listChats, listMessages,
   listTemplates, markChatRead,
 } from '../../services/whatsapp';
 import ChatList from './ChatList';
@@ -25,6 +25,7 @@ export default function Conversas() {
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [chats, setChats] = useState([]);
+  const [counts, setCounts] = useState({ mine: 0, unassigned: 0, team: 0, all: 0 });
   const [loadingList, setLoadingList] = useState(true);
 
   const [selected, setSelected] = useState(null); // chat aberto (objeto completo)
@@ -56,13 +57,13 @@ export default function Conversas() {
   const loadList = useCallback(async (silent = false) => {
     if (!silent) setLoadingList(true);
     try {
-      const { items } = await listChats({
-        tab,
-        status: status || undefined,
-        search: search || undefined,
-        take: 100,
-      });
+      const filters = { status: status || undefined, search: search || undefined };
+      const [{ items }, tabCounts] = await Promise.all([
+        listChats({ ...filters, tab, take: 100 }),
+        getChatCounts(filters).catch(() => null), // badges — best-effort, nao trava a lista
+      ]);
       setChats(items);
+      if (tabCounts) setCounts(tabCounts);
     } catch (err) {
       if (!silent) toast.error(err.message);
     } finally {
@@ -124,6 +125,7 @@ export default function Conversas() {
           status={status} onStatus={setStatus}
           search={search} onSearch={setSearch}
           chats={chats} loading={loadingList}
+          counts={counts}
           selectedId={selected?.id}
           onSelect={handleSelect}
         />

@@ -69,6 +69,25 @@ export class WhatsappInboxController {
     });
   }
 
+  /** Contagem de conversas por aba (badges) — mesmo escopo/filtros do listChats. */
+  @Get('chats/counts')
+  @RequirePermissions(...ANY_VIEW)
+  countChats(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status') status?: CommChatStatus,
+    @Query('search') search?: string,
+    @Query('environment_id') environmentId?: string,
+    @Query('connection_id') connectionId?: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.inbox.countChatsByScope(resolveOrganizationId(user, orgQuery), user, {
+      status,
+      search,
+      environmentId,
+      connectionId,
+    });
+  }
+
   @Get('chats/:id')
   @RequirePermissions(...ANY_VIEW)
   getChat(

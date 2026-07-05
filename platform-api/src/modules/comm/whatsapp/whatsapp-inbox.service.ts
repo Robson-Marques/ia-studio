@@ -7,7 +7,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CommChatStatus, Connection, WhatsappChat, WhatsappMessage } from '@prisma/client';
+import { CommChatStatus, Connection, Prisma, WhatsappChat, WhatsappMessage } from '@prisma/client';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
 import { WhatsappOrchestratorService, WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
 import { ChatScopeResolver, AttendanceScope } from '../attendance/chat-scope.resolver';
@@ -63,19 +63,7 @@ export class WhatsappInboxService {
     const tab = args.tab ?? 'mine';
 
     // Recorte da aba escolhida + recorte de visibilidade das perms.
-    let tabWhere: Record<string, unknown> | undefined;
-    if (tab === 'mine') {
-      tabWhere = { current_handler_type: 'USER', current_handler_id: scope.userId };
-    } else if (tab === 'unassigned') {
-      tabWhere = { current_handler_id: null };
-    } else if (tab === 'team') {
-      tabWhere = scope.myTeamIds.length ? { team_id: { in: scope.myTeamIds } } : { id: '__none__' };
-    }
-    const visibilityWhere = this.scopeResolver.buildVisibilityWhere(scope);
-    const combined =
-      tabWhere && visibilityWhere
-        ? { AND: [tabWhere, visibilityWhere] }
-        : (tabWhere ?? visibilityWhere);
+    const combined = this.buildTabVisibilityWhere(scope, tab);
 
     const { items, total } = await this.chats.listChats({
       organizationId: args.organizationId,
@@ -99,6 +87,52 @@ export class WhatsappInboxService {
         c.current_handler_type === 'USER' && c.current_handler_id ? (names.get(c.current_handler_id) ?? null) : null,
     }));
     return { items: views, total };
+  }
+
+  /**
+   * Compoe o WHERE de uma aba (recorte da aba + visibilidade do escopo) — a
+   * MESMA logica usada pela listagem, reaproveitada aqui pra contagem.
+   */
+  private buildTabVisibilityWhere(scope: AttendanceScope, tab: ChatTab): Prisma.WhatsappChatWhereInput | undefined {
+    let tabWhere: Prisma.WhatsappChatWhereInput | undefined;
+    if (tab === 'mine') {
+      tabWhere = { current_handler_type: 'USER', current_handler_id: scope.userId };
+    } else if (tab === 'unassigned') {
+      tabWhere = { current_handler_id: null };
+    } else if (tab === 'team') {
+      tabWhere = scope.myTeamIds.length ? { team_id: { in: scope.myTeamIds } } : { id: '__none__' };
+    }
+    const visibilityWhere = this.scopeResolver.buildVisibilityWhere(scope);
+    return tabWhere && visibilityWhere
+      ? { AND: [tabWhere, visibilityWhere] }
+      : (tabWhere ?? visibilityWhere);
+  }
+
+  /**
+   * Contagem por aba (Minhas / Não atribuídas / Minha Equipe / Todas) sob o
+   * escopo de visibilidade do ator — respeita os filtros status/search. Cada
+   * contagem usa exatamente o mesmo WHERE que a aba correspondente na listagem.
+   */
+  async countChatsByScope(
+    organizationId: string,
+    user: AuthenticatedUser,
+    opts: { status?: CommChatStatus; search?: string; environmentId?: string; connectionId?: string } = {},
+  ): Promise<{ mine: number; unassigned: number; team: number; all: number }> {
+    const scope = await this.scopeResolver.resolve(user);
+    const tabs: ChatTab[] = ['mine', 'unassigned', 'team', 'all'];
+    const [mine, unassigned, team, all] = await Promise.all(
+      tabs.map((tab) =>
+        this.chats.countChats({
+          organizationId,
+          environmentId: opts.environmentId,
+          status: opts.status,
+          connectionId: opts.connectionId,
+          search: opts.search,
+          visibilityWhere: this.buildTabVisibilityWhere(scope, tab) as never,
+        }),
+      ),
+    );
+    return { mine, unassigned, team, all };
   }
 
   async getChat(organizationId: string, chatId: string): Promise<ChatView> {
