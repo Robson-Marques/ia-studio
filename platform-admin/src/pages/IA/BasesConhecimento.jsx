@@ -310,13 +310,16 @@ function CreateBaseModal({ open, onClose, onCreated, workspaceId, environmentId 
 }
 
 function AddDocumentModal({ open, onClose, baseId, onAdded }) {
-  const [mode, setMode] = useState('TXT'); // TXT | URL
+  const [mode, setMode] = useState('TXT'); // TXT | MARKDOWN | URL
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
   const [ref, setRef] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (open) { setMode('TXT'); setText(''); setUrl(''); setRef(''); } }, [open]);
+  useEffect(() => { setText(''); setUrl(''); setRef(''); }, [mode]);
+
+  const isTextMode = mode === 'TXT' || mode === 'MARKDOWN';
 
   async function handleSave() {
     let body;
@@ -325,7 +328,7 @@ function AddDocumentModal({ open, onClose, baseId, onAdded }) {
       body = { source_type: 'URL', source_ref: url.trim() };
     } else {
       if (!text.trim()) { toast.error('Cole o texto do documento.'); return; }
-      body = { source_type: 'TXT', source_ref: ref.trim() || 'Texto colado', text: text.trim() };
+      body = { source_type: mode, source_ref: ref.trim() || (mode === 'MARKDOWN' ? 'Markdown colado' : 'Texto colado'), text: text.trim() };
     }
     setSaving(true);
     try {
@@ -359,7 +362,8 @@ function AddDocumentModal({ open, onClose, baseId, onAdded }) {
         <FormField label="Origem">
           <Select value={mode} onChange={(e) => setMode(e.target.value)}>
             <option value="TXT">Texto colado</option>
-            <option value="URL">URL</option>
+            <option value="MARKDOWN">Markdown</option>
+            <option value="URL">URL (página web)</option>
           </Select>
         </FormField>
         {mode === 'URL' ? (
@@ -371,8 +375,8 @@ function AddDocumentModal({ open, onClose, baseId, onAdded }) {
             <FormField label="Identificação" hint="Nome que aparece na lista.">
               <TextInput value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Ex.: Política de trocas" />
             </FormField>
-            <FormField label="Texto" required>
-              <Textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} placeholder="Cole aqui o conteúdo…" />
+            <FormField label={isTextMode && mode === 'MARKDOWN' ? 'Conteúdo Markdown' : 'Texto'} required hint={mode === 'MARKDOWN' ? 'Aceita sintaxe Markdown (títulos, listas, etc.).' : undefined}>
+              <Textarea rows={8} className={mode === 'MARKDOWN' ? 'font-mono text-xs' : ''} value={text} onChange={(e) => setText(e.target.value)} placeholder={mode === 'MARKDOWN' ? '# Título\n\n- item…' : 'Cole aqui o conteúdo…'} />
             </FormField>
           </>
         )}

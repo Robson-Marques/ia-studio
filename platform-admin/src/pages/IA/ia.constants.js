@@ -29,6 +29,51 @@ export const MEMORY_SCOPES = [
   { value: 'AGENT',    label: 'Agente' },
 ];
 
+// Modelos sugeridos por provider — atalho no editor de agente (o campo aceita
+// qualquer valor livre; isto é só uma lista amigável). Chave = provider_key da
+// Connection AI (minúsculo). Vazio/desconhecido cai no input livre.
+export const AGENT_MODELS = {
+  openai: [
+    { value: 'gpt-4o',       label: 'GPT-4o (mais capaz)' },
+    { value: 'gpt-4o-mini',  label: 'GPT-4o mini (rápido e econômico)' },
+    { value: 'gpt-4.1-mini', label: 'GPT-4.1 mini' },
+  ],
+  anthropic: [
+    { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet (equilibrado)' },
+    { value: 'claude-3-5-haiku',  label: 'Claude 3.5 Haiku (rápido)' },
+    { value: 'claude-3-opus',     label: 'Claude 3 Opus (mais capaz)' },
+  ],
+  gemini: [
+    { value: 'gemini-1.5-pro',   label: 'Gemini 1.5 Pro' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (rápido)' },
+  ],
+};
+
+// Persona guiada (porta do Aquapark). Compila no backend (agent-persona.ts):
+// tone(string) / emojis(boolean) / brevity(short|medium|long) / rules_always / rules_never.
+export const PERSONA_TONES = [
+  { value: '',          label: '—' },
+  { value: 'informal',  label: 'Informal' },
+  { value: 'amigável',  label: 'Amigável' },
+  { value: 'técnica',   label: 'Técnica' },
+  { value: 'formal',    label: 'Formal' },
+];
+
+// UI de 3 níveis mapeada pro boolean que o backend entende (moderado/frequente = true).
+export const PERSONA_EMOJIS = [
+  { value: '',          label: '—' },
+  { value: 'nenhum',    label: 'Sem emojis' },
+  { value: 'moderado',  label: 'Moderado' },
+  { value: 'frequente', label: 'Frequente' },
+];
+
+export const PERSONA_BREVITY = [
+  { value: '',       label: '—' },
+  { value: 'short',  label: 'Curtas (1 a 3 frases)' },
+  { value: 'medium', label: 'Médias (4 a 6 frases)' },
+  { value: 'long',   label: 'Completas e detalhadas' },
+];
+
 // Kinds de provider AI (espelha o enum AiProviderKind do backend).
 export const PROVIDER_KINDS = [
   { value: 'OPENAI',       label: 'OpenAI' },

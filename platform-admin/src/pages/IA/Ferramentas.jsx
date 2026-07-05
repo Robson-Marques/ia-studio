@@ -6,7 +6,7 @@ import Modal from '../../components/ui/Modal';
 import Tabs from '../../components/ui/Tabs';
 import EmptyState from '../../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
-import { FormField, TextInput, Textarea, Select } from '../../components/ui/FormField';
+import { FormField, TextInput, Textarea, Select, NumberInput } from '../../components/ui/FormField';
 import {
   listTools, createTool, updateTool,
   listMcpServers, createMcpServer, syncMcpServer, getMcpServerTools,
@@ -83,6 +83,7 @@ function CatalogTab() {
               <Th>Chave</Th>
               <Th>Categoria</Th>
               <Th>Origem</Th>
+              <Th>Status</Th>
               <Th>Aprovação</Th>
               <Th className="text-right">Ações</Th>
             </Thead>
@@ -95,10 +96,11 @@ function CatalogTab() {
                   <Td><span className="font-mono text-xs" style={{ color: 'var(--ap-text-3)' }}>{t.key}</span></Td>
                   <Td>{t.category || '—'}</Td>
                   <Td>{t.builtin ? <Badge variant="blue">Builtin</Badge> : <Badge variant="purple">Custom</Badge>}</Td>
+                  <Td>{t.is_active === false ? <Badge variant="gray">Desligada</Badge> : <Badge variant="green">Ativa</Badge>}</Td>
                   <Td>{t.requires_approval ? <Badge variant="yellow">Exige</Badge> : <span className="text-xs" style={{ color: 'var(--ap-text-5)' }}>não</span>}</Td>
                   <Td className="text-right">
-                    {canWrite && !t.builtin && (
-                      <button className="btn-ghost p-1.5" title="Editar" onClick={() => { setEditing(t); setEditorOpen(true); }}>
+                    {canWrite && (
+                      <button className="btn-ghost p-1.5" title={t.builtin ? 'Governança (ligar/desligar, aprovação, timeout)' : 'Editar'} onClick={() => { setEditing(t); setEditorOpen(true); }}>
                         <Pencil size={14} className="text-brand" />
                       </button>
                     )}
@@ -115,36 +117,74 @@ function CatalogTab() {
   );
 }
 
+// ToolModal: cria/edita tool custom (CRUD completo) OU só governança de builtin
+// (ligar/desligar, aprovação, timeout — o backend rejeita editar nome/schema de
+// builtin). Governança (is_active/timeout_ms/requires_approval) porta a UX do
+// Aquapark; nome/chave/schema seguem o padrão do IA Studio.
 function ToolModal({ open, tool, onClose, onSaved }) {
   const isEdit = !!tool?.id;
-  const [form, setForm] = useState({ key: '', name: '', description: '', category: '', input_schema: '{\n  "type": "object",\n  "properties": {}\n}', requires_approval: false });
+  const isBuiltin = !!tool?.builtin;
+  const EMPTY_TOOL = { key: '', name: '', description: '', category: '', input_schema: '{\n  "type": "object",\n  "properties": {}\n}', requires_approval: false, is_active: true, timeout_ms: '' };
+  const [form, setForm] = useState(EMPTY_TOOL);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setForm(tool
-      ? { key: tool.key || '', name: tool.name || '', description: tool.description || '', category: tool.category || '', input_schema: JSON.stringify(tool.input_schema || { type: 'object', properties: {} }, null, 2), requires_approval: !!tool.requires_approval }
-      : { key: '', name: '', description: '', category: '', input_schema: '{\n  "type": "object",\n  "properties": {}\n}', requires_approval: false });
+      ? {
+        key: tool.key || '', name: tool.name || '', description: tool.description || '', category: tool.category || '',
+        input_schema: JSON.stringify(tool.input_schema || { type: 'object', properties: {} }, null, 2),
+        requires_approval: !!tool.requires_approval,
+        is_active: tool.is_active !== false,
+        timeout_ms: tool.timeout_ms != null ? String(tool.timeout_ms) : '',
+      }
+      : { ...EMPTY_TOOL });
   }, [open, tool?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
 
   async function handleSave() {
-    if (!form.name.trim()) { toast.error('Informe o nome.'); return; }
-    if (!isEdit && !form.key.trim()) { toast.error('Informe a chave (key) única.'); return; }
-    let schema;
-    try { schema = JSON.parse(form.input_schema); } catch { toast.error('Input schema: JSON inválido.'); return; }
+    // Builtin: só governança (não valida nome/schema).
+    if (!isBuiltin) {
+      if (!form.name.trim()) { toast.error('Informe o nome.'); return; }
+      if (!isEdit && !form.key.trim()) { toast.error('Informe a chave (key) única.'); return; }
+    }
+    let schema = null;
+    if (!isBuiltin) {
+      try { schema = JSON.parse(form.input_schema); } catch { toast.error('Input schema: JSON inválido.'); return; }
+    }
+    const timeoutNum = form.timeout_ms === '' ? undefined : Number(form.timeout_ms);
+    if (timeoutNum !== undefined && (Number.isNaN(timeoutNum) || timeoutNum < 1000)) {
+      toast.error('Timeout deve ser um número em ms (mínimo 1000).');
+      return;
+    }
     setSaving(true);
     try {
-      const body = {
-        name: form.name.trim(),
-        description: form.description.trim() || undefined,
-        category: form.category.trim() || undefined,
-        input_schema: schema,
+      const governance = {
         requires_approval: form.requires_approval,
+        ...(timeoutNum !== undefined ? { timeout_ms: timeoutNum } : {}),
       };
-      if (isEdit) await updateTool(tool.id, body);
-      else await createTool({ ...body, key: form.key.trim() });
+      if (isBuiltin) {
+        await updateTool(tool.id, { ...governance, is_active: form.is_active });
+      } else if (isEdit) {
+        await updateTool(tool.id, {
+          name: form.name.trim(),
+          description: form.description.trim() || undefined,
+          category: form.category.trim() || undefined,
+          input_schema: schema,
+          is_active: form.is_active,
+          ...governance,
+        });
+      } else {
+        await createTool({
+          key: form.key.trim(),
+          name: form.name.trim(),
+          description: form.description.trim(),
+          category: form.category.trim() || undefined,
+          input_schema: schema,
+          ...governance,
+        });
+      }
       toast.success(isEdit ? 'Ferramenta atualizada.' : 'Ferramenta criada.');
       onSaved();
     } catch (err) {
@@ -158,7 +198,7 @@ function ToolModal({ open, tool, onClose, onSaved }) {
     <Modal
       open={open}
       onClose={saving ? undefined : onClose}
-      title={isEdit ? 'Editar ferramenta' : 'Nova ferramenta'}
+      title={isBuiltin ? `Governança · ${tool?.name ?? ''}` : (isEdit ? 'Editar ferramenta' : 'Nova ferramenta')}
       size="lg"
       dismissable={!saving}
       footer={
@@ -171,27 +211,46 @@ function ToolModal({ open, tool, onClose, onSaved }) {
       }
     >
       <div className="space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField label="Chave (key)" required hint="Única por organização. Não editável depois.">
-            <TextInput value={form.key} onChange={(e) => patch({ key: e.target.value })} disabled={isEdit} placeholder="consultar_estoque" />
-          </FormField>
-          <FormField label="Nome" required>
-            <TextInput value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Consultar estoque" />
-          </FormField>
-        </div>
-        <FormField label="Categoria">
-          <TextInput value={form.category} onChange={(e) => patch({ category: e.target.value })} placeholder="dados / comunicação / documento…" />
-        </FormField>
-        <FormField label="Descrição" hint="Explica ao modelo quando usar a ferramenta.">
-          <Textarea rows={2} value={form.description} onChange={(e) => patch({ description: e.target.value })} />
-        </FormField>
-        <FormField label="Input schema (JSON Schema)" required>
-          <Textarea rows={7} className="font-mono text-xs" value={form.input_schema} onChange={(e) => patch({ input_schema: e.target.value })} />
-        </FormField>
+        {isBuiltin && (
+          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+            Ferramenta builtin — só é possível ajustar a governança (ligar/desligar, aprovação e timeout).
+          </p>
+        )}
+        {!isBuiltin && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="Chave (key)" required hint="Única por organização. Não editável depois.">
+                <TextInput value={form.key} onChange={(e) => patch({ key: e.target.value })} disabled={isEdit} placeholder="consultar_estoque" />
+              </FormField>
+              <FormField label="Nome" required>
+                <TextInput value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Consultar estoque" />
+              </FormField>
+            </div>
+            <FormField label="Categoria">
+              <TextInput value={form.category} onChange={(e) => patch({ category: e.target.value })} placeholder="dados / comunicação / documento…" />
+            </FormField>
+            <FormField label="Descrição" hint="Explica ao modelo quando usar a ferramenta.">
+              <Textarea rows={2} value={form.description} onChange={(e) => patch({ description: e.target.value })} />
+            </FormField>
+            <FormField label="Input schema (JSON Schema)" required>
+              <Textarea rows={7} className="font-mono text-xs" value={form.input_schema} onChange={(e) => patch({ input_schema: e.target.value })} />
+            </FormField>
+          </>
+        )}
+
+        {isEdit && (
+          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ap-text-2)' }}>
+            <input type="checkbox" checked={form.is_active} onChange={(e) => patch({ is_active: e.target.checked })} className="w-4 h-4 accent-current" />
+            Ferramenta ligada (agentes podem usar)
+          </label>
+        )}
         <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ap-text-2)' }}>
           <input type="checkbox" checked={form.requires_approval} onChange={(e) => patch({ requires_approval: e.target.checked })} className="w-4 h-4 accent-current" />
           Exige aprovação antes de executar
         </label>
+        <FormField label="Timeout (ms)" hint="Tempo máximo de execução. Vazio = padrão (20000). Mínimo 1000.">
+          <NumberInput value={form.timeout_ms === '' ? null : Number(form.timeout_ms)} onChange={(v) => patch({ timeout_ms: v == null ? '' : String(v) })} allowEmpty min={1000} step={500} placeholder="20000" />
+        </FormField>
       </div>
     </Modal>
   );

@@ -185,9 +185,12 @@ export class WhatsappInboxController {
     if (!data) throw new BadRequestException('Nenhum arquivo recebido.');
 
     const readField = (name: string): string | undefined => {
-      const f = data.fields?.[name];
+      // Cast pra escapar do union Multipart (MultipartFile | MultipartValue) —
+      // só o value de campo interessa; MultipartFile não tem `.value`.
+      const f = (data.fields as Record<string, unknown> | undefined)?.[name];
       const single = Array.isArray(f) ? f[0] : f;
-      return typeof single?.value === 'string' ? single.value : undefined;
+      const value = (single as { value?: unknown } | undefined)?.value;
+      return typeof value === 'string' ? value : undefined;
     };
     const rawKind = (readField('kind') ?? '').trim();
     const validKinds: MediaKind[] = ['image', 'audio', 'video', 'document'];

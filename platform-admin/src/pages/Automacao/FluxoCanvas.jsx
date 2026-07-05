@@ -1,46 +1,238 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+// Editor VISUAL do fluxo (canvas React Flow). Porta a UX do WorkflowCanvas do
+// Aquapark (paleta recolhível agrupada por categoria, inspector recolhível com
+// os campos do nó renderizados inline, nó custom com handles por saída,
+// auto-centralização ao adicionar) — mas alimentado pelo catálogo DECLARATIVO
+// do IA Studio (getNodesCatalog) e pelo grafo { nodes:[{id,type,name,config}],
+// edges:[{from,to,when}] } com a posição em config.__pos. Salvar = nova versão
+// imutável (saveWorkflowVersion). Versões/publicar/rollback, dry-run e
+// export/import continuam nos modais da Fase 4.
+import React, {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
-  Handle, Position, addEdge, applyNodeChanges, applyEdgeChanges,
+  Handle, Position, addEdge, applyNodeChanges, applyEdgeChanges, useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  ArrowLeft, Download, GitBranch, History, Loader2, Play, Plus, Save, Zap, List,
+  ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, History,
+  Layers, List, Loader2, Play, Plus, Save, SlidersHorizontal, Trash2, Zap,
 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
-import { FormField, TextInput } from '../../components/ui/FormField';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { FormField, TextInput, Textarea, Select, NumberInput } from '../../components/ui/FormField';
 import {
   getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions,
-  exportWorkflow,
+  exportWorkflow, listAutomationTemplates,
 } from '../../services/automation';
+import { listConnections } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../../lib/toast';
 import { NODE_CATEGORY_ORDER } from './automation.constants';
 import { StatusBadge } from './Fluxos';
-import NodeConfigModal from './editor/NodeConfigModal';
 import TriggerEditor from './editor/TriggerEditor';
 import VersionsModal from './editor/VersionsModal';
 import ExecuteModal from './editor/ExecuteModal';
 
-// Editor VISUAL do fluxo (canvas React Flow — Fase 5). Consome o MESMO grafo
-// JSON {nodes:[{id,type,name,config}], edges:[{from,to,when}]} do editor em
-// lista. Duplo-clique num nó abre o NodeConfigModal existente. Salvar = nova
-// versão imutável. Versões/publicar/dry-run/export são preservados da Fase 4.
-export default function FluxoCanvas() {
+// Rótulos amigáveis das saídas (handles) — o id do handle = nome do output.
+const OUTPUT_LABELS = {
+  success: '', // saída padrão não precisa de rótulo
+  error: 'erro',
+  true: 'verdadeiro',
+  false: 'falso',
+};
+const outputLabel = (out) => (out in OUTPUT_LABELS ? OUTPUT_LABELS[out] : out);
+
+// ─── Nó custom ───────────────────────────────────────────────
+// Rótulo + id + handle de entrada (esquerda, exceto gatilhos) + um handle de
+// saída por output (direita). Cores via vars do tema.
+function StudioNode({ data, selected }) {
+  const def = data.definition;
+  const outputs = def?.outputs?.length ? def.outputs : ['success'];
+  const isTrigger = def?.kind === 'trigger';
+  const category = def?.category;
   return (
-    <ReactFlowProvider>
-      <FluxoCanvasInner />
-    </ReactFlowProvider>
+    <div style={{
+      minWidth: 150, maxWidth: 230, borderRadius: 10, padding: '8px 12px',
+      background: 'var(--ap-surface)', color: 'var(--ap-text-1)',
+      border: `2px solid ${selected ? 'var(--ap-accent, #6366f1)' : 'var(--ap-border)'}`,
+      fontSize: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+    }}>
+      {!isTrigger && <Handle type="target" position={Position.Left} style={{ background: '#64748b' }} />}
+      {category && (
+        <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--ap-text-5)' }}>{category}</div>
+      )}
+      <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--ap-text-1)' }} className="truncate">
+        {data.name || def?.label || data.nodeType}
+      </div>
+      <div style={{ color: 'var(--ap-text-5)', fontFamily: 'monospace', fontSize: 10 }} className="truncate">{data.nodeType}</div>
+      {outputs.map((out, i) => (
+        <Handle
+          key={out} type="source" id={out} position={Position.Right}
+          style={{ background: out === 'error' ? '#ef4444' : '#64748b', top: `${((i + 1) * 100) / (outputs.length + 1)}%` }}
+        />
+      ))}
+      {outputs.some((o) => outputLabel(o)) && (
+        <div style={{ position: 'absolute', right: -4, top: 0, bottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', pointerEvents: 'none' }}>
+          {outputs.map((o) => (
+            <span key={o} style={{ fontSize: 8, color: o === 'error' ? '#ef4444' : 'var(--ap-text-4)', transform: 'translateX(100%)', paddingLeft: 6, whiteSpace: 'nowrap' }}>
+              {outputLabel(o)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
-const nodeTypes = { studioNode: StudioNode };
+const NODE_TYPES = { studioNode: StudioNode };
 
+// ─── Conversão grafo JSON ↔ React Flow ───────────────────────
+function graphToFlow(rawGraph, defsByType) {
+  const graph = rawGraph || { nodes: [], edges: [] };
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  const edges = Array.isArray(graph.edges) ? graph.edges : [];
+
+  const rfNodes = nodes.map((n, i) => {
+    const pos = n.config?.__pos;
+    return {
+      id: n.id,
+      type: 'studioNode',
+      position: pos && typeof pos.x === 'number' ? pos : { x: 160, y: 80 + i * 110 },
+      data: {
+        name: n.name || defsByType[n.type]?.label || n.type,
+        nodeType: n.type,
+        config: stripPos(n.config),
+        definition: defsByType[n.type] || { type: n.type, label: n.name || n.type, outputs: ['success'], kind: 'action' },
+      },
+    };
+  });
+
+  const rfEdges = edges.map((e, i) => ({
+    id: e.id || `e_${e.from}_${e.to}_${i}`,
+    source: e.from,
+    target: e.to,
+    // 'when' vira o handle de saída (success = handle padrão).
+    sourceHandle: e.when || 'success',
+    type: 'default',
+  }));
+
+  return { rfNodes, rfEdges };
+}
+
+function flowToGraph(rfNodes, rfEdges) {
+  return {
+    nodes: rfNodes.map((n) => ({
+      id: n.id,
+      type: n.data.nodeType,
+      name: n.data.name,
+      // Persiste a posição dentro do config para reidratar o canvas.
+      config: { ...(n.data.config || {}), __pos: { x: Math.round(n.position.x), y: Math.round(n.position.y) } },
+    })),
+    edges: rfEdges.map((e) => ({
+      from: e.source,
+      to: e.target,
+      ...(e.sourceHandle && e.sourceHandle !== 'success' ? { when: e.sourceHandle } : {}),
+    })),
+  };
+}
+
+function stripPos(config) {
+  if (!config || typeof config !== 'object') return {};
+  const { __pos, ...rest } = config; // eslint-disable-line no-unused-vars
+  return rest;
+}
+
+function normalizeTrigger(raw) {
+  const t = raw || {};
+  return { type: t.type || 'manual', event: t.event, schedule: t.schedule };
+}
+
+// ─── Paleta recolhível (rail lateral quando fechada) ─────────
+function CollapsedRail({ side, icon: Icon, label, onExpand }) {
+  return (
+    <div style={{
+      width: 34, background: 'var(--ap-surface-2)', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', gap: 8, padding: '8px 0',
+      [side === 'left' ? 'borderRight' : 'borderLeft']: '1px solid var(--ap-border)',
+    }}>
+      <button onClick={onExpand} title={`Expandir ${label}`} className="rounded p-1"
+        style={{ border: '1px solid var(--ap-border)', background: 'var(--ap-surface)', color: 'var(--ap-text-3)' }}>
+        {side === 'left' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+      <Icon size={14} style={{ color: 'var(--ap-text-4)' }} />
+      <span style={{ writingMode: 'vertical-rl', fontSize: 10, letterSpacing: 1, color: 'var(--ap-text-4)', textTransform: 'uppercase' }}>{label}</span>
+    </div>
+  );
+}
+
+// Agrupa o catálogo por categoria, na ordem oficial (não-listadas vão ao fim).
+function groupByCategory(catalog) {
+  const map = new Map();
+  for (const def of (catalog || [])) {
+    if (!map.has(def.category)) map.set(def.category, []);
+    map.get(def.category).push(def);
+  }
+  const order = [
+    ...NODE_CATEGORY_ORDER,
+    ...[...map.keys()].filter((c) => !NODE_CATEGORY_ORDER.includes(c)),
+  ];
+  return order.filter((c) => map.has(c)).map((c) => [c, map.get(c)]);
+}
+
+// ─── Um campo do Inspector (renderiza a definição declarativa do nó) ──
+// Espelha os tipos que o NodeConfigModal já entende: text/textarea/number/
+// select/json/connection/template. Campo JSON usa um rascunho de texto pra
+// permitir digitação livre (parse no serialize).
+function InspectorField({ field, value, jsonDraft, refs, disabled, onChange, onJsonDraft }) {
+  const common = { disabled };
+  let control = null;
+  if (field.type === 'textarea') {
+    control = <Textarea rows={3} className="text-xs" value={value ?? ''} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} {...common} />;
+  } else if (field.type === 'number') {
+    control = <NumberInput className="text-xs" value={value ?? field.default ?? 0} onChange={(v) => onChange(v)} allowEmpty={false} {...common} />;
+  } else if (field.type === 'select') {
+    control = (
+      <Select className="text-xs" value={value ?? field.default ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
+        {(field.options || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </Select>
+    );
+  } else if (field.type === 'json') {
+    control = (
+      <Textarea rows={4} className="font-mono text-[11px]" value={jsonDraft ?? ''} placeholder='{ "chave": "valor" }' spellCheck={false}
+        onChange={(e) => onJsonDraft(e.target.value)} {...common} />
+    );
+  } else if (field.type === 'connection') {
+    control = (
+      <Select className="text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
+        <option value="">— nenhuma —</option>
+        {(refs.connections || []).map((c) => <option key={c.id} value={c.id}>{c.name} ({c.provider_key})</option>)}
+      </Select>
+    );
+  } else if (field.type === 'template') {
+    control = (
+      <Select className="text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
+        <option value="">— nenhum —</option>
+        {(refs.templates || []).map((t) => <option key={t.id} value={t.id}>{t.name} ({t.channel})</option>)}
+      </Select>
+    );
+  } else {
+    control = <TextInput className="text-xs" value={value ?? field.default ?? ''} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} {...common} />;
+  }
+  return (
+    <FormField label={field.label} required={field.required} hint={field.help}>
+      {control}
+    </FormField>
+  );
+}
+
+// ─── Canvas interno (dentro do ReactFlowProvider) ────────────
 function FluxoCanvasInner() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const { screenToFlowPosition } = useReactFlow();
 
   const [workflow, setWorkflow] = useState(null);
   const [catalog, setCatalog] = useState([]);
@@ -50,15 +242,23 @@ function FluxoCanvasInner() {
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
 
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [selId, setSelId] = useState(null);
+  const [paletteOpen, setPaletteOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [openCat, setOpenCat] = useState(NODE_CATEGORY_ORDER[0]);
+  const [jsonDrafts, setJsonDrafts] = useState({}); // { [nodeId]: { [fieldKey]: text } }
+  const [refs, setRefs] = useState({ connections: [], templates: [] });
+  const [removing, setRemoving] = useState(false);
+
   const [triggerOpen, setTriggerOpen] = useState(false);
-  const [editingNodeId, setEditingNodeId] = useState(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveNote, setSaveNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versions, setVersions] = useState([]);
   const [executeOpen, setExecuteOpen] = useState(false);
+
+  const flowWrapRef = useRef(null);
 
   const defsByType = useMemo(() => Object.fromEntries(catalog.map((d) => [d.type, d])), [catalog]);
   const canWrite = can('automation.workflows.write');
@@ -67,13 +267,16 @@ function FluxoCanvasInner() {
     setLoading(true);
     try {
       const [detail, nodes] = await Promise.all([getWorkflow(id), getNodesCatalog()]);
+      const dbt = Object.fromEntries((nodes.items || []).map((d) => [d.type, d]));
+      const { rfNodes: rn, rfEdges: re } = graphToFlow(detail.current_graph, dbt);
       setWorkflow(detail);
-      setCatalog(nodes.items);
-      const { rfNodes: rn, rfEdges: re } = graphToFlow(detail.current_graph, Object.fromEntries(nodes.items.map((d) => [d.type, d])));
+      setCatalog(nodes.items || []);
       setRfNodes(rn);
       setRfEdges(re);
       setTrigger(normalizeTrigger(detail.current_trigger));
       setVersions(detail.versions || []);
+      setJsonDrafts({});
+      setSelId(null);
       setDirty(false);
     } catch (err) {
       toast.error(err.message);
@@ -84,6 +287,17 @@ function FluxoCanvasInner() {
   }
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Referências (conexões/templates) — carregadas uma vez pros campos do inspector.
+  useEffect(() => {
+    if (!canWrite) return;
+    Promise.allSettled([
+      listConnections().then((r) => r.items),
+      listAutomationTemplates().then((r) => r.items),
+    ]).then(([c, t]) => {
+      setRefs({ connections: c.value || [], templates: t.value || [] });
+    });
+  }, [canWrite]);
 
   const onNodesChange = useCallback((changes) => {
     setRfNodes((nds) => applyNodeChanges(changes, nds));
@@ -97,50 +311,106 @@ function FluxoCanvasInner() {
 
   const onConnect = useCallback((connection) => {
     if (!canWrite) return;
-    setRfEdges((eds) => addEdge({ ...connection, type: 'default' }, eds));
+    setRfEdges((eds) => addEdge({ ...connection, sourceHandle: connection.sourceHandle ?? 'success', type: 'default' }, eds));
     setDirty(true);
   }, [canWrite]);
 
-  const onNodeDoubleClick = useCallback((_ev, node) => {
-    setEditingNodeId(node.id);
-  }, []);
-
   function addNode(definition) {
-    const seq = rfNodes.length + 1;
-    const newId = `passo_${Date.now().toString(36)}_${seq}`;
-    const position = { x: 120 + (seq % 4) * 60, y: 80 + rfNodes.length * 90 };
+    const base = definition.type.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const ids = new Set(rfNodes.map((n) => n.id));
+    let seq = rfNodes.length + 1;
+    let newId = `${base}_${seq}`;
+    while (ids.has(newId)) { seq += 1; newId = `${base}_${seq}`; }
+    // Nasce no CENTRO do canvas visível (respeita zoom/pan atuais).
+    const rect = flowWrapRef.current?.getBoundingClientRect();
+    const position = (screenToFlowPosition && rect)
+      ? screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+      : { x: 120 + rfNodes.length * 30, y: 80 + rfNodes.length * 20 };
     setRfNodes((nds) => [...nds, {
       id: newId,
       type: 'studioNode',
       position,
       data: { name: definition.label, nodeType: definition.type, config: {}, definition },
     }]);
+    setSelId(newId);
     setDirty(true);
-    setPaletteOpen(false);
-    setEditingNodeId(newId);
+    if (!inspectorOpen) setInspectorOpen(true);
   }
 
-  const editingNode = useMemo(() => {
-    const n = rfNodes.find((x) => x.id === editingNodeId);
-    if (!n) return null;
-    // Adapta o shape do canvas para o formato que o NodeConfigModal espera.
-    return { id: n.id, type: n.data.nodeType, name: n.data.name, config: n.data.config };
-  }, [editingNodeId, rfNodes]);
-
-  function applyNodeConfig(updated) {
-    setRfNodes((nds) => nds.map((n) => (n.id === updated.id
-      ? { ...n, data: { ...n.data, name: updated.name, config: updated.config } }
-      : n)));
-    setEditingNodeId(null);
+  function removeSelected() {
+    if (!selId) return;
+    setRfNodes((nds) => nds.filter((n) => n.id !== selId));
+    setRfEdges((eds) => eds.filter((e) => e.source !== selId && e.target !== selId));
+    setJsonDrafts((d) => { const next = { ...d }; delete next[selId]; return next; });
+    setSelId(null);
+    setRemoving(false);
     setDirty(true);
+  }
+
+  const selected = rfNodes.find((n) => n.id === selId) || null;
+  const selectedDef = selected ? defsByType[selected.data.nodeType] : null;
+
+  function setNodeName(name) {
+    setRfNodes((nds) => nds.map((n) => (n.id === selId ? { ...n, data: { ...n.data, name } } : n)));
+    setDirty(true);
+  }
+
+  function setField(key, value) {
+    setRfNodes((nds) => nds.map((n) => {
+      if (n.id !== selId) return n;
+      const next = { ...(n.data.config || {}) };
+      if (value === '' || value === undefined || value === null) delete next[key]; else next[key] = value;
+      return { ...n, data: { ...n.data, config: next } };
+    }));
+    setDirty(true);
+  }
+
+  function setJsonDraft(key, text) {
+    setJsonDrafts((d) => ({ ...d, [selId]: { ...(d[selId] || {}), [key]: text } }));
+    setDirty(true);
+  }
+
+  // Rascunho de texto de um campo JSON do nó selecionado (lazy a partir do config).
+  function jsonDraftFor(field) {
+    const draftForNode = jsonDrafts[selId] || {};
+    if (typeof draftForNode[field.key] === 'string') return draftForNode[field.key];
+    const v = selected?.data.config?.[field.key];
+    return v === undefined || v === null ? '' : JSON.stringify(v, null, 2);
+  }
+
+  // Monta o grafo aplicando os rascunhos JSON (com validação). Retorna null se inválido.
+  function buildGraph() {
+    const nodes = [];
+    for (const n of rfNodes) {
+      const def = defsByType[n.data.nodeType];
+      const config = { ...(n.data.config || {}) };
+      const draftForNode = jsonDrafts[n.id] || {};
+      for (const f of (def?.fields || []).filter((x) => x.type === 'json')) {
+        if (!(f.key in draftForNode)) continue;
+        const raw = String(draftForNode[f.key] ?? '').trim();
+        if (!raw) { delete config[f.key]; continue; }
+        try { config[f.key] = JSON.parse(raw); } catch {
+          toast.error(`Nó "${n.data.name}", campo "${f.label}": JSON inválido.`);
+          return null;
+        }
+      }
+      nodes.push({ id: n.id, type: n.data.nodeType, name: n.data.name, config });
+    }
+    const rfWithConfig = nodes.map((n) => {
+      const orig = rfNodes.find((x) => x.id === n.id);
+      return { id: n.id, position: orig.position, data: { nodeType: n.type, name: n.name, config: n.config } };
+    });
+    return flowToGraph(rfWithConfig, rfEdges);
   }
 
   async function handleSaveVersion() {
     if (!rfNodes.length) { toast.error('Adicione pelo menos um passo.'); return; }
+    const graph = buildGraph();
+    if (!graph) return; // JSON inválido já avisou
     setSaving(true);
     try {
       const result = await saveWorkflowVersion(id, {
-        graph: flowToGraph(rfNodes, rfEdges),
+        graph,
         trigger,
         note: saveNote.trim() || undefined,
       });
@@ -154,6 +424,13 @@ function FluxoCanvasInner() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function openSave() {
+    // Valida os rascunhos JSON antes de abrir o modal de nota.
+    if (!rfNodes.length) { toast.error('Adicione pelo menos um passo.'); return; }
+    if (!buildGraph()) return;
+    setSaveOpen(true);
   }
 
   async function openVersions() {
@@ -218,48 +495,148 @@ function FluxoCanvasInner() {
           </button>
         )}
         {canWrite && (
-          <>
-            <button className="btn-secondary" onClick={() => setPaletteOpen(true)} title="Adicionar passo ao canvas">
-              <Plus size={14} /> Adicionar passo
-            </button>
-            <button className="btn-primary" onClick={() => setSaveOpen(true)} title="Salvar como nova versão imutável">
-              <Save size={14} /> Salvar versão
-            </button>
-          </>
+          <button className="btn-primary" onClick={openSave} title="Salvar como nova versão imutável">
+            <Save size={14} /> Salvar versão
+          </button>
         )}
       </div>
 
-      {/* Canvas */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{ border: '1px solid var(--ap-border)', height: 'calc(100dvh - 190px)', minHeight: 420, background: 'var(--ap-surface-2)' }}
-      >
-        <ReactFlow
-          nodes={rfNodes}
-          edges={rfEdges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeDoubleClick={onNodeDoubleClick}
-          nodeTypes={nodeTypes}
-          nodesDraggable={canWrite}
-          nodesConnectable={canWrite}
-          edgesFocusable={canWrite}
-          fitView
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background gap={16} color="var(--ap-border)" />
-          <Controls />
-          <MiniMap pannable zoomable style={{ background: 'var(--ap-surface)' }} />
-        </ReactFlow>
+      {/* Editor: paleta + canvas + inspector */}
+      <div style={{
+        display: 'flex', height: 'calc(100dvh - 190px)', minHeight: 420,
+        border: '1px solid var(--ap-border)', borderRadius: 12, overflow: 'hidden',
+      }}>
+        {/* Paleta (biblioteca de nós) */}
+        {canWrite && (paletteOpen ? (
+          <div style={{ width: 190, borderRight: '1px solid var(--ap-border)', background: 'var(--ap-surface-2)', display: 'flex', flexDirection: 'column' }}>
+            <div className="flex items-center justify-between px-2 py-1.5" style={{ borderBottom: '1px solid var(--ap-border)' }}>
+              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: 'var(--ap-text-4)' }}>Biblioteca de passos</p>
+              <button onClick={() => setPaletteOpen(false)} title="Recolher" className="p-0.5 rounded" style={{ color: 'var(--ap-text-4)' }}><ChevronLeft size={14} /></button>
+            </div>
+            <div style={{ overflowY: 'auto', padding: 8 }}>
+              {groupByCategory(catalog).map(([cat, items]) => {
+                const open = openCat === cat;
+                return (
+                  <div key={cat} className="mb-1">
+                    <button onClick={() => setOpenCat(open ? null : cat)}
+                      className="w-full flex items-center justify-between px-1.5 py-1.5 rounded text-[10px] uppercase tracking-wide font-bold"
+                      style={{ color: 'var(--ap-text-4)', background: open ? 'var(--ap-surface-3)' : 'transparent' }}>
+                      <span>{cat}</span>
+                      <ChevronDown size={13} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                    </button>
+                    {open && (
+                      <div className="pt-1 pb-1">
+                        {items.map((def) => (
+                          <button key={def.type} onClick={() => addNode(def)} title={def.description}
+                            className="w-full text-left text-[11px] rounded px-2 py-1.5 mb-1 flex items-center gap-1"
+                            style={{ background: 'var(--ap-surface)', border: '1px solid var(--ap-border)', color: 'var(--ap-text-2)', cursor: 'pointer' }}>
+                            <Plus size={11} className="shrink-0" />
+                            <span className="truncate">{def.label || def.type}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <CollapsedRail side="left" icon={Layers} label="Passos" onExpand={() => setPaletteOpen(true)} />
+        ))}
+
+        {/* Canvas */}
+        <div ref={flowWrapRef} style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+          <ReactFlow
+            nodes={rfNodes}
+            edges={rfEdges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={NODE_TYPES}
+            onSelectionChange={({ nodes: sel }) => setSelId(sel?.[0]?.id ?? null)}
+            nodesDraggable={canWrite}
+            nodesConnectable={canWrite}
+            elementsSelectable
+            fitView
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background gap={18} color="var(--ap-border)" />
+            <Controls showInteractive={false}
+              style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--ap-border)', boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }} />
+            <MiniMap pannable zoomable
+              style={{ width: 132, height: 88, background: 'var(--ap-surface-2)', border: '1px solid var(--ap-border)', borderRadius: 8 }}
+              nodeColor="#94a3b8" nodeStrokeColor="#64748b" maskColor="rgba(100,116,139,0.14)" />
+          </ReactFlow>
+        </div>
+
+        {/* Inspector (propriedades do nó selecionado) */}
+        {inspectorOpen ? (
+          <div style={{ width: 260, borderLeft: '1px solid var(--ap-border)', background: 'var(--ap-surface-2)', display: 'flex', flexDirection: 'column' }}>
+            <div className="flex items-center justify-between px-2 py-1.5" style={{ borderBottom: '1px solid var(--ap-border)' }}>
+              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: 'var(--ap-text-4)' }}>Propriedades</p>
+              <button onClick={() => setInspectorOpen(false)} title="Recolher" className="p-0.5 rounded" style={{ color: 'var(--ap-text-4)' }}><ChevronRight size={14} /></button>
+            </div>
+            <div style={{ overflowY: 'auto', padding: 10 }}>
+              {!selected ? (
+                <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Clique num passo para configurar.</p>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--ap-text-1)' }}>{selectedDef?.label || selected.data.nodeType}</p>
+                    {selectedDef?.description && <p className="text-[11px] mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{selectedDef.description}</p>}
+                  </div>
+
+                  <FormField label="Nome do passo">
+                    <TextInput className="text-xs" value={selected.data.name ?? ''} placeholder={selectedDef?.label} disabled={!canWrite}
+                      onChange={(e) => setNodeName(e.target.value)} />
+                  </FormField>
+
+                  {selectedDef ? (
+                    (selectedDef.fields || []).length ? (
+                      <div className="space-y-2.5">
+                        <p className="text-[10px] mt-1" style={{ color: 'var(--ap-text-5)' }}>
+                          Campos de texto aceitam {'{{variáveis}}'} — ex.: {'{{input.phone}}'}, {'{{vars.passo_1.status}}'}.
+                        </p>
+                        {(selectedDef.fields || []).map((f) => (
+                          <InspectorField
+                            key={`${selected.id}:${f.key}`}
+                            field={f}
+                            value={selected.data.config?.[f.key]}
+                            jsonDraft={f.type === 'json' ? jsonDraftFor(f) : undefined}
+                            refs={refs}
+                            disabled={!canWrite}
+                            onChange={(v) => setField(f.key, v)}
+                            onJsonDraft={(text) => setJsonDraft(f.key, text)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Este passo não precisa de configuração.</p>
+                    )
+                  ) : (
+                    <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Tipo de passo desconhecido (não está no catálogo atual).</p>
+                  )}
+
+                  {canWrite && (
+                    <button className="btn-secondary text-xs w-full" onClick={() => setRemoving(true)}>
+                      <Trash2 size={12} /> Remover passo
+                    </button>
+                  )}
+
+                  <p className="text-[9px] font-mono" style={{ color: 'var(--ap-text-5)' }}>{selected.id} · {selected.data.nodeType}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <CollapsedRail side="right" icon={SlidersHorizontal} label="Propriedades" onExpand={() => setInspectorOpen(true)} />
+        )}
       </div>
 
       <p className="text-[11px]" style={{ color: 'var(--ap-text-5)' }}>
-        Duplo-clique num passo abre a configuração. Arraste das alças (handles) para ligar os passos; a alça de saída "erro" cria a aresta condicional.
+        Clique num passo para configurar. Arraste das alças (handles) à direita para ligar os passos; a saída "erro"/"falso" cria a aresta condicional.
       </p>
-
-      {/* Paleta */}
-      <NodePaletteModal open={paletteOpen} onClose={() => setPaletteOpen(false)} catalog={catalog} onPick={addNode} />
 
       {/* Gatilho */}
       <Modal open={triggerOpen} onClose={() => setTriggerOpen(false)} title="Gatilho do fluxo" size="md">
@@ -270,13 +647,15 @@ function FluxoCanvasInner() {
         />
       </Modal>
 
-      {/* Config do passo (reusa o modal declarativo da Fase 4) */}
-      <NodeConfigModal
-        open={editingNodeId !== null}
-        node={editingNode}
-        definition={editingNode ? defsByType[editingNode.type] : null}
-        onClose={() => setEditingNodeId(null)}
-        onSave={applyNodeConfig}
+      {/* Remover passo */}
+      <ConfirmDialog
+        open={removing}
+        danger
+        title="Remover passo"
+        message={`Remover o passo "${selected?.data.name || ''}" da edição atual? A remoção só vale ao salvar uma nova versão.`}
+        confirmLabel="Remover"
+        onClose={() => setRemoving(false)}
+        onConfirm={removeSelected}
       />
 
       {/* Salvar versão */}
@@ -317,139 +696,13 @@ function FluxoCanvasInner() {
   );
 }
 
-// Nó custom: label + handle de entrada (topo) + um handle de saída por output
-// (base). O id do handle de saída = nome do output ('success','error',...).
-function StudioNode({ data }) {
-  const outputs = data.definition?.outputs?.length ? data.definition.outputs : ['success'];
-  const category = data.definition?.category;
+// Editor VISUAL do fluxo (canvas React Flow). Consome o MESMO grafo JSON
+// { nodes:[{id,type,name,config}], edges:[{from,to,when}] } do editor em lista.
+// Salvar = nova versão imutável. Versões/publicar/dry-run/export preservados.
+export default function FluxoCanvas() {
   return (
-    <div
-      className="rounded-lg px-3 py-2 shadow-sm"
-      style={{ background: 'var(--ap-surface)', border: '1px solid var(--ap-border)', minWidth: 150, maxWidth: 220 }}
-    >
-      <Handle type="target" position={Position.Top} style={{ background: 'var(--ap-accent, #6366f1)' }} />
-      {category && (
-        <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-5)' }}>{category}</p>
-      )}
-      <p className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{data.name || data.definition?.label || data.nodeType}</p>
-      <div className="flex justify-around mt-1">
-        {outputs.map((out, i) => (
-          <div key={out} className="relative flex flex-col items-center" style={{ width: `${100 / outputs.length}%` }}>
-            <span className="text-[9px]" style={{ color: out === 'error' ? '#ef4444' : 'var(--ap-text-5)' }}>{out}</span>
-            <Handle
-              type="source"
-              id={out}
-              position={Position.Bottom}
-              style={{
-                left: `${((i + 0.5) / outputs.length) * 100}%`,
-                background: out === 'error' ? '#ef4444' : 'var(--ap-accent, #6366f1)',
-              }}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
+    <ReactFlowProvider>
+      <FluxoCanvasInner />
+    </ReactFlowProvider>
   );
-}
-
-function NodePaletteModal({ open, onClose, catalog, onPick }) {
-  const grouped = useMemo(() => {
-    const map = new Map();
-    for (const def of catalog) {
-      if (!map.has(def.category)) map.set(def.category, []);
-      map.get(def.category).push(def);
-    }
-    return [...map.entries()].sort(
-      (a, b) => NODE_CATEGORY_ORDER.indexOf(a[0]) - NODE_CATEGORY_ORDER.indexOf(b[0]),
-    );
-  }, [catalog]);
-
-  return (
-    <Modal open={open} onClose={onClose} title="Adicionar passo" size="lg">
-      <div className="space-y-4">
-        {grouped.map(([category, defs]) => (
-          <div key={category}>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--ap-text-5)' }}>{category}</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {defs.map((def) => (
-                <button
-                  key={def.type}
-                  className="rounded-lg p-3 text-left transition-colors min-h-[44px] hover:bg-brand/5"
-                  style={{ border: '1px solid var(--ap-border)' }}
-                  onClick={() => onPick(def)}
-                >
-                  <p className="text-sm font-medium" style={{ color: 'var(--ap-text-1)' }}>{def.label}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{def.description}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Modal>
-  );
-}
-
-// ─── Conversão grafo JSON ↔ React Flow ───────────────────────
-
-// Layout automático em cadeia quando o grafo salvo não traz posições
-// (a posição fica em node.config.__pos para persistir sem sujar o config real).
-function graphToFlow(rawGraph, defsByType) {
-  const graph = rawGraph || { nodes: [], edges: [] };
-  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
-  const edges = Array.isArray(graph.edges) ? graph.edges : [];
-
-  const rfNodes = nodes.map((n, i) => {
-    const pos = n.config?.__pos;
-    return {
-      id: n.id,
-      type: 'studioNode',
-      position: pos && typeof pos.x === 'number' ? pos : { x: 160, y: 80 + i * 110 },
-      data: {
-        name: n.name || defsByType[n.type]?.label || n.type,
-        nodeType: n.type,
-        config: stripPos(n.config),
-        definition: defsByType[n.type] || { type: n.type, label: n.name || n.type, outputs: ['success'] },
-      },
-    };
-  });
-
-  const rfEdges = edges.map((e, i) => ({
-    id: e.id || `e_${e.from}_${e.to}_${i}`,
-    source: e.from,
-    target: e.to,
-    // 'when' vira o handle de saída (success = handle padrão).
-    sourceHandle: e.when || 'success',
-    type: 'default',
-  }));
-
-  return { rfNodes, rfEdges };
-}
-
-function flowToGraph(rfNodes, rfEdges) {
-  return {
-    nodes: rfNodes.map((n) => ({
-      id: n.id,
-      type: n.data.nodeType,
-      name: n.data.name,
-      // Persiste a posição dentro do config para reidratar o canvas.
-      config: { ...(n.data.config || {}), __pos: { x: Math.round(n.position.x), y: Math.round(n.position.y) } },
-    })),
-    edges: rfEdges.map((e) => ({
-      from: e.source,
-      to: e.target,
-      ...(e.sourceHandle && e.sourceHandle !== 'success' ? { when: e.sourceHandle } : {}),
-    })),
-  };
-}
-
-function stripPos(config) {
-  if (!config || typeof config !== 'object') return {};
-  const { __pos, ...rest } = config; // eslint-disable-line no-unused-vars
-  return rest;
-}
-
-function normalizeTrigger(raw) {
-  const t = raw || {};
-  return { type: t.type || 'manual', event: t.event, schedule: t.schedule };
 }
