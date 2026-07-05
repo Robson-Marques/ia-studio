@@ -21,7 +21,15 @@ export class CoreAuthRepository {
         organization: { select: { id: true, name: true, slug: true, branding: true, is_active: true } },
         memberships: {
           include: {
-            workspace: { select: { id: true, name: true, slug: true, is_active: true } },
+            workspace: {
+              select: {
+                id: true, name: true, slug: true, is_active: true,
+                environments: {
+                  select: { id: true, name: true, kind: true, is_default: true },
+                  orderBy: { created_at: 'asc' },
+                },
+              },
+            },
             profile: { select: { id: true, name: true, permissions: true, deleted_at: true } },
           },
         },

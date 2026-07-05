@@ -90,6 +90,14 @@ export class CoreAuthService {
           id: m.workspace.id,
           name: m.workspace.name,
           slug: m.workspace.slug,
+          // Ambientes do workspace — o shell precisa deles pro seletor e pra
+          // escopar conexoes/fluxos (sem isso o front nao tem "ambiente").
+          environments: (m.workspace.environments ?? []).map((e) => ({
+            id: e.id,
+            name: e.name,
+            kind: e.kind,
+            is_default: e.is_default,
+          })),
           profile_id: m.profile?.id ?? null,
           profile_name: m.profile?.name ?? null,
           permissions: perms,

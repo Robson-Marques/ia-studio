@@ -65,7 +65,7 @@ export default function Header({ onToggleSidebar }) {
 
   const crumb = BREADCRUMBS[location.pathname]
     || (location.pathname.startsWith('/automacao/fluxos/') ? 'Automação / Fluxos / Editor' : 'IA Studio');
-  const envInfo = environment ? (ENV_BADGE[environment.type] || { label: environment.type, variant: 'gray' }) : null;
+  const envInfo = environment ? (ENV_BADGE[environment.kind] || { label: environment.name || environment.kind, variant: 'gray' }) : null;
 
   return (
     <header
@@ -133,7 +133,7 @@ export default function Header({ onToggleSidebar }) {
                     {w.id === workspace?.id && (w.environments || []).length > 0 && (
                       <div className="pl-8 pr-3 pb-1 flex flex-wrap gap-1">
                         {w.environments.map((e) => {
-                          const info = ENV_BADGE[e.type] || { label: e.type, variant: 'gray' };
+                          const info = ENV_BADGE[e.kind] || { label: e.name || e.kind, variant: 'gray' };
                           const on = e.id === environment?.id;
                           return (
                             <button

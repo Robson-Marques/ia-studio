@@ -107,7 +107,9 @@ export default function ConnectionWizard({ open, provider, onClose, onCreated })
     <Modal
       open={open}
       onClose={saving ? undefined : onClose}
-      dismissable={!saving}
+      // Formulario de varios passos: NAO fecha por clique fora/Esc (evita perder
+      // os dados preenchidos). Só fecha pelo X ou pelos botoes.
+      dismissable={false}
       title={`Conectar — ${provider.name}`}
       size="lg"
       footer={
@@ -170,10 +172,17 @@ export default function ConnectionWizard({ open, provider, onClose, onCreated })
               ) : (
                 <TextInput
                   type={field.secret || field.type === 'password' ? 'password' : field.type === 'number' ? 'number' : 'text'}
+                  name={`wiz-${provider.key}-${field.key}`}
                   value={values[field.key] ?? ''}
                   onChange={(e) => setValue(field.key, e.target.value)}
                   placeholder={field.placeholder}
-                  autoComplete="off"
+                  // Bloqueia autofill do navegador (Firefox tratava o form como
+                  // login e jogava e-mail/senha nos campos). new-password nos
+                  // secretos + off nos demais é o combo confiavel.
+                  autoComplete={field.secret || field.type === 'password' ? 'new-password' : 'off'}
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-form-type="other"
                 />
               )}
             </FormField>
