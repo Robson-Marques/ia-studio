@@ -13,12 +13,14 @@ import {
 import { ATTENDANCE_STATUS, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
 
+// Ticks estilo WhatsApp (sempre sobre balão claro): cinza p/ enviado/entregue,
+// azul p/ lido, vermelho p/ falha.
 function StatusTicks({ status }) {
-  if (status === 'read') return <CheckCheck size={13} className="text-sky-400" />;
-  if (status === 'delivered') return <CheckCheck size={13} style={{ color: 'var(--ap-text-4)' }} />;
-  if (status === 'sent') return <Check size={13} style={{ color: 'var(--ap-text-4)' }} />;
-  if (status === 'failed') return <AlertTriangle size={13} className="text-red-400" />;
-  return <Clock size={13} style={{ color: 'var(--ap-text-4)' }} />;
+  if (status === 'read') return <CheckCheck size={14} style={{ color: '#53bdeb' }} />;
+  if (status === 'delivered') return <CheckCheck size={14} style={{ color: '#8696a0' }} />;
+  if (status === 'sent') return <Check size={14} style={{ color: '#8696a0' }} />;
+  if (status === 'failed') return <AlertTriangle size={13} style={{ color: '#dc2626' }} />;
+  return <Clock size={13} style={{ color: '#8696a0' }} />;
 }
 
 // Mídia inbound: baixa da Meta sob demanda (proxy base64 do backend).
@@ -67,31 +69,34 @@ function InboundMedia({ chatId, message }) {
   );
 }
 
+// Balão estilo WhatsApp oficial: enviado = verde (#d9fdd3) à direita,
+// recebido = branco à esquerda, texto escuro, sombra leve. Cores fixas
+// (independem do tema do painel) — igual ao Aquapark.
 function Bubble({ chatId, message }) {
   const outgoing = message.direction === 'OUTGOING';
   return (
     <div className={outgoing ? 'flex justify-end' : 'flex justify-start'}>
       <div
-        className="max-w-[80%] md:max-w-[65%] rounded-xl px-3 py-2 text-sm space-y-1"
+        className="max-w-[80%] md:max-w-[65%] rounded-lg px-2.5 py-1.5 text-sm space-y-1"
         style={{
-          backgroundColor: outgoing ? 'var(--ap-accent, #6366f1)' : 'var(--ap-surface-3)',
-          color: outgoing ? '#fff' : 'var(--ap-text-1)',
+          backgroundColor: outgoing ? '#d9fdd3' : '#ffffff',
+          color: '#111b21',
+          boxShadow: '0 1px 0.5px rgba(11,20,26,.13)',
         }}
       >
         {(message.media && (message.media.media_id || message.media.url)) && (
           outgoing
-            ? (message.media.url && <a className="text-xs underline break-all" href={message.media.url} target="_blank" rel="noreferrer">{message.media.url}</a>)
+            ? (message.media.url && <a className="text-xs underline break-all" href={message.media.url} target="_blank" rel="noreferrer" style={{ color: '#027eb5' }}>{message.media.url}</a>)
             : <InboundMedia chatId={chatId} message={message} />
         )}
         {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
-        <div className={`flex items-center gap-1 justify-end text-[10px] ${outgoing ? 'text-white/70' : ''}`}
-          style={outgoing ? undefined : { color: 'var(--ap-text-4)' }}>
+        <div className="flex items-center gap-1 justify-end text-[10px]" style={{ color: '#667781' }}>
           {message.type === 'template' && <span>(modelo)</span>}
           <span>{new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           {outgoing && <StatusTicks status={message.status} />}
         </div>
         {message.status === 'failed' && message.error_detail && (
-          <p className="text-[10px] text-red-300">{message.error_detail}</p>
+          <p className="text-[10px]" style={{ color: '#dc2626' }}>{message.error_detail}</p>
         )}
       </div>
     </div>
@@ -191,7 +196,16 @@ export default function ChatWindow({
       </div>
 
       {/* Mensagens */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2" style={{ backgroundColor: 'var(--ap-bg-page)' }}>
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2"
+        style={{
+          // Fundo estilo WhatsApp: bege + padrão sutil de pontinhos (igual Aquapark).
+          backgroundColor: '#efeae2',
+          backgroundImage: 'radial-gradient(rgba(11,20,26,0.045) 1px, transparent 0)',
+          backgroundSize: '22px 22px',
+        }}
+      >
         {messages.map((m) => <Bubble key={m.id} chatId={chat.id} message={m} />)}
         {messages.length === 0 && (
           <p className="text-center text-xs py-8" style={{ color: 'var(--ap-text-4)' }}>Sem mensagens ainda.</p>
