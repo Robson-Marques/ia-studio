@@ -18,7 +18,7 @@
 //      com qualquer um dos dois ERPs, sem tocar em tool nenhuma.
 //   2) Operacoes GENERICAS (`ixc.listar/inserir/editar/excluir`) pra qualquer
 //      tabela — usadas por nos de workflow e usuarios avancados.
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ProviderCategory } from '@prisma/client';
 import { BaseProvider } from './base.provider';
 import {
@@ -87,8 +87,15 @@ const OPERATIONS = [
 
 type Operation = (typeof OPERATIONS)[number];
 
+// Paginacao das consultas de escopo. PAGE_SIZE alto reduz idas e vindas;
+// MAX_PAGES e o teto que impede um escopo largo demais de varrer a base.
+const PAGE_SIZE = 500;
+const MAX_PAGES = 20;
+
 @Injectable()
 export class IxcProvider extends BaseProvider {
+  private readonly logger = new Logger(IxcProvider.name);
+
   metadata(): ProviderMetadata {
     return {
       key: 'ixc',
@@ -313,9 +320,8 @@ export class IxcProvider extends BaseProvider {
 
     // Topologia PON: primeiro estagio devolve os id_login daquela porta/slot.
     if (fibra.length > 0) {
-      const onus = await this.list(ctx, token, FIBRA_TABLE, {
-        page: '1',
-        rp: '1000',
+      const onus = await this.listAll(ctx, token, FIBRA_TABLE, {
+        rp: String(PAGE_SIZE),
         sortname: `${FIBRA_TABLE}.id`,
         sortorder: 'asc',
         grid_param: buildGridParam(fibra),
@@ -335,9 +341,8 @@ export class IxcProvider extends BaseProvider {
     // que HERDAM o endereco (`endereco_padrao_cliente = 'S'`). Os de endereco
     // proprio ja vieram acima, e incluir os demais colocaria no incidente um
     // login que esta fisicamente noutro bairro.
-    const clientes = await this.list(ctx, token, T.cliente, {
-      page: '1',
-      rp: '1000',
+    const clientes = await this.listAll(ctx, token, T.cliente, {
+      rp: String(PAGE_SIZE),
       sortname: `${T.cliente}.id`,
       sortorder: 'asc',
       grid_param: buildGridParam(geoCli),
@@ -361,9 +366,8 @@ export class IxcProvider extends BaseProvider {
   }
 
   private listLogins(ctx: ProviderContext, token: string, filters: IxcGridFilter[]): Promise<Record<string, unknown>[]> {
-    return this.list(ctx, token, T.radusuarios, {
-      page: '1',
-      rp: '1000',
+    return this.listAll(ctx, token, T.radusuarios, {
+      rp: String(PAGE_SIZE),
       sortname: `${T.radusuarios}.id`,
       sortorder: 'asc',
       grid_param: buildGridParam(filters),
@@ -469,19 +473,24 @@ export class IxcProvider extends BaseProvider {
     const logins = await this.resolveLogins(ctx, token, args);
     if (logins.length === 0) return [];
 
-    // Lote unico de clientes (operador IN) → nome + telefone pro disparo.
+    // Clientes em lotes (operador IN) → nome + telefone pro disparo. Em lotes
+    // porque um IN longo devolve vazio sem erro: os afetados ficariam sem nome
+    // nem telefone, e o disparo proativo sairia mudo.
     const ids = [...new Set(logins.map((l) => String(l['id_cliente'] ?? '')).filter(Boolean))];
-    const clientes = ids.length
-      ? await this.list(ctx, token, T.cliente, {
+    const clientes: Record<string, unknown>[] = [];
+    for (const lote of chunk(ids, IN_CHUNK_SIZE)) {
+      clientes.push(
+        ...(await this.list(ctx, token, T.cliente, {
           qtype: `${T.cliente}.id`,
-          query: ids.join(','),
+          query: lote.join(','),
           oper: 'IN',
           page: '1',
-          rp: String(ids.length),
+          rp: String(lote.length),
           sortname: `${T.cliente}.id`,
           sortorder: 'asc',
-        })
-      : [];
+        })),
+      );
+    }
     const byId = new Map(clientes.map((c) => [String(c['id']), c]));
 
     return logins.map((l) => {
@@ -534,6 +543,30 @@ export class IxcProvider extends BaseProvider {
   }
 
   // ─── Transporte ─────────────────────────────────────
+
+  /**
+   * Listagem paginada ate o fim. `rp` sozinho TRUNCA em silencio: pedir 1000 num
+   * bairro com 1200 clientes devolve 1000 e nenhum aviso — a mesma familia de
+   * falha muda do `IN` grande e do `online` mal lido. Percorre as paginas ate vir
+   * menos que uma pagina cheia, com teto (MAX_PAGES) pra nao varrer a base toda
+   * quando o escopo e largo demais; ao bater no teto, avisa no log.
+   */
+  private async listAll(
+    ctx: ProviderContext,
+    token: string,
+    tabela: string,
+    params: IxcListParams,
+  ): Promise<Record<string, unknown>[]> {
+    const rp = params.rp ?? String(PAGE_SIZE);
+    const out: Record<string, unknown>[] = [];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const rows = await this.list(ctx, token, tabela, { ...params, page: String(page), rp });
+      out.push(...rows);
+      if (rows.length < Number(rp)) return out;
+    }
+    this.logger.warn(`IXC: "${tabela}" atingiu o teto de ${MAX_PAGES} páginas — escopo largo demais, resultado truncado.`);
+    return out;
+  }
 
   /**
    * Listagem (POST + header `ixcsoft: listar`). Devolve as linhas ja extraidas e

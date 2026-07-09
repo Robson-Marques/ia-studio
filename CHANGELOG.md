@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.10 - 2026-07-09 (o `rp` do IXC também trunca calado)
+
+- **Paginação de verdade nas consultas de escopo (IXC).** `rp: 1000` trunca em silêncio: um bairro com 1200 clientes devolvia 1000 e nenhum aviso. `listAll()` percorre as páginas até vir menos que uma página cheia, com teto de 20 páginas (avisa no log ao bater). O CENTRO, com 768 clientes, passava raspando.
+- **O lote que busca nome/telefone dos afetados usava um `IN` longo.** Com os 497 logins do CENTRO ele voltaria vazio: o incidente sairia sem nome e sem telefone, e o disparo proativo notificaria ninguém com aparência de sucesso. Agora vai em lotes de 100, como o resto.
+
 ## v0.9.9 - 2026-07-09 (o `IN` do IXC falha calado)
 
 - **`IN` com muitos ids devolve lista vazia, sem erro (IXC).** A união geográfica da v0.9.8 montava um `IN` com os ~768 ids de clientes do bairro numa string única. O IXC não recusa: responde `registros: []`. Resultado: `herdados` vazio, união sem efeito, e o `bairro` continuava devolvendo os mesmos 38 logins de endereço próprio — um número plausível, produzido por uma falha silenciosa. Agora o `IN` vai em **lotes de 100** (`IN_CHUNK_SIZE`). Confirmado que `grid_param` e `financeiro.boleto_aberto_todos` estavam corretos — o culpado era só o tamanho da lista.
