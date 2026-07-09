@@ -393,13 +393,19 @@ export class IxcProvider extends BaseProvider {
     return [];
   }
 
-  private async clienteId(ctx: ProviderContext, token: string, cpf?: string): Promise<string> {
+  /** Linha do cliente (nao so o id): a OS precisa da filial que vem no cadastro. */
+  private async clienteRow(ctx: ProviderContext, token: string, cpf?: string): Promise<Record<string, unknown>> {
     const rows = await this.findClientes(ctx, token, cpf);
-    const id = rows[0]?.['id'];
-    if (id === undefined || id === null || id === '') {
+    const row = rows[0];
+    const id = row?.['id'];
+    if (!row || id === undefined || id === null || id === '') {
       throw new BadRequestException(`Nenhum cliente encontrado no IXC com o CPF/CNPJ "${cpf}".`);
     }
-    return String(id);
+    return row;
+  }
+
+  private async clienteId(ctx: ProviderContext, token: string, cpf?: string): Promise<string> {
+    return String((await this.clienteRow(ctx, token, cpf))['id']);
   }
 
   /** Status de conexao do cliente (Radius). Aceita cpf OU login PPPoE. */
@@ -516,7 +522,7 @@ export class IxcProvider extends BaseProvider {
    * permite sobrescrever qualquer um deles sem tocar no provider.
    */
   private async abrirOs(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
-    const clienteId = await this.clienteId(ctx, token, this.str(args, 'cpf', true));
+    const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true));
     const assunto = this.str(args, 'id_assunto') ?? this.str(args, 'motivo');
     const setor = this.str(args, 'setor');
     const login = this.str(args, 'id_login');
@@ -525,17 +531,30 @@ export class IxcProvider extends BaseProvider {
         'Informe "id_assunto" (id do assunto da OS no IXC). Os assuntos disponíveis vêm do Descobrir recursos da conexão.',
       );
     }
+    // O IXC exige Setor e Filial ("Preencha Filial<br />Preencha Setor").
+    // Setor e decisao de operacao — nao ha default sensato. Filial vem do cadastro
+    // do cliente, entao so precisa ser informada quando o cadastro nao a tiver.
+    if (!setor) {
+      throw new BadRequestException(
+        'Informe "setor" (id do setor de OS no IXC) — é obrigatório. Os setores disponíveis vêm do Descobrir recursos da conexão.',
+      );
+    }
+    const idFilial = this.str(args, 'id_filial') ?? this.str(cliente, 'filial_id');
+    if (!idFilial) {
+      throw new BadRequestException('Cliente sem filial no cadastro do IXC — informe "id_filial".');
+    }
     const body: Record<string, unknown> = {
       tipo: 'C',
-      id_cliente: clienteId,
+      id_cliente: String(cliente['id']),
+      id_filial: idFilial,
       id_assunto: assunto,
+      setor,
       mensagem: this.str(args, 'descricao', true),
       status: 'A',
       prioridade: 'N',
       melhor_horario_agenda: 'Q',
       origem_endereco: 'M',
       data_abertura: ixcDateTime(),
-      ...(setor ? { setor } : {}),
       ...(login ? { id_login: login } : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };

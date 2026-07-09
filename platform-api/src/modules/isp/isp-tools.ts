@@ -265,9 +265,10 @@ export class IspTools implements OnModuleInit {
         properties: {
           cpf: { type: 'string' },
           customer_ref: { type: 'string', description: 'Login/CPF do cliente (checagem de incidente ativo).' },
-          setor: { type: 'string' },
+          setor: { type: 'string', description: 'Id do setor de OS. OBRIGATÓRIO no IXC (vem do "Descobrir recursos" da conexão).' },
           motivo: { type: 'string', description: 'Assunto/motivo da OS. No IXC é o id do assunto (su_oss_assunto).' },
-          id_assunto: { type: 'string', description: 'Id do assunto da OS (IXC). Obtido no "Descobrir recursos" da conexão.' },
+          id_assunto: { type: 'string', description: 'Id do assunto da OS (IXC). OBRIGATÓRIO no IXC; vem do "Descobrir recursos" da conexão.' },
+          id_filial: { type: 'string', description: 'Filial da OS. Se omitido, usa a filial do cadastro do cliente.' },
           descricao: { type: 'string' },
           connection_id: { type: 'string' }, filial: { type: 'string' },
         },
@@ -296,6 +297,7 @@ export class IspTools implements OnModuleInit {
         if (typeof args['setor'] === 'string') params['setor'] = args['setor'];
         if (typeof args['motivo'] === 'string') params['motivo'] = args['motivo'];
         if (typeof args['id_assunto'] === 'string') params['id_assunto'] = args['id_assunto'];
+        if (typeof args['id_filial'] === 'string') params['id_filial'] = args['id_filial'];
         const os = await this.connections.execute(ctx.organizationId, connectionId, 'os.cadastrar', params);
         return { os_suppressed: false, os, active_incident: incident };
       },
