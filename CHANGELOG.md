@@ -1,5 +1,9 @@
 # Changelog — IA Studio
 
+## Não publicado
+
+- Doc: como conferir o efeito do desbloqueio de confiança no IXC — `dt_ult_ativacao` (data de hoje) e `nao_bloquear_ate` (o prazo). **Não** `desbloqueio_confianca_ativo` nem `dt_ult_des_bloq_conf`: parecem os campos certos pelo nome, e ficam inalterados após um desbloqueio bem-sucedido. Verificado em base real (contrato bloqueado em 03/07, desbloqueado por 5 dias em 09/07).
+
 ## v0.9.12 - 2026-07-09 (boletos abertos, telefone e desbloqueio corretos)
 
 - **"Boleto em aberto" não é `status = 'A'` (IXC).** O exemplo oficial "Listar boletos abertos" filtra `liberado = 'S'` **e** `status != 'C'` (cancelado) **e** `status != 'R'` (recebido). Meu filtro por `status = 'A'` perdia títulos abertos noutro estado (renegociado, em cobrança) e incluía títulos **não liberados** — o cliente veria dívida a menos, ou receberia cobrança de um boleto que o provedor não liberou. Afeta `consultar_debitos`, `segunda_via_boleto` e `financeiro.boleto_base64`.

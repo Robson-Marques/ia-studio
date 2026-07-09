@@ -459,9 +459,14 @@ export class IxcProvider extends BaseProvider {
    * Desbloqueio de confianca: roda sobre o contrato ATIVO (`status = 'A'`).
    *
    * A rota `desbloqueio_confianca` recebe `id` = id do CONTRATO e e chamada no
-   * modo listar (ver `callListar`). `desbloqueio_confianca` tambem e o nome de
-   * uma coluna de `cliente_contrato` — nao confundir: quem indica o estado e
-   * `desbloqueio_confianca_ativo` ('S' apos o desbloqueio).
+   * modo listar (ver `callListar`). Verificada em base real (09/07/2026): a
+   * resposta traz o prazo concedido ("desbloqueado por 5 dias, ate DD/MM").
+   *
+   * COMO CONFERIR O EFEITO: `cliente_contrato.dt_ult_ativacao` (data de hoje) e
+   * `nao_bloquear_ate` (o prazo). NAO use `desbloqueio_confianca_ativo` nem
+   * `dt_ult_des_bloq_conf` — parecem os campos certos pelo nome e nao sao; ficam
+   * inalterados apos um desbloqueio bem-sucedido. `desbloqueio_confianca` (sem
+   * `_ativo`) e coluna de configuracao do contrato, nao de estado.
    *
    * NAO ha fallback: sem exatamente um contrato ativo, falha alto. Desbloquear
    * o contrato errado e pior do que nao desbloquear.

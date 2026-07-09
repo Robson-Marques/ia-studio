@@ -29,6 +29,18 @@ ERP é trocar a Connection: **nenhuma tool, serviço ou cron muda**.
 | `atendimento.listar_setor` | `atendimento/listar_setor` | `su_oss_setor` |
 | `atendimento.listar_motivo_atendimento` | `atendimento/listar_motivo_atendimento` | `su_oss_assunto` |
 
+> **Verificação:** todas as operações do IXC foram exercitadas contra uma base
+> real em 09/07/2026 (leitura, abertura de OS e desbloqueio de confiança).
+> Nenhuma continua apoiada em suposição.
+>
+> **A API do IXC erra calado.** Ela raramente levanta erro — devolve menos. Sete
+> exemplos encontrados: `radusuarios.online` vale `"S"` (a collection mostra
+> `"SS"`); `interface_transmissao_fibra` não existe na leitura; `"0"` significa
+> "não configurado" e como filtro casa com a base toda; `radusuarios.bairro` só
+> é preenchido para endereço próprio; `IN` com centenas de ids devolve
+> `registros: []`; `rp` trunca sem avisar; e "boleto em aberto" **não** é
+> `status = 'A'`. Ao mexer aqui, desconfie de todo número plausível.
+
 Diferenças conhecidas do IXC (assumidas, não contornadas):
 
 - **Sem envio de boleto por e-mail** pela API → `segunda_via_boleto` só aceita
