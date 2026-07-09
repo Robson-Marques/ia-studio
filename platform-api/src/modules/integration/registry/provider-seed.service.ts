@@ -11,6 +11,7 @@ import { ProviderRegistryService } from './provider-registry.service';
 import { CATALOG_ONLY_PROVIDERS } from './provider-catalog';
 import { ProviderMetadata } from '../../../shared/integration/provider.interface';
 import { AltaredeProvider } from './providers/altarede.provider';
+import { IxcProvider } from './providers/ixc.provider';
 import { OpenAiProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { PostgresqlProvider } from './providers/postgresql.provider';
@@ -33,6 +34,7 @@ export class ProviderSeedService implements OnApplicationBootstrap {
     private readonly repository: RegistryRepository,
     private readonly registry: ProviderRegistryService,
     private readonly altarede: AltaredeProvider,
+    private readonly ixc: IxcProvider,
     private readonly openai: OpenAiProvider,
     private readonly anthropic: AnthropicProvider,
     private readonly postgresql: PostgresqlProvider,
@@ -45,7 +47,7 @@ export class ProviderSeedService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     // 1) Registro em memoria das implementacoes (diretriz 2).
-    for (const provider of [this.altarede, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.googleWorkspace]) {
+    for (const provider of [this.altarede, this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.googleWorkspace]) {
       this.registry.register(provider);
     }
 

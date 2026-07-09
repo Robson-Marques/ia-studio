@@ -4,6 +4,7 @@ import { ProviderRegistryService } from './provider-registry.service';
 import { ProviderSeedService } from './provider-seed.service';
 import { RegistryRepository } from './registry.repository';
 import { AltaredeProvider } from './providers/altarede.provider';
+import { IxcProvider } from './providers/ixc.provider';
 import { OpenAiProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { PostgresqlProvider } from './providers/postgresql.provider';
@@ -19,6 +20,7 @@ import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
     ProviderSeedService,
     RegistryRepository,
     AltaredeProvider,
+    IxcProvider,
     OpenAiProvider,
     AnthropicProvider,
     PostgresqlProvider,

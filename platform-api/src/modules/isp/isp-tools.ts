@@ -1,9 +1,13 @@
 // Tools do agente ISP (Fase 6 §2) — registradas no MESMO mecanismo das tools
 // builtin (ToolRegistryService), semeadas no catalogo ai_tools pelo seed da
 // Fase 5 (AiProvidersSeedService itera toolRegistry.all()). Cada tool:
-//   * resolve a conexao Altarede (IspConnectionResolver — nunca conhece o ERP);
+//   * resolve a conexao de ERP (IspConnectionResolver — nunca sabe QUAL ERP);
 //   * chama ConnectionsService.execute (Provider Registry → IntegrationLog);
-//   * A IA NUNCA chama a API Altarede direto.
+//   * A IA NUNCA chama a API do ERP direto.
+// As chaves de operacao abaixo (`cliente.dados`, `financeiro.*`, `os.cadastrar`)
+// sao o CONTRATO CANONICO do ERP de provedor: Altarede e IXC implementam as
+// mesmas chaves, cada um traduzindo pra sua API. Trocar de ERP = trocar a
+// conexao; nenhuma tool muda.
 // abrir_os e status_regiao consultam IncidentLookupService (modo reativo):
 // se o cliente pertence a incidente ATIVO, devolvem o informativo e suprimem OS.
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
@@ -33,7 +37,12 @@ export class IspTools implements OnModuleInit {
     private readonly lookup: IncidentLookupService,
   ) {}
 
-  /** Resolve a conexao Altarede do escopo do run (aceita connection_id/tag opcionais). */
+  /**
+   * Resolve a conexao de ERP do escopo do run (aceita connection_id/tag
+   * opcionais). `erp` nao entra no schema das tools de proposito: escolher o
+   * ERP e decisao de operador (prioridade da conexao / tag), nao do modelo —
+   * mas nos de workflow podem passa-lo explicitamente.
+   */
   private async connectionId(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<string> {
     const connection = await this.resolver.resolve({
       organizationId: ctx.organizationId,
@@ -41,6 +50,7 @@ export class IspTools implements OnModuleInit {
       environmentId: ctx.environmentId ?? undefined,
       connectionId: typeof args['connection_id'] === 'string' ? (args['connection_id'] as string) : undefined,
       tag: typeof args['filial'] === 'string' ? (args['filial'] as string) : undefined,
+      providerKey: typeof args['erp'] === 'string' ? (args['erp'] as string) : undefined,
     });
     return connection.id;
   }
@@ -59,14 +69,14 @@ export class IspTools implements OnModuleInit {
     this.registry.register({
       key: 'identificar_cliente',
       name: 'Identificar cliente (ISP)',
-      description: 'Busca os dados cadastrais de um cliente do provedor por CPF/CNPJ no ERP Altarede.',
+      description: 'Busca os dados cadastrais de um cliente do provedor por CPF/CNPJ no ERP (Altarede ou IXC).',
       category: 'isp',
       input_schema: {
         type: 'object',
         properties: {
           cpf: { type: 'string', description: 'CPF ou CNPJ do cliente.' },
-          connection_id: { type: 'string', description: 'Conexão Altarede (opcional; resolvida automaticamente).' },
-          filial: { type: 'string', description: 'Tag/filial quando há múltiplas conexões Altarede (opcional).' },
+          connection_id: { type: 'string', description: 'Conexão do ERP (opcional; resolvida automaticamente).' },
+          filial: { type: 'string', description: 'Tag/filial quando há múltiplas conexões de ERP (opcional).' },
         },
         required: ['cpf'],
       },
@@ -82,7 +92,7 @@ export class IspTools implements OnModuleInit {
     this.registry.register({
       key: 'consultar_debitos',
       name: 'Consultar débitos (ISP)',
-      description: 'Lista boletos em aberto e histórico financeiro de um cliente no Altarede.',
+      description: 'Lista boletos em aberto e histórico financeiro de um cliente no ERP do provedor.',
       category: 'isp',
       input_schema: {
         type: 'object',
@@ -116,7 +126,7 @@ export class IspTools implements OnModuleInit {
     this.registry.register({
       key: 'status_conexao',
       name: 'Status da conexão (ISP)',
-      description: 'Verifica se o cliente está online/offline (IP, MAC, sessão) no Altarede.',
+      description: 'Verifica se o cliente está online/offline (IP, MAC, sessão) no ERP do provedor.',
       category: 'isp',
       input_schema: {
         type: 'object',
@@ -177,13 +187,17 @@ export class IspTools implements OnModuleInit {
     this.registry.register({
       key: 'segunda_via_boleto',
       name: '2ª via de boleto (ISP)',
-      description: 'Gera a 2ª via de boleto (linha digitável + PIX copia-e-cola + PDF/e-mail) no Altarede.',
+      description: 'Gera a 2ª via de boleto (linha digitável + PIX copia-e-cola, PDF ou e-mail) no ERP do provedor.',
       category: 'isp',
       input_schema: {
         type: 'object',
         properties: {
           cpf: { type: 'string' },
-          formato: { type: 'string', enum: ['linha', 'pdf', 'email'], description: 'linha (padrão), pdf (base64) ou email.' },
+          formato: {
+            type: 'string',
+            enum: ['linha', 'pdf', 'email'],
+            description: 'linha (padrão), pdf (base64) ou email. O IXC não suporta "email" — use linha ou pdf.',
+          },
           email: { type: 'string', description: 'Destino quando formato=email.' },
           connection_id: { type: 'string' }, filial: { type: 'string' },
         },
@@ -209,7 +223,7 @@ export class IspTools implements OnModuleInit {
     this.registry.register({
       key: 'desbloqueio_confianca',
       name: 'Desbloqueio de confiança (ISP)',
-      description: 'Libera temporariamente o acesso de um cliente em atraso (desbloqueio de confiança) no Altarede.',
+      description: 'Libera temporariamente o acesso de um cliente em atraso (desbloqueio de confiança) no ERP do provedor.',
       category: 'isp',
       requires_approval: true,
       input_schema: {
@@ -233,7 +247,7 @@ export class IspTools implements OnModuleInit {
       key: 'abrir_os',
       name: 'Abrir ordem de serviço (ISP)',
       description:
-        'Abre uma OS no Altarede. Antes, checa incidente ativo no escopo do cliente: se houver manutenção com supressão de OS, informa e NÃO abre OS duplicada.',
+        'Abre uma OS no ERP do provedor. Antes, checa incidente ativo no escopo do cliente: se houver manutenção com supressão de OS, informa e NÃO abre OS duplicada.',
       category: 'isp',
       requires_approval: true,
       input_schema: {
@@ -242,7 +256,8 @@ export class IspTools implements OnModuleInit {
           cpf: { type: 'string' },
           customer_ref: { type: 'string', description: 'Login/CPF do cliente (checagem de incidente ativo).' },
           setor: { type: 'string' },
-          motivo: { type: 'string' },
+          motivo: { type: 'string', description: 'Assunto/motivo da OS. No IXC é o id do assunto (su_oss_assunto).' },
+          id_assunto: { type: 'string', description: 'Id do assunto da OS (IXC). Obtido no "Descobrir recursos" da conexão.' },
           descricao: { type: 'string' },
           connection_id: { type: 'string' }, filial: { type: 'string' },
         },
@@ -270,6 +285,7 @@ export class IspTools implements OnModuleInit {
         const params: Record<string, unknown> = { cpf, descricao };
         if (typeof args['setor'] === 'string') params['setor'] = args['setor'];
         if (typeof args['motivo'] === 'string') params['motivo'] = args['motivo'];
+        if (typeof args['id_assunto'] === 'string') params['id_assunto'] = args['id_assunto'];
         const os = await this.connections.execute(ctx.organizationId, connectionId, 'os.cadastrar', params);
         return { os_suppressed: false, os, active_incident: incident };
       },

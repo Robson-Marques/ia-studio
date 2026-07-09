@@ -1,19 +1,58 @@
-# Módulo ISP — Solução Altarede (Fase 6)
+# Módulo ISP — Solução para provedores (Fase 6)
 
 Primeira solução vertical oficial da plataforma (provedores/ISP), implementada
 como **Resource Extension** (diretriz 50): **nada de ISP no core**. Toda a
-funcionalidade de negócio mora aqui, no `AltaredeProvider`
-(`integration/registry/providers/altarede.provider.ts`) e nas **tools ISP**
+funcionalidade de negócio mora aqui, nos **providers de ERP**
+(`integration/registry/providers/{altarede,ixc}.provider.ts`) e nas **tools ISP**
 (registradas no catálogo `ai_tools` da Fase 5). A plataforma nunca é dona de
-dados de negócio — os dados vivem no ERP Altarede.
+dados de negócio — os dados vivem no ERP do provedor.
+
+## Contrato canônico de ERP (multi-ERP)
+
+Os ERPs suportados (`altarede`, `ixc` — ver `ISP_ERP_PROVIDER_KEYS`) implementam
+as **mesmas chaves de operação**, cada um traduzindo para a sua API. Trocar de
+ERP é trocar a Connection: **nenhuma tool, serviço ou cron muda**.
+
+| Operação canônica | Altarede | IXC Soft |
+| --- | --- | --- |
+| `cliente.dados` | `cliente/dados` | `cliente` filtrado por `cnpj_cpf` |
+| `cliente.planos` | `cliente/planos` | `cliente_contrato` |
+| `cliente.acesso` | `cliente/acesso` | `radusuarios` (campo `online` S/N) |
+| `cliente.desbloqueio` | `cliente/desbloqueio` | rota `desbloqueio_confianca` (id do contrato) |
+| `financeiro.boleto_aberto` | `financeiro/boleto_aberto` | `fn_areceber` status `A`, vencimento asc, 1 registro |
+| `financeiro.boleto_aberto_todos` | idem `_todos` | `fn_areceber` status `A` |
+| `financeiro.historico` | `financeiro/historico` | `fn_areceber` do cliente (desc) |
+| `financeiro.boleto_base64` | `financeiro/boleto_base64` | rota `get_boleto` (base64) |
+| `financeiro.boleto_por_email` | `financeiro/boleto_por_email` | ❌ não existe na API do IXC |
+| `conectividade.listar_com_status` | `conectividade/listar/com_status` | `radusuarios` + lote de `cliente` (nome/telefone) |
+| `os.cadastrar` | `os/cadastrar` | insert em `su_oss_chamado` (exige `id_assunto`) |
+| `atendimento.listar_setor` | `atendimento/listar_setor` | `su_oss_setor` |
+| `atendimento.listar_motivo_atendimento` | `atendimento/listar_motivo_atendimento` | `su_oss_assunto` |
+
+Diferenças conhecidas do IXC (assumidas, não contornadas):
+
+- **Sem envio de boleto por e-mail** pela API → `segunda_via_boleto` só aceita
+  `linha` ou `pdf`.
+- **Filtros de escopo**: `cidade`, `bairro`, `id_olt` (→ `id_transmissor`) e
+  `id_cto` (→ `id_caixa_ftth`) têm equivalente; `ip_concentrador`,
+  `interface_concentrador` e `id_slot` **não** — são ignorados na consulta.
+- **`abrir_os` exige `id_assunto`** (o IXC não aceita motivo em texto livre).
+  Os ids vêm do **Descobrir recursos** da conexão (`su_oss_assunto`).
+- A conexão exige que o **IP do servidor esteja em "Redes permitidas"** do grupo
+  do usuário do token, senão a API responde erro de login.
+
+Além do contrato canônico, o `IxcProvider` expõe operações **genéricas** sobre
+qualquer tabela do IXC (`ixc.listar`, `ixc.inserir`, `ixc.editar`, `ixc.excluir`)
+para nós de workflow e casos fora do escopo ISP. Elas não são usadas pelas tools
+do agente.
 
 ## Componentes
 
 | Arquivo | Responsabilidade |
 | --- | --- |
 | `isp.repository.ts` | Porta única ao banco (`isp_incidents`, `isp_incident_targets`, `isp_incident_dispatches`). |
-| `isp-connection.resolver.ts` | Resolve a Connection Altarede ACTIVE do escopo (multi-instância: matriz/filiais). Nunca expõe a conexão à IA. |
-| `isp-connectivity.service.ts` | Lê `conectividade/listar/com_status` via `ConnectionsService.execute` e agrega % offline. |
+| `isp-connection.resolver.ts` | Resolve a Connection de ERP ACTIVE do escopo (multi-instância: matriz/filiais; multi-ERP: Altarede/IXC). Nunca expõe a conexão à IA. |
+| `isp-connectivity.service.ts` | Lê `conectividade.listar_com_status` via `ConnectionsService.execute` e agrega % offline. |
 | `incident-lookup.service.ts` | **Modo reativo**: `activeFor(customer)` que as tools `abrir_os`/`status_regiao` consultam. |
 | `isp-dispatch.service.ts` | **Modo proativo**: disparo em massa por WhatsApp (Meta Orchestrator) com confirmação + rate limit + log. |
 | `isp-incidents.service.ts` | CRUD de incidentes, resolver afetados, ativar/encerrar, orquestra o disparo. Mutations sensíveis auditadas. |
@@ -43,19 +82,23 @@ dados de negócio — os dados vivem no ERP Altarede.
 ## Tools do agente ISP
 
 Semeadas no catálogo `ai_tools` pelo seed da Fase 5 (o `AiProvidersSeedService`
-itera `toolRegistry.all()` por organização). Cada tool resolve a conexão
-Altarede pelo `IspConnectionResolver` e chama `ConnectionsService.execute` — **a
-IA nunca chama a API Altarede direto**.
+itera `toolRegistry.all()` por organização). Cada tool resolve a conexão de ERP
+pelo `IspConnectionResolver` e chama `ConnectionsService.execute` — **a IA nunca
+chama a API do ERP direto e nunca sabe qual ERP está do outro lado**.
 
-| Tool | Operação Altarede | Aprovação |
+| Tool | Operação canônica | Aprovação |
 | --- | --- | --- |
-| `identificar_cliente` | `cliente/dados` | — |
-| `consultar_debitos` | `financeiro/boleto_aberto_todos` + `historico` | — |
-| `status_conexao` | `cliente/acesso` | — |
-| `status_regiao` | `conectividade/listar/com_status` (+ checa incidente ativo) | — |
-| `segunda_via_boleto` | `financeiro/boleto_aberto` / `boleto_base64` / `boleto_por_email` | — |
-| `desbloqueio_confianca` | `cliente/desbloqueio` | ✅ requires_approval |
-| `abrir_os` | `os/cadastrar` (suprime OS se incidente ativo) | ✅ requires_approval |
+| `identificar_cliente` | `cliente.dados` | — |
+| `consultar_debitos` | `financeiro.boleto_aberto_todos` + `financeiro.historico` | — |
+| `status_conexao` | `cliente.acesso` | — |
+| `status_regiao` | `conectividade.listar_com_status` (+ checa incidente ativo) | — |
+| `segunda_via_boleto` | `financeiro.boleto_aberto` / `boleto_base64` / `boleto_por_email` | — |
+| `desbloqueio_confianca` | `cliente.desbloqueio` | ✅ requires_approval |
+| `abrir_os` | `os.cadastrar` (suprime OS se incidente ativo) | ✅ requires_approval |
+
+Quando a organização tem **mais de uma** conexão de ERP, a escolha é do operador,
+não do modelo: prioridade da Connection → tag/filial (`filial`) → `connection_id`
+explícito. Nós de workflow podem ainda fixar o ERP com `erp: "ixc" | "altarede"`.
 
 ## ACL
 

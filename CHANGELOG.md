@@ -1,5 +1,35 @@
 # Changelog — IA Studio
 
+## v0.9.2 - 2026-07-08 (WhatsApp em produção + port do Aquapark + ERP IXC Soft)
+
+### WhatsApp (Meta Cloud API) — primeiro fluxo ponta a ponta em produção
+
+- **Causa-raiz do webhook mudo:** a WABA não estava inscrita no app (`subscribed_apps`). O `connect()` do `WhatsappMetaProvider` agora chama `subscribeAppToWaba` (best-effort) — nenhuma conexão nova nasce sem receber inbound.
+- **Envio de mídia por upload real do aparelho:** `uploadMedia` no `meta-graph.client.ts` (FormData/Blob nativos, limites da Meta por tipo), `POST /comm/whatsapp/chats/:id/media/upload` (multipart) e `WhatsappInboxService.uploadAndSendMedia` — passa pela **mesma porta** do `/send` (reply gate + janela de 24h + takeover 409).
+- **UX portada do Aquapark:** `MessageComposer` (menu de anexo, gravação de áudio com pausa/retomar/preview/regravar, troca enviar↔microfone), `AudioPlayer` próprio (resolve duração de opus/blob da Meta, que o `<audio>` nativo não consegue), cores oficiais do WhatsApp nos balões/fundo/ticks, avatares e **badges de contagem** por aba (`GET /comm/whatsapp/chats/counts`).
+
+### Conexões e wizard
+
+- Wizard não fecha mais ao clicar fora (`dismissable={false}`) e bloqueia **autofill do navegador** em campos de segredo (`autoComplete="new-password"` + `data-1p-ignore`/`data-lpignore`) — o gerenciador de senhas preenchia WABA ID e Access Token.
+- Campo `generatable` com botões **Gerar** e **Copiar** (verify token) + caixa com a **URL do webhook** pronta pra colar na Meta.
+- **Editar conexão** (antes só criar): `PATCH` com merge raso de config e atualização só das chaves de segredo preenchidas.
+- `/auth/me` passou a devolver os **ambientes** do workspace (o seletor do topo ficava vazio e travava o wizard em "Selecione workspace e ambiente").
+
+### IA Studio e Automação — port do Aquapark
+
+- `FluxoCanvas` reescrito com a UX do Aquapark (paleta agrupada por categoria e colapsável, inspetor inline, nó customizado, auto-centralização) mantendo o motor **declarativo** do IA Studio: catálogo vem do `getNodesCatalog()`, grafo persistido é a fonte da verdade.
+- Editor de assistente (persona guiada + aba "Testar" embutida), tela de Ferramentas com governança (`is_active`/`timeout_ms`/`requires_approval`) e Bases de Conhecimento.
+
+### ERP IXC Soft (novo provider)
+
+- `IxcProvider` (`integration/registry/providers/ixc.provider.ts` + `ixc.helpers.ts`) — segundo ERP de provedor. A API do IXC é CRUD sobre tabelas (`/webservice/v1/<tabela>`), Basic auth com token `id:chave`, header `ixcsoft: listar` nas listagens. Wizard: URL do IXC + token (validado no formato). `health()` distingue token recusado de IP fora das "Redes permitidas". `discover()` traz setores, assuntos de OS e planos.
+- **Solução ISP virou multi-ERP:** Altarede e IXC implementam o **mesmo contrato canônico** de operações (`cliente.dados`, `financeiro.*`, `conectividade.listar_com_status`, `os.cadastrar`…), cada um traduzindo pra sua API. `IspConnectionResolver` resolve qualquer conexão de ERP ativa (`ISP_ERP_PROVIDER_KEYS`), com pin opcional por `erp`/`filial`/`connection_id`. **Nenhuma tool do agente mudou** — trocar de ERP é trocar a conexão.
+- Limitações assumidas do IXC (documentadas no README do módulo ISP): sem envio de boleto por e-mail; filtros de escopo `ip_concentrador`/`interface_concentrador`/`id_slot` sem equivalente; `abrir_os` exige `id_assunto` (vem do Descobrir recursos).
+
+### Correções
+
+- `whatsapp-inbox.controller.ts`: erro de build no union `Multipart` (`MultipartFile | MultipartValue`) ao ler campos do formulário.
+
 ## v0.9.1 - 2026-07-04 (primeiro deploy em produção + correções)
 
 Primeira instalação real (Debian 13, `studio.nivoo.dev.br`) e a rodada de ajustes de primeiro-deploy:
