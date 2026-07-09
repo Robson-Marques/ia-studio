@@ -56,6 +56,14 @@ export class BackupService {
     return files.sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 
+  /**
+   * Quantos arquivos de backup estao retidos em disco — dumps de banco da
+   * rotacao do upgrade (`.sql.gz`) + pacotes completos de migracao (`.tar.gz`).
+   */
+  async count(): Promise<number> {
+    return (await this.list()).length;
+  }
+
   // ─── Geracao ────────────────────────────────────────────────────────
 
   async generate(startedBy: string | null) {

@@ -37,9 +37,15 @@ export class SystemController {
   // ─── Atualizacao ────────────────────────────────────────────────────
 
   @Get('version')
-  @ApiOperation({ summary: 'Versão atual + tags disponíveis (git fetch + cache 5min; ?force=1 ignora o cache)' })
-  version(@Query('force') force?: string) {
-    return this.versions.getVersionInfo(force === '1' || force === 'true');
+  @ApiOperation({ summary: 'Versão atual + tags disponíveis + backups retidos (git fetch + cache 5min; ?force=1 ignora o cache)' })
+  async version(@Query('force') force?: string) {
+    // `backups_retained` alimenta o StatCard da tela de Atualização. Sem ele o
+    // card exibia 0 fixo (o front fazia `?? 0` sobre um campo inexistente).
+    const [info, backupsRetained] = await Promise.all([
+      this.versions.getVersionInfo(force === '1' || force === 'true'),
+      this.backups.count().catch(() => 0),
+    ]);
+    return { ...info, backups_retained: backupsRetained };
   }
 
   @Post('upgrade')

@@ -1,5 +1,9 @@
 # Changelog — IA Studio
 
+## v0.9.4 - 2026-07-08 (card de backups retidos)
+
+- **Card "Backups retidos" mostrava 0 fixo.** O endpoint `GET /console/system/version` nunca devolveu `backups_retained` — o Console fazia `?? 0` sobre um campo inexistente, então o número era zero mesmo com backups em disco. Agora o controller compõe a resposta com `BackupService.count()` (dumps `.sql.gz` da rotação do upgrade + pacotes `.tar.gz` de migração).
+
 ## v0.9.3 - 2026-07-08 (a tela de Atualização enxerga versões novas)
 
 - **Tela de Atualização não via versões novas.** O `VersionService` rodava `git tag --list` no clone de `/opt/iastudio` sem nunca fazer `git fetch` — a instância só enxergava as tags que existiam no momento da instalação e dizia "Instância atualizada" para sempre. Agora faz `git fetch --tags --force` (best-effort, timeout de 20s) antes de listar; se o fetch falhar, cai nas tags locais e a tela mostra um aviso de "repositório remoto inacessível" (`remote_synced: false`) em vez de mentir. Botão **Verificar agora** (`GET /console/system/version?force=1`) ignora o cache de 5 min.
