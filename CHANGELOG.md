@@ -1,7 +1,11 @@
 # Changelog — IA Studio
 
-## Não publicado
+## v0.9.12 - 2026-07-09 (boletos abertos, telefone e desbloqueio corretos)
 
+- **"Boleto em aberto" não é `status = 'A'` (IXC).** O exemplo oficial "Listar boletos abertos" filtra `liberado = 'S'` **e** `status != 'C'` (cancelado) **e** `status != 'R'` (recebido). Meu filtro por `status = 'A'` perdia títulos abertos noutro estado (renegociado, em cobrança) e incluía títulos **não liberados** — o cliente veria dívida a menos, ou receberia cobrança de um boleto que o provedor não liberou. Afeta `consultar_debitos`, `segunda_via_boleto` e `financeiro.boleto_base64`.
+- **Nova operação `cliente.por_telefone` (IXC).** O telefone do cliente mora em `telefone_celular`, `whatsapp`, `fone` e `telefone_comercial`, e o IXC não tem `OR` — a busca tenta coluna a coluna. Trata o número do WhatsApp (DDI 55, sem máscara) e a máscara do IXC (`(27) 99947-2853`). É a porta de entrada do atendimento: quem manda mensagem não digita CPF. Sem equivalente no Altarede, então **não** virou tool do agente ainda.
+- **`desbloqueio_confianca` era chamado errado.** O exemplo oficial em PHP usa `$api->get('desbloqueio_confianca', ['id' => <id_contrato>])` — e o `get()` do `WebserviceClient` é o **modo listar** (header `ixcsoft: listar`). O provider chamava como insert (`POST` sem header). Corrigido com `callListar()`. O `id` é mesmo o id do contrato. (`desbloqueio_confianca` é também o nome de uma coluna de `cliente_contrato`; quem indica o estado é `desbloqueio_confianca_ativo`.)
+- **`desbloqueio_confianca` sem fallback.** Acabou o "se nenhum contrato estiver ativo, usa o primeiro" — desbloquear o contrato errado é pior que não desbloquear. Agora exige exatamente um contrato ativo (`status = 'A'`) e falha alto nos demais casos. Verificação obrigatória no IXC: `desbloqueio_confianca_ativo` deve virar `'S'`.
 - **`os.cadastrar` não abria OS no IXC.** A API recusava com `Preencha Filial<br />Preencha Setor` — dois campos que a collection oficial mostra vazios e que eu não enviava. Agora `setor` é obrigatório (é decisão de operação; vem do Descobrir recursos) e `id_filial` sai do cadastro do cliente (`cliente.filial_id`), com override opcional. Ambos entraram no schema da tool `abrir_os`, senão o agente tomaria 400 sem saber por quê. Notável: **foi o primeiro erro alto do IXC** em toda a integração.
 
 ## v0.9.10 - 2026-07-09 (o `rp` do IXC também trunca calado)

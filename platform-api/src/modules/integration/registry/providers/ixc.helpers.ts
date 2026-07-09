@@ -236,3 +236,31 @@ export function ixcDateTime(date: Date = new Date()): string {
 export function isYes(value: unknown): boolean {
   return /^S/i.test(String(value ?? '').trim());
 }
+
+/**
+ * O telefone do cliente esta espalhado por varias colunas e o IXC nao tem `OR` —
+ * a busca tenta uma coluna de cada vez. Ordem = probabilidade de acerto no
+ * atendimento (quem manda mensagem usa celular/WhatsApp).
+ */
+export const PHONE_FIELDS = ['telefone_celular', 'whatsapp', 'fone', 'telefone_comercial'] as const;
+
+/** `(27) 99947-2853` ou `(27) 3726-1214` — mascara usada pelo IXC. */
+export function formatPhone(digits: string): string | null {
+  if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return null;
+}
+
+/**
+ * Candidatos de telefone, em ordem de tentativa. O IXC guarda COM mascara (ao
+ * contrario do `cnpj_cpf`, que na base conferida vem so com digitos), e o numero
+ * que chega do WhatsApp vem com DDI 55 e sem mascara nenhuma.
+ */
+export function phoneCandidates(raw: string): string[] {
+  const trimmed = raw.trim();
+  let digits = onlyDigits(trimmed);
+  // Tira o DDI 55 quando sobra um numero nacional plausivel (10 ou 11 digitos).
+  if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) digits = digits.slice(2);
+  const masked = formatPhone(digits);
+  return [...new Set([masked, trimmed, digits].filter((v): v is string => !!v))];
+}

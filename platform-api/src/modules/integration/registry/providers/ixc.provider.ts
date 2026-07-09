@@ -42,7 +42,9 @@ import {
   isYes,
   ixcDateTime,
   ixcErrorMessage,
+  phoneCandidates,
   redactRow,
+  PHONE_FIELDS,
   FIBRA_TABLE,
   SCOPE_GEO_CLIENTE,
   SCOPE_GEO_RADUSUARIOS,
@@ -67,6 +69,8 @@ const T = {
 const OPERATIONS = [
   // Contrato canonico ISP (mesmas chaves do AltaredeProvider)
   'cliente.dados',
+  // Extensao do IXC (sem equivalente no Altarede hoje): identificar por telefone.
+  'cliente.por_telefone',
   'cliente.planos',
   'cliente.acesso',
   'cliente.desbloqueio',
@@ -201,6 +205,9 @@ export class IxcProvider extends BaseProvider {
     switch (operation as Operation) {
       case 'cliente.dados':
         return { data: await this.findClientes(ctx, token, this.str(args, 'cpf', true)) };
+
+      case 'cliente.por_telefone':
+        return { data: await this.findClientesPorTelefone(ctx, token, this.str(args, 'telefone', true)!) };
 
       case 'cliente.planos': {
         const id = await this.clienteId(ctx, token, this.str(args, 'cpf', true));
@@ -393,6 +400,30 @@ export class IxcProvider extends BaseProvider {
     return [];
   }
 
+  /**
+   * Busca o cliente por telefone — a porta de entrada do atendimento (quem manda
+   * mensagem no WhatsApp nao digita CPF). O numero mora em varias colunas e o IXC
+   * nao tem `OR`, entao tenta coluna a coluna, formato a formato, e para no
+   * primeiro acerto. Pior caso: `PHONE_FIELDS.length x candidatos` requisicoes.
+   */
+  private async findClientesPorTelefone(ctx: ProviderContext, token: string, telefone: string): Promise<Record<string, unknown>[]> {
+    for (const candidate of phoneCandidates(telefone)) {
+      for (const field of PHONE_FIELDS) {
+        const rows = await this.list(ctx, token, T.cliente, {
+          qtype: `${T.cliente}.${field}`,
+          query: candidate,
+          oper: '=',
+          page: '1',
+          rp: '5',
+          sortname: `${T.cliente}.id`,
+          sortorder: 'asc',
+        });
+        if (rows.length > 0) return rows;
+      }
+    }
+    return [];
+  }
+
   /** Linha do cliente (nao so o id): a OS precisa da filial que vem no cadastro. */
   private async clienteRow(ctx: ProviderContext, token: string, cpf?: string): Promise<Record<string, unknown>> {
     const rows = await this.findClientes(ctx, token, cpf);
@@ -424,23 +455,49 @@ export class IxcProvider extends BaseProvider {
     return rows.map((r) => ({ ...r, online: isYes(r['online']), status: isYes(r['online']) ? 'Online' : 'Offline' }));
   }
 
-  /** Desbloqueio de confianca: roda sobre o CONTRATO ativo do cliente. */
+  /**
+   * Desbloqueio de confianca: roda sobre o contrato ATIVO (`status = 'A'`).
+   *
+   * A rota `desbloqueio_confianca` recebe `id` = id do CONTRATO e e chamada no
+   * modo listar (ver `callListar`). `desbloqueio_confianca` tambem e o nome de
+   * uma coluna de `cliente_contrato` — nao confundir: quem indica o estado e
+   * `desbloqueio_confianca_ativo` ('S' apos o desbloqueio).
+   *
+   * NAO ha fallback: sem exatamente um contrato ativo, falha alto. Desbloquear
+   * o contrato errado e pior do que nao desbloquear.
+   */
   private async desbloqueio(ctx: ProviderContext, token: string, cpf?: string): Promise<unknown> {
     const clienteId = await this.clienteId(ctx, token, cpf);
     const contratos = await this.list(ctx, token, T.contrato, {
       ...this.eq(`${T.contrato}.id_cliente`, clienteId, `${T.contrato}.id`),
       rp: '20',
     });
-    const ativo = contratos.find((c) => String(c['status'] ?? '').toUpperCase() === 'A') ?? contratos[0];
-    const contratoId = ativo?.['id'];
-    if (!contratoId) {
-      throw new BadRequestException('Cliente sem contrato no IXC — desbloqueio de confiança indisponível.');
+    const ativos = contratos.filter((c) => String(c['status'] ?? '').toUpperCase() === 'A');
+    if (ativos.length === 0) {
+      throw new BadRequestException(
+        `Cliente sem contrato ativo (status "A") no IXC — desbloqueio de confiança indisponível. Contratos encontrados: ${contratos.length}.`,
+      );
     }
-    // Rota dedicada do IXC (nao e uma tabela; nao leva o header `ixcsoft`).
-    return this.write(ctx, token, 'POST', 'desbloqueio_confianca', { id: String(contratoId) });
+    if (ativos.length > 1) {
+      throw new BadRequestException(
+        `Cliente com ${ativos.length} contratos ativos no IXC — informe qual desbloquear. Desbloquear o contrato errado é pior do que não desbloquear.`,
+      );
+    }
+    const contratoId = String(ativos[0]!['id']);
+    // Rota dedicada, chamada no modo LISTAR (header `ixcsoft: listar`), nao como
+    // insert: o exemplo oficial em PHP usa `$api->get('desbloqueio_confianca',
+    // ['id' => <id_contrato>])`, e `get()` do WebserviceClient e o modo listar.
+    return this.callListar(ctx, token, 'desbloqueio_confianca', { id: contratoId });
   }
 
-  /** Boletos em aberto (status "A"), do vencimento mais antigo pro mais novo. */
+  /**
+   * Boletos em aberto, do vencimento mais antigo pro mais novo.
+   *
+   * "Em aberto" no IXC NAO e um status especifico: e `liberado = 'S'` e status
+   * diferente de 'C' (cancelado) e de 'R' (recebido) — como faz o exemplo oficial
+   * "Listar boletos abertos". Filtrar por `status = 'A'` perderia titulos abertos
+   * noutro estado (renegociado, em cobranca) e incluiria titulos nao liberados.
+   */
   private async boletosAbertos(ctx: ProviderContext, token: string, cpf: string | undefined, rp: string): Promise<Record<string, unknown>[]> {
     const clienteId = await this.clienteId(ctx, token, cpf);
     return this.list(ctx, token, T.areceber, {
@@ -450,7 +507,9 @@ export class IxcProvider extends BaseProvider {
       sortorder: 'asc',
       grid_param: buildGridParam([
         { TB: `${T.areceber}.id_cliente`, OP: '=', P: clienteId },
-        { TB: `${T.areceber}.status`, OP: '=', P: 'A' },
+        { TB: `${T.areceber}.liberado`, OP: '=', P: 'S' },
+        { TB: `${T.areceber}.status`, OP: '!=', P: 'C' },
+        { TB: `${T.areceber}.status`, OP: '!=', P: 'R' },
       ]),
     });
   }
@@ -605,6 +664,26 @@ export class IxcProvider extends BaseProvider {
       body: params,
       timeoutMs,
     });
+  }
+
+  /**
+   * Rota dedicada chamada no modo LISTAR (`ixcsoft: listar`) — nao e tabela e
+   * nao devolve `registros`. Ex.: `desbloqueio_confianca`. Devolve o corpo cru.
+   */
+  private async callListar(
+    ctx: ProviderContext,
+    token: string,
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<unknown> {
+    const res = await httpRequest(`${this.baseUrl(ctx)}/${path}`, {
+      method: 'POST',
+      headers: { Authorization: basicAuthHeader(token), ixcsoft: 'listar' },
+      body,
+      timeoutMs: 25_000,
+    });
+    this.assertOk(res.status, res.data, path);
+    return res.data;
   }
 
   /** Escrita (insert/update/delete e rotas dedicadas) — SEM o header `ixcsoft`. */
