@@ -72,12 +72,19 @@ export class IspConnectivityService {
       const status = String(row['STATUS'] ?? row['status'] ?? '').trim();
       const login = String(row['LOGIN'] ?? row['login'] ?? row['CPF'] ?? row['cpf'] ?? '');
       const phone = String(row['TELEFONE_CELULAR1'] ?? row['TELEFONE_CELULAR2'] ?? row['telefone'] ?? '');
+      // Quando o provider ja resolveu o estado (campo booleano `online`), essa e
+      // a fonte da verdade. A regex sobre o texto e so o fallback pra providers
+      // que devolvem apenas o rotulo — depender dela e fragil: mudar "Offline"
+      // para "Desconectado" inverteria a contagem sem quebrar nada visivelmente.
+      const online = typeof row['online'] === 'boolean'
+        ? (row['online'] as boolean)
+        : /online|conectad|ativo|up/i.test(status);
       return {
         customer_ref: login,
         name: this.str(row['NOME'] ?? row['nome']),
         phone: phone || undefined,
         status,
-        online: /online|conectad|ativo|up/i.test(status),
+        online,
       };
     });
   }

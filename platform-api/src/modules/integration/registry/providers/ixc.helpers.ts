@@ -65,15 +65,34 @@ export function formatCpfCnpj(digits: string): string | null {
 }
 
 /**
- * O IXC guarda cnpj_cpf COM mascara na maioria das instalacoes, mas ha bases
- * so com digitos. Devolve os candidatos a tentar em ordem (mascarado primeiro).
+ * O `cnpj_cpf` pode estar gravado so com digitos ou com mascara, dependendo da
+ * instalacao. Candidatos em ordem de tentativa: o valor como veio (acerta quando
+ * o chamador ja usa o formato da base), depois so-digitos, depois mascarado.
+ * (Bases so-digitos sao o caso comum — mascara primeiro gastava uma request.)
  */
 export function cpfCnpjCandidates(raw: string): string[] {
   const trimmed = raw.trim();
   const digits = onlyDigits(trimmed);
   const masked = formatCpfCnpj(digits);
-  const out = [masked, trimmed, digits].filter((v): v is string => !!v);
+  const out = [trimmed, digits, masked].filter((v): v is string => !!v);
   return [...new Set(out)];
+}
+
+/**
+ * Campos que NUNCA saem do provider. O `cliente` do IXC devolve `senha` (a senha
+ * da central do assinante) em texto claro, e `radusuarios` devolve a senha PPPoE
+ * e as do roteador/wi-fi. Essas linhas alimentam as tools do agente — sem isso a
+ * senha do cliente entraria no contexto do LLM e poderia ser repetida a ele.
+ */
+const SENSITIVE_KEY_RE = /(senha|password|secret|token|api_key)/i;
+
+/** Remove os campos sensiveis de uma linha do IXC (nao muta a original). */
+export function redactRow(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (!SENSITIVE_KEY_RE.test(key)) out[key] = value;
+  }
+  return out;
 }
 
 /** `{type:'error', message:'...'}` — erro de negocio/permissao do IXC. */
@@ -104,18 +123,66 @@ export function buildGridParam(filters: IxcGridFilter[]): string {
  * Traducao dos filtros de escopo canonicos da solucao ISP (SCOPE_KEYS, nomeados
  * a partir do Altarede) para colunas de `radusuarios` no IXC. Nomes conferidos
  * contra a collection oficial da API (CRUD radusuarios).
- * `id_slot` fica de fora: nao ha coluna equivalente clara em `radusuarios`
- * (os candidatos — `interface_transmissao`, `ftth_porta`, `splitter` — sao
- * conceitos distintos). Chave ignorada = consulta menos especifica, nao invalida.
+ *
+ * Precisao decrescente pra delimitar um incidente: `porta_pon` (todos os
+ * clientes da mesma PON caem juntos) → `id_cto` → `id_olt` → `vlan`/interface do
+ * concentrador → bairro/cidade (geografia; proxy ruim de topologia).
+ *
+ * `interface_concentrador` so isola um grupo quando ha uma interface por VLAN;
+ * com VLANs empilhadas numa interface unica ela cobre a base toda — use `vlan`.
+ *
+ * Conferido contra uma base real (2026-07-09): `id_porta_transmissor` vem `"0"`
+ * na base inteira e a coluna `interface_transmissao_fibra` da collection nem
+ * existe na resposta de leitura. A topologia PON mora em
+ * `radpop_radio_cliente_fibra` (ver SCOPE_TO_FIBRA).
+ *
+ * `id_porta_pon` e o atalho de UMA requisicao: `radusuarios.interface_transmissao`
+ * guarda o mesmo valor que `radpop_radio_cliente_fibra.id_radpop_radio_porta`
+ * (conferido: ambos `42` para o login 6171). Quando o operador tem esse id,
+ * filtra direto no login; com `ponid`/`slotno`/`ponno` a consulta e em 2 estagios.
  */
 export const SCOPE_TO_RADUSUARIOS: Record<string, string> = {
   cidade: 'radusuarios.cidade',
   bairro: 'radusuarios.bairro',
   ip_concentrador: 'radusuarios.ip_concentrador',
   interface_concentrador: 'radusuarios.interface',
+  vlan: 'radusuarios.vlan',
   id_olt: 'radusuarios.id_transmissor',
   id_cto: 'radusuarios.id_caixa_ftth',
+  id_porta_pon: 'radusuarios.interface_transmissao',
 };
+
+/** Tabela da ONU/fibra — ligada a `radusuarios` por `id_login`. */
+export const FIBRA_TABLE = 'radpop_radio_cliente_fibra';
+
+/**
+ * Escopo de topologia PON. Vive noutra tabela, entao a consulta e em dois
+ * estagios: filtra a fibra → colhe `id_login` → busca esses logins.
+ * `porta_pon` casa com `ponid`, que e uma STRING no formato frame/slot/pon
+ * (ex.: `"0/1/1"`), nao um id numerico. `slotno`/`ponno` sao os numeros soltos.
+ */
+export const SCOPE_TO_FIBRA: Record<string, string> = {
+  porta_pon: `${FIBRA_TABLE}.ponid`,
+  id_slot: `${FIBRA_TABLE}.slotno`,
+  numero_pon: `${FIBRA_TABLE}.ponno`,
+  porta_cto: `${FIBRA_TABLE}.porta_ftth`,
+};
+
+/**
+ * Chaves em que `"0"` significa "nao configurado" no IXC — como filtro casariam
+ * com a base toda e o escopo do incidente vira lista de disparo em massa.
+ * Ficam de fora, deliberadamente:
+ *  - `id_slot`/`numero_pon`: slot 0 e PON 0 existem;
+ *  - `porta_cto`: porta 0 do splitter e valida;
+ *  - `porta_pon`: e string ("0/1/1"), nunca o literal "0".
+ */
+export const ZERO_MEANS_UNSET = new Set([
+  'vlan',
+  'interface_concentrador',
+  'id_olt',
+  'id_cto',
+  'id_porta_pon',
+]);
 
 /** `YYYY-MM-DD HH:mm:ss` — formato de data/hora aceito nos inserts do IXC. */
 export function ixcDateTime(date: Date = new Date()): string {

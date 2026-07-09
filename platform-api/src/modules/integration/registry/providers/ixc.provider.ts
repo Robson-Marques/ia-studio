@@ -40,7 +40,11 @@ import {
   isYes,
   ixcDateTime,
   ixcErrorMessage,
+  redactRow,
+  FIBRA_TABLE,
+  SCOPE_TO_FIBRA,
   SCOPE_TO_RADUSUARIOS,
+  ZERO_MEANS_UNSET,
 } from './ixc.helpers';
 
 // Tabelas do IXC usadas pelo contrato canonico.
@@ -378,23 +382,37 @@ export class IxcProvider extends BaseProvider {
    * num unico lote (sem N+1), no formato que o IspConnectivityService espera.
    */
   private async conectividade(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<Record<string, unknown>[]> {
-    const filters: IxcGridFilter[] = [];
-    for (const [scopeKey, column] of Object.entries(SCOPE_TO_RADUSUARIOS)) {
-      const value = args[scopeKey];
-      if (typeof value === 'string' && value.trim()) filters.push({ TB: column, OP: '=', P: value.trim() });
-    }
+    const radFilters = this.scopeFilters(args, SCOPE_TO_RADUSUARIOS);
+    const fibraFilters = this.scopeFilters(args, SCOPE_TO_FIBRA);
     // Sem filtro nenhum a consulta varreria a base inteira — exige escopo.
-    if (filters.length === 0) {
-      throw new BadRequestException('Informe ao menos um filtro de escopo (cidade, bairro, id_olt ou id_cto).');
+    if (radFilters.length === 0 && fibraFilters.length === 0) {
+      throw new BadRequestException(
+        'Informe ao menos um filtro de escopo. Do mais preciso ao menos: porta_pon, id_cto, id_olt, vlan, bairro.',
+      );
     }
-    filters.push({ TB: `${T.radusuarios}.ativo`, OP: '=', P: 'S' });
+
+    // Escopo de PON mora em `radpop_radio_cliente_fibra`: primeiro estagio
+    // resolve os `id_login` da porta/slot; o segundo busca esses logins.
+    if (fibraFilters.length > 0) {
+      const onus = await this.list(ctx, token, FIBRA_TABLE, {
+        page: '1',
+        rp: '1000',
+        sortname: `${FIBRA_TABLE}.id`,
+        sortorder: 'asc',
+        grid_param: buildGridParam(fibraFilters),
+      });
+      const loginIds = [...new Set(onus.map((o) => String(o['id_login'] ?? '')).filter((v) => v && v !== '0'))];
+      if (loginIds.length === 0) return [];
+      radFilters.push({ TB: `${T.radusuarios}.id`, OP: 'IN', P: loginIds.join(',') });
+    }
+    radFilters.push({ TB: `${T.radusuarios}.ativo`, OP: '=', P: 'S' });
 
     const logins = await this.list(ctx, token, T.radusuarios, {
       page: '1',
       rp: '1000',
       sortname: `${T.radusuarios}.id`,
       sortorder: 'asc',
-      grid_param: buildGridParam(filters),
+      grid_param: buildGridParam(radFilters),
     });
     if (logins.length === 0) return [];
 
@@ -464,11 +482,15 @@ export class IxcProvider extends BaseProvider {
 
   // ─── Transporte ─────────────────────────────────────
 
-  /** Listagem (POST + header `ixcsoft: listar`). Devolve as linhas ja extraidas. */
+  /**
+   * Listagem (POST + header `ixcsoft: listar`). Devolve as linhas ja extraidas e
+   * REDIGIDAS. A redacao mora aqui, no ponto unico por onde toda leitura passa —
+   * incluir uma operacao nova nao reintroduz o vazamento de senha por esquecimento.
+   */
   private async list(ctx: ProviderContext, token: string, tabela: string, params: IxcListParams): Promise<Record<string, unknown>[]> {
     const res = await this.rawList(ctx, token, tabela, params, 20_000);
     this.assertOk(res.status, res.data, tabela);
-    return extractRegistros(res.data);
+    return extractRegistros(res.data).map(redactRow);
   }
 
   private rawList(ctx: ProviderContext, token: string, tabela: string, params: IxcListParams, timeoutMs: number) {
@@ -539,6 +561,29 @@ export class IxcProvider extends BaseProvider {
     if (typeof value === 'number') return String(value);
     if (required) throw new BadRequestException(`Parâmetro "${key}" obrigatório.`);
     return undefined;
+  }
+
+  /**
+   * Converte as chaves de escopo presentes em `args` nos filtros da tabela dada.
+   * Recusa `"0"` nas chaves em que isso significa "não configurado" no IXC:
+   * como filtro casaria com TODOS os logins, e o escopo de um incidente vira a
+   * lista do disparo em massa por WhatsApp. Slot 0 e PON 0 existem — por isso a
+   * recusa e por chave (ZERO_MEANS_UNSET), nao universal.
+   */
+  private scopeFilters(args: Record<string, unknown>, map: Record<string, string>): IxcGridFilter[] {
+    const filters: IxcGridFilter[] = [];
+    for (const [scopeKey, column] of Object.entries(map)) {
+      const value = args[scopeKey];
+      if (typeof value !== 'string' || !value.trim()) continue;
+      const trimmed = value.trim();
+      if (trimmed === '0' && ZERO_MEANS_UNSET.has(scopeKey)) {
+        throw new BadRequestException(
+          `Filtro de escopo "${scopeKey}" com valor "0": no IXC isso significa "não configurado" e casaria com todos os clientes. Use um escopo real (porta_pon, id_cto ou id_olt).`,
+        );
+      }
+      filters.push({ TB: column, OP: '=', P: trimmed });
+    }
+    return filters;
   }
 
   /** Atalho pro filtro simples de igualdade. */
