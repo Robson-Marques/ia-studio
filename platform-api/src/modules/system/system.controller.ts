@@ -37,9 +37,9 @@ export class SystemController {
   // ─── Atualizacao ────────────────────────────────────────────────────
 
   @Get('version')
-  @ApiOperation({ summary: 'Versão atual + tags disponíveis (cache 5min)' })
-  version() {
-    return this.versions.getVersionInfo();
+  @ApiOperation({ summary: 'Versão atual + tags disponíveis (git fetch + cache 5min; ?force=1 ignora o cache)' })
+  version(@Query('force') force?: string) {
+    return this.versions.getVersionInfo(force === '1' || force === 'true');
   }
 
   @Post('upgrade')

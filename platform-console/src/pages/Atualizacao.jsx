@@ -48,8 +48,9 @@ const TERMINAL = new Set(['SUCCESS', 'FAILED']);
 
 function TabAtualizacao() {
   const { can } = usePermissions();
-  const [version, setVersion] = useState({ current_version: '—', available: [], backups_retained: 0 });
+  const [version, setVersion] = useState({ current_version: '—', available: [], backups_retained: 0, remote_synced: true });
   const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
   const [current, setCurrent] = useState(null);   // upgrade em curso
   const [confirmTag, setConfirmTag] = useState(null);
   const [acting, setActing] = useState(false);
@@ -59,14 +60,34 @@ function TabAtualizacao() {
   const logRef = useRef(null);
   const prevStatusRef = useRef(null);
 
-  const loadVersion = useCallback(async () => {
+  // force=true refaz o `git fetch --tags` no servidor, ignorando o cache de 5min.
+  const loadVersion = useCallback(async (force = false) => {
     try {
-      const v = await getVersion();
+      const v = await getVersion(force);
       setVersion(v);
+      return v;
     } catch (err) {
       toast.error(err.message);
+      return null;
     }
   }, []);
+
+  async function handleCheckNow() {
+    setChecking(true);
+    try {
+      const v = await loadVersion(true);
+      if (!v) return;
+      if (!v.remote_synced) {
+        toast.warn('Não foi possível consultar o repositório remoto. A lista pode estar desatualizada.');
+      } else if (!v.available?.length) {
+        toast.info('Nenhuma versão mais recente que a atual.');
+      } else {
+        toast.success(`${v.available.length} versão(ões) disponível(is).`);
+      }
+    } finally {
+      setChecking(false);
+    }
+  }
 
   // Polling 2s do upgrade em curso.
   const poll = useCallback(async () => {
@@ -246,11 +267,38 @@ function TabAtualizacao() {
         </div>
       ) : null}
 
+      {/* Aviso: o servidor não conseguiu falar com o repositório remoto */}
+      {version.remote_synced === false && (
+        <div
+          className="rounded-lg px-4 py-3 flex items-start gap-3"
+          style={{ backgroundColor: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)' }}
+        >
+          <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold" style={{ color: 'var(--ap-text-1)' }}>Repositório remoto inacessível</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-3)' }}>
+              O servidor não conseguiu buscar as versões no repositório (rede ou credencial do git).
+              A lista abaixo mostra apenas as versões já conhecidas localmente.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Lista de versões disponíveis */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--ap-text-4)' }}>
-          Versões disponíveis (mais recentes que a atual)
-        </p>
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-4)' }}>
+            Versões disponíveis (mais recentes que a atual)
+          </p>
+          <button
+            className="btn-secondary !py-1 !px-2.5 text-xs disabled:opacity-60"
+            onClick={handleCheckNow}
+            disabled={checking || running}
+            title="Consulta o repositório agora (ignora o cache de 5 minutos)"
+          >
+            {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Verificar agora
+          </button>
+        </div>
         {!newer.length ? (
           <EmptyState icon={RefreshCw} title="Instância atualizada" description="Não há versões mais recentes que a atual." />
         ) : (

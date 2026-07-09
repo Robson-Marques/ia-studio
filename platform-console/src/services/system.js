@@ -6,13 +6,16 @@ import api, { extractErrorMessage, normalizeList } from '../lib/api';
 
 /* ───────────────────────── Atualização ───────────────────────── */
 
-export async function getVersion() {
+// force=true ignora o cache de 5min do backend e refaz o `git fetch --tags`.
+export async function getVersion(force = false) {
   try {
-    const { data } = await api.get('/console/system/version');
+    const { data } = await api.get('/console/system/version', { params: force ? { force: '1' } : {} });
     return {
       current_version: data?.current_version || data?.current || '—',
       available: Array.isArray(data?.available) ? data.available : [],
       backups_retained: data?.backups_retained ?? data?.backupsRetained ?? 0,
+      // false = o git fetch falhou (sem rede/credencial): a lista pode estar velha.
+      remote_synced: data?.remote_synced !== false,
     };
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar versão')); }
 }

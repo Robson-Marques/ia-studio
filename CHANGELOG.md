@@ -28,6 +28,7 @@
 
 ### Correções
 
+- **Tela de Atualização não via versões novas.** O `VersionService` rodava `git tag --list` no clone de `/opt/iastudio` sem nunca fazer `git fetch` — a instância só enxergava as tags que existiam no momento da instalação e dizia "Instância atualizada" para sempre. Agora faz `git fetch --tags --force` (best-effort, timeout de 20s) antes de listar; se o fetch falhar, cai nas tags locais e a tela mostra um aviso de "repositório remoto inacessível" (`remote_synced: false`) em vez de mentir. Botão **Verificar agora** (`GET /console/system/version?force=1`) ignora o cache de 5 min.
 - `whatsapp-inbox.controller.ts`: erro de build no union `Multipart` (`MultipartFile | MultipartValue`) ao ler campos do formulário.
 
 ## v0.9.1 - 2026-07-04 (primeiro deploy em produção + correções)
