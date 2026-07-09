@@ -42,6 +42,8 @@ import {
   ixcErrorMessage,
   redactRow,
   FIBRA_TABLE,
+  SCOPE_GEO_CLIENTE,
+  SCOPE_GEO_RADUSUARIOS,
   SCOPE_TO_FIBRA,
   SCOPE_TO_RADUSUARIOS,
   ZERO_MEANS_UNSET,
@@ -286,6 +288,80 @@ export class IxcProvider extends BaseProvider {
     return { resources };
   }
 
+  // ─── Resolucao dos logins de um escopo de rede ──────
+
+  /**
+   * Resolve os logins ATIVOS de um escopo. Tres fontes, porque o IXC espalha a
+   * informacao e nao tem operador OR:
+   *   1. topologia PON  → `radpop_radio_cliente_fibra` (2 estagios, por id_login);
+   *   2. rede logica    → colunas do proprio `radusuarios`;
+   *   3. geografia      → `radusuarios` (endereco proprio) UNIAO `cliente`
+   *      (endereco de cadastro, herdado pelos logins com bairro vazio).
+   */
+  private async resolveLogins(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<Record<string, unknown>[]> {
+    const base = this.scopeFilters(args, SCOPE_TO_RADUSUARIOS);
+    const fibra = this.scopeFilters(args, SCOPE_TO_FIBRA);
+    const geoRad = this.scopeFilters(args, SCOPE_GEO_RADUSUARIOS);
+    const geoCli = this.scopeFilters(args, SCOPE_GEO_CLIENTE);
+    if (base.length === 0 && fibra.length === 0 && geoRad.length === 0) {
+      throw new BadRequestException(
+        'Informe ao menos um filtro de escopo. Do mais preciso ao menos: porta_pon, id_cto, id_olt, vlan, bairro.',
+      );
+    }
+
+    // Topologia PON: primeiro estagio devolve os id_login daquela porta/slot.
+    if (fibra.length > 0) {
+      const onus = await this.list(ctx, token, FIBRA_TABLE, {
+        page: '1',
+        rp: '1000',
+        sortname: `${FIBRA_TABLE}.id`,
+        sortorder: 'asc',
+        grid_param: buildGridParam(fibra),
+      });
+      const loginIds = [...new Set(onus.map((o) => String(o['id_login'] ?? '')).filter((v) => v && v !== '0'))];
+      if (loginIds.length === 0) return [];
+      base.push({ TB: `${T.radusuarios}.id`, OP: 'IN', P: loginIds.join(',') });
+    }
+    base.push({ TB: `${T.radusuarios}.ativo`, OP: '=', P: 'S' });
+
+    if (geoRad.length === 0) return this.listLogins(ctx, token, base);
+
+    // Geografia: logins com endereco proprio no escopo...
+    const proprios = await this.listLogins(ctx, token, [...base, ...geoRad]);
+
+    // ...uniao dos logins dos clientes cadastrados no escopo, considerando so os
+    // que HERDAM o endereco (`endereco_padrao_cliente = 'S'`). Os de endereco
+    // proprio ja vieram acima, e incluir os demais colocaria no incidente um
+    // login que esta fisicamente noutro bairro.
+    const clientes = await this.list(ctx, token, T.cliente, {
+      page: '1',
+      rp: '1000',
+      sortname: `${T.cliente}.id`,
+      sortorder: 'asc',
+      grid_param: buildGridParam(geoCli),
+    });
+    const clienteIds = [...new Set(clientes.map((c) => String(c['id'] ?? '')).filter(Boolean))];
+    if (clienteIds.length === 0) return proprios;
+
+    const herdados = (
+      await this.listLogins(ctx, token, [...base, { TB: `${T.radusuarios}.id_cliente`, OP: 'IN', P: clienteIds.join(',') }])
+    ).filter((l) => isYes(l['endereco_padrao_cliente']));
+
+    const byId = new Map(proprios.map((l) => [String(l['id']), l]));
+    for (const login of herdados) byId.set(String(login['id']), login);
+    return [...byId.values()];
+  }
+
+  private listLogins(ctx: ProviderContext, token: string, filters: IxcGridFilter[]): Promise<Record<string, unknown>[]> {
+    return this.list(ctx, token, T.radusuarios, {
+      page: '1',
+      rp: '1000',
+      sortname: `${T.radusuarios}.id`,
+      sortorder: 'asc',
+      grid_param: buildGridParam(filters),
+    });
+  }
+
   // ─── Operacoes de negocio ───────────────────────────
 
   /** Busca o cliente por CPF/CNPJ tentando os formatos aceitos pela base. */
@@ -382,38 +458,7 @@ export class IxcProvider extends BaseProvider {
    * num unico lote (sem N+1), no formato que o IspConnectivityService espera.
    */
   private async conectividade(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<Record<string, unknown>[]> {
-    const radFilters = this.scopeFilters(args, SCOPE_TO_RADUSUARIOS);
-    const fibraFilters = this.scopeFilters(args, SCOPE_TO_FIBRA);
-    // Sem filtro nenhum a consulta varreria a base inteira — exige escopo.
-    if (radFilters.length === 0 && fibraFilters.length === 0) {
-      throw new BadRequestException(
-        'Informe ao menos um filtro de escopo. Do mais preciso ao menos: porta_pon, id_cto, id_olt, vlan, bairro.',
-      );
-    }
-
-    // Escopo de PON mora em `radpop_radio_cliente_fibra`: primeiro estagio
-    // resolve os `id_login` da porta/slot; o segundo busca esses logins.
-    if (fibraFilters.length > 0) {
-      const onus = await this.list(ctx, token, FIBRA_TABLE, {
-        page: '1',
-        rp: '1000',
-        sortname: `${FIBRA_TABLE}.id`,
-        sortorder: 'asc',
-        grid_param: buildGridParam(fibraFilters),
-      });
-      const loginIds = [...new Set(onus.map((o) => String(o['id_login'] ?? '')).filter((v) => v && v !== '0'))];
-      if (loginIds.length === 0) return [];
-      radFilters.push({ TB: `${T.radusuarios}.id`, OP: 'IN', P: loginIds.join(',') });
-    }
-    radFilters.push({ TB: `${T.radusuarios}.ativo`, OP: '=', P: 'S' });
-
-    const logins = await this.list(ctx, token, T.radusuarios, {
-      page: '1',
-      rp: '1000',
-      sortname: `${T.radusuarios}.id`,
-      sortorder: 'asc',
-      grid_param: buildGridParam(radFilters),
-    });
+    const logins = await this.resolveLogins(ctx, token, args);
     if (logins.length === 0) return [];
 
     // Lote unico de clientes (operador IN) → nome + telefone pro disparo.

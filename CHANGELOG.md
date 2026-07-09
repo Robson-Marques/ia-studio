@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.8 - 2026-07-09 (escopo geográfico correto no IXC)
+
+- **Escopo geográfico contava só uma fração dos afetados (IXC).** `radusuarios.bairro`/`cidade` só vêm preenchidos quando o login tem endereço **próprio** (`endereco_padrao_cliente = 'N'`); a maioria herda o endereço do cliente e deixa esses campos vazios (`cidade = "0"`). Filtrar por bairro devolvia apenas os logins de endereço próprio — num incidente, notificaria uma fração dos afetados **sem sinal de erro**, com um número plausível. Agora `conectividade.listar_com_status` une duas fontes: `radusuarios` (endereço próprio) + `cliente` (endereço de cadastro, restrito aos logins com `endereco_padrao_cliente = 'S'`), já que o IXC não tem operador `OR`. A resolução dos logins saiu para `resolveLogins()` — `conectividade` estava respondendo três perguntas.
+- IXC: `cidade` entrou em `ZERO_MEANS_UNSET` (`"0"` é "não configurado", casaria com a base toda).
+- Confirmado contra base real: `id_porta_pon` (atalho de 1 requisição, via `radusuarios.interface_transmissao`) devolve **exatamente** a mesma lista que `porta_pon` (2 requisições, via `radpop_radio_cliente_fibra.ponid`) — 106 logins idênticos na PON `0/1/1`.
+
 ## v0.9.7 - 2026-07-09 (redação de senhas + escopo de rede)
 
 - **Vazamento de senha do cliente para o LLM (IXC).** A tabela `cliente` do IXC devolve `senha` (senha da central do assinante) em texto claro, e `radusuarios` devolve a senha PPPoE e as do roteador/Wi-Fi. Essas linhas iam inteiras para a tool `identificar_cliente` — ou seja, para o contexto do modelo, que poderia repeti-las ao próprio cliente no WhatsApp. Agora `IxcProvider.list()` redige todo campo cujo nome case com `senha|password|secret|token|api_key`, no ponto único por onde toda leitura passa (adicionar operação nova não reintroduz o vazamento).

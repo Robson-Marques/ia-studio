@@ -142,14 +142,35 @@ export function buildGridParam(filters: IxcGridFilter[]): string {
  * filtra direto no login; com `ponid`/`slotno`/`ponno` a consulta e em 2 estagios.
  */
 export const SCOPE_TO_RADUSUARIOS: Record<string, string> = {
-  cidade: 'radusuarios.cidade',
-  bairro: 'radusuarios.bairro',
   ip_concentrador: 'radusuarios.ip_concentrador',
   interface_concentrador: 'radusuarios.interface',
   vlan: 'radusuarios.vlan',
   id_olt: 'radusuarios.id_transmissor',
   id_cto: 'radusuarios.id_caixa_ftth',
   id_porta_pon: 'radusuarios.interface_transmissao',
+};
+
+/**
+ * Escopo GEOGRAFICO — o unico que precisa de duas fontes.
+ *
+ * `radusuarios.bairro`/`cidade` so vem preenchido quando o login tem endereco
+ * PROPRIO (`endereco_padrao_cliente = 'N'`). Quem usa o endereco do cliente
+ * (a maioria) deixa esses campos vazios e `cidade = "0"`. Filtrar so por
+ * `radusuarios` devolve um subconjunto e cala sobre o resto — num incidente de
+ * bairro, notificaria uma fracao dos afetados sem sinal de erro.
+ *
+ * Entao: filtra `radusuarios` (enderecos proprios) UNIAO `cliente` (endereco de
+ * cadastro, para os logins que o herdam). O IXC nao tem operador OR — a uniao e
+ * feita aqui, em duas consultas.
+ */
+export const SCOPE_GEO_RADUSUARIOS: Record<string, string> = {
+  cidade: 'radusuarios.cidade',
+  bairro: 'radusuarios.bairro',
+};
+
+export const SCOPE_GEO_CLIENTE: Record<string, string> = {
+  cidade: 'cliente.cidade',
+  bairro: 'cliente.bairro',
 };
 
 /** Tabela da ONU/fibra — ligada a `radusuarios` por `id_login`. */
@@ -182,6 +203,7 @@ export const ZERO_MEANS_UNSET = new Set([
   'id_olt',
   'id_cto',
   'id_porta_pon',
+  'cidade',
 ]);
 
 /** `YYYY-MM-DD HH:mm:ss` — formato de data/hora aceito nos inserts do IXC. */
