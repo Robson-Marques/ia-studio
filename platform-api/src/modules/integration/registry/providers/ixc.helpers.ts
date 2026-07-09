@@ -120,6 +120,19 @@ export function buildGridParam(filters: IxcGridFilter[]): string {
 }
 
 /**
+ * Tamanho do lote do operador `IN`. Uma lista com centenas de ids numa string
+ * unica faz o IXC devolver `registros` vazio em vez de erro (falha silenciosa).
+ */
+export const IN_CHUNK_SIZE = 100;
+
+/** Parte um array em lotes de no maximo `size`. */
+export function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
  * Traducao dos filtros de escopo canonicos da solucao ISP (SCOPE_KEYS, nomeados
  * a partir do Altarede) para colunas de `radusuarios` no IXC. Nomes conferidos
  * contra a collection oficial da API (CRUD radusuarios).

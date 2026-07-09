@@ -34,7 +34,9 @@ import {
   IxcListParams,
   basicAuthHeader,
   buildGridParam,
+  chunk,
   cpfCnpjCandidates,
+  IN_CHUNK_SIZE,
   extractRegistros,
   isValidIxcToken,
   isYes,
@@ -343,12 +345,18 @@ export class IxcProvider extends BaseProvider {
     const clienteIds = [...new Set(clientes.map((c) => String(c['id'] ?? '')).filter(Boolean))];
     if (clienteIds.length === 0) return proprios;
 
-    const herdados = (
-      await this.listLogins(ctx, token, [...base, { TB: `${T.radusuarios}.id_cliente`, OP: 'IN', P: clienteIds.join(',') }])
-    ).filter((l) => isYes(l['endereco_padrao_cliente']));
-
     const byId = new Map(proprios.map((l) => [String(l['id']), l]));
-    for (const login of herdados) byId.set(String(login['id']), login);
+    // O `IN` vai em lotes: uma lista com centenas de ids numa string so faz o
+    // IXC devolver `registros` VAZIO em vez de erro — o afetado sumiria calado.
+    for (const lote of chunk(clienteIds, IN_CHUNK_SIZE)) {
+      const herdados = await this.listLogins(ctx, token, [
+        ...base,
+        { TB: `${T.radusuarios}.id_cliente`, OP: 'IN', P: lote.join(',') },
+      ]);
+      for (const login of herdados) {
+        if (isYes(login['endereco_padrao_cliente'])) byId.set(String(login['id']), login);
+      }
+    }
     return [...byId.values()];
   }
 

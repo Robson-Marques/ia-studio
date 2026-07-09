@@ -196,7 +196,8 @@ export class IspTools implements OnModuleInit {
     this.registry.register({
       key: 'segunda_via_boleto',
       name: '2ª via de boleto (ISP)',
-      description: 'Gera a 2ª via de boleto (linha digitável + PIX copia-e-cola, PDF ou e-mail) no ERP do provedor.',
+      description:
+        'Gera a 2ª via de boleto no ERP do provedor. No IXC devolve linha digitável e link do boleto no gateway (não há PIX copia-e-cola); no Altarede, linha digitável e PIX quando disponível.',
       category: 'isp',
       input_schema: {
         type: 'object',

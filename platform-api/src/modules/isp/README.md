@@ -32,7 +32,13 @@ ERP é trocar a Connection: **nenhuma tool, serviço ou cron muda**.
 Diferenças conhecidas do IXC (assumidas, não contornadas):
 
 - **Sem envio de boleto por e-mail** pela API → `segunda_via_boleto` só aceita
-  `linha` ou `pdf`.
+  `linha` ou `pdf`. E **não há PIX copia-e-cola**: `fn_areceber` traz
+  `linha_digitavel` e `gateway_link` (link do boleto no gateway); `pix_txid` vem
+  vazio.
+- **O operador `IN` falha em silêncio** com listas grandes: o IXC responde
+  `registros: []` em vez de erro. Toda consulta com `IN` vai em lotes de 100
+  (`IN_CHUNK_SIZE`). Um `IN` de 768 ids devolveu zero e quase passou por
+  "bairro sem clientes".
 - **Filtros de escopo** (conferidos contra a collection oficial `radusuarios`):
   `cidade`, `bairro`, `ip_concentrador`, `interface_concentrador` (→ `interface`),
   `id_olt` (→ `id_transmissor`) e `id_cto` (→ `id_caixa_ftth`) têm equivalente.
