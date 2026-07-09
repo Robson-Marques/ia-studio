@@ -101,6 +101,17 @@ export class ConnectionsController {
     return this.connections.test(resolveOrganizationId(user, orgQuery), id);
   }
 
+  /** Schema Discovery — read-only; nada é persistido além de `last_sync_at`. */
+  @Post(':id/discover')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ)
+  discover(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.connections.discover(resolveOrganizationId(user, orgQuery), id);
+  }
+
   @Post(':id/execute')
   @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_EXECUTE)
   execute(

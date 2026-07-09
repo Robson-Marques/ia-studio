@@ -61,6 +61,15 @@ export async function testConnection(id) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao testar conexão')); }
 }
 
+// Schema Discovery: lista os recursos que a conexão expõe (assuntos de OS,
+// setores, planos, números, templates...). Read-only — nada é persistido.
+export async function discoverConnection(id) {
+  try {
+    const { data } = await api.post(`/connections/${id}/discover`);
+    return Array.isArray(data?.resources) ? data.resources : [];
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao descobrir recursos')); }
+}
+
 export async function listConnectionLogs(id, take = 50) {
   try {
     const { data } = await api.get(`/connections/${id}/logs`, { params: { take } });

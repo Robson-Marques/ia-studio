@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Activity, CheckCircle2, Loader2, Pause, Pencil, Play, Plug, Plus, ScrollText, Wrench, XCircle,
+  Activity, CheckCircle2, Compass, Copy, Loader2, Pause, Pencil, Play, Plug, Plus,
+  ScrollText, Wrench, XCircle,
 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Tabs from '../../components/ui/Tabs';
@@ -10,7 +11,7 @@ import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Tabl
 import { FormField, Select, TextInput, NumberInput } from '../../components/ui/FormField';
 import {
   listConnections, changeConnectionState, testConnection, listConnectionLogs, getMarketplace,
-  updateConnection,
+  updateConnection, discoverConnection,
 } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -33,6 +34,8 @@ export default function Conexoes() {
   const [acting, setActing] = useState(false);
   const [detail, setDetail] = useState(null); // conexão do modal de detalhe
   const [editing, setEditing] = useState(null); // conexão sendo editada
+  const [discovering, setDiscovering] = useState(null); // id em descoberta
+  const [discovery, setDiscovery] = useState(null); // { connection, resources }
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wizardFor, setWizardFor] = useState(null);
 
@@ -72,6 +75,22 @@ export default function Conexoes() {
       toast.error(err.message);
     } finally {
       setTesting(null);
+    }
+  }
+
+  // Descobrir recursos: read-only. Traz os ids que o usuário não deve digitar
+  // à mão (assuntos/setores de OS no IXC, números/templates na Meta...).
+  async function handleDiscover(connection) {
+    setDiscovering(connection.id);
+    try {
+      const resources = await discoverConnection(connection.id);
+      setDiscovery({ connection, resources });
+      if (!resources.length) toast.info('Nenhum recurso retornado por esta conexão.');
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setDiscovering(null);
     }
   }
 
@@ -188,6 +207,18 @@ export default function Conexoes() {
                               : <Activity size={14} className="text-brand" />}
                           </button>
                         )}
+                        {can('integrations.connections.read') && c.status === 'ACTIVE' && (
+                          <button
+                            className="btn-ghost p-1.5 disabled:opacity-60"
+                            title="Descobrir recursos (lista o que a conexão expõe — não altera nada)"
+                            disabled={discovering === c.id}
+                            onClick={(e) => { e.stopPropagation(); handleDiscover(c); }}
+                          >
+                            {discovering === c.id
+                              ? <Loader2 size={14} className="animate-spin" />
+                              : <Compass size={14} className="text-brand" />}
+                          </button>
+                        )}
                         {can('integrations.connections.write') && c.status !== 'ACTIVE' && (
                           <button
                             className="btn-ghost p-1.5"
@@ -242,6 +273,11 @@ export default function Conexoes() {
         onClose={() => setDetail(null)}
       />
 
+      <DiscoveryModal
+        discovery={discovery}
+        onClose={() => setDiscovery(null)}
+      />
+
       <EditConnectionModal
         connection={editing}
         onClose={() => setEditing(null)}
@@ -259,6 +295,83 @@ export default function Conexoes() {
         onClose={() => { setWizardFor(null); load(); }}
       />
     </div>
+  );
+}
+
+// Rótulos amigáveis dos tipos de recurso que os providers devolvem.
+const KIND_LABELS = {
+  setor: 'Setores de OS',
+  motivo_atendimento: 'Assuntos de OS',
+  plano: 'Planos',
+  model: 'Modelos',
+  phone_number: 'Números',
+  template: 'Templates',
+  table: 'Tabelas',
+  bucket: 'Buckets',
+};
+
+// Resultado do "Descobrir recursos": read-only, agrupado por tipo. O id é o que
+// interessa (ex.: `id_assunto` da OS no IXC), então dá pra copiar com um clique.
+function DiscoveryModal({ discovery, onClose }) {
+  if (!discovery) return null;
+  const { connection, resources } = discovery;
+
+  const groups = resources.reduce((acc, r) => {
+    (acc[r.kind] = acc[r.kind] || []).push(r);
+    return acc;
+  }, {});
+
+  async function copyId(id) {
+    try {
+      await navigator.clipboard.writeText(String(id));
+      toast.success('Id copiado.');
+    } catch {
+      toast.error('Não foi possível copiar.');
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Recursos — ${connection.name}`} size="lg">
+      <p className="text-xs mb-3" style={{ color: 'var(--ap-text-4)' }}>
+        Somente leitura: a plataforma não guarda esses dados, apenas consulta a conexão.
+        Use os ids ao configurar ferramentas e fluxos.
+      </p>
+      {!resources.length ? (
+        <EmptyState
+          icon={Compass}
+          title="Nenhum recurso"
+          description="A conexão respondeu, mas não expôs recursos descobríveis."
+        />
+      ) : (
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          {Object.entries(groups).map(([kind, rows]) => (
+            <div key={kind}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--ap-text-4)' }}>
+                {KIND_LABELS[kind] || kind} <span className="normal-case font-normal">({rows.length})</span>
+              </p>
+              <div className="divide-y rounded-lg" style={{ border: '1px solid var(--ap-border-sub)', borderColor: 'var(--ap-border-sub)' }}>
+                {rows.map((r) => (
+                  <div key={`${kind}:${r.id}`} className="flex items-center gap-2 px-3 py-2">
+                    <span className="text-sm flex-1 min-w-0 truncate" style={{ color: 'var(--ap-text-1)' }}>{r.name}</span>
+                    <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--ap-surface-2)', color: 'var(--ap-text-3)' }}>
+                      {r.id}
+                    </code>
+                    <button
+                      type="button"
+                      className="btn-ghost p-1"
+                      title="Copiar id"
+                      onClick={() => copyId(r.id)}
+                    >
+                      <Copy size={13} className="text-brand" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   );
 }
 

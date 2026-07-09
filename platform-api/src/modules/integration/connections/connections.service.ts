@@ -336,6 +336,57 @@ export class ConnectionsService {
     }
   }
 
+  // ─── Descoberta de recursos (Schema Discovery) ──────
+  /**
+   * `IProvider.discover()`: lista os recursos que a conexao expoe — assuntos/
+   * setores/planos no IXC, numeros e templates na Meta, tabelas no Postgres.
+   * READ-ONLY: a plataforma NAO e dona de dados de negocio (principio reitor).
+   * Nao persiste os recursos; devolve pro chamador e grava so `last_sync_at`
+   * mais o IntegrationLog. Serve pra UI preencher ids que o usuario nao deve
+   * digitar a mao (ex.: `id_assunto` da OS no IXC).
+   */
+  async discover(organizationId: string, id: string) {
+    const connection = await this.findById(organizationId, id);
+    if (!this.registry.has(connection.provider_key)) {
+      throw new BadRequestException('Conector sem implementação — descoberta de recursos indisponível.');
+    }
+    if (connection.status !== 'ACTIVE') {
+      throw new ConflictException('Conexão não está ativa — teste/reative antes de descobrir recursos.');
+    }
+    const provider = this.registry.get(connection.provider_key);
+    const ctx = this.buildContext(connection);
+    const startedAt = Date.now();
+    try {
+      const result = await provider.discover(ctx);
+      const durationMs = Date.now() - startedAt;
+      await this.repository.update(id, { last_sync_at: new Date() });
+      await this.integrationLogs.record({
+        organizationId,
+        connectionId: id,
+        direction: IntegrationDirection.OUTBOUND,
+        operation: 'discover',
+        status: IntegrationLogStatus.SUCCESS,
+        durationMs,
+        responseMeta: { resources: result.resources.length },
+        traceId: getRequestStore()?.traceId ?? null,
+      });
+      return result;
+    } catch (e) {
+      const durationMs = Date.now() - startedAt;
+      await this.integrationLogs.record({
+        organizationId,
+        connectionId: id,
+        direction: IntegrationDirection.OUTBOUND,
+        operation: 'discover',
+        status: IntegrationLogStatus.FAILURE,
+        durationMs,
+        error: (e as Error).message,
+        traceId: getRequestStore()?.traceId ?? null,
+      });
+      throw e;
+    }
+  }
+
   /**
    * Upload de midia binaria pra Meta (retorna media_id). Caminho SEPARADO do
    * execute() porque o binario NAO pode ir pro log de integracao (redactSensitive
