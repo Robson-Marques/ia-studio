@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.9.6 - 2026-07-09 (IXC conferido contra as collections oficiais)
+
+- IXC: rótulo errado no Descobrir recursos. O IXC devolve `""` (string vazia) nos campos não preenchidos e o fallback usava `??`, que só pula `null`/`undefined` — planos sem `descricao` apareciam em branco. Pior: a ordem de preferência era global, então planos mostravam `descricao` (código interno, ex. `2MG(Outros)`) em vez do `nome` que o operador vê na tela do IXC (`AGUARDANDO5`). Agora a ordem de rótulos é **por tabela** (`vd_contratos` → `nome`; `su_oss_assunto` → `assunto`; `su_oss_setor` → `setor`) e ignora string vazia, caindo em `(sem nome) #id`.
+- Conexões: o **id da conexão** não aparecia em lugar nenhum da UI. Agora está no modal de detalhe (clique na linha), com botão de copiar — é ele que vai nas chamadas de API e ao fixar a conexão em tools/fluxos.
+- IXC, correções a partir das collections oficiais da API (`radusuarios`, `fn_areceber`, `cliente_contrato`, `su_oss_chamado`):
+  - `radusuarios.online` vale **`'SS'`**, não `'S'` — o `isYes` comparava por igualdade estrita e leria **toda** conexão como offline (o `status_regiao` reportaria 100% offline). Agora aceita qualquer valor iniciado por `S`.
+  - `ip_concentrador` e `interface` **existem** em `radusuarios` — a doc dizia que não tinham equivalente e os dois filtros de escopo eram descartados silenciosamente. Mapeados. Só `id_slot` segue sem equivalente.
+  - `os.cadastrar` passou a enviar os defaults documentados (`tipo`, `prioridade`, `melhor_horario_agenda`) e aceita `id_login` para vincular a OS ao login do cliente.
+
 ## v0.9.5 - 2026-07-08 (Schema Discovery ligado)
 
 - **"Descobrir recursos" nunca existiu.** O `IProvider.discover()` estava implementado em todos os providers e declarado na interface desde a Fase 2, mas **nenhum endpoint e nenhuma tela jamais o chamavam** — era código morto. Agora: `POST /integration/connections/:id/discover` (perm `integrations.connections.read`, read-only, grava só `last_sync_at` + `IntegrationLog`) e a ação **Descobrir recursos** (ícone bússola) na tela de Conexões, com modal agrupado por tipo e botão de copiar id. É por aí que se obtém o `id_assunto` que o `abrir_os` do IXC exige.

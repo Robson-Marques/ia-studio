@@ -274,9 +274,11 @@ export class IxcProvider extends BaseProvider {
   async discover(ctx: ProviderContext): Promise<DiscoveryResult> {
     const token = await this.token(ctx);
     const resources: DiscoveredResource[] = [];
-    resources.push(...(await this.discoverList(ctx, token, T.osSetor, 'setor')));
-    resources.push(...(await this.discoverList(ctx, token, T.osAssunto, 'motivo_atendimento')));
-    resources.push(...(await this.discoverList(ctx, token, T.plano, 'plano')));
+    // A ordem dos rotulos e POR TABELA: em `vd_contratos` o rotulo que o
+    // operador ve na tela do IXC (coluna "Plano") e `nome`, nao `descricao`.
+    resources.push(...(await this.discoverList(ctx, token, T.osSetor, 'setor', ['setor', 'nome', 'descricao'])));
+    resources.push(...(await this.discoverList(ctx, token, T.osAssunto, 'motivo_atendimento', ['assunto', 'descricao', 'nome'])));
+    resources.push(...(await this.discoverList(ctx, token, T.plano, 'plano', ['nome', 'descricao'])));
     return { resources };
   }
 
@@ -427,24 +429,34 @@ export class IxcProvider extends BaseProvider {
     });
   }
 
-  /** Abertura de OS. `id_assunto`/`setor` vêm do discover() — não são texto livre. */
+  /**
+   * Abertura de OS. `id_assunto`/`setor` vêm do discover() — não são texto livre.
+   * Os defaults (`tipo`, `prioridade`, `melhor_horario_agenda`, `origem_endereco`)
+   * seguem a collection oficial da API do IXC (CRUD su_oss_chamado); `extra`
+   * permite sobrescrever qualquer um deles sem tocar no provider.
+   */
   private async abrirOs(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
     const clienteId = await this.clienteId(ctx, token, this.str(args, 'cpf', true));
     const assunto = this.str(args, 'id_assunto') ?? this.str(args, 'motivo');
     const setor = this.str(args, 'setor');
+    const login = this.str(args, 'id_login');
     if (!assunto) {
       throw new BadRequestException(
         'Informe "id_assunto" (id do assunto da OS no IXC). Os assuntos disponíveis vêm do Descobrir recursos da conexão.',
       );
     }
     const body: Record<string, unknown> = {
+      tipo: 'C',
       id_cliente: clienteId,
       id_assunto: assunto,
       mensagem: this.str(args, 'descricao', true),
       status: 'A',
-      data_abertura: ixcDateTime(),
+      prioridade: 'N',
+      melhor_horario_agenda: 'Q',
       origem_endereco: 'M',
+      data_abertura: ixcDateTime(),
       ...(setor ? { setor } : {}),
+      ...(login ? { id_login: login } : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };
     return this.write(ctx, token, 'POST', T.os, body);
@@ -543,17 +555,36 @@ export class IxcProvider extends BaseProvider {
     return rest;
   }
 
-  private async discoverList(ctx: ProviderContext, token: string, tabela: string, kind: string): Promise<DiscoveredResource[]> {
+  private async discoverList(
+    ctx: ProviderContext,
+    token: string,
+    tabela: string,
+    kind: string,
+    labelKeys: string[],
+  ): Promise<DiscoveredResource[]> {
     try {
       const rows = await this.list(ctx, token, tabela, { page: '1', rp: '200', sortname: `${tabela}.id`, sortorder: 'asc' });
       return rows.map((row, i) => {
         const id = String(row['id'] ?? i);
-        const name = String(row['assunto'] ?? row['descricao'] ?? row['nome'] ?? row['setor'] ?? id);
+        const name = this.firstLabel(row, labelKeys) ?? `(sem nome) #${id}`;
         return { kind, id, name, meta: row };
       });
     } catch {
       // discover nunca derruba a UI — recurso indisponivel = lista vazia.
       return [];
     }
+  }
+
+  /**
+   * Primeiro rotulo NAO-VAZIO da linha, na ordem pedida. `??` nao serve aqui:
+   * o IXC devolve "" (string vazia) nos campos nao preenchidos, e "" passa
+   * pelo nullish — foi por isso que planos sem `descricao` apareciam em branco.
+   */
+  private firstLabel(row: Record<string, unknown>, keys: string[]): string | undefined {
+    for (const key of keys) {
+      const value = row[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return undefined;
   }
 }

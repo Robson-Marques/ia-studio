@@ -33,9 +33,10 @@ Diferenças conhecidas do IXC (assumidas, não contornadas):
 
 - **Sem envio de boleto por e-mail** pela API → `segunda_via_boleto` só aceita
   `linha` ou `pdf`.
-- **Filtros de escopo**: `cidade`, `bairro`, `id_olt` (→ `id_transmissor`) e
-  `id_cto` (→ `id_caixa_ftth`) têm equivalente; `ip_concentrador`,
-  `interface_concentrador` e `id_slot` **não** — são ignorados na consulta.
+- **Filtros de escopo** (conferidos contra a collection oficial `radusuarios`):
+  `cidade`, `bairro`, `ip_concentrador`, `interface_concentrador` (→ `interface`),
+  `id_olt` (→ `id_transmissor`) e `id_cto` (→ `id_caixa_ftth`) têm equivalente.
+  Só `id_slot` fica de fora — não há coluna clara em `radusuarios`.
 - **`abrir_os` exige `id_assunto`** (o IXC não aceita motivo em texto livre).
   Os ids vêm do **Descobrir recursos** da conexão (`su_oss_assunto`).
 - A conexão exige que o **IP do servidor esteja em "Redes permitidas"** do grupo

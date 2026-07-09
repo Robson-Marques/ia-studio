@@ -416,6 +416,29 @@ function ConnectionDetailModal({ connection, scopeName, onClose }) {
       <Tabs items={TABS} active={tab} onChange={setTab} bleed={false} />
       {tab === 'dados' && (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          {/* Id da conexão: necessário em chamadas de API e configuração de
+              tools/fluxos que fixam a conexão. Não aparecia em lugar nenhum. */}
+          <InfoRow
+            label="Id da conexão"
+            value={
+              <span className="inline-flex items-center gap-1.5 min-w-0">
+                <code className="text-[11px] truncate" style={{ color: 'var(--ap-text-3)' }}>{connection.id}</code>
+                <button
+                  type="button"
+                  className="btn-ghost p-1 shrink-0"
+                  title="Copiar id da conexão"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(connection.id);
+                      toast.success('Id copiado.');
+                    } catch { toast.error('Não foi possível copiar.'); }
+                  }}
+                >
+                  <Copy size={12} className="text-brand" />
+                </button>
+              </span>
+            }
+          />
           <InfoRow label="Conector" value={connection.provider_key} />
           <InfoRow label="Escopo" value={scopeName(connection)} />
           <InfoRow label="Status" value={<Badge variant={meta.variant}>{meta.label}</Badge>} />

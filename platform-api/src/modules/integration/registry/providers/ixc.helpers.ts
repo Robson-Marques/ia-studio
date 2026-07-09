@@ -102,13 +102,17 @@ export function buildGridParam(filters: IxcGridFilter[]): string {
 
 /**
  * Traducao dos filtros de escopo canonicos da solucao ISP (SCOPE_KEYS, nomeados
- * a partir do Altarede) para colunas de `radusuarios` no IXC.
- * Chaves sem equivalente no IXC (ip/interface do concentrador, slot) sao
- * ignoradas de proposito — a consulta continua valida, so menos especifica.
+ * a partir do Altarede) para colunas de `radusuarios` no IXC. Nomes conferidos
+ * contra a collection oficial da API (CRUD radusuarios).
+ * `id_slot` fica de fora: nao ha coluna equivalente clara em `radusuarios`
+ * (os candidatos — `interface_transmissao`, `ftth_porta`, `splitter` — sao
+ * conceitos distintos). Chave ignorada = consulta menos especifica, nao invalida.
  */
 export const SCOPE_TO_RADUSUARIOS: Record<string, string> = {
   cidade: 'radusuarios.cidade',
   bairro: 'radusuarios.bairro',
+  ip_concentrador: 'radusuarios.ip_concentrador',
+  interface_concentrador: 'radusuarios.interface',
   id_olt: 'radusuarios.id_transmissor',
   id_cto: 'radusuarios.id_caixa_ftth',
 };
@@ -122,7 +126,11 @@ export function ixcDateTime(date: Date = new Date()): string {
   );
 }
 
-/** `S`/`N` do IXC → boolean. */
+/**
+ * Flag do IXC → boolean. NAO e igualdade estrita com "S": a collection oficial
+ * mostra `radusuarios.online` valendo `'SS'`, e outras colunas usam `'S'`/`'N'`.
+ * Qualquer valor comecando com S conta como sim; o resto (N, vazio) e nao.
+ */
 export function isYes(value: unknown): boolean {
-  return String(value ?? '').trim().toUpperCase() === 'S';
+  return /^S/i.test(String(value ?? '').trim());
 }
