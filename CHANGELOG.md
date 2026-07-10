@@ -1,6 +1,20 @@
 # Changelog — IA Studio
 
-## Não publicado
+## v0.9.13 - 2026-07-09 (agente ISP em leitura + o agente sabe com quem fala)
+
+### Frente A — o agente passa a saber com quem fala
+
+- **O nó AGENT não propagava `scope_keys`.** `AgentRunnerService` e `ToolExecutionContext` já previam o campo; ninguém o preenchia. Ou seja: o agente nunca soube o telefone de quem estava falando, e a memória de contato/sessão caía no fallback do `agent_run_id` (memória nova a cada mensagem). Agora o nó expõe dois campos de template — **Identificação do contato** (`{{input.phone}}`) e **Identificação da conversa** (`{{input.chat_id}}`) — visíveis e editáveis no canvas.
+- **`resume()` perdia o escopo.** Um run pausado por aprovação retomava com `scopeKeys: {}` — e a retomada é exatamente o caminho das ações destrutivas (`desbloqueio_confianca`). A ação aprovada seria a única a rodar sem saber com quem falava. Novo campo `AiAgentRun.scope_keys Json?` persiste o escopo; `resume()` o recupera. (`db push` adiciona coluna nullable — **não destrutivo**.)
+
+### Agente ISP em modo leitura
+
+- **`identificar_cliente` aceita telefone.** Quem chega pelo WhatsApp traz o número, não o CPF — a tool só sabia buscar por CPF, então o agente não conseguia identificar com quem falava. Agora aceita `cpf` **ou** `telefone` (inclusive `5527999998888`, como a Meta entrega) e usa `cliente.por_telefone`. O Altarede, que não busca por telefone, responde com uma mensagem útil em vez de despejar o catálogo de operações.
+- **Nova tool `consultar_contrato` (leitura).** Mostra o plano e o `status_internet` — ou seja, se o acesso está **bloqueado por inadimplência**. Sem ela o agente via "offline" e sugeria ordem de serviço técnica para um problema financeiro.
+- **Tools ISP passaram a projetar a saída (`isp-projections.ts`).** O ERP devolve a linha inteira da tabela: o `cliente` do IXC tem ~150 colunas (`crm_data_sondagem`, `emp_remuneracao`, `ref_pes_fone2`...). Isso ia todo para o contexto do modelo — milhares de tokens de ruído por chamada, e cada campo é algo a mais que o LLM pode repetir ao cliente. A redação no provider tira o **perigoso** (senhas); a projeção tira o **irrelevante**. O provider segue devolvendo a linha crua para workflows e `ixc.listar`; quem estreita é a tool, que é a fronteira com o modelo.
+- Modo leitura não exigiu código: `AiAgent.allowed_tools` é uma lista — basta não incluir `abrir_os` nem `desbloqueio_confianca`. O gate de aprovação do `ToolRuntimeService` segue como segunda trava.
+
+### Outros
 
 - Doc: como conferir o efeito do desbloqueio de confiança no IXC — `dt_ult_ativacao` (data de hoje) e `nao_bloquear_ate` (o prazo). **Não** `desbloqueio_confianca_ativo` nem `dt_ult_des_bloq_conf`: parecem os campos certos pelo nome, e ficam inalterados após um desbloqueio bem-sucedido. Verificado em base real (contrato bloqueado em 03/07, desbloqueado por 5 dias em 09/07).
 

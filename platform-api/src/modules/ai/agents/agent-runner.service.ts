@@ -111,6 +111,7 @@ export class AgentRunnerService {
       trace_id: traceId,
       status: AiRunStatus.RUNNING,
       input: { text: params.input } as Prisma.InputJsonValue,
+      scope_keys: (params.scopeKeys ?? {}) as Prisma.InputJsonValue,
       model: agent.model,
       provider_kind: resolved.kind,
       created_by: params.createdBy ?? null,
@@ -144,9 +145,21 @@ export class AgentRunnerService {
     return this.loop(agent, runId, resolved, messages, llmTools, guardrails, {
       traceId: run.trace_id,
       dryRun: false,
-      scopeKeys: {},
+      // Recupera os escopos do run: a retomada e o caminho das acoes aprovadas
+      // (as destrutivas). Rodar sem contato/sessao aqui seria o pior lugar.
+      scopeKeys: this.parseScopeKeys(run.scope_keys),
       executionId: run.execution_id,
     });
+  }
+
+  /** Le `AiAgentRun.scope_keys` (Json) como Record<string,string>, sem `any`. */
+  private parseScopeKeys(raw: unknown): Record<string, string> {
+    if (!raw || typeof raw !== 'object') return {};
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof value === 'string' && value.trim()) out[key] = value;
+    }
+    return out;
   }
 
   // ─── Loop principal ─────────────────────────────────

@@ -17,6 +17,7 @@ import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
 import { IncidentLookupService } from './incident-lookup.service';
 import { SCOPE_KEYS } from './isp.constants';
+import { projectBoleto, projectCliente, projectConexao, projectContrato, rows } from './isp-projections';
 
 function asString(value: unknown, field: string): string {
   if (typeof value !== 'string' || !value.trim()) {
@@ -69,22 +70,29 @@ export class IspTools implements OnModuleInit {
     this.registry.register({
       key: 'identificar_cliente',
       name: 'Identificar cliente (ISP)',
-      description: 'Busca os dados cadastrais de um cliente do provedor por CPF/CNPJ no ERP (Altarede ou IXC).',
+      description:
+        'Busca o cadastro de um cliente do provedor por CPF/CNPJ ou por telefone. No atendimento por WhatsApp, comece pelo telefone — o cliente raramente digita o CPF.',
       category: 'isp',
       input_schema: {
         type: 'object',
         properties: {
-          cpf: { type: 'string', description: 'CPF ou CNPJ do cliente.' },
+          cpf: { type: 'string', description: 'CPF ou CNPJ do cliente (com ou sem máscara).' },
+          telefone: { type: 'string', description: 'Telefone do cliente, inclusive no formato do WhatsApp (5527999998888). Só no IXC.' },
           connection_id: { type: 'string', description: 'Conexão do ERP (opcional; resolvida automaticamente).' },
           filial: { type: 'string', description: 'Tag/filial quando há múltiplas conexões de ERP (opcional).' },
         },
-        required: ['cpf'],
       },
       handler: async (args, ctx) => {
-        const cpf = asString(args['cpf'], 'cpf');
-        if (ctx.dryRun) return { simulated: true, cpf };
+        const cpf = typeof args['cpf'] === 'string' && args['cpf'].trim() ? args['cpf'].trim() : undefined;
+        const telefone = typeof args['telefone'] === 'string' && args['telefone'].trim() ? args['telefone'].trim() : undefined;
+        if (!cpf && !telefone) throw new Error('Informe cpf ou telefone.');
+        if (ctx.dryRun) return { simulated: true, cpf, telefone };
         const connectionId = await this.connectionId(args, ctx);
-        return this.connections.execute(ctx.organizationId, connectionId, 'cliente.dados', { cpf });
+        // Telefone tem precedencia: e o dado que o atendimento realmente possui.
+        const raw = telefone
+          ? await this.connections.execute(ctx.organizationId, connectionId, 'cliente.por_telefone', { telefone })
+          : await this.connections.execute(ctx.organizationId, connectionId, 'cliente.dados', { cpf });
+        return { clientes: rows(raw).map(projectCliente) };
       },
     });
 
@@ -114,11 +122,36 @@ export class IspTools implements OnModuleInit {
           'financeiro.boleto_aberto_todos',
           { cpf },
         );
+        const out: Record<string, unknown> = { abertos: rows(abertos).map(projectBoleto) };
         if (args['incluir_historico'] === true) {
           const historico = await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.historico', { cpf });
-          return { abertos, historico };
+          out['historico'] = rows(historico).map(projectBoleto);
         }
-        return { abertos };
+        return out;
+      },
+    });
+
+    // ─── consultar_contrato ───────────────────────────
+    this.registry.register({
+      key: 'consultar_contrato',
+      name: 'Consultar contrato/plano (ISP)',
+      description:
+        'Mostra o plano contratado e o estado do contrato — inclusive se o acesso está BLOQUEADO por inadimplência (status_internet). Consulte antes de tratar "sem internet" como problema técnico: contrato bloqueado não se resolve com ordem de serviço.',
+      category: 'isp',
+      input_schema: {
+        type: 'object',
+        properties: {
+          cpf: { type: 'string' },
+          connection_id: { type: 'string' }, filial: { type: 'string' },
+        },
+        required: ['cpf'],
+      },
+      handler: async (args, ctx) => {
+        const cpf = asString(args['cpf'], 'cpf');
+        if (ctx.dryRun) return { simulated: true, cpf };
+        const connectionId = await this.connectionId(args, ctx);
+        const raw = await this.connections.execute(ctx.organizationId, connectionId, 'cliente.planos', { cpf });
+        return { contratos: rows(raw).map(projectContrato) };
       },
     });
 
@@ -144,7 +177,8 @@ export class IspTools implements OnModuleInit {
         if (!params['cpf'] && !params['login']) throw new Error('Informe cpf ou login.');
         if (ctx.dryRun) return { simulated: true };
         const connectionId = await this.connectionId(args, ctx);
-        return this.connections.execute(ctx.organizationId, connectionId, 'cliente.acesso', params);
+        const raw = await this.connections.execute(ctx.organizationId, connectionId, 'cliente.acesso', params);
+        return { conexoes: rows(raw).map(projectConexao) };
       },
     });
 
@@ -225,7 +259,8 @@ export class IspTools implements OnModuleInit {
           const email = asString(args['email'], 'email');
           return this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_por_email', { cpf, email });
         }
-        return this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_aberto', { cpf });
+        const raw = await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_aberto', { cpf });
+        return { boletos: rows(raw).map(projectBoleto) };
       },
     });
 

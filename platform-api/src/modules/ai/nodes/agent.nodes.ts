@@ -27,6 +27,20 @@ export class AgentNodes implements OnModuleInit {
         fields: [
           { key: 'agent_id', label: 'Agente', type: 'select', required: true, help: 'Agente de IA ativo desta organização.' },
           { key: 'input', label: 'Input', type: 'template', help: 'Texto/pergunta enviada ao agente (aceita {{variáveis}}).' },
+          {
+            key: 'scope_contact',
+            label: 'Identificação do contato',
+            type: 'template',
+            placeholder: '{{input.phone}}',
+            help: 'Quem está falando (telefone, e-mail, id). Escopo da memória CONTACT e base da identificação do assistente.',
+          },
+          {
+            key: 'scope_session',
+            label: 'Identificação da conversa',
+            type: 'template',
+            placeholder: '{{input.chat_id}}',
+            help: 'Conversa atual. Escopo da memória SESSION — sem ela, o assistente esquece o que já foi dito.',
+          },
         ],
       },
       executor: async (ctx) => {
@@ -34,9 +48,17 @@ export class AgentNodes implements OnModuleInit {
         const input = String(ctx.config['input'] ?? '').trim();
         if (!agentId) return { handle: 'error', output: { error: 'Selecione um agente.' } };
 
+        // Escopos do run: sem eles o agente nao sabe COM QUEM fala nem lembra da
+        // conversa. Chaves vazias sao omitidas (nao vira escopo "").
+        const scopeKeys: Record<string, string> = {};
+        const contact = String(ctx.config['scope_contact'] ?? '').trim();
+        const session = String(ctx.config['scope_session'] ?? '').trim();
+        if (contact) scopeKeys['contact'] = contact;
+        if (session) scopeKeys['session'] = session;
+
         if (ctx.dryRun) {
           await ctx.log('info', `[simulado] executaria o agente ${agentId}.`);
-          return { handle: 'success', output: { simulated: true, agent_id: agentId } };
+          return { handle: 'success', output: { simulated: true, agent_id: agentId, scope_keys: scopeKeys } };
         }
         try {
           const result = await this.runner.run({
@@ -44,6 +66,7 @@ export class AgentNodes implements OnModuleInit {
             input,
             executionId: ctx.executionId,
             traceId: ctx.traceId,
+            scopeKeys,
           });
           const handle = result.status === 'ERROR' ? 'error' : 'success';
           await ctx.log(handle === 'error' ? 'warn' : 'info', `Agente ${agentId} → ${result.status} (${result.totalTokens} tokens).`);

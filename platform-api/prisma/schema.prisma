@@ -1219,6 +1219,10 @@ model AiAgentRun {
   trace_id          String
   status            AiRunStatus @default(RUNNING)
   input             Json?
+  // Escopos do run ({ contact, session, ... }): COM QUEM o agente fala e em qual
+  // conversa. Persistido porque `resume()` (retomada apos aprovacao) reconstroi o
+  // contexto do zero — sem isso, justamente a acao aprovada rodaria sem escopo.
+  scope_keys        Json?
   output            String?
   // Transcript completo (messages[]).
   messages          Json?

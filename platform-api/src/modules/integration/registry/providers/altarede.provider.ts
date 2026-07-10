@@ -121,6 +121,13 @@ export class AltaredeProvider extends BaseProvider {
   async execute(ctx: ProviderContext, operation: string, params: unknown): Promise<unknown> {
     const path = OPERATIONS[operation];
     if (!path) {
+      if (operation === 'cliente.por_telefone') {
+        // O agente tenta identificar por telefone no atendimento; a API do
+        // Altarede so busca por CPF. Mensagem util em vez de despejar o catalogo.
+        throw new BadRequestException(
+          'A API do Altarede não busca cliente por telefone — peça o CPF/CNPJ ao cliente.',
+        );
+      }
       throw new BadRequestException(
         `Operação desconhecida "${operation}". Disponíveis: ${Object.keys(OPERATIONS).join(', ')}.`,
       );
