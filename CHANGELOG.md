@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.23 - 2026-07-10 (versão real na barra + excluir fluxo de verdade)
+
+- **A versão exibida na barra lateral estava presa em `v0.1.0`.** O `__APP_VERSION__` (barra lateral dos dois painéis) lia a versão do `package.json`, que nunca foi atualizado de `0.1.0`. Ou seja: por mais que você aplicasse v0.9.x, a barra sempre mostrava v0.1.0 — não dava para saber se o painel tinha atualizado (o backend mostrava a versão certa; só o rótulo da barra mentia). Agora o `vite.config` lê a versão real do **CHANGELOG.md** (a fonte da verdade do release; no build o repositório já está na tag certa), com fallback para o package.json. Vale para o painel do cliente e o console.
+- **Fluxo só podia ser arquivado, nunca excluído.** Um rascunho que nunca rodou virava lixo permanente na tela — "arquivar" faz sentido para coisas com histórico, mas para um fluxo descartável é dogma sem visão de negócio. Adicionado **Excluir de verdade** (ícone lixeira, ao lado de Arquivar): `DELETE /automation/workflows/:id` apaga o fluxo e tudo que é dele (execuções, logs, versões, agendamento) numa transação — se qualquer passo falhar, nada é apagado. ConfirmDialog com aviso de que é permanente. Arquivar continua existindo para quem quer só tirar das listas ativas sem perder o histórico.
+
 ## v0.9.22 - 2026-07-10 (editor de automação humanizado + 3 buracos corrigidos)
 
 O pente-fino anterior não cobriu o editor de fluxos — que estava cheio de jargão de desenvolvedor na cara. Corrigido, e no caminho apareceram dois buracos funcionais reais.

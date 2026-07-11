@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, Loader2, Plus, Upload, Archive } from 'lucide-react';
+import { GitBranch, Loader2, Plus, Upload, Archive, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
 import { FormField, TextInput, Textarea } from '../../components/ui/FormField';
-import { listWorkflows, createWorkflow, importWorkflow, archiveWorkflow } from '../../services/automation';
+import { listWorkflows, createWorkflow, importWorkflow, archiveWorkflow, deleteWorkflow } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { toast } from '../../lib/toast';
@@ -24,6 +24,8 @@ export default function Fluxos() {
   const [importOpen, setImportOpen] = useState(false);
   const [archiving, setArchiving] = useState(null);
   const [archLoading, setArchLoading] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const [delLoading, setDelLoading] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -50,6 +52,20 @@ export default function Fluxos() {
       toast.error(err.message);
     } finally {
       setArchLoading(false);
+    }
+  }
+
+  async function confirmDelete() {
+    setDelLoading(true);
+    try {
+      await deleteWorkflow(deleting.id);
+      toast.success('Fluxo excluído.');
+      setDeleting(null);
+      load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setDelLoading(false);
     }
   }
 
@@ -123,15 +139,26 @@ export default function Fluxos() {
                     </Td>
                     <Td>{formatDateTime(w.updated_at)}</Td>
                     <Td className="text-right">
-                      {can('automation.workflows.write') && w.status !== 'ARCHIVED' && (
-                        <button
-                          className="btn-ghost p-1.5"
-                          title="Arquivar: para gatilhos e tira das listas ativas (não exclui)"
-                          onClick={(ev) => { ev.stopPropagation(); setArchiving(w); }}
-                        >
-                          <Archive size={14} className="text-red-500" />
-                        </button>
-                      )}
+                      <div className="flex items-center justify-end gap-0.5">
+                        {can('automation.workflows.write') && w.status !== 'ARCHIVED' && (
+                          <button
+                            className="btn-ghost p-1.5"
+                            title="Arquivar: guarda o fluxo mas para os gatilhos e tira das listas ativas"
+                            onClick={(ev) => { ev.stopPropagation(); setArchiving(w); }}
+                          >
+                            <Archive size={14} className="text-amber-500" />
+                          </button>
+                        )}
+                        {can('automation.workflows.write') && (
+                          <button
+                            className="btn-ghost p-1.5"
+                            title="Excluir de vez este fluxo"
+                            onClick={(ev) => { ev.stopPropagation(); setDeleting(w); }}
+                          >
+                            <Trash2 size={14} className="text-red-500" />
+                          </button>
+                        )}
+                      </div>
                     </Td>
                   </Tr>
                 ))}
@@ -179,10 +206,20 @@ export default function Fluxos() {
         danger
         loading={archLoading}
         title="Arquivar fluxo"
-        message={`Arquivar "${archiving?.name}"? Gatilhos (evento/agendamento/webhook) param de disparar. O histórico de versões e execuções é mantido — nada é excluído.`}
+        message={`Arquivar "${archiving?.name}"? Os gatilhos param de disparar e o fluxo sai das listas ativas. O histórico é mantido — nada é excluído.`}
         confirmLabel="Arquivar"
         onClose={() => setArchiving(null)}
         onConfirm={confirmArchive}
+      />
+      <ConfirmDialog
+        open={!!deleting}
+        danger
+        loading={delLoading}
+        title="Excluir fluxo"
+        message={`Excluir "${deleting?.name}" de vez? O fluxo e todo o seu histórico (versões e execuções) serão removidos permanentemente. Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir"
+        onClose={() => setDeleting(null)}
+        onConfirm={confirmDelete}
       />
     </div>
   );

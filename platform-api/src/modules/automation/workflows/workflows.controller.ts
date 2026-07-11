@@ -1,6 +1,6 @@
 // Fluxos de automacao — CRUD + versoes + publicar/rollback + executar +
 // export/import. Sem DELETE: fluxo e arquivado, nunca excluido.
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
@@ -116,6 +116,17 @@ export class WorkflowsController {
     @Query('organization_id') orgQuery?: string,
   ) {
     return this.workflows.archive(resolveOrganizationId(user, orgQuery), id);
+  }
+
+  /** Exclusão definitiva (arquivar guarda; excluir remove de vez). */
+  @Delete(':id')
+  @RequirePermissions(PERMISSIONS.AUTOMATION_WORKFLOWS_WRITE)
+  remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.workflows.remove(resolveOrganizationId(user, orgQuery), id);
   }
 
   @Post(':id/webhook-token/rotate')

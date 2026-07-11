@@ -38,6 +38,13 @@ export async function archiveWorkflow(id) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao arquivar fluxo')); }
 }
 
+export async function deleteWorkflow(id) {
+  try {
+    const { data } = await api.delete(`/automation/workflows/${id}`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao excluir fluxo')); }
+}
+
 export async function saveWorkflowVersion(id, body) {
   try {
     const { data } = await api.post(`/automation/workflows/${id}/versions`, body);

@@ -153,6 +153,23 @@ export class WorkflowsService {
     return updated;
   }
 
+  /** Exclusão definitiva do fluxo (e de tudo que é dele). Diferente de arquivar:
+   *  arquivar tira das listas ativas mas guarda; excluir remove de vez. */
+  async remove(organizationId: string, id: string) {
+    const workflow = await this.findById(organizationId, id);
+    await this.scheduler.disableSchedule(id).catch(() => undefined);
+    const execCount = await this.repository.countExecutions(id);
+    await this.repository.hardDelete(id);
+    await this.audit.record({
+      action: 'automation.workflow.delete',
+      entityType: 'Workflow',
+      entityId: id,
+      organizationId,
+      oldValue: { name: workflow.name, status: workflow.status, executions: execCount },
+    });
+    return { deleted: true };
+  }
+
   // ─── Versoes (diretriz 3) ───────────────────────────
 
   /** Salvar = SEMPRE nova versao imutavel (nunca UPDATE de graph). */

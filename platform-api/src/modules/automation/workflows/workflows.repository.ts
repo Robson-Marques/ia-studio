@@ -54,6 +54,30 @@ export class WorkflowsRepository {
     return this.prisma.workflow.update({ where: { id }, data });
   }
 
+  /** Quantas execuções o fluxo já teve (decide se o excluir é "seguro"). */
+  countExecutions(id: string) {
+    return this.prisma.workflowExecution.count({ where: { workflow_id: id } });
+  }
+
+  /**
+   * Exclusão DEFINITIVA do fluxo. Sem onDelete: Cascade no schema, apaga os
+   * filhos em ordem (logs → execuções → versões → agendamento) numa transação;
+   * se qualquer passo falhar, nada é apagado.
+   */
+  async hardDelete(id: string) {
+    await this.prisma.$transaction(async (tx) => {
+      const execs = await tx.workflowExecution.findMany({ where: { workflow_id: id }, select: { id: true } });
+      const execIds = execs.map((e) => e.id);
+      if (execIds.length > 0) {
+        await tx.executionLog.deleteMany({ where: { execution_id: { in: execIds } } });
+        await tx.workflowExecution.deleteMany({ where: { workflow_id: id } });
+      }
+      await tx.workflowVersion.deleteMany({ where: { workflow_id: id } });
+      await tx.automationSchedule.deleteMany({ where: { workflow_id: id } });
+      await tx.workflow.delete({ where: { id } });
+    });
+  }
+
   // ─── Versoes (imutaveis) ────────────────────────────
 
   createVersion(data: Prisma.WorkflowVersionUncheckedCreateInput) {
