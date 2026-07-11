@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.31 - 2026-07-11 (assistente com MEMÓRIA da conversa — continuidade)
+
+- **A raiz do "coloquei um CPF que não existe e ele não soube tratar": cada mensagem virava um run STATELESS.** O assistente esquecia o que já tinha sido dito (pediu CPF → recebeu CPF → mas já tinha "esquecido" o "estou sem internet" → voltava a cumprimentar). Agora o nó Assistente **carrega os turnos anteriores da conversa** (do chat de WhatsApp, via `scope_session=chat_id`) e injeta como histórico no assistente. Com contexto, ele: lembra do problema, chama a ferramenta de identificar quando o CPF chega e, se o CPF não existir, sabe responder "não localizei esse cadastro".
+- Técnico: `AgentRunnerService.run` aceita `history[]` (semeia as mensagens antes do input); o nó AGENT carrega via `WhatsappInboxService.listMessages` (best-effort, tira a mensagem atual). `CommModule` passou a exportar o `WhatsappInboxService`. Sem `db push`.
+- **Ainda pendente (frente aprovada):** IA assumir a conversa como **BOT** (filtro "IA" + "atendido pela IA") e **debounce** (agrupar mensagens picadas em uma resposta) — próximas.
+
 ## v0.9.30 - 2026-07-11 (assistente-exemplo: triar motivo → suporte identifica, venda não pede CPF)
 
 - **O assistente conversava mas não conduzia.** Agora ele **entende o motivo do contato primeiro** e ramifica: (a) **assinante com suporte** (internet, fatura, contrato) → pede o CPF/CNPJ do titular para identificar e confirma antes de tratar dos dados; (b) **quem quer contratar / saber de planos** → é **VENDA**, **não** pede CPF, conduz como comercial (pergunta cidade/endereço e o que procura). A regra de ouro embutida: *nunca pedir CPF a quem só quer contratar*.

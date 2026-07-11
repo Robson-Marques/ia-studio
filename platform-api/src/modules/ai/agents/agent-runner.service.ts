@@ -38,6 +38,10 @@ export interface RunAgentParams {
   scopeKeys?: Record<string, string>;
   dryRun?: boolean;
   createdBy?: string | null;
+  /** Histórico da conversa (turnos anteriores) — dá CONTINUIDADE ao assistente:
+   *  sem isto cada mensagem recebida vira um run stateless e ele "esquece" o
+   *  que já foi dito. O nó AGENT carrega do chat quando há sessão. */
+  history?: { role: 'user' | 'assistant'; content: string }[];
 }
 
 export interface RunAgentOutput {
@@ -100,6 +104,7 @@ export class AgentRunnerService {
 
     const messages: LlmMessage[] = [
       { role: 'system', content: systemPrompt },
+      ...(params.history ?? []).map((m) => ({ role: m.role, content: m.content } as LlmMessage)),
       { role: 'user', content: params.input },
     ];
 

@@ -6,6 +6,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { NodeRegistryService } from '../../automation/engine/node-registry.service';
 import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsService } from '../agents/agents.service';
+import { WhatsappInboxService } from '../../comm/whatsapp/whatsapp-inbox.service';
 
 @Injectable()
 export class AgentNodes implements OnModuleInit {
@@ -13,6 +14,7 @@ export class AgentNodes implements OnModuleInit {
     private readonly registry: NodeRegistryService,
     private readonly runner: AgentRunnerService,
     private readonly agents: AgentsService,
+    private readonly inbox: WhatsappInboxService,
   ) {}
 
   onModuleInit(): void {
@@ -60,6 +62,12 @@ export class AgentNodes implements OnModuleInit {
           await ctx.log('info', `[simulado] executaria o agente ${agentId}.`);
           return { handle: 'success', output: { simulated: true, agent_id: agentId, scope_keys: scopeKeys } };
         }
+
+        // Continuidade: se a sessão é uma conversa de WhatsApp (chat_id), carrega
+        // os turnos anteriores e passa como histórico — senão cada mensagem vira
+        // um run sem memória e o assistente "esquece" o que já foi dito.
+        const history = await this.loadChatHistory(ctx.organizationId, session);
+
         try {
           const result = await this.runner.run({
             agentId,
@@ -67,6 +75,7 @@ export class AgentNodes implements OnModuleInit {
             executionId: ctx.executionId,
             traceId: ctx.traceId,
             scopeKeys,
+            history,
           });
           // Só é SUCESSO se concluiu COM texto. Status ERRO, AWAITING_APPROVAL
           // (pausou numa tool que exige aprovação — ninguém retoma dentro do
@@ -102,5 +111,27 @@ export class AgentNodes implements OnModuleInit {
   /** Catalogo auxiliar: agentes ativos pro select do no (usado pelo front). */
   activeAgents(organizationId: string, workspaceId?: string, environmentId?: string) {
     return this.agents.findActive(organizationId, { workspaceId, environmentId });
+  }
+
+  /** Carrega os turnos anteriores de uma conversa de WhatsApp (quando a sessão é
+   *  um chat_id) pra dar continuidade ao assistente. Remove a última mensagem
+   *  (a atual, que já vai no input). Best-effort: falha vira "sem histórico". */
+  private async loadChatHistory(
+    organizationId: string,
+    session: string,
+  ): Promise<{ role: 'user' | 'assistant'; content: string }[] | undefined> {
+    if (!session) return undefined;
+    const rows = await this.inbox.listMessages(organizationId, session, 16).catch(() => []);
+    if (!rows.length) return undefined;
+    // listMessages já vem em ordem cronológica (antiga→nova). Tira a última
+    // (a mensagem atual, que já vai no input).
+    const chrono = rows.slice(0, -1);
+    const history = chrono
+      .filter((m) => (m.content ?? '').trim())
+      .map((m) => ({
+        role: (m.direction === 'INCOMING' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.content as string,
+      }));
+    return history.length ? history : undefined;
   }
 }
