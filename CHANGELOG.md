@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.24 - 2026-07-10 (o erro silencioso da versão + reload robusto)
+
+- **A correção da versão da v0.9.23 caiu num erro silencioso.** O `vite.config` lia `readFileSync('../CHANGELOG.md')` com caminho **relativo ao diretório onde o build roda** — se esse caminho não batesse, o `try/catch` engolia a falha e caía calado no `package.json` (0.1.0). Resultado: a barra continuava em v0.1.0 mesmo com a v0.9.23 aplicada. Agora o caminho é resolvido a partir do **próprio arquivo** (`import.meta.url`), independente do diretório de build. (Exatamente o tipo de erro silencioso que vinha mascarando tudo: o upgrade concluía e recarregava, mas a barra presa em v0.1.0 fazia parecer que nada acontecia.)
+- **Tela de Atualização: portado o padrão comprovado do Aquapark** em vez de remendar o meu. Polling **contínuo** (2s enquanto roda, 30s parado — nunca para) com `loadAll` buscando versão + status juntos, cada um com `catch`: durante o restart do backend a API cai, os fetches viram null, o estado anterior é preservado, e quando a API volta com SUCCESS o próximo ciclo detecta a transição e recarrega. O meu iniciava/parava o polling — era aí que se perdia o momento do SUCCESS e a tela "sumia como se tivesse concluído". Removido o banner "reiniciando" e o estado `restarting` (o polling contínuo já cobre).
+
 ## v0.9.23 - 2026-07-10 (versão real na barra + excluir fluxo de verdade)
 
 - **A versão exibida na barra lateral estava presa em `v0.1.0`.** O `__APP_VERSION__` (barra lateral dos dois painéis) lia a versão do `package.json`, que nunca foi atualizado de `0.1.0`. Ou seja: por mais que você aplicasse v0.9.x, a barra sempre mostrava v0.1.0 — não dava para saber se o painel tinha atualizado (o backend mostrava a versão certa; só o rótulo da barra mentia). Agora o `vite.config` lê a versão real do **CHANGELOG.md** (a fonte da verdade do release; no build o repositório já está na tag certa), com fallback para o package.json. Vale para o painel do cliente e o console.

@@ -44,39 +44,58 @@ export default function Atualizacao() {
 
 /* ═══════════════════════ Aba: Atualização ═══════════════════════ */
 
-const TERMINAL = new Set(['SUCCESS', 'FAILED']);
-
 function TabAtualizacao() {
   const { can } = usePermissions();
   const [version, setVersion] = useState({ current_version: '—', available: [], backups_retained: 0, remote_synced: true });
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [current, setCurrent] = useState(null);   // upgrade em curso
-  const [restarting, setRestarting] = useState(false); // API caiu durante o restart do upgrade
   const [confirmTag, setConfirmTag] = useState(null);
   const [acting, setActing] = useState(false);
   const [releasing, setReleasing] = useState(false);
 
-  const pollRef = useRef(null);
   const logRef = useRef(null);
   const prevStatusRef = useRef(null);
 
-  // force=true refaz o `git fetch --tags` no servidor, ignorando o cache de 5min.
-  const loadVersion = useCallback(async (force = false) => {
+  // Padrão do Aquapark (comprovado): polling CONTÍNUO que nunca para — 2s
+  // enquanto roda, 30s parado. `loadAll` busca versão + status juntos, cada um
+  // com catch: durante o restart do backend a API cai, os fetches viram null e
+  // o estado anterior é preservado; quando a API volta com SUCCESS, o próximo
+  // ciclo detecta e recarrega. Sem start/stop (era aí que as brechas moravam).
+  const loadAll = useCallback(async (silent = false, force = false) => {
+    if (!silent) setLoading(true);
     try {
-      const v = await getVersion(force);
-      setVersion(v);
-      return v;
-    } catch (err) {
-      toast.error(err.message);
-      return null;
+      const [v, cur] = await Promise.all([
+        getVersion(force).catch(() => null),
+        getCurrentUpgrade().catch(() => null),
+      ]);
+      if (v) setVersion(v);
+      if (cur !== undefined) {
+        const prev = prevStatusRef.current;
+        const status = cur?.status || null;
+        // Concluiu: estava RUNNING, agora SUCCESS → recarrega pra pegar a versão nova.
+        if (prev === 'RUNNING' && status === 'SUCCESS') {
+          toast.success('Atualização concluída. Recarregando…');
+          setTimeout(() => window.location.reload(), 2500);
+        }
+        if (prev === 'RUNNING' && status === 'FAILED') {
+          toast.error(`Falha na atualização${cur?.error_step ? ` na etapa "${cur.error_step}"` : ''}.`);
+        }
+        // Só atualiza a referência/estado quando o fetch respondeu (não durante o
+        // restart, pra não perder o "prev = RUNNING").
+        if (cur !== null || status !== null) { prevStatusRef.current = status; }
+        if (cur !== null) setCurrent(cur);
+      }
+    } finally {
+      if (!silent) setLoading(false);
     }
   }, []);
 
   async function handleCheckNow() {
     setChecking(true);
     try {
-      const v = await loadVersion(true);
+      const v = await getVersion(true).catch(() => null);
+      if (v) setVersion(v);
       if (!v) return;
       if (!v.remote_synced) {
         toast.warn('Não foi possível consultar o repositório remoto. A lista pode estar desatualizada.');
@@ -90,81 +109,21 @@ function TabAtualizacao() {
     }
   }
 
-  // Polling 2s do upgrade em curso.
-  const poll = useCallback(async () => {
-    try {
-      const cur = await getCurrentUpgrade();
-      setCurrent(cur);
-      setRestarting(false); // voltou a responder → não está mais reiniciando
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-      const prev = prevStatusRef.current;
-      const status = cur?.status || null;
-
-      // Transição RUNNING → SUCCESS: recarrega a página (pega a nova versão).
-      if (prev === 'RUNNING' && status === 'SUCCESS') {
-        toast.success('Atualização concluída. Recarregando…');
-        stopPolling();
-        setTimeout(() => window.location.reload(), 1500);
-        return;
-      }
-      // Transição RUNNING → FAILED: toast de erro (mantém log visível).
-      if (prev === 'RUNNING' && status === 'FAILED') {
-        toast.error(`Falha na atualização${cur?.error_step ? ` na etapa "${cur.error_step}"` : ''}.`);
-        stopPolling();
-        loadVersion();
-      }
-      // Se já não há upgrade RUNNING, para o polling.
-      if (!status || TERMINAL.has(status)) {
-        if (status !== 'RUNNING') stopPolling();
-      }
-      prevStatusRef.current = status;
-    } catch {
-      // A API cai por 1-2 min quando o backend reinicia (fase final do upgrade).
-      // Durante um upgrade em curso isso é ESPERADO — não é erro: mostra "reiniciando"
-      // e segue tentando em silêncio. A página recarrega sozinha quando a API voltar
-      // com status SUCCESS. Só fora de um upgrade um erro de rede vira toast.
-      if (prevStatusRef.current === 'RUNNING' || current?.status === 'RUNNING') {
-        setRestarting(true);
-      } else {
-        stopPolling();
-      }
-    }
-  }, [loadVersion, current?.status]);
-
-  const startPolling = useCallback(() => {
-    if (pollRef.current) return;
-    pollRef.current = setInterval(poll, 2000);
-  }, [poll]);
-
-  function stopPolling() {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-  }
-
+  // Polling dinâmico — 2s enquanto roda, 30s parado. NUNCA para.
+  const running = current?.status === 'RUNNING';
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      await loadVersion();
-      try {
-        const cur = await getCurrentUpgrade();
-        if (!alive) return;
-        setCurrent(cur);
-        prevStatusRef.current = cur?.status || null;
-        if (cur?.status === 'RUNNING') startPolling();
-      } catch (err) {
-        if (alive) toast.error(err.message);
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; stopPolling(); };
-  }, [loadVersion, startPolling]);
+    const interval = running ? 2000 : 30000;
+    const t = setInterval(() => loadAll(true), interval);
+    return () => clearInterval(t);
+  }, [running, loadAll]);
 
   // Auto-scroll do viewer de log.
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [current?.log_lines]);
 
-  const running = current?.status === 'RUNNING';
   const orphan = Boolean(current?.orphan_lock) || isStale(current);
   const newer = Array.isArray(version.available) ? version.available : [];
 
@@ -173,12 +132,12 @@ function TabAtualizacao() {
     setActing(true);
     try {
       await startUpgrade(confirmTag);
-      toast.success('Atualização iniciada.');
+      toast.success('Atualização iniciada. Pode levar alguns minutos.');
       setConfirmTag(null);
-      setRestarting(false);
       prevStatusRef.current = 'RUNNING';
+      // Marca RUNNING localmente → o polling acelera pra 2s e a tela mostra o log.
       setCurrent({ status: 'RUNNING', log_lines: [], started_at: new Date().toISOString(), to_version: confirmTag });
-      startPolling();
+      loadAll(true);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -191,11 +150,8 @@ function TabAtualizacao() {
     try {
       await releaseUpgradeLock();
       toast.success('Lock liberado.');
-      stopPolling();
       prevStatusRef.current = null;
-      const cur = await getCurrentUpgrade().catch(() => null);
-      setCurrent(cur);
-      await loadVersion();
+      await loadAll(true);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -209,19 +165,6 @@ function TabAtualizacao() {
 
   return (
     <div className="space-y-5">
-      {/* Banner de "reiniciando" — a API cai no fim do upgrade; a página recarrega sozinha */}
-      {restarting && (
-        <div
-          className="rounded-lg px-4 py-3 flex items-center gap-3"
-          style={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)' }}
-        >
-          <Loader2 size={18} className="text-blue-500 shrink-0 animate-spin" />
-          <p className="text-sm" style={{ color: 'var(--ap-text-2)' }}>
-            Aplicando a atualização e reiniciando os serviços… A página recarrega sozinha quando terminar (pode levar 1–2 minutos).
-          </p>
-        </div>
-      )}
-
       {/* Banner de lock órfão */}
       {orphan && (
         <div
