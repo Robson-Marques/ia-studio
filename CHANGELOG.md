@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.25 - 2026-07-11 (acesso ao /console corrigido + base amarrada na doc)
+
+- **`studio.nivoo.dev.br/console` levava ao login do CLIENTE (bug de roteamento nginx).** A regra era `location /console/` (com barra final); `/console` **sem** a barra não casava e caía no `location /` → servia o painel do cliente. Adicionado redirect exato `location = /console { return 301 /console/; }` no `install.sh`. **Instalação existente não regenera o nginx sozinha** — aplicar o patch ao vivo no servidor (comando no handoff) + `nginx -t && systemctl reload nginx`.
+- **Base do projeto amarrada na doc (porte do Aquapark):** `CLAUDE.md` ganhou **Pensar antes de codar** (checklist de 10 pontos), **Definição de pronto** e a regra **pós-compactação = re-ancorar antes de agir** (reler CLAUDE.md + topo do CHANGELOG e conferir estado real antes de agir; nunca cravar versão/arquivo de cabeça). `docs/base-doc-e-portes-aquapark.md` = mapa/backlog de porte. (Só doc + script — sem `db push`.)
+
 ## v0.9.24 - 2026-07-10 (o erro silencioso da versão + reload robusto)
 
 - **A correção da versão da v0.9.23 caiu num erro silencioso.** O `vite.config` lia `readFileSync('../CHANGELOG.md')` com caminho **relativo ao diretório onde o build roda** — se esse caminho não batesse, o `try/catch` engolia a falha e caía calado no `package.json` (0.1.0). Resultado: a barra continuava em v0.1.0 mesmo com a v0.9.23 aplicada. Agora o caminho é resolvido a partir do **próprio arquivo** (`import.meta.url`), independente do diretório de build. (Exatamente o tipo de erro silencioso que vinha mascarando tudo: o upgrade concluía e recarregava, mas a barra presa em v0.1.0 fazia parecer que nada acontecia.)

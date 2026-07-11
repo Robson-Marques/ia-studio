@@ -10,6 +10,15 @@ Sempre responder em pt-BR. Identificadores de código em inglês (kebab-case arq
 ## ⚖️ PRINCÍPIO REITOR
 A plataforma é totalmente genérica e orientada a integrações. A primeira solução oficial é para provedores (ISP) com o Altarede como primeiro Provider ERP. **Nenhuma decisão arquitetural pode depender de segmento específico** — funcionalidade de negócio entra via Providers, Tools, Resource Extensions e Templates. A plataforma NUNCA é dona de dados de negócio.
 
+## 🔁 REGRAS DE OURO DA EXECUÇÃO (lições caras — leia antes de codar)
+
+- **PORTE, NÃO REINVENTE.** O Aquapark (`C:\Users\Flowspec\Documents\delivery-system\aquapark`) está à frente e tem muita coisa testada em produção. Antes de construir algo que ele já tem (upgrade/atualização, canvas de fluxo, composer/áudio do WhatsApp, tela de versão, backup), **LER o equivalente lá e portar o padrão** — não refazer do zero. Reinventar = repetir bugs já resolvidos. Só se constrói do zero o que é genuinamente novo do IA Studio (multi-tenant, Provider Registry, declarativo), e mesmo aí herdando os padrões de UX/estrutura.
+- **DESCONFIE DE ERRO SILENCIOSO.** O pior bug é o que devolve resultado plausível em vez de estourar. Exemplos que já morderam: `try/catch` que engole a falha e cai num fallback (versão presa em v0.1.0); API do IXC que "erra calado" (`IN` grande devolve vazio, `rp` trunca sem avisar, `online` mal lido). Regra: nunca `catch` que engole e devolve fallback **sem sinal**; validar contra dado real; ao ver um número "plausível", confirmar que é o certo, não presumir.
+- **ARQUIVAR ≠ EXCLUIR — por caso, não por dogma.** "Nunca excluir, só mudar de estado" vale para o que tem histórico/referência (conexão que processou dados, entidade central). Um **rascunho descartável** (fluxo/assistente sem uso) tem que poder ser **excluído de verdade** — forçar arquivar aí é dogma sem visão de negócio.
+- **UX humana vale no CANVAS e nos editores também**, não só nas telas de lista/form. Auditar o editor de automação, o inspetor de nó e os modais — não só as tabelas.
+- **CHECKPOINT entre frentes; sem empilhar.** 1 mudança estrutural por vez, validação humana, depois a próxima. Ver `docs/base-doc-e-portes-aquapark.md` para o backlog de porte da base.
+- **PÓS-COMPACTAÇÃO = RE-ANCORAR ANTES DE AGIR.** Quando a conversa é compactada (resumo "This session is being continued…"), a memória fica não-confiável e começa a alucinar plausível (o próprio erro silencioso). Regra: a **primeira ação** após uma compactação é reground silencioso — reler este `CLAUDE.md` + o topo do `CHANGELOG.md` (= versão real atual) e conferir o estado real (`git`, `ls`, ler o arquivo) antes de recomendar comando ou tocar em código. **NUNCA** cravar número de versão, nome de arquivo/coluna ou "o que já foi aplicado no servidor" de cabeça — confirmar contra o arquivo real ou perguntar ao Robson. Tag nunca é reusada.
+
 ## 🏗️ ESTRUTURA DO MONOREPO
 ```
 ├── CLAUDE.md / CHANGELOG.md / README.md
@@ -62,10 +71,16 @@ A plataforma é totalmente genérica e orientada a integrações. A primeira sol
 - Release: entrada no `CHANGELOG.md` → commit → tag anotada `vX.Y.Z` (SEMPRE confirmar o número com o Robson; nunca reusar tag) → painel de Atualização aplica.
 - Ao concluir mudança de código, entregar os comandos PowerShell de release; avisar quando `db push` for destrutivo.
 
+## 🧠 PENSAR ANTES DE CODAR (obrigatório — porte do Aquapark)
+Antes de implementar qualquer feature, mapear em prosa: **1)** módulo/service/repository/DTO/guard afetados; **2)** eventos emitidos/consumidos; **3)** ACL (perm nova? front `can()` + back `@RequirePermissions`); **4)** licensing/metering (registra consumo?); **5)** auditoria (`@Auditable` em mutation sensível?); **6)** multi-tenant (`organization_id`/workspace/environment); **7)** estados de erro (toast)/empty (`EmptyState`)/loading; **8)** mobile 375px + dark; **9)** navegação (sidebar/breadcrumb/rota); **10)** reutilização (existe componente/helper/porte do Aquapark?). Só codar depois de 1-10. **Proibido:** criar componente quando `components/ui/*` já tem; duplicar service; abstração sem 2+ consumidores; feature sem gating; refator estrutural junto com feature nova.
+
+## ✅ DEFINIÇÃO DE PRONTO (porte do Aquapark)
+Uma feature só está pronta se: service tem a regra (sem lógica em controller) · repository encapsula Prisma · DTO com class-validator · controller com `@RequirePermissions` · eventos críticos com `source_event_id` + idempotência · auditoria em mutation sensível · front com `can()` nos botões + toast de erro + `EmptyState` + loading · responsivo (Table desktop/Cards mobile, touch ≥44px) testado em 375px e dark · perm nova seguiu os 5 passos (constante + grupo + label + perfis + Administrador herda) · rota nova em breadcrumb + sidebar · CHANGELOG atualizado. **NÃO é pronto:** só desktop, só CRUD sem ACL granular, só front OU só back, sem dark, sem toast de erro, sem o CANVAS/editor auditado (quando aplicável).
+
 ## 🛡️ GOVERNANÇA
 - 1 frente estrutural por vez; checkpoint + validação humana entre frentes; mudanças incrementais e reversíveis.
-- Documentação DURANTE o desenvolvimento: README por módulo + CHANGELOG + docs/ de cada fase.
-- Antes de implementar: mapear backend/frontend/ACL/licensing/metering/auditoria/eventos/estados de erro/empty/loading/mobile.
-- Sinais de alarme: endpoint sem `@RequirePermissions`; tabela sem `organization_id`; módulo importando BullMQ/provider direto; secret fora do Secrets Manager; automatismo nascendo ON.
+- **Sweeps mecânicos NÃO são triviais:** 1 arquivo por vez, validar antes do próximo; nunca assumir que um arquivo "parece truncado" sem conferir; parar e revisar a cada ~3 arquivos.
+- Documentação DURANTE o desenvolvimento: README por módulo + CHANGELOG + docs/ de cada fase. `docs/base-doc-e-portes-aquapark.md` = backlog de amarração da base.
+- Sinais de alarme: endpoint sem `@RequirePermissions`; tabela sem `organization_id`; módulo importando BullMQ/provider direto; secret fora do Secrets Manager; automatismo nascendo ON; `catch` que engole erro e devolve fallback sem sinal; tipo técnico (`TRIGGER_EVENT`, chave crua) renderizado na tela; feature que o Aquapark já tem sendo feita do zero.
 
-*Versão do documento: 1.0.0 — 02/07/2026 (Fase 0)*
+*Versão do documento: 1.1.0 — 10/07/2026 (base amarrada via Aquapark: porte-não-reinvente, erro silencioso, arquivar≠excluir, pensar-antes-de-codar, definição-de-pronto)*

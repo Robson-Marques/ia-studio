@@ -495,6 +495,9 @@ server {
     location /api/ { proxy_pass http://iastudio_api; }
 
     # Console SaaS sob /console/ (build com base=/console/)
+    # /console (sem barra) NAO casa com "location /console/" -> cairia no
+    # "location /" e serviria o painel do CLIENTE (login errado). Redirect exato:
+    location = /console { return 301 /console/; }
     location /console/ {
         alias ${CONSOLE_DIR}/dist/;
         try_files \$uri \$uri/ /console/index.html;
