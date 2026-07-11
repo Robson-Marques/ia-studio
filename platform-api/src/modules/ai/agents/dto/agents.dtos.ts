@@ -46,6 +46,11 @@ export class CreateAgentDto {
   @IsObject()
   persona?: Record<string, unknown>;
 
+  /** Roteiro estruturado ("O que faz"): { objetivo, passos[], situacoes[] }. */
+  @IsOptional()
+  @IsObject()
+  roteiro?: Record<string, unknown>;
+
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -121,6 +126,11 @@ export class UpdateAgentDto {
   @IsOptional()
   @IsObject()
   persona?: Record<string, unknown>;
+
+  /** Roteiro estruturado ("O que faz"): { objetivo, passos[], situacoes[] }. */
+  @IsOptional()
+  @IsObject()
+  roteiro?: Record<string, unknown>;
 
   @IsOptional()
   @IsString()

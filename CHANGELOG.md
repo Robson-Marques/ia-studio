@@ -1,5 +1,9 @@
 # Changelog — IA Studio
 
+## v0.9.16 - 2026-07-09 ("O que faz": roteiro em vez de prompt)
+
+- **"O que faz" virou roteiro estruturado (fatia 2).** Em vez de um textão de prompt, o usuário monta **Objetivo + Passos (na ordem, reordenáveis) + Situações (Quando… faça…)** — descreve o assistente como instruiria um funcionário novo. Nova coluna `AiAgent.roteiro Json?` (`{objetivo, passos[], situacoes[]}`); compilador puro `agent-roteiro.ts` (espelha `agent-persona.ts`) injeta no system prompt como `## Objetivo / ## Passos / ## Situações`. A fonte da verdade é a estrutura; o texto é derivado. O `goal` legado é herdado pelo `objetivo` (migração suave, sem duplicar campo). O **prompt cru** saiu da vista: virou "Instruções adicionais (avançado)" em Ajustes avançados. Roteiro entra no snapshot de versão e no export/import. `db push` adiciona coluna nullable — **não destrutivo**.
+
 ## v0.9.15 - 2026-07-09 (editor do assistente na língua do usuário)
 
 - **Editor do assistente na língua do usuário (fatia 1).** As oito abas técnicas (Geral/Persona/Prompt/Ferramentas/Conhecimento/Memória/Guardrails/Custos) viraram humanas: **Visão geral** (checklist "pronto para publicar?"), **Quem é**, **O que faz**, **O que sabe**, **O que pode fazer**, **Quem atende**, **Testar**, **Ajustes avançados**. Todo o jargão (conexão, modelo, temperatura, tokens, limites) foi para "Ajustes avançados"; as ferramentas aparecem pelo nome com marca "grava dados" nas de escrita, não mais por `tool.key`. **Só frontend** — nenhuma mudança no salvamento nem no schema. Nova regra máxima no CLAUDE.md: superfície sempre na língua do usuário, nunca do desenvolvedor.

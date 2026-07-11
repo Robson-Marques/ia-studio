@@ -77,10 +77,35 @@ form, sem estado novo); "O que pode fazer" mostra nome amigável + "grava dados"
 avançados". Nenhuma mudança de schema, nenhuma mudança no corpo do save. Risco
 mínimo. **← começa aqui.**
 
-**Fatia 2 — "O que faz" estruturado.** Nova coluna `AiAgent.roteiro Json?`
-(`{ objetivo, passos[], situacoes[] }`) + compilador puro `agent-roteiro.ts`
-(espelha `agent-persona.ts`) que injeta no system prompt. UI de Passos/Situações.
-`db push` nullable (não destrutivo). Checkpoint.
+**Fatia 2 — "O que faz" estruturado (o roteiro).** O usuário nunca escreve
+prompt; monta um roteiro em caixinhas, como instruiria um funcionário novo.
+
+Shape `AiAgent.roteiro Json?`:
+```jsonc
+{
+  "objetivo": "Identificar o cliente e resolver dúvidas de conexão e financeiro.",
+  "passos": [
+    { "titulo": "Identificar o cliente", "descricao": "Peça o CPF e confirme o nome antes de tratar de dados." },
+    { "titulo": "Entender o problema", "descricao": "Pergunte o que está acontecendo; consulte a conexão e o contrato." }
+  ],
+  "situacoes": [
+    { "quando": "o acesso estiver bloqueado por falta de pagamento", "faca": "Ofereça a 2ª via do boleto; não abra ordem de serviço." },
+    { "quando": "o cliente pedir algo que você não pode fazer", "faca": "Explique que vai encaminhar para um atendente." }
+  ]
+}
+```
+
+- **Passos** = sequência (reordenáveis ↑↓, título + descrição). **Situações** =
+  condicionais (Quando → Faça), sem ordem.
+- Compilador puro `agent-roteiro.ts` (espelha `agent-persona.ts`) → injeta no
+  system prompt como `## Objetivo / ## Passos (nesta ordem) / ## Situações`.
+  Fonte da verdade é a estrutura; o texto é derivado.
+- `goal` (já existe) passa a ser o `objetivo` do roteiro (mesma ideia — migrar
+  o valor, não duplicar campo).
+- O **prompt cru** sai da vista: vira "Instruções adicionais (avançado)" em
+  Ajustes avançados, para o caso raro. O compilado (persona + roteiro) é o que
+  vale por padrão.
+- `db push` nullable (não destrutivo). Frente própria + checkpoint.
 
 **Fatia 3 — "O que pode fazer": Ações autorizadas.** UI de `action_permissions`
 a partir de um catálogo (endpoint das permissões que o próprio ator possui —
@@ -94,6 +119,17 @@ zero) — pré-preenchem persona+roteiro+tools. Barato depois da Fatia 2.
 
 Follow-up e "Quem atende" dependem do subsistema de atendimento (a outra frente)
 — ficam para depois dela.
+
+## Frente futura — pente-fino de UX no sistema inteiro
+
+Pedido do Robson (09/07/2026): a regra de linguagem-do-usuário vale para **todo**
+o sistema, não só o IA Studio. Depois das fatias do assistente, varredura tela a
+tela (admin + console) contra a regra máxima de UX:
+- caçar jargão de superfície (chaves, `snake_case`, IDs, "endpoint", "payload",
+  "token", nomes de coluna) fora de "Ajustes avançados";
+- toast em vez de banner/`alert`; empty states com ação; loading states;
+- consistência de rótulos (o mesmo conceito com o mesmo nome em todas as telas);
+- mobile + dark. Frente própria, tela a tela, com checkpoint — não sweep cego.
 
 ## Não-metas desta frente
 - Fazer a IA responder no WhatsApp (frente separada; é o listener de inbound).

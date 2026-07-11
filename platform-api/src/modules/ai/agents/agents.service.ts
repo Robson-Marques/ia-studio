@@ -85,6 +85,7 @@ export class AgentsService {
       model: dto.model,
       system_prompt: dto.system_prompt,
       persona: dto.persona === undefined ? undefined : (dto.persona as Prisma.InputJsonValue),
+      roteiro: dto.roteiro === undefined ? undefined : (dto.roteiro as Prisma.InputJsonValue),
       goal: dto.goal,
       temperature: dto.temperature ?? 0.3,
       max_steps: dto.max_steps ?? 6,
@@ -117,6 +118,7 @@ export class AgentsService {
     if (dto.model !== undefined) data.model = dto.model;
     if (dto.system_prompt !== undefined) data.system_prompt = dto.system_prompt;
     if (dto.persona !== undefined) data.persona = dto.persona as Prisma.InputJsonValue;
+    if (dto.roteiro !== undefined) data.roteiro = dto.roteiro as Prisma.InputJsonValue;
     if (dto.goal !== undefined) data.goal = dto.goal;
     if (dto.temperature !== undefined) data.temperature = dto.temperature;
     if (dto.max_steps !== undefined) data.max_steps = dto.max_steps;
@@ -217,6 +219,7 @@ export class AgentsService {
       model: typeof snap['model'] === 'string' ? (snap['model'] as string) : 'gpt-4o-mini',
       system_prompt: typeof snap['system_prompt'] === 'string' ? (snap['system_prompt'] as string) : undefined,
       persona: this.asObject(snap['persona']),
+      roteiro: this.asObject(snap['roteiro']),
       goal: typeof snap['goal'] === 'string' ? (snap['goal'] as string) : undefined,
       temperature: typeof snap['temperature'] === 'number' ? (snap['temperature'] as number) : undefined,
       max_steps: typeof snap['max_steps'] === 'number' ? (snap['max_steps'] as number) : undefined,
@@ -250,6 +253,7 @@ export class AgentsService {
       max_steps: agent.max_steps,
       max_tokens: agent.max_tokens,
       persona: agent.persona,
+      roteiro: (agent as AiAgent & { roteiro?: unknown }).roteiro,
       allowed_tools: agent.allowed_tools,
       knowledge_base_ids: agent.knowledge_base_ids,
       memory_profile_ids: agent.memory_profile_ids,

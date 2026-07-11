@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto';
 import { AiAgent, AiProviderKind, AiRunStatus, Prisma } from '@prisma/client';
 import { AgentsRepository } from './agents.repository';
 import { compilePersona } from './agent-persona';
+import { compileRoteiro, hasRoteiro } from './agent-roteiro';
 import { PromptSecurityService } from './prompt-security.service';
 import { LlmProviderService, ResolvedLlmConnection } from '../providers/llm-provider.service';
 import { AiOrchestratorService } from '../orchestrator/ai-orchestrator.service';
@@ -369,8 +370,15 @@ export class AgentRunnerService {
 
   private async buildSystemPrompt(agent: AiAgent, userInput: string, traceId: string): Promise<string> {
     const parts: string[] = [];
+    // Instrucoes adicionais (avancado) primeiro, depois o roteiro estruturado.
     if (agent.system_prompt) parts.push(agent.system_prompt);
-    if (agent.goal) parts.push(`\n\n## Objetivo\n${agent.goal}`);
+    const agentAny = agent as AiAgent & { roteiro?: unknown };
+    if (hasRoteiro(agentAny.roteiro)) {
+      // Roteiro estruturado ja traz o Objetivo — nao duplica com agent.goal.
+      parts.push(compileRoteiro(agentAny.roteiro));
+    } else if (agent.goal) {
+      parts.push(`\n\n## Objetivo\n${agent.goal}`);
+    }
     parts.push(compilePersona(agent.persona));
 
     // Contexto RAG: consulta as bases habilitadas com o input do usuario.

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Loader2, Settings, Sparkles, Target, Wrench, BookOpen, ClipboardCheck, Users,
-  Play, FlaskConical, Check, Circle,
+  Play, FlaskConical, Check, Circle, Plus, Trash2, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import Tabs from '../../../components/ui/Tabs';
@@ -36,6 +36,8 @@ const EMPTY = {
   name: '', description: '', connection_id: '', model: '',
   temperature: 0.3, max_steps: 6, max_tokens: null,
   system_prompt: '', goal: '',
+  // "O que faz" estruturado — objetivo + passos (ordem) + situações (condicionais).
+  roteiro: { objetivo: '', passos: [], situacoes: [] },
   persona: { name: '', tone: '', emojis: false, emojis_ui: '', brevity: 'medium', rules_always: [], rules_never: [] },
   allowed_tools: [], knowledge_base_ids: [], memory_profile_ids: [], action_permissions: [],
   guardrails: { max_cost_usd_per_run: null, blocked_words: [], pii_redact: false },
@@ -79,6 +81,23 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
   const patchPersona = (p) => setForm((prev) => ({ ...prev, persona: { ...prev.persona, ...p } }));
   const patchGuard = (p) => setForm((prev) => ({ ...prev, guardrails: { ...prev.guardrails, ...p } }));
+  const patchRoteiro = (p) => setForm((prev) => ({ ...prev, roteiro: { ...prev.roteiro, ...p } }));
+
+  // Passos (na ordem) — adicionar / editar / mover / remover.
+  const addPasso = () => patchRoteiro({ passos: [...(form.roteiro.passos || []), { titulo: '', descricao: '' }] });
+  const setPasso = (i, p) => patchRoteiro({ passos: form.roteiro.passos.map((x, j) => (j === i ? { ...x, ...p } : x)) });
+  const delPasso = (i) => patchRoteiro({ passos: form.roteiro.passos.filter((_, j) => j !== i) });
+  const movePasso = (i, dir) => {
+    const arr = [...form.roteiro.passos];
+    const j = i + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    patchRoteiro({ passos: arr });
+  };
+  // Situações (Quando... faça...).
+  const addSituacao = () => patchRoteiro({ situacoes: [...(form.roteiro.situacoes || []), { quando: '', faca: '' }] });
+  const setSituacao = (i, p) => patchRoteiro({ situacoes: form.roteiro.situacoes.map((x, j) => (j === i ? { ...x, ...p } : x)) });
+  const delSituacao = (i) => patchRoteiro({ situacoes: form.roteiro.situacoes.filter((_, j) => j !== i) });
 
   const toggleIn = (field, id) => setForm((prev) => {
     const set = new Set(prev[field] || []);
@@ -93,12 +112,33 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
   const modelSuggestions = AGENT_MODELS[providerKey] || [];
 
   // Checklist "pronto para publicar?" — derivado do form, sem estado novo.
-  const readiness = useMemo(() => ([
-    { ok: !!form.name.trim(), label: 'Tem nome' },
-    { ok: !!(form.goal.trim() || form.system_prompt.trim()), label: 'Tem objetivo e/ou roteiro' },
-    { ok: form.knowledge_base_ids.length > 0, label: 'Sabe responder (base de conhecimento)', optional: true },
-    { ok: form.allowed_tools.length > 0, label: 'Tem habilidades marcadas' },
-  ]), [form.name, form.goal, form.system_prompt, form.knowledge_base_ids, form.allowed_tools]);
+  const readiness = useMemo(() => {
+    const r = form.roteiro || {};
+    const temRoteiro = !!(r.objetivo?.trim()
+      || (r.passos || []).some((p) => p.titulo?.trim() || p.descricao?.trim())
+      || (r.situacoes || []).some((s) => s.quando?.trim() || s.faca?.trim())
+      || form.system_prompt.trim());
+    return [
+      { ok: !!form.name.trim(), label: 'Tem nome' },
+      { ok: temRoteiro, label: 'Tem objetivo e/ou roteiro' },
+      { ok: form.knowledge_base_ids.length > 0, label: 'Sabe responder (base de conhecimento)', optional: true },
+      { ok: form.allowed_tools.length > 0, label: 'Tem habilidades marcadas' },
+    ];
+  }, [form.name, form.roteiro, form.system_prompt, form.knowledge_base_ids, form.allowed_tools]);
+
+  // Limpa o roteiro antes de salvar: tira passos/situações vazios.
+  function buildRoteiro() {
+    const r = form.roteiro || {};
+    return {
+      objetivo: (r.objetivo || '').trim(),
+      passos: (r.passos || [])
+        .map((p) => ({ titulo: (p.titulo || '').trim(), descricao: (p.descricao || '').trim() }))
+        .filter((p) => p.titulo || p.descricao),
+      situacoes: (r.situacoes || [])
+        .map((s) => ({ quando: (s.quando || '').trim(), faca: (s.faca || '').trim() }))
+        .filter((s) => s.quando || s.faca),
+    };
+  }
 
   function buildPersona() {
     const p = form.persona || {};
@@ -130,7 +170,8 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
         max_steps: form.max_steps,
         max_tokens: form.max_tokens ?? null,
         system_prompt: form.system_prompt.trim() || undefined,
-        goal: form.goal.trim() || undefined,
+        goal: form.roteiro.objetivo.trim() || undefined, // objetivo do roteiro alimenta o goal legado
+        roteiro: buildRoteiro(),
         persona: buildPersona(),
         allowed_tools: form.allowed_tools,
         knowledge_base_ids: form.knowledge_base_ids,
@@ -252,15 +293,63 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
         </div>
       )}
 
-      {/* ── O que faz (objetivo + roteiro) ── */}
+      {/* ── O que faz (objetivo + passos + situações) ── */}
       {tab === 'faz' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <FormField label="Objetivo" hint="O que este assistente deve alcançar. Ex.: 'Resolver a dúvida ou encaminhar ao setor certo.'">
-            <Textarea rows={2} value={form.goal} onChange={(e) => patch({ goal: e.target.value })} placeholder="Identificar o cliente e resolver dúvidas de conexão e financeiro." />
+            <Textarea rows={2} value={form.roteiro.objetivo} onChange={(e) => patchRoteiro({ objetivo: e.target.value })} placeholder="Identificar o cliente e resolver dúvidas de conexão e financeiro." />
           </FormField>
-          <FormField label="Roteiro e instruções" hint="Descreva como o assistente deve agir. (Em breve: passos e situações em vez de texto corrido.)">
-            <Textarea rows={7} value={form.system_prompt} onChange={(e) => patch({ system_prompt: e.target.value })} placeholder={'1. Peça o CPF do cliente e identifique.\n2. Confirme com a pessoa antes de tratar dos dados.\n3. …'} />
-          </FormField>
+          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+            Monte o roteiro que o assistente segue — sem escrever texto corrido. Os <strong>Passos</strong> são feitos na ordem; as <strong>Situações</strong> só acontecem quando a condição ocorre.
+          </p>
+
+          {/* Passos */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-4)' }}>Passos (na ordem)</p>
+              <button type="button" className="btn-secondary !py-1 !px-2.5 text-xs" onClick={addPasso}><Plus size={13} /> Adicionar passo</button>
+            </div>
+            {(form.roteiro.passos || []).length === 0 && (
+              <p className="text-xs py-3 text-center" style={{ color: 'var(--ap-text-5)' }}>Nenhum passo ainda. O assistente vai agir livremente pelo objetivo e pela persona.</p>
+            )}
+            <div className="space-y-2">
+              {(form.roteiro.passos || []).map((p, i) => (
+                <div key={i} className="rounded-lg p-2.5" style={{ border: '1px solid var(--ap-border)' }}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-semibold shrink-0" style={{ color: 'var(--ap-accent, #6366f1)' }}>Passo {i + 1}</span>
+                    <TextInput value={p.titulo || ''} onChange={(e) => setPasso(i, { titulo: e.target.value })} placeholder="Título do passo (ex.: Identificar o cliente)" />
+                    <button type="button" className="btn-ghost p-1 disabled:opacity-30" title="Subir" disabled={i === 0} onClick={() => movePasso(i, -1)}><ChevronUp size={15} /></button>
+                    <button type="button" className="btn-ghost p-1 disabled:opacity-30" title="Descer" disabled={i === form.roteiro.passos.length - 1} onClick={() => movePasso(i, 1)}><ChevronDown size={15} /></button>
+                    <button type="button" className="btn-ghost p-1 text-red-500" title="Remover" onClick={() => delPasso(i)}><Trash2 size={15} /></button>
+                  </div>
+                  <Textarea rows={2} value={p.descricao || ''} onChange={(e) => setPasso(i, { descricao: e.target.value })} placeholder="O que o assistente faz neste passo." />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Situações */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-4)' }}>Situações (Quando… faça…)</p>
+              <button type="button" className="btn-secondary !py-1 !px-2.5 text-xs" onClick={addSituacao}><Plus size={13} /> Adicionar situação</button>
+            </div>
+            {(form.roteiro.situacoes || []).length === 0 && (
+              <p className="text-xs py-3 text-center" style={{ color: 'var(--ap-text-5)' }}>Nenhuma situação. Ex.: "quando o acesso estiver bloqueado por falta de pagamento, ofereça a 2ª via".</p>
+            )}
+            <div className="space-y-2">
+              {(form.roteiro.situacoes || []).map((s, i) => (
+                <div key={i} className="rounded-lg p-2.5" style={{ border: '1px solid var(--ap-border)' }}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-semibold shrink-0" style={{ color: 'var(--ap-text-4)' }}>Quando</span>
+                    <TextInput value={s.quando || ''} onChange={(e) => setSituacao(i, { quando: e.target.value })} placeholder="a condição acontecer (ex.: o cliente pedir cancelamento)" />
+                    <button type="button" className="btn-ghost p-1 text-red-500" title="Remover" onClick={() => delSituacao(i)}><Trash2 size={15} /></button>
+                  </div>
+                  <Textarea rows={2} value={s.faca || ''} onChange={(e) => setSituacao(i, { faca: e.target.value })} placeholder="…faça isto." />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -368,6 +457,12 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
               />
             </FormField>
           )}
+
+          <div className="pt-2" style={{ borderTop: '1px solid var(--ap-border)' }}>
+            <FormField label="Instruções adicionais (avançado)" hint="Texto livre acrescentado ao roteiro. Deixe em branco se montou tudo em 'O que faz'.">
+              <Textarea rows={4} value={form.system_prompt} onChange={(e) => patch({ system_prompt: e.target.value })} placeholder="Instruções extras para casos que o roteiro não cobre…" />
+            </FormField>
+          </div>
 
           <div className="pt-2" style={{ borderTop: '1px solid var(--ap-border)' }}>
             <p className="text-xs font-semibold uppercase tracking-wider mb-2 mt-2" style={{ color: 'var(--ap-text-4)' }}>Limites de segurança</p>
@@ -501,8 +596,17 @@ function emojisToUi(persona) {
   return '';
 }
 
+function hydrateRoteiro(agent) {
+  const r = agent.roteiro && typeof agent.roteiro === 'object' ? agent.roteiro : {};
+  const passos = Array.isArray(r.passos) ? r.passos.map((p) => ({ titulo: p?.titulo || '', descricao: p?.descricao || '' })) : [];
+  const situacoes = Array.isArray(r.situacoes) ? r.situacoes.map((s) => ({ quando: s?.quando || '', faca: s?.faca || '' })) : [];
+  // Objetivo: usa o do roteiro; se vazio, herda o `goal` legado (migração suave).
+  const objetivo = (typeof r.objetivo === 'string' && r.objetivo) || agent.goal || '';
+  return { objetivo, passos, situacoes };
+}
+
 function hydrate(agent) {
-  if (!agent) return { ...EMPTY, persona: { ...EMPTY.persona }, guardrails: { ...EMPTY.guardrails } };
+  if (!agent) return { ...EMPTY, roteiro: { objetivo: '', passos: [], situacoes: [] }, persona: { ...EMPTY.persona }, guardrails: { ...EMPTY.guardrails } };
   const persona = agent.persona || {};
   return {
     name: agent.name || '',
@@ -514,6 +618,7 @@ function hydrate(agent) {
     max_tokens: agent.max_tokens ?? null,
     system_prompt: agent.system_prompt || '',
     goal: agent.goal || '',
+    roteiro: hydrateRoteiro(agent),
     persona: {
       name: typeof persona.name === 'string' ? persona.name : '',
       tone: persona.tone || '',

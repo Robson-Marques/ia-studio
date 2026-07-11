@@ -1162,6 +1162,10 @@ model AiAgent {
   system_prompt      String?
   // { tone, emojis, brevity, rules_always[], rules_never[] }
   persona            Json?
+  // Roteiro estruturado ("O que faz"): { objetivo, passos[], situacoes[] }.
+  // Fonte da verdade humana; compila pro system prompt (agent-roteiro.ts).
+  // system_prompt vira "instruções adicionais (avançado)".
+  roteiro            Json?
   goal               String?
   temperature        Float    @default(0.3)
   max_steps          Int      @default(6)
