@@ -12,6 +12,21 @@ import { IspExampleRepository, AUTOREPLY_WF_NAME } from './isp-example.repositor
 
 const AGENT_NAME = 'Atendimento (exemplo ISP)';
 
+// Instrução FORTE de comportamento (system prompt). Sem isto o modelo só
+// cumprimentava. A regra-chave é TRIAR o motivo antes de pedir qualquer coisa:
+// suporte de assinante → identifica; quem quer contratar → é VENDA, não pede CPF.
+const SYSTEM_PROMPT = [
+  'Você é o atendimento de um provedor de internet (ISP) no WhatsApp.',
+  'Cumprimente e, antes de qualquer coisa, ENTENDA O MOTIVO do contato — pergunte em que pode ajudar.',
+  'Ramifique conforme o caso: (a) se a pessoa JÁ é assinante e precisa de SUPORTE (internet caiu, fatura, 2ª via, contrato), peça o CPF ou CNPJ do titular para identificar o cadastro (aceite com ou sem pontuação), confirme com ela que é aquele assinante e só então trate dos dados; (b) se a pessoa NÃO é cliente e quer CONTRATAR / saber de planos, preços ou cobertura, isso é uma VENDA — NÃO peça CPF: entenda o que ela procura (plano, cidade/endereço) e conduza como atendimento comercial.',
+  'Nunca peça CPF a quem só quer contratar. Seja cordial e objetivo e não invente informação que as ferramentas não confirmaram.',
+].join(' ');
+
+// Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
+// system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
+// atualizar). Ver refreshContent no repositório.
+const CONTENT_VERSION = 'v2-identifica';
+
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
 const READ_ONLY_TOOLS = [
@@ -26,37 +41,59 @@ const READ_ONLY_TOOLS = [
 // Roteiro ESTRUTURADO (aba "O que faz"): objetivo + passos + situações. Nasce
 // quebrado em caixinhas — o usuário abre e vê a lógica pronta, sem prompt cru.
 const ROTEIRO = {
-  objetivo: 'Identificar o assinante e resolver dúvidas de conexão e financeiro em modo consulta.',
+  objetivo:
+    'Entender o motivo do contato e ajudar: dar suporte a quem já é assinante (identificando pelo CPF) e atender como venda quem quer contratar.',
   passos: [
     {
-      titulo: 'Identificar o cliente',
+      titulo: 'Entender o motivo do contato',
       descricao:
-        'Peça o CPF ou CNPJ do assinante (aceite com ou sem pontuação) e use a ferramenta de identificar cliente.',
+        'Cumprimente e pergunte em que pode ajudar. Descubra se a pessoa JÁ é assinante e precisa de suporte, ou se quer CONTRATAR / saber de planos (isso é venda).',
     },
     {
-      titulo: 'Confirmar antes de tratar dos dados',
+      titulo: 'Se for suporte de assinante: identificar',
       descricao:
-        'Ao localizar o cadastro, confirme com a pessoa: "Localizei o cadastro de <nome>. O atendimento é para este cliente?". Só prossiga após a confirmação.',
+        'Peça o CPF ou CNPJ do titular (aceite com ou sem pontuação) e use a ferramenta de identificar cliente. Confirme "Localizei o cadastro de <nome>. É para este cliente?" antes de tratar dos dados.',
     },
     {
-      titulo: 'Entender o problema',
+      titulo: 'Se for venda: NÃO pedir CPF',
       descricao:
-        'Pergunte o que está acontecendo. Para queda de sinal, veja o status da conexão do cliente e da região; para fatura, consulte os débitos.',
+        'Quem quer contratar ainda não é cliente — não peça CPF. Entenda o que procura (plano, cidade/endereço para checar cobertura) e conduza como atendimento comercial.',
     },
   ],
   situacoes: [
     {
-      quando: 'o cliente disser que está sem internet',
-      faca: 'Antes de tratar como problema técnico, consulte o contrato: se o acesso estiver bloqueado por falta de pagamento, a solução é financeira — ofereça a 2ª via do boleto.',
+      quando: 'a pessoa quiser contratar, perguntar preço ou cobertura',
+      faca: 'Trate como venda: não peça CPF. Pergunte a cidade/endereço e o que ela precisa, e apresente as opções de plano.',
     },
     {
-      quando: 'o cliente pedir 2ª via ou tiver dúvida de fatura',
-      faca: 'Consulte os débitos e gere a 2ª via (linha digitável e link do boleto).',
+      quando: 'um assinante disser que está sem internet',
+      faca: 'Depois de identificar, consulte o contrato: se o acesso estiver bloqueado por falta de pagamento, a solução é financeira — ofereça a 2ª via do boleto; senão veja o status da conexão e da região.',
+    },
+    {
+      quando: 'um assinante pedir 2ª via ou tiver dúvida de fatura',
+      faca: 'Após identificar, consulte os débitos e gere a 2ª via (linha digitável e link do boleto).',
     },
     {
       quando: 'o cliente precisar de algo que você não pode fazer (abrir OS, desbloquear acesso)',
       faca: 'Explique com clareza que vai encaminhar para um atendente humano — você está em modo consulta.',
     },
+  ],
+};
+
+const PERSONA = {
+  tone: 'cordial, objetivo e paciente',
+  emojis: false,
+  brevity: 'short',
+  rules_always: [
+    'Entender o motivo do contato antes de pedir dados.',
+    'Só pedir CPF/CNPJ quando for suporte de assinante — nunca para quem quer contratar (venda).',
+    'Confirmar a identidade do cliente antes de tratar de dados dele.',
+    'Repassar valores e prazos exatamente como o sistema retornou.',
+  ],
+  rules_never: [
+    'Pedir CPF a quem só quer contratar/saber de planos.',
+    'Prometer prazos ou serviços que as ferramentas não confirmaram.',
+    'Abrir OS ou desbloquear acesso (este assistente é só consulta).',
   ],
 };
 
@@ -94,6 +131,21 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
           this.logger.log(`Assistente-exemplo ISP criado na organização ${organizationId}.`);
         }
 
+        // Atualiza o CONTEÚDO do exemplo (roteiro/persona/system_prompt) para a
+        // versão atual — é um exemplo, pode evoluir. Uma vez por versão. Assim o
+        // assistente já criado passa a triar cliente×venda e pedir CPF só quando
+        // é suporte, sem o usuário ter que reeditar.
+        if (agentId && !(await this.repository.contentVersionSeeded(organizationId, CONTENT_VERSION))) {
+          await this.repository.refreshAgentContent(agentId, {
+            roteiro: ROTEIRO,
+            persona: PERSONA,
+            systemPrompt: SYSTEM_PROMPT,
+            goal: ROTEIRO.objetivo,
+          });
+          await this.repository.markContentVersionSeeded(organizationId, CONTENT_VERSION);
+          this.logger.log(`Conteúdo do assistente-exemplo atualizado (${CONTENT_VERSION}) na org ${organizationId}.`);
+        }
+
         // Fluxo-companheiro "IA responde no WhatsApp" (DRAFT, inerte). Só nasce
         // se há um assistente pra apontar e nunca foi semeado antes (não
         // ressuscita se o usuário apagou o fluxo).
@@ -123,19 +175,6 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
     scope: { workspace_id: string; environment_id: string },
   ): Promise<string> {
     const connectionId = await this.repository.singleAiConnection(organizationId);
-    const persona = {
-      tone: 'cordial, objetivo e paciente',
-      emojis: false,
-      brevity: 'short',
-      rules_always: [
-        'Confirmar a identidade do cliente antes de tratar de dados dele.',
-        'Repassar valores e prazos exatamente como o sistema retornou.',
-      ],
-      rules_never: [
-        'Prometer prazos ou serviços que as ferramentas não confirmaram.',
-        'Abrir OS ou desbloquear acesso (este assistente é só consulta).',
-      ],
-    };
 
     const agent = await this.repository.createAgent({
       organization_id: organizationId,
@@ -147,7 +186,8 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
       connection_id: connectionId,
       model: 'gpt-4o-mini',
       roteiro: ROTEIRO as unknown as Prisma.InputJsonValue,
-      persona: persona as unknown as Prisma.InputJsonValue,
+      persona: PERSONA as unknown as Prisma.InputJsonValue,
+      system_prompt: SYSTEM_PROMPT,
       goal: ROTEIRO.objetivo,
       temperature: 0.3,
       max_steps: 8,

@@ -29,7 +29,9 @@ function buildAutoreplyGraph(agentId: string) {
         name: 'Assistente responde',
         config: {
           agent_id: agentId,
-          input: 'Mensagem recebida de {{input.contact_name}} ({{input.phone}}): "{{input.content}}". Responda o cliente de forma útil, cordial e objetiva.',
+          // Neutro: entrega a mensagem e deixa o ROTEIRO/persona do assistente
+          // conduzir (triar cliente×venda, identificar quando for suporte).
+          input: 'Mensagem de {{input.contact_name}}: "{{input.content}}". Atenda seguindo o seu roteiro.',
           scope_contact: '{{input.phone}}',
           scope_session: '{{input.chat_id}}',
         },
@@ -121,6 +123,42 @@ export class IspExampleRepository {
   markSeeded(organizationId: string) {
     return this.prisma.systemSetting.create({
       data: { organization_id: organizationId, key: SEED_FLAG_KEY, value: true as unknown as Prisma.InputJsonValue },
+    });
+  }
+
+  /** Já apliquei ESTA versão de conteúdo do exemplo nesta org? */
+  async contentVersionSeeded(organizationId: string, version: string): Promise<boolean> {
+    const row = await this.prisma.systemSetting.findFirst({
+      where: { organization_id: organizationId, key: `isp_example_content_${version}` },
+      select: { id: true },
+    });
+    return !!row;
+  }
+
+  markContentVersionSeeded(organizationId: string, version: string) {
+    return this.prisma.systemSetting.create({
+      data: {
+        organization_id: organizationId,
+        key: `isp_example_content_${version}`,
+        value: true as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  /** Re-aplica o conteúdo comportamental do assistente-exemplo (roteiro/persona/
+   *  system_prompt/goal). É um EXEMPLO — pode evoluir com o produto. */
+  refreshAgentContent(
+    agentId: string,
+    content: { roteiro: unknown; persona: unknown; systemPrompt: string; goal: string },
+  ) {
+    return this.prisma.aiAgent.update({
+      where: { id: agentId },
+      data: {
+        roteiro: content.roteiro as Prisma.InputJsonValue,
+        persona: content.persona as Prisma.InputJsonValue,
+        system_prompt: content.systemPrompt,
+        goal: content.goal,
+      },
     });
   }
 

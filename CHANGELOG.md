@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.30 - 2026-07-11 (assistente-exemplo: triar motivo → suporte identifica, venda não pede CPF)
+
+- **O assistente conversava mas não conduzia.** Agora ele **entende o motivo do contato primeiro** e ramifica: (a) **assinante com suporte** (internet, fatura, contrato) → pede o CPF/CNPJ do titular para identificar e confirma antes de tratar dos dados; (b) **quem quer contratar / saber de planos** → é **VENDA**, **não** pede CPF, conduz como comercial (pergunta cidade/endereço e o que procura). A regra de ouro embutida: *nunca pedir CPF a quem só quer contratar*.
+- Reforço via `system_prompt` directivo + roteiro estruturado reescrito (triagem cliente×venda) + persona com as regras. O texto que o fluxo manda ao assistente virou neutro ("atenda seguindo o seu roteiro") — antes o "responda de forma útil" fazia o modelo só cumprimentar.
+- **Aplica no assistente JÁ criado:** o seed re-aplica o conteúdo (roteiro/persona/system_prompt) uma vez por versão (marcador `isp_example_content_v2-identifica`) no boot — sem o usuário reeditar, sem `db push`.
+
 ## v0.9.29 - 2026-07-11 (pente-fino: a automação por evento volta a FUNCIONAR + caça a erros silenciosos)
 
 Auditoria do código inteiro, área por área. A "IA não respondia no WhatsApp" tinha DUAS causas reais (não era config) — as duas corrigidas:
