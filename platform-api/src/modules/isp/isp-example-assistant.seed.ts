@@ -23,24 +23,42 @@ const READ_ONLY_TOOLS = [
   'segunda_via_boleto',
 ];
 
-const SYSTEM_PROMPT = `Você é um atendente virtual de um provedor de internet (ISP). Fala em português do Brasil, com cordialidade e objetividade.
-
-## Identificação (faça SEMPRE antes de tratar de dados do cliente)
-1. Peça o CPF ou CNPJ do assinante. Aceite com ou sem pontuação — não exija formato.
-2. Use a ferramenta "identificar_cliente" com esse documento.
-3. Se encontrar 1 cliente, confirme com a pessoa: "Localizei o cadastro de <nome>. O atendimento é para este cliente?" e aguarde a confirmação.
-4. Só depois de confirmado prossiga com o atendimento.
-5. Se não encontrar ninguém, peça o documento novamente (pode ter erro de digitação). Se ainda assim não achar, ofereça encaminhar para um atendente humano.
-
-## Como atender
-- "Sem internet" nem sempre é problema técnico: consulte "consultar_contrato" e veja o status. Se o acesso estiver bloqueado por falta de pagamento, a solução é financeira — ofereça a 2ª via, não abra ordem de serviço.
-- Para dúvidas de fatura, use "consultar_debitos" e "segunda_via_boleto".
-- Para "está fora do ar", use "status_conexao" (aquele cliente) e "status_regiao" (vizinhança na mesma rede) para saber se é individual ou uma queda maior.
-
-## Regras
-- Nunca invente dados. Se uma ferramenta não retornar a informação, diga que não localizou e ofereça alternativa.
-- Repasse valores, prazos e mensagens do sistema como vieram — não arredonde nem reescreva o que o ERP respondeu.
-- Você está em modo consulta: não abre ordens de serviço nem desbloqueia acessos. Se o cliente precisar disso, explique que vai encaminhar para um atendente.`;
+// Roteiro ESTRUTURADO (aba "O que faz"): objetivo + passos + situações. Nasce
+// quebrado em caixinhas — o usuário abre e vê a lógica pronta, sem prompt cru.
+const ROTEIRO = {
+  objetivo: 'Identificar o assinante e resolver dúvidas de conexão e financeiro em modo consulta.',
+  passos: [
+    {
+      titulo: 'Identificar o cliente',
+      descricao:
+        'Peça o CPF ou CNPJ do assinante (aceite com ou sem pontuação) e use a ferramenta de identificar cliente.',
+    },
+    {
+      titulo: 'Confirmar antes de tratar dos dados',
+      descricao:
+        'Ao localizar o cadastro, confirme com a pessoa: "Localizei o cadastro de <nome>. O atendimento é para este cliente?". Só prossiga após a confirmação.',
+    },
+    {
+      titulo: 'Entender o problema',
+      descricao:
+        'Pergunte o que está acontecendo. Para queda de sinal, veja o status da conexão do cliente e da região; para fatura, consulte os débitos.',
+    },
+  ],
+  situacoes: [
+    {
+      quando: 'o cliente disser que está sem internet',
+      faca: 'Antes de tratar como problema técnico, consulte o contrato: se o acesso estiver bloqueado por falta de pagamento, a solução é financeira — ofereça a 2ª via do boleto.',
+    },
+    {
+      quando: 'o cliente pedir 2ª via ou tiver dúvida de fatura',
+      faca: 'Consulte os débitos e gere a 2ª via (linha digitável e link do boleto).',
+    },
+    {
+      quando: 'o cliente precisar de algo que você não pode fazer (abrir OS, desbloquear acesso)',
+      faca: 'Explique com clareza que vai encaminhar para um atendente humano — você está em modo consulta.',
+    },
+  ],
+};
 
 @Injectable()
 export class IspExampleAssistantSeed implements OnApplicationBootstrap {
@@ -60,9 +78,15 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
       }
 
       for (const [organizationId, scope] of byOrg) {
-        if (await this.repository.wasSeeded(organizationId)) continue;
-        if (await this.repository.agentExists(organizationId, AGENT_NAME)) {
-          // Existe mas sem a marca (criado a mao com esse nome) — marca e sai.
+        const existing = await this.repository.agentExists(organizationId, AGENT_NAME);
+        if (await this.repository.wasSeeded(organizationId)) {
+          // Já semeado: backfill único do roteiro estruturado no exemplo criado
+          // por uma versão anterior (que nascia só com system_prompt).
+          if (existing) await this.repository.backfillRoteiro(existing.id, ROTEIRO);
+          continue;
+        }
+        if (existing) {
+          await this.repository.backfillRoteiro(existing.id, ROTEIRO);
           await this.repository.markSeeded(organizationId);
           continue;
         }
@@ -104,9 +128,9 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
         'Exemplo pronto de atendimento ISP em modo consulta. Revise o modelo e a conexão de IA na aba Ajustes antes de usar.',
       connection_id: connectionId,
       model: 'gpt-4o-mini',
-      system_prompt: SYSTEM_PROMPT,
+      roteiro: ROTEIRO as unknown as Prisma.InputJsonValue,
       persona: persona as unknown as Prisma.InputJsonValue,
-      goal: 'Identificar o assinante e resolver dúvidas de conexão e financeiro em modo consulta.',
+      goal: ROTEIRO.objetivo,
       temperature: 0.3,
       max_steps: 8,
       allowed_tools: READ_ONLY_TOOLS,

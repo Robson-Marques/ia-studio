@@ -56,6 +56,24 @@ export class IspExampleRepository {
     return this.prisma.aiAgent.create({ data });
   }
 
+  /**
+   * Preenche o roteiro do exemplo UMA vez, só se ainda estiver vazio — o
+   * exemplo de uma versao anterior nascia com system_prompt e sem roteiro.
+   * Nunca sobrescreve um roteiro que o usuario ja editou.
+   */
+  async backfillRoteiro(agentId: string, roteiro: unknown): Promise<void> {
+    const agent = await this.prisma.aiAgent.findUnique({
+      where: { id: agentId },
+      select: { roteiro: true },
+    });
+    if (agent && (agent.roteiro === null || agent.roteiro === undefined)) {
+      await this.prisma.aiAgent.update({
+        where: { id: agentId },
+        data: { roteiro: roteiro as Prisma.InputJsonValue },
+      });
+    }
+  }
+
   /** Marca "ja semeei o exemplo nesta org" — impede ressurreicao pos-exclusao. */
   async wasSeeded(organizationId: string): Promise<boolean> {
     const row = await this.prisma.systemSetting.findFirst({
