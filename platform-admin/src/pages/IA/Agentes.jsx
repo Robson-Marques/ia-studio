@@ -86,18 +86,18 @@ export default function Agentes() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-[200px]">
-          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Agentes de IA</h1>
+          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Assistentes</h1>
           <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-            Agentes com persona, ferramentas, conhecimento e memória — versões imutáveis, publicar aponta a ativa.
+            Quem atende: personalidade, o que faz, o que sabe e o que pode fazer. Cada mudança vira uma versão.
           </p>
         </div>
         {canWrite && (
           <>
-            <button className="btn-secondary" onClick={() => setImportOpen(true)} title="Importar agente de um JSON exportado">
+            <button className="btn-secondary" onClick={() => setImportOpen(true)} title="Importar assistente de um arquivo exportado">
               <Upload size={14} /> Importar
             </button>
             <button className="btn-primary" onClick={() => openEditor(null)}>
-              <Plus size={14} /> Novo agente
+              <Plus size={14} /> Novo assistente
             </button>
           </>
         )}
@@ -109,9 +109,9 @@ export default function Agentes() {
         <div className="card">
           <EmptyState
             icon={Bot}
-            title="Nenhum agente neste ambiente"
-            description="Crie um agente e configure persona, ferramentas e conhecimento."
-            action={canWrite && <button className="btn-primary" onClick={() => openEditor(null)}><Plus size={14} /> Novo agente</button>}
+            title="Nenhum assistente neste ambiente"
+            description="Crie um assistente e configure quem ele é, o que faz e o que pode fazer."
+            action={canWrite && <button className="btn-primary" onClick={() => openEditor(null)}><Plus size={14} /> Novo assistente</button>}
           />
         </div>
       ) : (

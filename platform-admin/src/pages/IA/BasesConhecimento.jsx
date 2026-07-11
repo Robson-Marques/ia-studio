@@ -68,7 +68,7 @@ export default function BasesConhecimento() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-[200px]">
-          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Bases de Conhecimento</h1>
+          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Conhecimento</h1>
           <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
             Fontes para RAG — documentos são divididos em chunks e indexados por embeddings.
           </p>

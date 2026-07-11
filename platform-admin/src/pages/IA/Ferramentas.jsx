@@ -28,7 +28,7 @@ export default function Ferramentas() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Ferramentas</h1>
+        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Habilidades</h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
           Capacidades que os agentes podem usar — builtin da plataforma, customizadas e descobertas por MCP.
         </p>

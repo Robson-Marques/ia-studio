@@ -28,7 +28,7 @@ export default function Aprovacoes() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Aprovações</h1>
+        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Pendências</h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
           Ações de agentes que exigem revisão humana antes de executar (diretriz 31).
         </p>

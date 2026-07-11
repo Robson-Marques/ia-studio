@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.19 - 2026-07-09 (menu humano + perfis com rótulos legíveis)
+
+- **Bug: a tela de Perfis mostrava a chave crua da permissão (`core.users.read`) num balaio único "permissions 10/83".** O backend sempre mandou grupos + rótulos humanos (`{permissions, groups, labels}`), mas o `normalizeCatalog` do front não tratava esse formato — caía no fallback e imprimia a chave. Corrigido: agora renderiza os grupos ("Usuários e Acessos", "IA"…) com os rótulos humanos ("Ver usuários", "Conceder à IA ações que gravam dados"). As 83 permissões já tinham label no backend. Exemplo clássico de tela feita para desenvolvedor virando tela para usuário.
+- **Menu de IA na língua do usuário (fatia 5).** Grupo "IA" → **IA Studio**; itens: Agentes→**Assistentes**, Bases de Conhecimento→**Conhecimento**, Ferramentas→**Habilidades**, Aprovações→**Pendências** (Memória e Custos mantidos). Só rótulos — as rotas `/ia/*` (internas, invisíveis) ficam iguais, sem risco de navegação. Breadcrumbs de `/ia/*` adicionados (não existiam). Títulos e textos das páginas atualizados para casar com o menu ("Assistentes", "Novo assistente", empty states).
+
 ## v0.9.18 - 2026-07-09 (anti-escalada nas ações da IA)
 
 - **Trava anti-escalada nas ferramentas que gravam dados (fatia 3).** Marcar uma habilidade **"grava dados"** (`abrir_os`, `desbloqueio_confianca` — as `requires_approval`) num assistente passou a exigir a nova permissão `ai.agents.actions` ("Conceder à IA ações que gravam dados"). Sem ela, o operador só concede habilidades de **consulta** — no backend (rejeita no save de create/update/import, `ForbiddenException` com mensagem clara) **e** no front (checkbox desabilitado com o motivo). Ninguém eleva o poder da IA além do próprio. No runtime, a ação ainda passa por aprovação humana (`requires_approval`) — são duas travas em série.

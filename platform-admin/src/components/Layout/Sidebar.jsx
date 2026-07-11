@@ -17,14 +17,16 @@ import { usePermissions } from '../../hooks/usePermissions';
 const NAV = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   {
-    label: 'IA', icon: BrainCircuit,
+    // Rótulos na língua do usuário (regra máxima de UX). Rotas /ia/* internas
+    // mantidas — só o texto visível mudou.
+    label: 'IA Studio', icon: BrainCircuit,
     children: [
-      { label: 'Agentes',              icon: Bot,        path: '/ia/agentes',      perm: 'ai.agents.read' },
-      { label: 'Bases de Conhecimento', icon: BookOpen,   path: '/ia/conhecimento', perm: 'ai.knowledge.read' },
-      { label: 'Memória',              icon: Brain,      path: '/ia/memoria',      perm: 'ai.memory.read' },
-      { label: 'Ferramentas',          icon: Wrench,     path: '/ia/ferramentas',  perm: 'ai.tools.read' },
-      { label: 'Aprovações',           icon: ShieldCheck, path: '/ia/aprovacoes',   perm: 'ai.approvals.read' },
-      { label: 'Custos',               icon: DollarSign, path: '/ia/custos',       perm: 'ai.costs.read' },
+      { label: 'Assistentes',   icon: Bot,        path: '/ia/agentes',      perm: 'ai.agents.read' },
+      { label: 'Conhecimento',  icon: BookOpen,   path: '/ia/conhecimento', perm: 'ai.knowledge.read' },
+      { label: 'Memória',       icon: Brain,      path: '/ia/memoria',      perm: 'ai.memory.read' },
+      { label: 'Habilidades',   icon: Wrench,     path: '/ia/ferramentas',  perm: 'ai.tools.read' },
+      { label: 'Pendências',    icon: ShieldCheck, path: '/ia/aprovacoes',   perm: 'ai.approvals.read' },
+      { label: 'Custos',        icon: DollarSign, path: '/ia/custos',       perm: 'ai.costs.read' },
     ],
   },
   {

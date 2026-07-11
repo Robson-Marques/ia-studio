@@ -33,6 +33,12 @@ const BREADCRUMBS = {
   '/automacao/templates':    'Automação / Templates',
   '/automacao/eventos':      'Automação / Eventos',
   '/automacao/notificacoes': 'Automação / Notificações',
+  '/ia/agentes':      'IA Studio / Assistentes',
+  '/ia/conhecimento': 'IA Studio / Conhecimento',
+  '/ia/memoria':      'IA Studio / Memória',
+  '/ia/ferramentas':  'IA Studio / Habilidades',
+  '/ia/aprovacoes':   'IA Studio / Pendências',
+  '/ia/custos':       'IA Studio / Custos',
 };
 
 const ENV_BADGE = {
