@@ -52,6 +52,7 @@ function TabAtualizacao() {
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [current, setCurrent] = useState(null);   // upgrade em curso
+  const [restarting, setRestarting] = useState(false); // API caiu durante o restart do upgrade
   const [confirmTag, setConfirmTag] = useState(null);
   const [acting, setActing] = useState(false);
   const [releasing, setReleasing] = useState(false);
@@ -94,11 +95,12 @@ function TabAtualizacao() {
     try {
       const cur = await getCurrentUpgrade();
       setCurrent(cur);
+      setRestarting(false); // voltou a responder → não está mais reiniciando
 
       const prev = prevStatusRef.current;
       const status = cur?.status || null;
 
-      // Transição RUNNING → SUCCESS: toast + reload.
+      // Transição RUNNING → SUCCESS: recarrega a página (pega a nova versão).
       if (prev === 'RUNNING' && status === 'SUCCESS') {
         toast.success('Atualização concluída. Recarregando…');
         stopPolling();
@@ -116,11 +118,18 @@ function TabAtualizacao() {
         if (status !== 'RUNNING') stopPolling();
       }
       prevStatusRef.current = status;
-    } catch (err) {
-      // Erro transitório de polling — não derruba a tela.
-      toast.error(err.message);
+    } catch {
+      // A API cai por 1-2 min quando o backend reinicia (fase final do upgrade).
+      // Durante um upgrade em curso isso é ESPERADO — não é erro: mostra "reiniciando"
+      // e segue tentando em silêncio. A página recarrega sozinha quando a API voltar
+      // com status SUCCESS. Só fora de um upgrade um erro de rede vira toast.
+      if (prevStatusRef.current === 'RUNNING' || current?.status === 'RUNNING') {
+        setRestarting(true);
+      } else {
+        stopPolling();
+      }
     }
-  }, [loadVersion]);
+  }, [loadVersion, current?.status]);
 
   const startPolling = useCallback(() => {
     if (pollRef.current) return;
@@ -166,6 +175,7 @@ function TabAtualizacao() {
       await startUpgrade(confirmTag);
       toast.success('Atualização iniciada.');
       setConfirmTag(null);
+      setRestarting(false);
       prevStatusRef.current = 'RUNNING';
       setCurrent({ status: 'RUNNING', log_lines: [], started_at: new Date().toISOString(), to_version: confirmTag });
       startPolling();
@@ -199,6 +209,19 @@ function TabAtualizacao() {
 
   return (
     <div className="space-y-5">
+      {/* Banner de "reiniciando" — a API cai no fim do upgrade; a página recarrega sozinha */}
+      {restarting && (
+        <div
+          className="rounded-lg px-4 py-3 flex items-center gap-3"
+          style={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)' }}
+        >
+          <Loader2 size={18} className="text-blue-500 shrink-0 animate-spin" />
+          <p className="text-sm" style={{ color: 'var(--ap-text-2)' }}>
+            Aplicando a atualização e reiniciando os serviços… A página recarrega sozinha quando terminar (pode levar 1–2 minutos).
+          </p>
+        </div>
+      )}
+
       {/* Banner de lock órfão */}
       {orphan && (
         <div

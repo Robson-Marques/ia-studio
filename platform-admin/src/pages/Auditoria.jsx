@@ -65,8 +65,8 @@ export default function Auditoria({ fetcher = listAudit, title = 'Auditoria', su
       {/* Filtros */}
       <div className="card p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <TextInput placeholder="Ação (ex.: user.create)" value={filters.action} onChange={(e) => set('action', e.target.value)} />
-          <TextInput placeholder="Entidade (ex.: User)" value={filters.entity} onChange={(e) => set('entity', e.target.value)} />
+          <TextInput placeholder="Filtrar por ação" value={filters.action} onChange={(e) => set('action', e.target.value)} />
+          <TextInput placeholder="Filtrar por item afetado" value={filters.entity} onChange={(e) => set('entity', e.target.value)} />
           <TextInput type="date" value={filters.from} onChange={(e) => set('from', e.target.value)} title="Data inicial" />
           <TextInput type="date" value={filters.to} onChange={(e) => set('to', e.target.value)} title="Data final" />
           <button className="btn-primary justify-center" onClick={() => load(1)} disabled={loading}>

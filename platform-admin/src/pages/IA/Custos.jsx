@@ -73,8 +73,8 @@ function SummaryTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-end gap-2">
-        <FormField label="Período" className="w-40">
-          <TextInput value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="YYYY-MM" />
+        <FormField label="Mês" className="w-44">
+          <TextInput type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
         </FormField>
       </div>
 

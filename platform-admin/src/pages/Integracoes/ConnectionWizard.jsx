@@ -153,7 +153,7 @@ export default function ConnectionWizard({ open, provider, onClose, onCreated })
       {!isFinalStep && (
         <div className="space-y-3">
           {stepIndex === 0 && (
-            <FormField label="Nome da conexão" required hint="Ex.: Financeiro, Comercial — a linguagem é Provider → Instância nomeada.">
+            <FormField label="Nome da conexão" required hint="Um nome para você identificar esta conexão. Ex.: Financeiro, Comercial.">
               <TextInput value={name} onChange={(e) => setName(e.target.value)} autoFocus />
             </FormField>
           )}

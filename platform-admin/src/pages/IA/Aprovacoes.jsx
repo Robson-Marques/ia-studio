@@ -30,7 +30,7 @@ export default function Aprovacoes() {
       <div>
         <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Pendências</h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Ações de agentes que exigem revisão humana antes de executar (diretriz 31).
+          Ações dos assistentes que exigem sua revisão antes de executar.
         </p>
       </div>
       <Tabs items={PAGE_TABS} active={tab} onChange={setTab} />
@@ -68,7 +68,7 @@ function QueueTab() {
     setApproveLoading(true);
     try {
       await decideApproval(approving.id, { decision: 'APPROVED' });
-      toast.success('Ação aprovada — a execução do agente é retomada.');
+      toast.success('Ação aprovada — o assistente retoma o atendimento.');
       setApproving(null);
       load();
     } catch (err) {
@@ -109,7 +109,7 @@ function QueueTab() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 min-h-[36px]"
-                            title="Aprovar a ação — a execução do agente prossegue"
+                            title="Aprovar a ação — o assistente prossegue"
                             onClick={() => setApproving(a)}
                           >
                             <Check size={13} className="inline" /> Aprovar
@@ -137,7 +137,7 @@ function QueueTab() {
         open={!!approving}
         loading={approveLoading}
         title="Aprovar ação"
-        message={`Aprovar a execução de "${approving?.target}"? A ação será executada de verdade e a execução do agente prossegue. Verifique o contexto antes de confirmar.`}
+        message={`Aprovar a execução de "${approving?.target}"? A ação será executada de verdade e o assistente prossegue. Verifique o contexto antes de confirmar.`}
         confirmLabel="Aprovar e executar"
         onClose={() => setApproving(null)}
         onConfirm={confirmApprove}
@@ -161,7 +161,7 @@ function RejectModal({ approval, onClose, onRejected }) {
     setSaving(true);
     try {
       await decideApproval(approval.id, { decision: 'REJECTED', reject_reason: reason.trim() || undefined });
-      toast.success('Ação rejeitada — a execução do agente foi encerrada.');
+      toast.success('Ação rejeitada — o atendimento do assistente foi encerrado.');
       onRejected();
     } catch (err) {
       toast.error(err.message);
@@ -192,7 +192,7 @@ function RejectModal({ approval, onClose, onRejected }) {
     >
       <div className="space-y-3">
         <p className="text-sm" style={{ color: 'var(--ap-text-2)' }}>
-          Rejeitar "{approval?.target}"? A ação não será executada e a execução do agente é encerrada. Ação destrutiva — não pode ser desfeita.
+          Rejeitar "{approval?.target}"? A ação não será executada e o atendimento do assistente é encerrado. Ação destrutiva — não pode ser desfeita.
         </p>
         <FormField label="Motivo (opcional)">
           <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: destinatários incorretos" />

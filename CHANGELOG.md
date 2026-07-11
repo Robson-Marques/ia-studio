@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.21 - 2026-07-10 (tela de Atualização sem pânico + pente-fino passada 2)
+
+- **Tela de Atualização não entra mais em pânico durante o restart.** Ao aplicar um upgrade, o backend reinicia e a API cai por 1–2 min — o polling antes disparava um `toast.error` vermelho a cada 2s, parecendo falha. Agora, durante um upgrade em curso, a falha de rede é tratada como **esperada**: mostra um aviso azul calmo ("Aplicando a atualização e reiniciando os serviços… a página recarrega sozinha") e segue tentando em silêncio. Quando a API volta com status SUCCESS, **recarrega a página sozinha**. Fora de um upgrade, erro de rede continua sendo erro.
+- **Pente-fino passada 2:** Aprovações ("execução do agente"→"o assistente"), Auditoria (placeholders "user.create"/"User"→"Filtrar por ação"/"item afetado"), Execuções ("trace_id"→"Código de rastreio"), assistente de conexão (hint "Provider → Instância nomeada"→"nome para identificar esta conexão"), Custos (campo "YYYY-MM"→seletor de mês nativo).
+
 ## v0.9.20 - 2026-07-10 (pente-fino de UX, passada 1)
 
 Auditoria de linguagem tela a tela (regra máxima: língua do usuário, nunca do desenvolvedor). Confirmado limpo: nenhum `confirm()/alert()` nativo, nenhum banner de erro de submit inline. Corrigido nesta passada (só texto visível — sem mudança de comportamento):

@@ -80,7 +80,7 @@ export default function Execucoes() {
           value={traceId}
           onChange={(e) => setTraceId(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); load(1); } }}
-          placeholder="trace_id…"
+          placeholder="Código de rastreio…"
           className="max-w-[220px] font-mono text-xs"
         />
       </div>
@@ -224,8 +224,8 @@ function ExecutionDetailModal({ id, onClose, canRetry, onChanged }) {
               {TRIGGER_TYPE_LABEL[execution.trigger_type] || execution.trigger_type} · {execution.duration_ms != null ? `${execution.duration_ms} ms` : 'em andamento'}
             </span>
           </div>
-          <p className="text-[11px] font-mono break-all" style={{ color: 'var(--ap-text-5)' }} title="trace_id — correlação ponta a ponta">
-            trace: {execution.trace_id}
+          <p className="text-[11px] font-mono break-all" style={{ color: 'var(--ap-text-5)' }} title="Código de rastreio da execução">
+            Rastreio: {execution.trace_id}
           </p>
           {execution.error && (
             <p className="text-xs rounded-lg p-2 text-red-500" style={{ border: '1px solid var(--ap-border)' }}>{execution.error}</p>
