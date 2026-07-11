@@ -40,7 +40,7 @@ export type NodeValidator = (config: Record<string, unknown>) => string[];
 
 // ─── Definition (metadados pro editor renderizar o modal sem codigo) ────
 
-export type NodeFieldType = 'text' | 'textarea' | 'number' | 'select' | 'json' | 'connection' | 'template';
+export type NodeFieldType = 'text' | 'textarea' | 'number' | 'select' | 'json' | 'connection' | 'template' | 'agent';
 
 export interface NodeField {
   key: string;

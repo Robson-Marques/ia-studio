@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.26 - 2026-07-11 (upgrade destravado: build da API + painel que PARA e MOSTRA a falha)
+
+- **A CAUSA-RAIZ de "o upgrade não muda nada há tempo": a build da API vinha falhando calada.** Quando humanizei o editor de automação, criei o campo `type: 'agent'` no nó do Assistente (`agent.nodes.ts`) mas **nunca adicionei `'agent'` ao union `NodeFieldType`** (`node-registry.service.ts`). O `nest build` estourava `TS2322` — e como o `upgrade.sh` tem `set -euo pipefail` + `mark_failed` no passo `API_BUILD`, **todo upgrade abortava ali** (fail-safe: produção seguia na versão anterior). Corrigido: `'agent'` adicionado ao `NodeFieldType`.
+- **O painel também lia o status do lugar errado — por isso a tela "sumia como se concluído".** O backend responde `{ upgrade, orphaned }`, mas o `getCurrentUpgrade` (console `services/system.js`) lia `data.status`/`data.log_lines` do **nível de cima** — sempre `undefined`. O painel **nunca** via RUNNING/SUCCESS/FAILED (status sempre `null`): não mostrava progresso, não recarregava no fim, não exibia falha. Corrigido conforme o Aquapark (que guarda o status em `.upgrade`): o service desembrulha `data.upgrade` e lê o órfão de `data.orphaned`.
+- **Falha agora PARA e APARECE (padrão Aquapark):** o log passa a exibir também quando o upgrade terminou `FAILED`/`SUCCESS` (não só com linhas), e o estado `FAILED` mostra bloco vermelho explícito — "falhou na etapa X e foi interrompida; o sistema continua na versão anterior; revise o log e publique nova versão". Fim da falha silenciosa.
+- Doc: regra de ouro reforçada — **antes de qualquer correção, olhar como o Aquapark faz** (prática obrigatória, não só em feature nova).
+
 ## v0.9.25 - 2026-07-11 (acesso ao /console corrigido + base amarrada na doc)
 
 - **`studio.nivoo.dev.br/console` levava ao login do CLIENTE (bug de roteamento nginx).** A regra era `location /console/` (com barra final); `/console` **sem** a barra não casava e caía no `location /` → servia o painel do cliente. Adicionado redirect exato `location = /console { return 301 /console/; }` no `install.sh`. **Instalação existente não regenera o nginx sozinha** — aplicar o patch ao vivo no servidor (comando no handoff) + `nginx -t && systemctl reload nginx`.

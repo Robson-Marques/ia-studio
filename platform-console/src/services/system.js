@@ -31,13 +31,19 @@ export async function getCurrentUpgrade() {
   try {
     const { data } = await api.get('/console/system/upgrade/current');
     if (!data) return null;
+    // O backend responde { upgrade, orphaned }. O status/log ficam em .upgrade —
+    // ler `data.status` direto devolvia SEMPRE null (o painel nunca via
+    // RUNNING/SUCCESS/FAILED, então "sumia como se concluído" e nunca mostrava a
+    // falha). Desembrulha a row e lê o flag de órfão do nível de cima.
+    const row = data.upgrade ?? (data.status ? data : null);
+    if (!row) return null;
     return {
-      status: data.status || null,
-      log_lines: Array.isArray(data.log_lines) ? data.log_lines : (Array.isArray(data.logLines) ? data.logLines : []),
-      error_step: data.error_step || data.errorStep || null,
-      started_at: data.started_at || data.startedAt || null,
-      to_version: data.to_version || data.toVersion || null,
-      orphan_lock: Boolean(data.orphan_lock ?? data.orphanLock ?? false),
+      status: row.status || null,
+      log_lines: Array.isArray(row.log_lines) ? row.log_lines : (Array.isArray(row.logLines) ? row.logLines : []),
+      error_step: row.error_step || row.errorStep || null,
+      started_at: row.started_at || row.startedAt || null,
+      to_version: row.to_version || row.toVersion || null,
+      orphan_lock: Boolean(data.orphaned ?? data.orphan_lock ?? row.orphan_lock ?? false),
     };
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao consultar atualização em curso')); }
 }

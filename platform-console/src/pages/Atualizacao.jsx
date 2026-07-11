@@ -201,7 +201,7 @@ function TabAtualizacao() {
       </div>
 
       {/* Viewer de log ao vivo (upgrade em curso ou último) */}
-      {current && (current.log_lines?.length || running) ? (
+      {current && (current.log_lines?.length || running || current.status === 'FAILED' || current.status === 'SUCCESS') ? (
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-4)' }}>
@@ -227,8 +227,17 @@ function TabAtualizacao() {
               : <span style={{ color: '#64748b' }}>Aguardando saída do script…</span>}
             {running && <div className="flex items-center gap-2 mt-1" style={{ color: '#64748b' }}><Loader2 size={12} className="animate-spin" /> em execução…</div>}
           </div>
-          {current.status === 'FAILED' && current.error_step && (
-            <p className="text-xs mt-2 text-red-500">Falhou na etapa: <code>{current.error_step}</code></p>
+          {current.status === 'FAILED' && (
+            <div
+              className="rounded-lg px-3 py-2 mt-2 flex items-start gap-2"
+              style={{ backgroundColor: 'rgba(239, 68, 68, 0.10)', border: '1px solid rgba(239, 68, 68, 0.35)' }}
+            >
+              <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs" style={{ color: 'var(--ap-text-2)' }}>
+                A atualização <strong>falhou{current.error_step ? <> na etapa <code>{current.error_step}</code></> : ''}</strong> e foi interrompida.
+                O sistema <strong>continua na versão anterior</strong> (nada foi aplicado pela metade). Revise o log acima, corrija a causa e publique uma nova versão para tentar de novo.
+              </p>
+            </div>
           )}
         </div>
       ) : null}
