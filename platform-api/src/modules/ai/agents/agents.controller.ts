@@ -75,7 +75,7 @@ export class AgentsController {
     @Body() dto: CreateAgentDto,
     @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.create(resolveOrganizationId(user, orgQuery), dto, user.sub);
+    return this.agents.create(resolveOrganizationId(user, orgQuery), dto, user.sub, user);
   }
 
   @Patch(':id')
@@ -86,7 +86,7 @@ export class AgentsController {
     @Body() dto: UpdateAgentDto,
     @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.update(resolveOrganizationId(user, orgQuery), id, dto);
+    return this.agents.update(resolveOrganizationId(user, orgQuery), id, dto, user);
   }
 
   @Post(':id/versions')
@@ -148,6 +148,6 @@ export class AgentsController {
     @Body() dto: ImportAgentDto,
     @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.importAgent(resolveOrganizationId(user, orgQuery), dto, user.sub);
+    return this.agents.importAgent(resolveOrganizationId(user, orgQuery), dto, user.sub, user);
   }
 }

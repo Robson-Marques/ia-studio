@@ -4,10 +4,13 @@
 // is_active=false.
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { PERMISSIONS } from '../../../shared/permissions.constants';
+import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { AiAgent, Prisma } from '@prisma/client';
 import { AgentsRepository } from './agents.repository';
 import { LimitsService } from '../../licensing/limits.service';
@@ -68,10 +71,42 @@ export class AgentsService {
     return this.findById(organizationId, id).then(() => this.repository.listRuns(id, 50));
   }
 
+  // ─── Anti-escalada de ações da IA ───────────────────
+
+  /**
+   * Trava de concessão de poder à IA: marcar uma ferramenta que GRAVA dados
+   * (`requires_approval` no catálogo) num assistente exige a permissão
+   * `ai.agents.actions`. Sem ela, o operador só concede ferramentas de leitura.
+   * Platform admin (bypass ['*']) e quem tem a perm passam. Ninguém eleva o
+   * poder da IA além do próprio. (No runtime, a ação ainda passa por aprovação.)
+   */
+  private async assertActionGrant(
+    organizationId: string,
+    allowedTools: string[] | undefined,
+    actor?: AuthenticatedUser,
+  ): Promise<void> {
+    if (!allowedTools || allowedTools.length === 0) return;
+    const perms = actor?.permissions ?? [];
+    const canGrant = actor?.is_platform_admin || perms.includes('*') || perms.includes(PERMISSIONS.AI_AGENTS_ACTIONS);
+    if (canGrant) return;
+
+    const writeTools = await this.prisma.aiTool.findMany({
+      where: { organization_id: organizationId, key: { in: allowedTools }, requires_approval: true },
+      select: { name: true },
+    });
+    if (writeTools.length > 0) {
+      const nomes = writeTools.map((t) => `"${t.name}"`).join(', ');
+      throw new ForbiddenException(
+        `Você não tem permissão para conceder ações que gravam dados (${nomes}). Peça a um administrador a permissão "Conceder à IA ações que gravam dados", ou marque apenas habilidades de consulta.`,
+      );
+    }
+  }
+
   // ─── CRUD ───────────────────────────────────────────
 
-  async create(organizationId: string, dto: CreateAgentDto, createdBy: string | null) {
+  async create(organizationId: string, dto: CreateAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
     await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
+    await this.assertActionGrant(organizationId, dto.allowed_tools, actor);
     const count = await this.repository.countByOrg(organizationId);
     await this.limits.assertCountWithin(organizationId, 'ai_agents', count);
 
@@ -109,8 +144,12 @@ export class AgentsService {
     return agent;
   }
 
-  async update(organizationId: string, id: string, dto: UpdateAgentDto) {
+  async update(organizationId: string, id: string, dto: UpdateAgentDto, actor?: AuthenticatedUser) {
     const before = await this.findById(organizationId, id);
+    // Só valida quando o próprio update mexe em allowed_tools.
+    if (dto.allowed_tools !== undefined) {
+      await this.assertActionGrant(organizationId, dto.allowed_tools, actor);
+    }
     const data: Prisma.AiAgentUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description;
@@ -198,7 +237,7 @@ export class AgentsService {
     };
   }
 
-  async importAgent(organizationId: string, dto: ImportAgentDto, createdBy: string | null) {
+  async importAgent(organizationId: string, dto: ImportAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
     const data = dto.data as {
       kind?: string;
       schema_version?: number;
@@ -228,7 +267,7 @@ export class AgentsService {
       memory_profile_ids: [],
       guardrails: this.asObject(snap['guardrails']),
     };
-    const agent = await this.create(organizationId, createDto, createdBy);
+    const agent = await this.create(organizationId, createDto, createdBy, actor);
     await this.audit.record({
       action: 'ai.agent.import',
       entityType: 'AiAgent',

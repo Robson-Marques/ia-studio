@@ -46,6 +46,8 @@ const EMPTY = {
 export default function AgentEditorModal({ open, onClose, agent, onSaved, canWrite, workspaceId, environmentId }) {
   const { can } = usePermissions();
   const canExecute = can('ai.agents.execute');
+  // Conceder ferramentas que gravam dados exige permissão (anti-escalada).
+  const canActions = can('ai.agents.actions');
   const isEdit = !!agent?.id;
   const [savedId, setSavedId] = useState(agent?.id || null);
   const [tab, setTab] = useState('visao');
@@ -375,12 +377,18 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
           <p className="text-xs mb-2" style={{ color: 'var(--ap-text-4)' }}>
             Marque as habilidades do assistente. As marcadas com <Badge variant="yellow">grava dados</Badge> mudam ou registram algo.
           </p>
+          {!canActions && (
+            <p className="text-xs mb-2 rounded-lg p-2" style={{ background: 'var(--ap-surface-2)', border: '1px solid var(--ap-border)', color: 'var(--ap-text-3)' }}>
+              Você só pode marcar habilidades de <strong>consulta</strong>. As que <em>gravam dados</em> exigem a permissão “Conceder à IA ações que gravam dados”.
+            </p>
+          )}
           <MultiSelectList
             items={tools}
             selected={form.allowed_tools}
             onToggle={(id) => toggleIn('allowed_tools', id)}
             getId={(t) => t.key}
             renderTitle={(t) => t.name}
+            isDisabled={(t) => t.requires_approval && !canActions && !form.allowed_tools.includes(t.key)}
             renderSub={(t) => (
               <>
                 {t.requires_approval && <Badge variant="yellow">grava dados</Badge>}
@@ -557,7 +565,7 @@ function TestTab({ agentId, canExecute }) {
   );
 }
 
-function MultiSelectList({ items, selected, onToggle, getId, renderTitle, renderSub, empty }) {
+function MultiSelectList({ items, selected, onToggle, getId, renderTitle, renderSub, empty, isDisabled }) {
   const set = useMemo(() => new Set(selected || []), [selected]);
   if (!items.length) return <p className="text-xs py-4 text-center" style={{ color: 'var(--ap-text-4)' }}>{empty}</p>;
   return (
@@ -565,15 +573,18 @@ function MultiSelectList({ items, selected, onToggle, getId, renderTitle, render
       {items.map((it) => {
         const id = getId(it);
         const on = set.has(id);
+        const disabled = isDisabled ? isDisabled(it) : false;
         return (
           <button
             key={id}
             type="button"
-            onClick={() => onToggle(id)}
-            className="w-full text-left rounded-lg p-2.5 flex items-center gap-2.5 transition-colors hover:bg-brand/5"
+            disabled={disabled}
+            onClick={() => !disabled && onToggle(id)}
+            className="w-full text-left rounded-lg p-2.5 flex items-center gap-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-brand/5"
             style={{ border: `1px solid ${on ? 'var(--ap-accent, #6366f1)' : 'var(--ap-border)'}` }}
+            title={disabled ? 'Requer a permissão “Conceder à IA ações que gravam dados”.' : undefined}
           >
-            <input type="checkbox" readOnly checked={on} className="w-4 h-4 accent-current shrink-0" />
+            <input type="checkbox" readOnly checked={on} disabled={disabled} className="w-4 h-4 accent-current shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{renderTitle(it)}</p>
               <p className="text-[11px] flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--ap-text-4)' }}>{renderSub(it)}</p>

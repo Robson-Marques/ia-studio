@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.18 - 2026-07-09 (anti-escalada nas ações da IA)
+
+- **Trava anti-escalada nas ferramentas que gravam dados (fatia 3).** Marcar uma habilidade **"grava dados"** (`abrir_os`, `desbloqueio_confianca` — as `requires_approval`) num assistente passou a exigir a nova permissão `ai.agents.actions` ("Conceder à IA ações que gravam dados"). Sem ela, o operador só concede habilidades de **consulta** — no backend (rejeita no save de create/update/import, `ForbiddenException` com mensagem clara) **e** no front (checkbox desabilitado com o motivo). Ninguém eleva o poder da IA além do próprio. No runtime, a ação ainda passa por aprovação humana (`requires_approval`) — são duas travas em série.
+- **Descoberta honesta:** `AiAgent.action_permissions` (campo herdado do conceito do Aquapark) **nunca foi lido em execução** no IA Studio — construir só a UI dele seria decorativo. Em vez disso, a lógica "operador autoriza o que a IA pode, sem conceder além do próprio poder" foi aplicada onde o IA Studio de fato controla: o grant das ferramentas. Perm nova seguiu os 5 passos do ACL (constante + grupo IA + label + Administrador herda via `ALL_PERMISSIONS`; fora dos demais perfis por ser opt-in).
+
 ## v0.9.17 - 2026-07-09 (exemplo já nasce quebrado em passos)
 
 - **Assistente-exemplo ISP já nasce quebrado em passos.** O exemplo passou a ser semeado com o `roteiro` estruturado (objetivo + 3 passos + 3 situações), não mais com prompt cru — ao abrir "O que faz" você vê a lógica em caixinhas, sem precisar quebrar à mão. Backfill único no seed preenche o roteiro do exemplo já criado por versão anterior (só se estiver vazio — nunca sobrescreve edição sua).

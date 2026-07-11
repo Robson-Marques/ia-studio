@@ -79,6 +79,9 @@ export const PERMISSIONS = {
   AI_AGENTS_WRITE: 'ai.agents.write',
   AI_AGENTS_PUBLISH: 'ai.agents.publish',
   AI_AGENTS_EXECUTE: 'ai.agents.execute',
+  // Conceder à IA ferramentas que GRAVAM dados (abrir OS, desbloquear...).
+  // Anti-escalada: só quem tem esta perm marca uma ferramenta "grava dados".
+  AI_AGENTS_ACTIONS: 'ai.agents.actions',
   AI_KNOWLEDGE_READ: 'ai.knowledge.read',
   AI_KNOWLEDGE_WRITE: 'ai.knowledge.write',
   AI_MEMORY_READ: 'ai.memory.read',
@@ -223,6 +226,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       PERMISSIONS.AI_AGENTS_WRITE,
       PERMISSIONS.AI_AGENTS_PUBLISH,
       PERMISSIONS.AI_AGENTS_EXECUTE,
+      PERMISSIONS.AI_AGENTS_ACTIONS,
       PERMISSIONS.AI_KNOWLEDGE_READ,
       PERMISSIONS.AI_KNOWLEDGE_WRITE,
       PERMISSIONS.AI_MEMORY_READ,
@@ -330,6 +334,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.AI_AGENTS_WRITE]: 'Criar/editar agentes de IA',
   [PERMISSIONS.AI_AGENTS_PUBLISH]: 'Publicar/reverter versões de agente',
   [PERMISSIONS.AI_AGENTS_EXECUTE]: 'Executar/testar agentes de IA',
+  [PERMISSIONS.AI_AGENTS_ACTIONS]: 'Conceder à IA ações que gravam dados',
   [PERMISSIONS.AI_KNOWLEDGE_READ]: 'Ver bases de conhecimento',
   [PERMISSIONS.AI_KNOWLEDGE_WRITE]: 'Criar/editar bases de conhecimento',
   [PERMISSIONS.AI_MEMORY_READ]: 'Ver memória dos agentes',
