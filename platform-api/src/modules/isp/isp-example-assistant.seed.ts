@@ -8,7 +8,7 @@
 // por enquanto; a Frente B a tornara estrutural (coluna identification + gate).
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { IspExampleRepository } from './isp-example.repository';
+import { IspExampleRepository, AUTOREPLY_WF_NAME } from './isp-example.repository';
 
 const AGENT_NAME = 'Atendimento (exemplo ISP)';
 
@@ -79,20 +79,38 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
 
       for (const [organizationId, scope] of byOrg) {
         const existing = await this.repository.agentExists(organizationId, AGENT_NAME);
+        let agentId: string | null = existing?.id ?? null;
+
         if (await this.repository.wasSeeded(organizationId)) {
           // Já semeado: backfill único do roteiro estruturado no exemplo criado
           // por uma versão anterior (que nascia só com system_prompt).
           if (existing) await this.repository.backfillRoteiro(existing.id, ROTEIRO);
-          continue;
-        }
-        if (existing) {
+        } else if (existing) {
           await this.repository.backfillRoteiro(existing.id, ROTEIRO);
           await this.repository.markSeeded(organizationId);
-          continue;
+        } else {
+          agentId = await this.createExample(organizationId, scope);
+          await this.repository.markSeeded(organizationId);
+          this.logger.log(`Assistente-exemplo ISP criado na organização ${organizationId}.`);
         }
-        await this.createExample(organizationId, scope);
-        await this.repository.markSeeded(organizationId);
-        this.logger.log(`Assistente-exemplo ISP criado na organização ${organizationId}.`);
+
+        // Fluxo-companheiro "IA responde no WhatsApp" (DRAFT, inerte). Só nasce
+        // se há um assistente pra apontar e nunca foi semeado antes (não
+        // ressuscita se o usuário apagou o fluxo).
+        if (agentId && !(await this.repository.autoreplyWasSeeded(organizationId))) {
+          const wf = await this.repository.autoreplyWorkflowExists(organizationId, AUTOREPLY_WF_NAME);
+          if (!wf) {
+            await this.repository.createAutoreplyWorkflow({
+              organizationId,
+              workspaceId: scope.workspace_id,
+              environmentId: scope.environment_id,
+              name: AUTOREPLY_WF_NAME,
+              agentId,
+            });
+            this.logger.log(`Fluxo "IA responde no WhatsApp" (exemplo) criado na organização ${organizationId}.`);
+          }
+          await this.repository.markAutoreplySeeded(organizationId);
+        }
       }
     } catch (e) {
       // Seed nunca derruba o boot.
@@ -103,7 +121,7 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
   private async createExample(
     organizationId: string,
     scope: { workspace_id: string; environment_id: string },
-  ): Promise<void> {
+  ): Promise<string> {
     const connectionId = await this.repository.singleAiConnection(organizationId);
     const persona = {
       tone: 'cordial, objetivo e paciente',
@@ -119,7 +137,7 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
       ],
     };
 
-    await this.repository.createAgent({
+    const agent = await this.repository.createAgent({
       organization_id: organizationId,
       workspace_id: scope.workspace_id,
       environment_id: scope.environment_id,
@@ -137,5 +155,6 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
       is_active: true,
       created_by: 'seed:isp-exemplo',
     });
+    return agent.id;
   }
 }

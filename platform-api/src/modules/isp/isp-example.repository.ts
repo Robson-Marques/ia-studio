@@ -8,6 +8,41 @@ import { PrismaService } from '../../shared/prisma/prisma.service';
 import { ISP_ERP_PROVIDER_KEYS } from './isp.constants';
 
 const SEED_FLAG_KEY = 'isp_example_assistant_seeded';
+const AUTOREPLY_FLAG_KEY = 'isp_example_autoreply_seeded';
+
+// Nome do fluxo de exemplo "IA responde no WhatsApp".
+export const AUTOREPLY_WF_NAME = 'IA responde no WhatsApp (exemplo)';
+
+// Grafo do fluxo: gatilho de mensagem recebida → condição "ninguém humano
+// atendendo" (handler_type != USER) → assistente responde → enviar WhatsApp
+// (texto = saída do assistente). O gate humano é DADO no evento — o executor
+// segue genérico. Resposta é texto livre (o gatilho É um inbound → janela 24h
+// aberta; template HSM não é necessário aqui).
+function buildAutoreplyGraph(agentId: string) {
+  return {
+    nodes: [
+      { id: 'trigger', type: 'TRIGGER_EVENT', name: 'Nova mensagem de WhatsApp', config: { event: 'whatsapp.inbound.message' } },
+      { id: 'guard', type: 'CONDITION', name: 'Ninguém humano atendendo?', config: { left: '{{input.handler_type}}', op: '!=', right: 'USER' } },
+      {
+        id: 'assistente',
+        type: 'AGENT',
+        name: 'Assistente responde',
+        config: {
+          agent_id: agentId,
+          input: 'Mensagem recebida de {{input.contact_name}} ({{input.phone}}): "{{input.content}}". Responda o cliente de forma útil, cordial e objetiva.',
+          scope_contact: '{{input.phone}}',
+          scope_session: '{{input.chat_id}}',
+        },
+      },
+      { id: 'enviar', type: 'WHATSAPP_SEND', name: 'Enviar resposta', config: { phone: '{{input.phone}}', text: '{{vars.assistente.output}}' } },
+    ],
+    edges: [
+      { from: 'trigger', to: 'guard' },
+      { from: 'guard', to: 'assistente', when: 'true' },
+      { from: 'assistente', to: 'enviar' },
+    ],
+  };
+}
 
 @Injectable()
 export class IspExampleRepository {
@@ -86,6 +121,68 @@ export class IspExampleRepository {
   markSeeded(organizationId: string) {
     return this.prisma.systemSetting.create({
       data: { organization_id: organizationId, key: SEED_FLAG_KEY, value: true as unknown as Prisma.InputJsonValue },
+    });
+  }
+
+  // ─── Fluxo de exemplo "IA responde no WhatsApp" ─────────────────────────
+
+  autoreplyWorkflowExists(organizationId: string, name: string) {
+    return this.prisma.workflow.findFirst({
+      where: { organization_id: organizationId, name },
+      select: { id: true },
+    });
+  }
+
+  /** Já semeei o fluxo de autoresposta nesta org? (não ressuscita se apagado). */
+  async autoreplyWasSeeded(organizationId: string): Promise<boolean> {
+    const row = await this.prisma.systemSetting.findFirst({
+      where: { organization_id: organizationId, key: AUTOREPLY_FLAG_KEY },
+      select: { id: true },
+    });
+    return !!row;
+  }
+
+  markAutoreplySeeded(organizationId: string) {
+    return this.prisma.systemSetting.create({
+      data: { organization_id: organizationId, key: AUTOREPLY_FLAG_KEY, value: true as unknown as Prisma.InputJsonValue },
+    });
+  }
+
+  /** Cria o fluxo "IA responde no WhatsApp" — DRAFT (inerte até o toggle ligar).
+   *  Versão 1 carrega o grafo (canvas) + o gatilho de evento (dispatcher). */
+  async createAutoreplyWorkflow(input: {
+    organizationId: string;
+    workspaceId: string;
+    environmentId: string;
+    name: string;
+    agentId: string;
+  }): Promise<void> {
+    const graph = buildAutoreplyGraph(input.agentId);
+    const trigger = { type: 'event', event: 'whatsapp.inbound.message' };
+    await this.prisma.workflow.create({
+      data: {
+        organization_id: input.organizationId,
+        workspace_id: input.workspaceId,
+        environment_id: input.environmentId,
+        name: input.name,
+        description:
+          'Fluxo de exemplo: quando um cliente manda mensagem no WhatsApp e nenhum humano está atendendo, o assistente de IA responde. Nasce DESLIGADO — ligue em WhatsApp → Atendimento por IA.',
+        status: 'DRAFT',
+        // Tag estável pra o toggle "Atendimento por IA" achar o fluxo sem depender
+        // do nome (o usuário pode renomear).
+        tags: ['ia-whatsapp'],
+        current_version: 1,
+        created_by: 'seed:isp-exemplo',
+        versions: {
+          create: {
+            version: 1,
+            graph: graph as unknown as Prisma.InputJsonValue,
+            trigger: trigger as unknown as Prisma.InputJsonValue,
+            note: 'Fluxo de exemplo semeado.',
+            created_by: 'seed:isp-exemplo',
+          },
+        },
+      },
     });
   }
 }

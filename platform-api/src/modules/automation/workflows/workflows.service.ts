@@ -241,6 +241,26 @@ export class WorkflowsService {
     return { ...updated, warnings: this.collectWarnings(graph) };
   }
 
+  /** Despublicar: volta a DRAFT (para os gatilhos) MAS mantém o fluxo visível e
+   *  editável — diferente de arquivar (que some das listas). É o "desligar" do
+   *  toggle de autoresposta. No-op se já não está publicado. */
+  async unpublish(organizationId: string, id: string, actorId: string | null) {
+    const workflow = await this.findById(organizationId, id);
+    if (workflow.status !== 'PUBLISHED') return workflow;
+    const updated = await this.repository.update(id, { status: 'DRAFT' });
+    await this.scheduler.disableSchedule(id).catch(() => undefined);
+    await this.audit.record({
+      action: 'automation.workflow.unpublish',
+      entityType: 'Workflow',
+      entityId: id,
+      organizationId,
+      oldValue: { status: workflow.status },
+      newValue: { status: 'DRAFT' },
+    });
+    this.logger.log(`Workflow ${id} despublicado (DRAFT) por ${actorId ?? 'sistema'}.`);
+    return updated;
+  }
+
   async rotateWebhookToken(organizationId: string, id: string) {
     await this.findById(organizationId, id);
     const updated = await this.repository.update(id, { webhook_token: this.generateWebhookToken() });

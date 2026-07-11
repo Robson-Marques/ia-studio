@@ -53,6 +53,7 @@ const NAV = [
         label: 'Conversas', icon: MessageCircle, path: '/whatsapp/conversas',
         perm: ['comm.whatsapp.view.assigned', 'comm.whatsapp.view.unassigned', 'comm.whatsapp.view.team', 'comm.whatsapp.view.all'],
       },
+      { label: 'Atendimento por IA', icon: Bot,      path: '/whatsapp/atendimento-ia', perm: 'automation.workflows.read' },
       { label: 'Templates',       icon: FileText,    path: '/whatsapp/templates', perm: 'comm.whatsapp.templates.read' },
       { label: 'Equipes e Filas', icon: ListOrdered, path: '/whatsapp/equipes',   perm: 'comm.whatsapp.teams.read' },
       { label: 'Números',         icon: Phone,       path: '/whatsapp/numeros',   perm: 'comm.whatsapp.numbers.read' },

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   RefreshCw, DatabaseBackup, Package, Download, Loader2, Upload, Trash2,
   RotateCcw, Unlock, AlertTriangle, Archive, CheckCircle2, XCircle,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, History,
 } from 'lucide-react';
 import Tabs from '../components/ui/Tabs';
 import StatCard from '../components/ui/StatCard';
@@ -13,7 +13,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { formatDateTime } from '../lib/format';
 import { toast } from '../lib/toast';
 import {
-  getVersion, startUpgrade, getCurrentUpgrade, releaseUpgradeLock,
+  getVersion, startUpgrade, getCurrentUpgrade, releaseUpgradeLock, getUpgradeHistory,
   listBackups, createBackup, getCurrentBackupOp, downloadBackup, uploadBackup,
   deleteBackup, restoreBackup,
 } from '../services/system';
@@ -54,6 +54,8 @@ function TabAtualizacao() {
   const [confirmTag, setConfirmTag] = useState(null);
   const [acting, setActing] = useState(false);
   const [releasing, setReleasing] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const logRef = useRef(null);
   const prevStatusRef = useRef(null);
@@ -66,11 +68,13 @@ function TabAtualizacao() {
   const loadAll = useCallback(async (silent = false, force = false) => {
     if (!silent) setLoading(true);
     try {
-      const [v, cur] = await Promise.all([
+      const [v, cur, hist] = await Promise.all([
         getVersion(force).catch(() => null),
         getCurrentUpgrade().catch(() => null),
+        getUpgradeHistory().catch(() => null),
       ]);
       if (v) setVersion(v);
+      if (Array.isArray(hist)) setHistory(hist);
       if (cur !== undefined) {
         const prev = prevStatusRef.current;
         const status = cur?.status || null;
@@ -232,12 +236,6 @@ function TabAtualizacao() {
         </div>
       ) : null}
 
-      {/* TERMINADO (não rodando): card calmo de resumo — SUCCESS verde / FAILED
-          vermelho — visualmente distinto do console ao vivo (padrão Aquapark). */}
-      {current && !running && (current.status === 'SUCCESS' || current.status === 'FAILED') && (
-        <LastUpgradeCard upgrade={current} />
-      )}
-
       {/* Aviso: o servidor não conseguiu falar com o repositório remoto */}
       {version.remote_synced === false && (
         <div
@@ -255,48 +253,97 @@ function TabAtualizacao() {
         </div>
       )}
 
-      {/* Lista de versões disponíveis */}
-      <div>
-        <div className="flex items-center justify-between mb-2 gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-4)' }}>
-            Versões disponíveis (mais recentes que a atual)
-          </p>
-          <button
-            className="btn-secondary !py-1 !px-2.5 text-xs disabled:opacity-60"
-            onClick={handleCheckNow}
-            disabled={checking || running}
-            title="Consulta o repositório agora (ignora o cache de 5 minutos)"
-          >
-            {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Verificar agora
-          </button>
-        </div>
-        {!newer.length ? (
-          <EmptyState icon={RefreshCw} title="Instância atualizada" description="Não há versões mais recentes que a atual." />
-        ) : (
-          <div className="space-y-2">
-            {newer.map((tag) => (
-              <div
-                key={tag}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg"
-                style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border-sub)' }}
-              >
-                <Package size={16} className="text-brand shrink-0" />
-                <span className="text-sm font-medium flex-1 min-w-0 truncate" style={{ color: 'var(--ap-text-1)' }}>{tag}</span>
-                {can('system.upgrade') && (
-                  <button
-                    className="btn-primary shrink-0 disabled:opacity-50"
-                    onClick={() => setConfirmTag(tag)}
-                    disabled={running}
-                    title={running ? 'Aguarde a atualização em curso' : `Atualizar a instância para ${tag}`}
-                  >
-                    <RefreshCw size={14} /> Atualizar
-                  </button>
-                )}
-              </div>
-            ))}
+      {/* 2 colunas (padrão Aquapark): Versões disponíveis | Último upgrade —
+          lado a lado reduz a sobrecarga vertical. Some durante a execução:
+          enquanto roda, só o console ao vivo acima aparece. */}
+      {!running && (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        {/* Coluna 1: Versões disponíveis */}
+        <div className="rounded-lg p-4" style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface)' }}>
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-4)' }}>
+              Versões disponíveis
+            </p>
+            <button
+              className="btn-secondary !py-1 !px-2.5 text-xs disabled:opacity-60"
+              onClick={handleCheckNow}
+              disabled={checking || running}
+              title="Consulta o repositório agora (ignora o cache de 5 minutos)"
+            >
+              {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Verificar agora
+            </button>
           </div>
+          {!newer.length ? (
+            <EmptyState icon={RefreshCw} title="Instância atualizada" description="Não há versões mais recentes que a atual." />
+          ) : (
+            <div className="space-y-2">
+              {newer.map((tag) => (
+                <div
+                  key={tag}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg"
+                  style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border-sub)' }}
+                >
+                  <Package size={16} className="text-brand shrink-0" />
+                  <span className="text-sm font-medium flex-1 min-w-0 truncate" style={{ color: 'var(--ap-text-1)' }}>{tag}</span>
+                  {can('system.upgrade') && (
+                    <button
+                      className="btn-primary shrink-0 disabled:opacity-50"
+                      onClick={() => setConfirmTag(tag)}
+                      disabled={running}
+                      title={running ? 'Aguarde a atualização em curso' : `Atualizar a instância para ${tag}`}
+                    >
+                      <RefreshCw size={14} /> Atualizar
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Coluna 2: Último upgrade (só quando terminado e não rodando) */}
+        {current && !running && (current.status === 'SUCCESS' || current.status === 'FAILED') && (
+          <LastUpgradeCard upgrade={current} />
         )}
       </div>
+      )}
+
+      {/* Histórico colapsável (padrão Aquapark) */}
+      {history.length > 0 && (
+        <div className="rounded-lg" style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface)' }}>
+          <button
+            onClick={() => setHistoryOpen((o) => !o)}
+            className="w-full flex items-center gap-2 p-4 text-left"
+          >
+            {historyOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <History size={15} style={{ color: 'var(--ap-text-4)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--ap-text-1)' }}>
+              Histórico de atualizações ({history.length})
+            </span>
+          </button>
+          {historyOpen && (
+            <div className="border-t" style={{ borderColor: 'var(--ap-border)' }}>
+              {history.map((h) => (
+                <div
+                  key={h.id}
+                  className="flex items-center justify-between gap-3 px-4 py-3 border-t first:border-t-0"
+                  style={{ borderColor: 'var(--ap-border-sub)' }}
+                >
+                  <div className="min-w-0">
+                    <span className="text-sm font-mono" style={{ color: 'var(--ap-text-1)' }}>
+                      {h.from_version ? `${h.from_version} → ` : ''}{h.to_version}
+                    </span>
+                    <span className="text-xs ml-2" style={{ color: 'var(--ap-text-4)' }}>
+                      {formatDateTime(h.started_at)}
+                    </span>
+                  </div>
+                  <UpgradeStatusBadge status={h.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <ConfirmDialog
         open={Boolean(confirmTag)}

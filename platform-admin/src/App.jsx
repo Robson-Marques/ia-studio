@@ -22,6 +22,7 @@ import Conversas from './pages/WhatsApp/Conversas';
 import Templates from './pages/WhatsApp/Templates';
 import EquipesFilas from './pages/WhatsApp/EquipesFilas';
 import Numeros from './pages/WhatsApp/Numeros';
+import AtendimentoIA from './pages/WhatsApp/AtendimentoIA';
 import Fluxos from './pages/Automacao/Fluxos';
 import FluxoEditor from './pages/Automacao/FluxoEditor';
 import FluxoCanvas from './pages/Automacao/FluxoCanvas';
@@ -82,6 +83,7 @@ export default function App() {
                 <Route path="/whatsapp/templates" element={<PermissionRoute perm="comm.whatsapp.templates.read"><Templates /></PermissionRoute>} />
                 <Route path="/whatsapp/equipes" element={<PermissionRoute perm="comm.whatsapp.teams.read"><EquipesFilas /></PermissionRoute>} />
                 <Route path="/whatsapp/numeros" element={<PermissionRoute perm="comm.whatsapp.numbers.read"><Numeros /></PermissionRoute>} />
+                <Route path="/whatsapp/atendimento-ia" element={<PermissionRoute perm="automation.workflows.read"><AtendimentoIA /></PermissionRoute>} />
                 <Route path="/automacao/fluxos" element={<PermissionRoute perm="automation.workflows.read"><Fluxos /></PermissionRoute>} />
                 <Route path="/automacao/fluxos/:id" element={<PermissionRoute perm="automation.workflows.read"><FluxoCanvas /></PermissionRoute>} />
                 <Route path="/automacao/fluxos/:id/lista" element={<PermissionRoute perm="automation.workflows.read"><FluxoEditor /></PermissionRoute>} />

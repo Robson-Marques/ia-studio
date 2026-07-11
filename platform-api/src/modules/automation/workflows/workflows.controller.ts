@@ -118,6 +118,18 @@ export class WorkflowsController {
     return this.workflows.archive(resolveOrganizationId(user, orgQuery), id);
   }
 
+  /** Despublicar: volta a DRAFT (para os gatilhos) mantendo o fluxo visível.
+   *  É o "desligar" do toggle de autoresposta. */
+  @Post(':id/unpublish')
+  @RequirePermissions(PERMISSIONS.AUTOMATION_WORKFLOWS_PUBLISH)
+  unpublish(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.workflows.unpublish(resolveOrganizationId(user, orgQuery), id, user.sub);
+  }
+
   /** Exclusão definitiva (arquivar guarda; excluir remove de vez). */
   @Delete(':id')
   @RequirePermissions(PERMISSIONS.AUTOMATION_WORKFLOWS_WRITE)

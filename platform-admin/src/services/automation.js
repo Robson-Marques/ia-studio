@@ -66,6 +66,13 @@ export async function publishWorkflow(id, version) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao publicar versão')); }
 }
 
+export async function unpublishWorkflow(id) {
+  try {
+    const { data } = await api.post(`/automation/workflows/${id}/unpublish`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao desligar o fluxo')); }
+}
+
 export async function executeWorkflow(id, body) {
   try {
     const { data } = await api.post(`/automation/workflows/${id}/execute`, body);

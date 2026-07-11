@@ -1,11 +1,23 @@
 # Changelog — IA Studio
 
+## v0.9.28 - 2026-07-11 (a IA responde no WhatsApp — fluxo + toggle)
+
+Frente nova: o assistente de IA responde as mensagens do WhatsApp automaticamente. Porta a *lógica* do SDR do Aquapark num formato declarativo (o fluxo fica visível no canvas), sem clonar o SDR gigante. Sem mudança de schema (não precisa `db push`).
+
+- **Fluxo semeado "IA responde no WhatsApp (exemplo)"** (por organização, junto do assistente-exemplo ISP): gatilho *mensagem recebida* → condição *ninguém humano atendendo* → **assistente responde** → **enviar WhatsApp** (texto = resposta do assistente). Nasce **DRAFT/desligado** e não ressuscita se apagado (marcador em `system_settings`). Marcado com a tag `ia-whatsapp`.
+- **Gate humano como DADO:** o evento `whatsapp.inbound.message` passou a carregar `handler_type` (quem atende) e `contact_name`. A condição do fluxo (`{{input.handler_type}} != USER`) evita responder por cima de um atendente — o executor segue genérico (não conhece atendimento).
+- **Toggle "Atendimento por IA"** (WhatsApp → Atendimento por IA): liga = publica o fluxo / desliga = despublica (novo `unpublish` no workflows service/controller, volta a DRAFT mantendo o fluxo visível — diferente de arquivar). Interruptor em linguagem do usuário, com confirmação ao ligar (os 5 patrasques) e explicação de quando a IA responde.
+- **Decisões por regra:** nasce **OFF** (regra "todo automatismo nasce OFF" + IA agindo é alto risco — o Aquapark é ON, aqui é opt-in consciente); resposta em **texto livre** (o gatilho é um inbound → janela de 24h aberta, sem template HSM); usa o **nó de envio** (envia como sistema, sem pausa de aprovação) em vez da tool interna do agente.
+- Novo item de menu + rota + breadcrumb `/whatsapp/atendimento-ia`; front acha o fluxo pela tag e publica/despublica.
+
 ## v0.9.27 - 2026-07-11 (painel de Atualização com o VISUAL do Aquapark: 2 modos)
 
 - **Portado o visual do Aquapark (não só a lógica).** Robson apontou certo: a lógica veio de lá, o visual tinha que vir junto — eu tinha reusado uma caixa de log única pra tudo, então um upgrade **histórico** que falhou parecia um **alarme atual**. Agora são dois modos distintos, como no Aquapark:
   - **Enquanto roda:** caixa escura de console com o log ao vivo + "em execução…".
   - **Terminado (não rodando):** card calmo **"Último upgrade: vX → vY"** — ícone verde (SUCCESS) ou vermelho (FAILED), status, iniciado/concluído; se falhou, uma faixa vermelha discreta com a etapa. **Não** é mais a mesma caixa grande e alarmante.
 - **Elemento novo (adição, não mudança de lógica):** dentro do card de resultado, um expander **"Ver log completo"** — mantém o diagnóstico sem poluir a tela. O service passou a trazer `from_version` e `finished_at` pro card.
+- **Layout em 2 colunas (como o Aquapark):** "Versões disponíveis" e "Último upgrade" ficam **lado a lado** (`xl:grid-cols-2`), cada um em card próprio — em vez de empilhados na vertical, o que reduz a sobrecarga visual. Detalhe pequeno, impacto grande na leitura da tela.
+- **Alinhamento fino ao Aquapark:** durante um upgrade em execução, a grade de versões **some** — fica só o console ao vivo no topo (sem poluir com a lista). E entrou o **Histórico de atualizações** colapsável no rodapé (from → to + data + badge de status), que o painel não tinha.
 
 ## v0.9.26 - 2026-07-11 (upgrade destravado: build da API + painel que PARA e MOSTRA a falha)
 

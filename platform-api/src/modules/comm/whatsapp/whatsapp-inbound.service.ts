@@ -139,6 +139,12 @@ export class WhatsappInboundService {
           phone: from,
           type,
           content,
+          // Nome do contato e quem atende agora (USER = humano no teclado,
+          // BOT = IA, null = ninguém). O fluxo "IA responde no WhatsApp" usa
+          // handler_type numa condição pra NÃO responder por cima de um humano
+          // — mantém o executor genérico (o gate vira dado, não regra de domínio).
+          contact_name: chat.contact_name ?? contactName ?? null,
+          handler_type: chat.current_handler_type ?? null,
         },
       });
     }
