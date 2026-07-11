@@ -50,6 +50,7 @@ A plataforma é totalmente genérica e orientada a integrações. A primeira sol
 - Default de produção de flag técnica mora no código (env só override). Toggle de usuário mora no banco (`system_settings`/FeatureFlag), configurável por UI, viaja no backup.
 
 ## 🎨 UX (painéis)
+- **REGRA MÁXIMA DE UX — linguagem do usuário, nunca do desenvolvedor.** Todo texto de superfície (menu, aba, label, botão, dica, mensagem) fala a língua do dono do negócio, não a do código. "O que o assistente pode fazer", não "allowed_tools"; "Quem é", não "persona JSON"; "Assistentes", não "Agentes/LLM". O usuário descreve o que quer; o sistema traduz para os identificadores técnicos por baixo. Jargão (chaves, modelos, tokens, IDs) fica escondido em "Ajustes avançados" ou fora da tela. Vale para TODA tela nova.
 - Erros/validações SEMPRE via toast (`toast.error/success/warn/info`) — nunca banner inline, nunca `confirm()/alert()/prompt()` nativos.
 - Ações destrutivas: os **5 patrasques** — ConfirmDialog, disclaimer, tooltip, loading state, permission gate.
 - Componentes de `components/ui/` (Modal, Tabs folder/pills, Table+Pagination, FormField, NumericInput, EmptyState, ConfirmDialog, StatCard). Cores via CSS vars `--ap-*` (dark+light). Sem libs de UI alternativas.

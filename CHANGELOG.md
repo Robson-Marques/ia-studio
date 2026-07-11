@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.15 - 2026-07-09 (editor do assistente na língua do usuário)
+
+- **Editor do assistente na língua do usuário (fatia 1).** As oito abas técnicas (Geral/Persona/Prompt/Ferramentas/Conhecimento/Memória/Guardrails/Custos) viraram humanas: **Visão geral** (checklist "pronto para publicar?"), **Quem é**, **O que faz**, **O que sabe**, **O que pode fazer**, **Quem atende**, **Testar**, **Ajustes avançados**. Todo o jargão (conexão, modelo, temperatura, tokens, limites) foi para "Ajustes avançados"; as ferramentas aparecem pelo nome com marca "grava dados" nas de escrita, não mais por `tool.key`. **Só frontend** — nenhuma mudança no salvamento nem no schema. Nova regra máxima no CLAUDE.md: superfície sempre na língua do usuário, nunca do desenvolvedor.
+- Nota de versão deixou de repetir em cada aba — agora aparece uma vez, na Visão geral.
+
 ## v0.9.14 - 2026-07-09 (assistente-exemplo ISP no painel)
 
 - **Assistente "Atendimento (exemplo ISP)" nasce pronto no painel.** Seed idempotente (`isp-example-assistant.seed.ts`) que cria um `AiAgent` real — editável e removível — para você ver a lógica montada. Nasce **só** em organização que já tem uma conexão ISP ativa (Altarede/IXC), no mesmo workspace/ambiente da conexão. Modo **leitura**: `allowed_tools` traz as seis consultas (identificar/contrato/débitos/conexão/região/2ª via) e **não** inclui `abrir_os` nem `desbloqueio_confianca`. O fluxo "pede CPF → confirma nome → atende" vive no `system_prompt` por ora (a Frente B o torna estrutural + com gate). Marca-se como semeado em `system_settings` → **não ressuscita** se você apagar. Vem com modelo `gpt-4o-mini` e a conexão de IA da org (se houver só uma) — a descrição avisa para revisar modelo/conexão antes de usar.

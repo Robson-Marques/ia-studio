@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Settings, Sparkles, Target, Wrench, BookOpen, Brain, ShieldCheck, DollarSign,
-  Play, FlaskConical,
+  Loader2, Settings, Sparkles, Target, Wrench, BookOpen, ClipboardCheck, Users,
+  Play, FlaskConical, Check, Circle,
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import Tabs from '../../../components/ui/Tabs';
@@ -18,38 +18,35 @@ import {
   AGENT_MODELS, PERSONA_TONES, PERSONA_EMOJIS, PERSONA_BREVITY, RUN_STATUS,
 } from '../ia.constants';
 
+// Abas na LÍNGUA DO USUÁRIO (regra máxima de UX do CLAUDE.md): a pessoa descreve
+// o atendente que quer; o jargão (modelo/temperatura/conexão) fica em "Ajustes
+// avançados". Os campos por baixo continuam os mesmos — só a casca mudou.
 const TABS = [
-  { id: 'geral',       label: 'Geral',       Icon: Settings },
-  { id: 'persona',     label: 'Persona',     Icon: Sparkles },
-  { id: 'prompt',      label: 'Prompt & Objetivo', Icon: Target },
-  { id: 'tools',       label: 'Ferramentas', Icon: Wrench },
-  { id: 'knowledge',   label: 'Conhecimento', Icon: BookOpen },
-  { id: 'memory',      label: 'Memória',     Icon: Brain },
-  { id: 'guardrails',  label: 'Aprovações/Guardrails', Icon: ShieldCheck },
-  { id: 'costs',       label: 'Custos',      Icon: DollarSign },
-  { id: 'test',        label: 'Testar',      Icon: FlaskConical },
+  { id: 'visao',      label: 'Visão geral',      Icon: ClipboardCheck },
+  { id: 'quem',       label: 'Quem é',           Icon: Sparkles },
+  { id: 'faz',        label: 'O que faz',        Icon: Target },
+  { id: 'sabe',       label: 'O que sabe',       Icon: BookOpen },
+  { id: 'pode',       label: 'O que pode fazer', Icon: Wrench },
+  { id: 'quematende', label: 'Quem atende',      Icon: Users },
+  { id: 'testar',     label: 'Testar',           Icon: FlaskConical },
+  { id: 'avancado',   label: 'Ajustes avançados', Icon: Settings },
 ];
 
 const EMPTY = {
   name: '', description: '', connection_id: '', model: '',
   temperature: 0.3, max_steps: 6, max_tokens: null,
   system_prompt: '', goal: '',
-  // persona guiada — emojis_ui é só de UI (mapeia pro boolean emojis no save).
   persona: { name: '', tone: '', emojis: false, emojis_ui: '', brevity: 'medium', rules_always: [], rules_never: [] },
   allowed_tools: [], knowledge_base_ids: [], memory_profile_ids: [], action_permissions: [],
   guardrails: { max_cost_usd_per_run: null, blocked_words: [], pii_redact: false },
 };
 
-// Editor multi-aba do agente. Criar/editar grava a config; "Salvar como versão"
-// publica uma versão nova. Aba "Testar" executa uma run síncrona sem sair do
-// editor (porta da UX do Aquapark). Persona guiada compila no backend
-// (agent-persona.ts): tone/emojis(boolean)/brevity/rules_always/rules_never.
 export default function AgentEditorModal({ open, onClose, agent, onSaved, canWrite, workspaceId, environmentId }) {
   const { can } = usePermissions();
   const canExecute = can('ai.agents.execute');
   const isEdit = !!agent?.id;
   const [savedId, setSavedId] = useState(agent?.id || null);
-  const [tab, setTab] = useState('geral');
+  const [tab, setTab] = useState('visao');
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [saveVersion, setSaveVersion] = useState(true);
@@ -63,7 +60,7 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
 
   useEffect(() => {
     if (!open) return;
-    setTab('geral');
+    setTab('visao');
     setNote('');
     setSaveVersion(true);
     setSavedId(agent?.id || null);
@@ -89,20 +86,26 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
     return { ...prev, [field]: [...set] };
   });
 
-  // Modelos sugeridos pro provider da conexão escolhida (fallback: input livre).
   const providerKey = useMemo(() => {
     const conn = connections.find((c) => c.id === form.connection_id);
     return (conn?.provider_key || '').toLowerCase();
   }, [connections, form.connection_id]);
   const modelSuggestions = AGENT_MODELS[providerKey] || [];
 
+  // Checklist "pronto para publicar?" — derivado do form, sem estado novo.
+  const readiness = useMemo(() => ([
+    { ok: !!form.name.trim(), label: 'Tem nome' },
+    { ok: !!(form.goal.trim() || form.system_prompt.trim()), label: 'Tem objetivo e/ou roteiro' },
+    { ok: form.knowledge_base_ids.length > 0, label: 'Sabe responder (base de conhecimento)', optional: true },
+    { ok: form.allowed_tools.length > 0, label: 'Tem habilidades marcadas' },
+  ]), [form.name, form.goal, form.system_prompt, form.knowledge_base_ids, form.allowed_tools]);
+
   function buildPersona() {
     const p = form.persona || {};
-    // emojis_ui (3 níveis) → boolean que o backend entende.
     const emojis = p.emojis_ui === 'nenhum' ? false
       : (p.emojis_ui === 'moderado' || p.emojis_ui === 'frequente') ? true
       : (p.emojis ?? false);
-    const persona = {
+    return {
       ...(p.name ? { name: p.name } : {}),
       ...(p.tone ? { tone: p.tone } : {}),
       emojis,
@@ -110,12 +113,11 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
       rules_always: p.rules_always || [],
       rules_never: p.rules_never || [],
     };
-    return persona;
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { toast.error('Informe o nome do agente.'); setTab('geral'); return; }
-    if (!form.model.trim()) { toast.error('Informe o modelo (ex.: gpt-4o-mini).'); setTab('geral'); return; }
+    if (!form.name.trim()) { toast.error('Dê um nome ao assistente (aba "Quem é").'); setTab('quem'); return; }
+    if (!form.model.trim()) { toast.error('Escolha o modelo em "Ajustes avançados".'); setTab('avancado'); return; }
     if (!isEdit && (!workspaceId || !environmentId)) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
     setSaving(true);
     try {
@@ -143,12 +145,12 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
         saved = await createAgent({ ...body, workspace_id: workspaceId, environment_id: environmentId });
       }
       const id = saved?.id || savedId;
-      setSavedId(id); // habilita a aba Testar após o 1º save
+      setSavedId(id);
       if (saveVersion && id) {
         const res = await saveAgentVersion(id, { note: note.trim() || undefined });
-        toast.success(`Agente salvo — versão v${res?.version ?? ''} gerada.`);
+        toast.success(`Assistente salvo — versão v${res?.version ?? ''} gerada.`);
       } else {
-        toast.success('Agente salvo.');
+        toast.success('Assistente salvo.');
       }
       onSaved(saved);
     } catch (err) {
@@ -162,7 +164,7 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
     <Modal
       open={open}
       onClose={saving ? undefined : onClose}
-      title={isEdit ? `Editar agente: ${agent?.name}` : 'Novo agente'}
+      title={isEdit ? `Editar assistente: ${agent?.name}` : 'Novo assistente'}
       size="xl"
       dismissable={!saving}
       footer={
@@ -171,7 +173,7 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
             <input type="checkbox" checked={saveVersion} onChange={(e) => setSaveVersion(e.target.checked)} className="w-4 h-4 accent-current" />
             Salvar como nova versão
           </label>
-          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Fechar</button>
           <button className="btn-primary disabled:opacity-60" onClick={() => handleSave()} disabled={saving || !canWrite}>
             {saving && <Loader2 size={14} className="animate-spin" />} Salvar
           </button>
@@ -181,54 +183,48 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
       <Tabs items={TABS} active={tab} onChange={setTab} />
       {loadingRefs && <div className="flex justify-center py-2"><Loader2 size={16} className="animate-spin" /></div>}
 
-      {tab === 'geral' && (
+      {/* ── Visão geral ── */}
+      {tab === 'visao' && (
         <div className="space-y-3">
-          <FormField label="Nome" required>
-            <TextInput value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Ex.: Assistente de atendimento" />
+          <div className="rounded-lg p-4" style={{ background: 'var(--ap-surface-2)', border: '1px solid var(--ap-border)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2.5" style={{ color: 'var(--ap-text-4)' }}>Pronto para publicar?</p>
+            <div className="space-y-1.5">
+              {readiness.map((r) => (
+                <div key={r.label} className="flex items-center gap-2 text-sm" style={{ color: r.ok ? 'var(--ap-text-1)' : 'var(--ap-text-3)' }}>
+                  {r.ok
+                    ? <Check size={15} className="text-emerald-500 shrink-0" />
+                    : <Circle size={13} className="shrink-0" style={{ color: 'var(--ap-text-5)' }} />}
+                  {r.label}
+                  {r.optional && <span className="text-[11px]" style={{ color: 'var(--ap-text-5)' }}>(opcional)</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+            Preencha <strong>Quem é</strong> e <strong>O que faz</strong>, ligue <strong>O que sabe</strong> e <strong>O que pode fazer</strong>, e teste.
+          </p>
+          <FormField label="Nome do assistente" required hint="Nome interno, na sua lista de assistentes.">
+            <TextInput value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Ex.: Atendimento" />
           </FormField>
           <FormField label="Descrição">
-            <Textarea rows={2} value={form.description} onChange={(e) => patch({ description: e.target.value })} />
+            <Textarea rows={2} value={form.description} onChange={(e) => patch({ description: e.target.value })} placeholder="Para que serve este assistente." />
           </FormField>
-          <FormField label="Conexão de IA (provider)" hint="Connection categoria AI. Vazio = orquestrador escolhe por custo/fallback.">
-            <Select value={form.connection_id} onChange={(e) => patch({ connection_id: e.target.value })}>
-              <option value="">— orquestrador (automático) —</option>
-              {connections.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.provider_key})</option>)}
-            </Select>
-          </FormField>
-          <FormField label="Modelo" required hint="Selecione um sugerido ou digite o identificador do modelo.">
-            {modelSuggestions.length > 0 && (
-              <Select
-                value={modelSuggestions.some((m) => m.value === form.model) ? form.model : ''}
-                onChange={(e) => e.target.value && patch({ model: e.target.value })}
-                className="mb-2"
-              >
-                <option value="">— escolher um modelo sugerido —</option>
-                {modelSuggestions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </Select>
-            )}
-            <TextInput value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
-          </FormField>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <FormField label="Temperatura" hint="0 = determinístico; 1 = criativo.">
-              <NumberInput value={form.temperature} onChange={(v) => patch({ temperature: v })} min={0} max={2} step={0.1} />
+          {saveVersion && (
+            <FormField label="Nota da versão" hint="O que mudou nesta edição (aparece no histórico de versões).">
+              <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: ajusta o tom e adiciona a 2ª via de boleto" />
             </FormField>
-            <FormField label="Máx. de passos" hint="Iterações do loop de tool-calling.">
-              <NumberInput value={form.max_steps} onChange={(v) => patch({ max_steps: v })} min={1} max={20} step={1} />
-            </FormField>
-            <FormField label="Máx. tokens (opcional)">
-              <NumberInput value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })} allowEmpty min={1} step={1} />
-            </FormField>
-          </div>
+          )}
         </div>
       )}
 
-      {tab === 'persona' && (
+      {/* ── Quem é (persona) ── */}
+      {tab === 'quem' && (
         <div className="space-y-3">
           <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-            A persona guia o comportamento do agente — o sistema a compila num bloco de instruções.
+            Como o assistente se apresenta e se comporta na conversa.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <FormField label="Nome do agente" hint="Como a IA se apresenta. Vazio = sem nome.">
+            <FormField label="Nome que a IA usa" hint="Como ela se apresenta. Vazio = sem nome.">
               <TextInput value={form.persona.name || ''} onChange={(e) => patchPersona({ name: e.target.value })} placeholder="Ex.: Luan" />
             </FormField>
             <FormField label="Tom de voz">
@@ -247,116 +243,152 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
               </Select>
             </FormField>
           </div>
-          <FormField label="Sempre (uma regra por linha)" hint="Regras que o agente deve sempre seguir.">
-            <Textarea rows={3} value={(form.persona.rules_always || []).join('\n')} onChange={(e) => patchPersona({ rules_always: linesToArr(e.target.value) })} placeholder={'Confirmar o nome do cliente\nOferecer ajuda adicional'} />
+          <FormField label="Sempre (uma regra por linha)" hint="O que o assistente deve sempre fazer.">
+            <Textarea rows={3} value={(form.persona.rules_always || []).join('\n')} onChange={(e) => patchPersona({ rules_always: linesToArr(e.target.value) })} placeholder={'Confirmar o nome do cliente\nResponder em português'} />
           </FormField>
-          <FormField label="Nunca (uma regra por linha)" hint="Regras que o agente nunca deve violar.">
-            <Textarea rows={3} value={(form.persona.rules_never || []).join('\n')} onChange={(e) => patchPersona({ rules_never: linesToArr(e.target.value) })} placeholder={'Prometer prazos sem confirmação\nCompartilhar dados sensíveis'} />
-          </FormField>
-        </div>
-      )}
-
-      {tab === 'prompt' && (
-        <div className="space-y-3">
-          <FormField label="Instruções avançadas (system prompt)" hint="Complementa a Persona. Aceita {{variáveis}}. Pode deixar em branco.">
-            <Textarea rows={6} value={form.system_prompt} onChange={(e) => patch({ system_prompt: e.target.value })} placeholder="Você é um assistente de atendimento da empresa…" />
-          </FormField>
-          <FormField label="Objetivo" hint="Meta que o agente busca atingir na conversa.">
-            <Textarea rows={3} value={form.goal} onChange={(e) => patch({ goal: e.target.value })} placeholder="Resolver a dúvida do cliente ou encaminhar ao setor correto." />
+          <FormField label="Nunca (uma regra por linha)" hint="O que ele nunca deve fazer.">
+            <Textarea rows={3} value={(form.persona.rules_never || []).join('\n')} onChange={(e) => patchPersona({ rules_never: linesToArr(e.target.value) })} placeholder={'Prometer prazos sem confirmação\nInventar valores'} />
           </FormField>
         </div>
       )}
 
-      {tab === 'tools' && (
-        <MultiSelectList
-          items={tools}
-          selected={form.allowed_tools}
-          onToggle={(id) => toggleIn('allowed_tools', id)}
-          getId={(t) => t.key}
-          renderTitle={(t) => t.name}
-          renderSub={(t) => (
-            <>
-              <span className="font-mono">{t.key}</span> · {t.category || 'geral'}
-              {t.builtin && <Badge variant="blue">builtin</Badge>}
-              {t.requires_approval && <Badge variant="yellow">exige aprovação</Badge>}
-              {t.is_active === false && <Badge variant="gray">desligada</Badge>}
-            </>
-          )}
-          empty="Nenhuma ferramenta no catálogo."
-        />
-      )}
-
-      {tab === 'knowledge' && (
-        <MultiSelectList
-          items={bases}
-          selected={form.knowledge_base_ids}
-          onToggle={(id) => toggleIn('knowledge_base_ids', id)}
-          getId={(b) => b.id}
-          renderTitle={(b) => b.name}
-          renderSub={(b) => `${b.embedding_model || 'embeddings'} · ${b.document_count ?? b.documents?.length ?? 0} docs`}
-          empty="Nenhuma base de conhecimento criada."
-        />
-      )}
-
-      {tab === 'memory' && (
-        <MultiSelectList
-          items={profiles}
-          selected={form.memory_profile_ids}
-          onToggle={(id) => toggleIn('memory_profile_ids', id)}
-          getId={(p) => p.id}
-          renderTitle={(p) => p.name}
-          renderSub={(p) => `escopo: ${p.scope}`}
-          empty="Nenhum perfil de memória criado."
-        />
-      )}
-
-      {tab === 'guardrails' && (
+      {/* ── O que faz (objetivo + roteiro) ── */}
+      {tab === 'faz' && (
         <div className="space-y-3">
-          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-            Guardrails limitam o comportamento do agente. Aprovações finas de ações são configuradas em IA → Aprovações (políticas).
+          <FormField label="Objetivo" hint="O que este assistente deve alcançar. Ex.: 'Resolver a dúvida ou encaminhar ao setor certo.'">
+            <Textarea rows={2} value={form.goal} onChange={(e) => patch({ goal: e.target.value })} placeholder="Identificar o cliente e resolver dúvidas de conexão e financeiro." />
+          </FormField>
+          <FormField label="Roteiro e instruções" hint="Descreva como o assistente deve agir. (Em breve: passos e situações em vez de texto corrido.)">
+            <Textarea rows={7} value={form.system_prompt} onChange={(e) => patch({ system_prompt: e.target.value })} placeholder={'1. Peça o CPF do cliente e identifique.\n2. Confirme com a pessoa antes de tratar dos dados.\n3. …'} />
+          </FormField>
+        </div>
+      )}
+
+      {/* ── O que sabe (conhecimento) ── */}
+      {tab === 'sabe' && (
+        <>
+          <p className="text-xs mb-2" style={{ color: 'var(--ap-text-4)' }}>Bases de conhecimento que o assistente consulta para responder.</p>
+          <MultiSelectList
+            items={bases}
+            selected={form.knowledge_base_ids}
+            onToggle={(id) => toggleIn('knowledge_base_ids', id)}
+            getId={(b) => b.id}
+            renderTitle={(b) => b.name}
+            renderSub={(b) => `${b.document_count ?? b.documents?.length ?? 0} documento(s)`}
+            empty="Nenhuma base de conhecimento criada ainda."
+          />
+        </>
+      )}
+
+      {/* ── O que pode fazer (ferramentas) ── */}
+      {tab === 'pode' && (
+        <>
+          <p className="text-xs mb-2" style={{ color: 'var(--ap-text-4)' }}>
+            Marque as habilidades do assistente. As marcadas com <Badge variant="yellow">grava dados</Badge> mudam ou registram algo.
           </p>
-          <FormField label="Custo máximo por execução (US$)" hint="Se ultrapassar, a execução é encerrada com erro. Vazio = sem limite.">
-            <NumberInput value={form.guardrails.max_cost_usd_per_run} onChange={(v) => patchGuard({ max_cost_usd_per_run: v })} allowEmpty min={0} step={0.01} />
-          </FormField>
-          <FormField label="Palavras bloqueadas (uma por linha)" hint="Respostas contendo estes termos são bloqueadas.">
-            <Textarea rows={3} value={(form.guardrails.blocked_words || []).join('\n')} onChange={(e) => patchGuard({ blocked_words: linesToArr(e.target.value) })} />
-          </FormField>
-          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ap-text-2)' }}>
-            <input type="checkbox" checked={form.guardrails.pii_redact} onChange={(e) => patchGuard({ pii_redact: e.target.checked })} className="w-4 h-4 accent-current" />
-            Redigir dados pessoais (PII) nas respostas
-          </label>
-        </div>
+          <MultiSelectList
+            items={tools}
+            selected={form.allowed_tools}
+            onToggle={(id) => toggleIn('allowed_tools', id)}
+            getId={(t) => t.key}
+            renderTitle={(t) => t.name}
+            renderSub={(t) => (
+              <>
+                {t.requires_approval && <Badge variant="yellow">grava dados</Badge>}
+                {t.is_active === false && <Badge variant="gray">desligada</Badge>}
+                <span>{t.category || 'geral'}</span>
+              </>
+            )}
+            empty="Nenhuma habilidade disponível no catálogo."
+          />
+        </>
       )}
 
-      {tab === 'costs' && (
-        <div className="space-y-3">
-          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-            O limite por execução acima também vale como teto de custo. Orçamentos por período (mês) são definidos em IA → Custos.
+      {/* ── Quem atende (roteamento — depende da frente de atendimento) ── */}
+      {tab === 'quematende' && (
+        <div className="rounded-lg p-4 text-sm space-y-2" style={{ background: 'var(--ap-surface-2)', border: '1px solid var(--ap-border)', color: 'var(--ap-text-3)' }}>
+          <p style={{ color: 'var(--ap-text-1)' }} className="font-medium">Quando este assistente atende</p>
+          <p>
+            O atendimento automático pelo WhatsApp (a IA responder sozinha às mensagens que chegam) ainda
+            está sendo montado. Por enquanto, você usa este assistente pela aba <strong>Testar</strong> ou
+            ligando-o num fluxo em <strong>Automações</strong> (gatilho de mensagem recebida → Agente de IA).
           </p>
-          <FormField label="Custo máximo por execução (US$)" hint="Mesmo campo dos guardrails.">
-            <NumberInput value={form.guardrails.max_cost_usd_per_run} onChange={(v) => patchGuard({ max_cost_usd_per_run: v })} allowEmpty min={0} step={0.01} />
-          </FormField>
         </div>
       )}
 
-      {tab === 'test' && (
+      {/* ── Testar ── */}
+      {tab === 'testar' && (
         <TestTab agentId={savedId} canExecute={canExecute} />
       )}
 
-      {saveVersion && tab !== 'test' && (
-        <div className="mt-4 pt-3" style={{ borderTop: '1px solid var(--ap-border)' }}>
-          <FormField label="Nota da versão" hint="O que mudou (aparece no histórico de versões).">
-            <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: ajusta persona e adiciona ferramenta de FAQ" />
+      {/* ── Ajustes avançados (o jargão fica aqui) ── */}
+      {tab === 'avancado' && (
+        <div className="space-y-3">
+          <FormField label="Conexão de IA" hint="Vazio = a plataforma escolhe pelo menor custo.">
+            <Select value={form.connection_id} onChange={(e) => patch({ connection_id: e.target.value })}>
+              <option value="">— automático —</option>
+              {connections.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.provider_key})</option>)}
+            </Select>
           </FormField>
+          <FormField label="Modelo" required hint="Escolha um sugerido ou digite o identificador.">
+            {modelSuggestions.length > 0 && (
+              <Select
+                value={modelSuggestions.some((m) => m.value === form.model) ? form.model : ''}
+                onChange={(e) => e.target.value && patch({ model: e.target.value })}
+                className="mb-2"
+              >
+                <option value="">— escolher um modelo sugerido —</option>
+                {modelSuggestions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </Select>
+            )}
+            <TextInput value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
+          </FormField>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <FormField label="Criatividade" hint="0 = direto ao ponto; 1 = mais criativo.">
+              <NumberInput value={form.temperature} onChange={(v) => patch({ temperature: v })} min={0} max={2} step={0.1} />
+            </FormField>
+            <FormField label="Máx. de passos" hint="Quantas ações a IA encadeia por resposta.">
+              <NumberInput value={form.max_steps} onChange={(v) => patch({ max_steps: v })} min={1} max={20} step={1} />
+            </FormField>
+            <FormField label="Máx. de tokens (opcional)">
+              <NumberInput value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })} allowEmpty min={1} step={1} />
+            </FormField>
+          </div>
+
+          {profiles.length > 0 && (
+            <FormField label="Memória" hint="Perfis de memória que o assistente usa (contato, sessão…).">
+              <MultiSelectList
+                items={profiles}
+                selected={form.memory_profile_ids}
+                onToggle={(id) => toggleIn('memory_profile_ids', id)}
+                getId={(p) => p.id}
+                renderTitle={(p) => p.name}
+                renderSub={(p) => `escopo: ${p.scope}`}
+                empty="Nenhum perfil de memória."
+              />
+            </FormField>
+          )}
+
+          <div className="pt-2" style={{ borderTop: '1px solid var(--ap-border)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2 mt-2" style={{ color: 'var(--ap-text-4)' }}>Limites de segurança</p>
+            <FormField label="Custo máximo por conversa (US$)" hint="Se ultrapassar, a execução para. Vazio = sem limite.">
+              <NumberInput value={form.guardrails.max_cost_usd_per_run} onChange={(v) => patchGuard({ max_cost_usd_per_run: v })} allowEmpty min={0} step={0.01} />
+            </FormField>
+            <FormField label="Palavras bloqueadas (uma por linha)" hint="Respostas com estes termos são bloqueadas.">
+              <Textarea rows={2} value={(form.guardrails.blocked_words || []).join('\n')} onChange={(e) => patchGuard({ blocked_words: linesToArr(e.target.value) })} />
+            </FormField>
+            <label className="flex items-center gap-2 text-sm cursor-pointer mt-1" style={{ color: 'var(--ap-text-2)' }}>
+              <input type="checkbox" checked={form.guardrails.pii_redact} onChange={(e) => patchGuard({ pii_redact: e.target.checked })} className="w-4 h-4 accent-current" />
+              Ocultar dados pessoais nas respostas
+            </label>
+          </div>
         </div>
       )}
+
     </Modal>
   );
 }
 
-// Aba de teste embutida (porta da UX do Aquapark): só disponível após salvar o
-// agente. Aceita texto simples (a mensagem). Executa uma run síncrona e mostra
-// status + saída + tokens/custo.
 function TestTab({ agentId, canExecute }) {
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
@@ -365,14 +397,14 @@ function TestTab({ agentId, canExecute }) {
   if (!agentId) {
     return (
       <p className="text-xs py-6 text-center" style={{ color: 'var(--ap-text-4)' }}>
-        Salve o agente para habilitar o teste.
+        Salve o assistente para habilitar o teste.
       </p>
     );
   }
   if (!canExecute) {
     return (
       <p className="text-xs py-6 text-center" style={{ color: 'var(--ap-text-4)' }}>
-        Você não tem permissão para testar agentes.
+        Você não tem permissão para testar assistentes.
       </p>
     );
   }
@@ -401,7 +433,7 @@ function TestTab({ agentId, canExecute }) {
     <div className="space-y-3">
       <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--ap-surface-2)', border: '1px solid var(--ap-border)' }}>
         <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>
-          Escreva uma mensagem como se fosse o usuário. Ex.: "Qual o horário de atendimento?".
+          Escreva uma mensagem como se fosse o cliente. Ex.: "minha internet caiu".
         </p>
         <div className="flex gap-2 items-start">
           <Textarea rows={2} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Digite uma mensagem de teste…" />
@@ -462,7 +494,6 @@ function linesToArr(text) {
   return String(text || '').split('\n').map((l) => l.trim()).filter(Boolean);
 }
 
-// Deriva o valor de emojis_ui (3 níveis) a partir do boolean persistido.
 function emojisToUi(persona) {
   if (typeof persona?.emojis_ui === 'string' && persona.emojis_ui) return persona.emojis_ui;
   if (persona?.emojis === true) return 'moderado';
