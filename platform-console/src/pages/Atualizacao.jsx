@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   RefreshCw, DatabaseBackup, Package, Download, Loader2, Upload, Trash2,
-  RotateCcw, Unlock, AlertTriangle, Archive,
+  RotateCcw, Unlock, AlertTriangle, Archive, CheckCircle2, XCircle,
+  ChevronDown, ChevronRight,
 } from 'lucide-react';
 import Tabs from '../components/ui/Tabs';
 import StatCard from '../components/ui/StatCard';
@@ -200,12 +201,13 @@ function TabAtualizacao() {
         <StatCard label="Backups retidos" value={version.backups_retained ?? 0} icon={Archive} color="purple" />
       </div>
 
-      {/* Viewer de log ao vivo (upgrade em curso ou último) */}
-      {current && (current.log_lines?.length || running || current.status === 'FAILED' || current.status === 'SUCCESS') ? (
+      {/* ENQUANTO RODA: log ao vivo (caixa escura de console). Padrão Aquapark:
+          o console só aparece durante a execução — não é a view de resultado. */}
+      {current && running ? (
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-4)' }}>
-              Log da atualização
+              Atualização em andamento
             </p>
             <UpgradeStatusBadge status={current.status} />
           </div>
@@ -225,22 +227,16 @@ function TabAtualizacao() {
             {(current.log_lines || []).length
               ? current.log_lines.map((line, i) => <div key={i}>{line}</div>)
               : <span style={{ color: '#64748b' }}>Aguardando saída do script…</span>}
-            {running && <div className="flex items-center gap-2 mt-1" style={{ color: '#64748b' }}><Loader2 size={12} className="animate-spin" /> em execução…</div>}
+            <div className="flex items-center gap-2 mt-1" style={{ color: '#64748b' }}><Loader2 size={12} className="animate-spin" /> em execução…</div>
           </div>
-          {current.status === 'FAILED' && (
-            <div
-              className="rounded-lg px-3 py-2 mt-2 flex items-start gap-2"
-              style={{ backgroundColor: 'rgba(239, 68, 68, 0.10)', border: '1px solid rgba(239, 68, 68, 0.35)' }}
-            >
-              <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
-              <p className="text-xs" style={{ color: 'var(--ap-text-2)' }}>
-                A atualização <strong>falhou{current.error_step ? <> na etapa <code>{current.error_step}</code></> : ''}</strong> e foi interrompida.
-                O sistema <strong>continua na versão anterior</strong> (nada foi aplicado pela metade). Revise o log acima, corrija a causa e publique uma nova versão para tentar de novo.
-              </p>
-            </div>
-          )}
         </div>
       ) : null}
+
+      {/* TERMINADO (não rodando): card calmo de resumo — SUCCESS verde / FAILED
+          vermelho — visualmente distinto do console ao vivo (padrão Aquapark). */}
+      {current && !running && (current.status === 'SUCCESS' || current.status === 'FAILED') && (
+        <LastUpgradeCard upgrade={current} />
+      )}
 
       {/* Aviso: o servidor não conseguiu falar com o repositório remoto */}
       {version.remote_synced === false && (
@@ -321,6 +317,75 @@ function UpgradeStatusBadge({ status }) {
   if (status === 'SUCCESS') return <Badge variant="green">Concluída</Badge>;
   if (status === 'FAILED')  return <Badge variant="red">Falhou</Badge>;
   return null;
+}
+
+// Card calmo de resumo do último upgrade (não rodando) — porte visual do Aquapark.
+// SUCCESS = verde, FAILED = vermelho, distinto do console ao vivo. O log completo
+// fica num expander (elemento novo) pra não perder a capacidade de diagnóstico.
+function LastUpgradeCard({ upgrade }) {
+  const [logOpen, setLogOpen] = useState(false);
+  const failed = upgrade.status === 'FAILED';
+  const from = upgrade.from_version;
+  const to = upgrade.to_version;
+  const titulo = from && to ? `${from} → ${to}` : (to || from || '');
+  const lines = Array.isArray(upgrade.log_lines) ? upgrade.log_lines : [];
+  return (
+    <div className="rounded-lg p-4" style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface)' }}>
+      <div className="flex items-center gap-2 mb-2">
+        {failed
+          ? <XCircle size={18} style={{ color: '#ef4444' }} />
+          : <CheckCircle2 size={18} style={{ color: '#10b981' }} />}
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--ap-text-1)' }}>
+          Último upgrade{titulo ? `: ${titulo}` : ''}
+        </h3>
+        <span className="ml-auto"><UpgradeStatusBadge status={upgrade.status} /></span>
+      </div>
+      <div className="text-xs space-y-0.5" style={{ color: 'var(--ap-text-3)' }}>
+        {upgrade.started_at && <p>Iniciado: {formatDateTime(upgrade.started_at)}</p>}
+        {upgrade.finished_at && <p>Concluído: {formatDateTime(upgrade.finished_at)}</p>}
+      </div>
+
+      {failed && (
+        <div
+          className="rounded-lg px-3 py-2 mt-2"
+          style={{ backgroundColor: 'rgba(239, 68, 68, 0.10)', border: '1px solid rgba(239, 68, 68, 0.30)' }}
+        >
+          <p className="text-xs" style={{ color: 'var(--ap-text-2)' }}>
+            Falhou{upgrade.error_step ? <> na etapa <code>{upgrade.error_step}</code></> : ''} e foi interrompido.
+            O sistema <strong>continua na versão anterior</strong> — nada foi aplicado pela metade. Corrija a causa e publique uma nova versão.
+          </p>
+        </div>
+      )}
+
+      {lines.length > 0 && (
+        <div className="mt-3">
+          <button
+            onClick={() => setLogOpen((o) => !o)}
+            className="text-xs flex items-center gap-1"
+            style={{ color: 'var(--ap-text-4)' }}
+          >
+            {logOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {logOpen ? 'Ocultar log completo' : 'Ver log completo'}
+          </button>
+          {logOpen && (
+            <div
+              className="rounded-lg p-3 font-mono text-[11px] leading-relaxed overflow-y-auto mt-2"
+              style={{
+                backgroundColor: '#0b1120',
+                border: '1px solid var(--ap-border)',
+                color: '#cbd5e1',
+                maxHeight: 280,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {lines.map((line, i) => <div key={i}>{line}</div>)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Considera lock órfão se RUNNING há mais de 10 min.

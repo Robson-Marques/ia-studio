@@ -42,6 +42,8 @@ export async function getCurrentUpgrade() {
       log_lines: Array.isArray(row.log_lines) ? row.log_lines : (Array.isArray(row.logLines) ? row.logLines : []),
       error_step: row.error_step || row.errorStep || null,
       started_at: row.started_at || row.startedAt || null,
+      finished_at: row.finished_at || row.finishedAt || null,
+      from_version: row.from_version || row.fromVersion || null,
       to_version: row.to_version || row.toVersion || null,
       orphan_lock: Boolean(data.orphaned ?? data.orphan_lock ?? row.orphan_lock ?? false),
     };

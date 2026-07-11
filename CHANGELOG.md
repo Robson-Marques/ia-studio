@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.27 - 2026-07-11 (painel de Atualização com o VISUAL do Aquapark: 2 modos)
+
+- **Portado o visual do Aquapark (não só a lógica).** Robson apontou certo: a lógica veio de lá, o visual tinha que vir junto — eu tinha reusado uma caixa de log única pra tudo, então um upgrade **histórico** que falhou parecia um **alarme atual**. Agora são dois modos distintos, como no Aquapark:
+  - **Enquanto roda:** caixa escura de console com o log ao vivo + "em execução…".
+  - **Terminado (não rodando):** card calmo **"Último upgrade: vX → vY"** — ícone verde (SUCCESS) ou vermelho (FAILED), status, iniciado/concluído; se falhou, uma faixa vermelha discreta com a etapa. **Não** é mais a mesma caixa grande e alarmante.
+- **Elemento novo (adição, não mudança de lógica):** dentro do card de resultado, um expander **"Ver log completo"** — mantém o diagnóstico sem poluir a tela. O service passou a trazer `from_version` e `finished_at` pro card.
+
 ## v0.9.26 - 2026-07-11 (upgrade destravado: build da API + painel que PARA e MOSTRA a falha)
 
 - **A CAUSA-RAIZ de "o upgrade não muda nada há tempo": a build da API vinha falhando calada.** Quando humanizei o editor de automação, criei o campo `type: 'agent'` no nó do Assistente (`agent.nodes.ts`) mas **nunca adicionei `'agent'` ao union `NodeFieldType`** (`node-registry.service.ts`). O `nest build` estourava `TS2322` — e como o `upgrade.sh` tem `set -euo pipefail` + `mark_failed` no passo `API_BUILD`, **todo upgrade abortava ali** (fail-safe: produção seguia na versão anterior). Corrigido: `'agent'` adicionado ao `NodeFieldType`.
