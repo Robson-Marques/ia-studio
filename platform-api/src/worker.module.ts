@@ -16,6 +16,11 @@ import { LicensingModule } from './modules/licensing/licensing.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { CommModule } from './modules/comm/comm.module';
 import { AutomationModule } from './modules/automation/automation.module';
+// O worker roda a ENGINE — precisa dos mesmos nós/tools registrados que a API,
+// senão em produção (WORKER_INLINE=off) o nó "Assistente" (AGENT) e as tools
+// não existem no processo do worker → o fluxo pula calado e não responde.
+import { AiModule } from './modules/ai/ai.module';
+import { IspModule } from './modules/isp/isp.module';
 
 @Module({
   imports: [
@@ -31,6 +36,8 @@ import { AutomationModule } from './modules/automation/automation.module';
     IntegrationModule,
     CommModule,
     AutomationModule,
+    AiModule,
+    IspModule,
   ],
 })
 export class WorkerModule {}

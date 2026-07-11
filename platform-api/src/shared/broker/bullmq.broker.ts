@@ -28,7 +28,7 @@ export class BullMqBroker implements IMessageBroker, OnModuleDestroy {
   private readonly logger = new Logger(BullMqBroker.name);
   private connection: IORedis | null = null;
   private available = false;
-  private connectAttempted = false;
+  private connectPromise: Promise<void> | null = null;
   private warnedUnavailable = false;
 
   private readonly queues = new Map<string, Queue>();
@@ -65,9 +65,29 @@ export class BullMqBroker implements IMessageBroker, OnModuleDestroy {
   process(queue: string, handler: BrokerHandler, opts: ProcessOptions = {}): void {
     // Sempre registra o handler local (fallback em memoria).
     this.localHandlers.set(queue, handler);
+    void this.startWorker(queue, handler, opts, 0);
+  }
 
-    void this.ensureConnection().then(() => {
-      if (!this.available || !this.connection) return;
+  /** Cria o consumidor BullMQ; se o Redis ainda nao subiu no boot, re-tenta com
+   *  backoff ate ~60s (senao a fila ficava sem consumidor por ordem de boot). */
+  private async startWorker(
+    queue: string,
+    handler: BrokerHandler,
+    opts: ProcessOptions,
+    attempt: number,
+  ): Promise<void> {
+    await this.ensureConnection();
+    if (!this.available || !this.connection) {
+      if (attempt >= 20) {
+        this.logger.error(
+          `Fila "${queue}" sem Redis após ${attempt} tentativas — só fallback em memória (jobs enfileirados por outro processo NÃO serão consumidos).`,
+        );
+        return;
+      }
+      setTimeout(() => void this.startWorker(queue, handler, opts, attempt + 1), 3_000);
+      return;
+    }
+    {
       const worker = new Worker(
         queue,
         async (job: Job) => {
@@ -100,7 +120,7 @@ export class BullMqBroker implements IMessageBroker, OnModuleDestroy {
       worker.on('error', (err) => this.logger.warn(`Worker da fila "${queue}": ${err.message}`));
       this.workers.push(worker);
       this.logger.log(`Processor registrado na fila "${queue}" (concurrency=${opts.concurrency ?? 5}).`);
-    });
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -111,11 +131,19 @@ export class BullMqBroker implements IMessageBroker, OnModuleDestroy {
 
   // ─── Privados ───────────────────────────────────────
 
-  /** Conexao lazy: 1 tentativa curta; sem Redis → warn unico + fallback. */
+  /** Conexao lazy: 1 tentativa curta; sem Redis → warn unico + fallback.
+   *  TODOS os chamadores concorrentes esperam a MESMA promessa de conexao —
+   *  senao os process() seguintes ao primeiro seguiam com available=false
+   *  (a conexao ainda em voo) e os workers de EVENTS/NOTIFICATIONS nunca eram
+   *  criados → a fila de eventos nao era consumida (zero execucao). */
   private async ensureConnection(): Promise<void> {
-    if (this.connectAttempted) return;
-    this.connectAttempted = true;
+    if (this.available) return;
+    if (this.connectPromise) return this.connectPromise;
+    this.connectPromise = this.doConnect();
+    return this.connectPromise;
+  }
 
+  private async doConnect(): Promise<void> {
     const url = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     try {
       const conn = new IORedis(url, {
@@ -135,6 +163,10 @@ export class BullMqBroker implements IMessageBroker, OnModuleDestroy {
     } catch (e) {
       this.available = false;
       this.connection = null;
+      // Libera a promessa pra permitir NOVA tentativa no proximo enqueue/process
+      // — senao uma unica falha de boot (Redis subindo depois do worker) deixava
+      // o broker preso em fallback pra sempre, sem consumidor da fila.
+      this.connectPromise = null;
       if (!this.warnedUnavailable) {
         this.warnedUnavailable = true;
         this.logger.warn(

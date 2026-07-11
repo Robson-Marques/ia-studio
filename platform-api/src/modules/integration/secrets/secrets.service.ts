@@ -3,7 +3,7 @@
 //
 // REGRA DE OURO: getDecrypted*/accessorFor sao INTERNOS — nunca expostos
 // via HTTP. Endpoints listam apenas metadados (toView remove encrypted_value).
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, Secret, SecretKind } from '@prisma/client';
 import { SecretsRepository } from './secrets.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
@@ -36,6 +36,8 @@ export interface CreateSecretInput {
 
 @Injectable()
 export class SecretsService {
+  private readonly logger = new Logger(SecretsService.name);
+
   constructor(
     private readonly repository: SecretsRepository,
     private readonly audit: AuditLogService,
@@ -166,16 +168,24 @@ export class SecretsService {
   }
 
   private parseMap(row: Secret): Record<string, string> {
+    // decrypt LANÇA se o valor está cifrado mas a auth tag não bate (ENCRYPTION_KEY
+    // divergente após restore/migração, ou dado corrompido). NÃO engolir pra {}:
+    // o mergeValues parte deste mapa e, com {}, sobrescreveria o segredo apagando
+    // os campos. Propaga → a operação aborta e o erro fica visível (regra do
+    // projeto: nunca catch que engole e devolve fallback sem sinal).
+    const raw = decrypt(row.encrypted_value);
+    let parsed: Record<string, unknown>;
     try {
-      const parsed = JSON.parse(decrypt(row.encrypted_value)) as Record<string, unknown>;
-      const out: Record<string, string> = {};
-      for (const [k, v] of Object.entries(parsed)) {
-        if (typeof v === 'string') out[k] = v;
-      }
-      return out;
+      parsed = JSON.parse(raw) as Record<string, unknown>;
     } catch {
+      // Decifrou mas não é JSON (valor legado em claro) — trata como vazio.
       return {};
     }
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof v === 'string') out[k] = v;
+    }
+    return out;
   }
 
   /** View sem encrypted_value — expoe so os NOMES dos campos. */
@@ -183,8 +193,12 @@ export class SecretsService {
     let fields: string[] = [];
     try {
       fields = Object.keys(JSON.parse(decrypt(row.encrypted_value)) as Record<string, unknown>);
-    } catch {
+    } catch (e) {
+      // Só a VIEW (nomes de campos) tolera falha, mas com SINAL — não silencioso.
       fields = [];
+      this.logger.warn(
+        `Não foi possível decifrar o segredo ${row.id} (ENCRYPTION_KEY divergente após restore/migração?): ${(e as Error).message}`,
+      );
     }
     return {
       id: row.id,

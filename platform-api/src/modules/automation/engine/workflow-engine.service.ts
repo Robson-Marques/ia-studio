@@ -119,7 +119,12 @@ export class WorkflowEngineService {
         const nodeType = this.registry.get(current.type);
         let handle = 'success';
         if (!nodeType) {
-          await nodeLog('warn', `tipo de nó desconhecido "${current.type}" — seguindo pela saída padrão.`);
+          // Nó não registrado NESTE processo (ex.: worker sem o módulo que o
+          // registra) NÃO pode seguir calado pela saída padrão — isso mascarava
+          // fluxos quebrados como "concluídos" e mandava dado vazio adiante.
+          // Falha a execução com mensagem clara (aparece no monitor).
+          await nodeLog('error', `tipo de nó desconhecido "${current.type}" — execução interrompida.`);
+          throw new Error(`Tipo de nó "${current.type}" não está registrado neste processo.`);
         } else {
           const config = interpolate(current.config ?? {}, varCtx) as Record<string, unknown>;
           const ctx: NodeExecutionContext = {

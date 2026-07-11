@@ -1,5 +1,26 @@
 # Changelog — IA Studio
 
+## v0.9.29 - 2026-07-11 (pente-fino: a automação por evento volta a FUNCIONAR + caça a erros silenciosos)
+
+Auditoria do código inteiro, área por área. A "IA não respondia no WhatsApp" tinha DUAS causas reais (não era config) — as duas corrigidas:
+
+**Por que nenhuma execução acontecia (evento→fluxo morto):**
+- **Corrida no broker** (`bullmq.broker.ts`): `ensureConnection` marcava `connectAttempted` no topo, então a 2ª/3ª fila (EVENTS/NOTIFICATIONS) registravam com `available=false` (conexão ainda em voo) e **o consumidor da fila de eventos nunca era criado**. Worker de pé, Redis de pé, e mesmo assim ninguém consumia. Agora todos esperam a MESMA conexão; `process()` re-tenta criar o consumidor se o Redis ainda sobe no boot; falha de conexão libera a re-tentativa (não fica preso em fallback pra sempre).
+- **Worker sem o nó Assistente** (`worker.module.ts`): o processo `iastudio-worker` (que roda a engine em produção) não importava `AiModule`/`IspModule` → o nó AGENT e as ferramentas não existiam lá → o fluxo chegava em "Assistente responde", caía em nó desconhecido e **seguia calado** mandando vazio. Corrigido o import.
+- **Nó desconhecido agora FALHA a execução** (`workflow-engine`) em vez de "seguir pela saída padrão" — nunca mais mascara fluxo quebrado como concluído (aparece FAILED no monitor).
+
+**Erros silenciosos caçados (a mesma classe que vinha mordendo):**
+- Nó Assistente com aprovação-pendente / texto vazio / estouro de passos agora vai pra saída de **erro** (não manda mensagem em branco); estouro de `max_steps` virou ERRO.
+- **Conexão de IA**: resolução por escopo exato não achava a OpenAI da org se o assistente estivesse em outro workspace/ambiente — agora cai pra org inteira.
+- **Segredos**: decifração que falha (ENCRYPTION_KEY divergente pós-restore) não é mais engolida pra `{}` — propaga (evita o merge sobrescrever/apagar o segredo) e loga na view.
+- **Permissões**: um blip do Postgres não tranca mais o usuário por 60s (não cacheia conjunto vazio quando a query falha).
+- **Cron de sync WhatsApp** rodava em DOBRO (API + worker) — gated pra um processo só.
+- **Front (dado errado plausível):** progresso de backup/restauração no console (lia `data.status` em vez de `data.operation`); dashboard consolidado com Execuções=NaN e custo/tokens zerados (shape aninhado); Dashboard/Minha Conta do cliente zerando plano/limites/consumo (envelope de licença achatado).
+
+**UX (crítica do Robson):** publicar fluxo saiu de dentro de "Versões" — agora tem botão **Publicar/Despublicar** direto na barra do canvas (padrão Aquapark), com ícone de power.
+
+**Pendências mapeadas (precisam de schema/`db push` ou frente própria):** IA assumir a conversa como atendente **BOT** (aparecer "atendido pela IA" + filtro "IA") — porte do `assignBot` do Aquapark; `@@unique` em `external_id` da mensagem + publicar evento sempre (dedup só no bus); `WHATSAPP_SEND` usar o envio inteligente (janela 24h/HSM); enforce de `action_permissions` do agente.
+
 ## v0.9.28 - 2026-07-11 (a IA responde no WhatsApp — fluxo + toggle)
 
 Frente nova: o assistente de IA responde as mensagens do WhatsApp automaticamente. Porta a *lógica* do SDR do Aquapark num formato declarativo (o fluxo fica visível no canvas), sem clonar o SDR gigante. Sem mudança de schema (não precisa `db push`).

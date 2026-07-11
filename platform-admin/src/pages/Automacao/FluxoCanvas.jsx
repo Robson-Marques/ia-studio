@@ -17,14 +17,14 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
   ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, History,
-  Layers, List, Loader2, Play, Plus, Save, SlidersHorizontal, Trash2, Zap,
+  Layers, List, Loader2, Play, Plus, Power, Save, SlidersHorizontal, Trash2, Zap,
 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { FormField, TextInput, Textarea, Select, NumberInput } from '../../components/ui/FormField';
 import {
   getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions,
-  exportWorkflow, listAutomationTemplates,
+  exportWorkflow, listAutomationTemplates, publishWorkflow, unpublishWorkflow,
 } from '../../services/automation';
 import { listConnections } from '../../services/integrations';
 import { listAgents } from '../../services/ai';
@@ -267,6 +267,8 @@ function FluxoCanvasInner() {
   const [saving, setSaving] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versions, setVersions] = useState([]);
+  const [publishConfirm, setPublishConfirm] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [executeOpen, setExecuteOpen] = useState(false);
 
   const flowWrapRef = useRef(null);
@@ -457,6 +459,30 @@ function FluxoCanvasInner() {
     }
   }
 
+  // Publicar/Despublicar direto na barra (padrão Aquapark: um botão só, sem
+  // entrar em "Versões"). Publica a última versão salva; despublicar volta a
+  // rascunho mantendo o fluxo visível.
+  async function doPublish() {
+    const v = versions[0]?.version ?? workflow?.current_version ?? 0;
+    if (!v) { toast.error('Salve o fluxo antes de publicar.'); return; }
+    setPublishing(true);
+    try {
+      await publishWorkflow(id, v);
+      toast.success('Fluxo publicado — está ativo.');
+      setPublishConfirm(false);
+      await load();
+    } catch (err) { toast.error(err.message); } finally { setPublishing(false); }
+  }
+
+  async function doUnpublish() {
+    setPublishing(true);
+    try {
+      await unpublishWorkflow(id);
+      toast.success('Fluxo desligado — parou de rodar (continua salvo).');
+      await load();
+    } catch (err) { toast.error(err.message); } finally { setPublishing(false); }
+  }
+
   async function handleExport() {
     try {
       const data = await exportWorkflow(id);
@@ -500,9 +526,24 @@ function FluxoCanvasInner() {
         <button className="btn-secondary" onClick={handleExport} title="Baixar uma cópia do fluxo (sem senhas nem segredos)">
           <Download size={14} /> Exportar
         </button>
-        <button className="btn-secondary" onClick={openVersions} title="Histórico de versões — publicar, reverter e comparar">
+        <button className="btn-secondary" onClick={openVersions} title="Histórico de versões — reverter e comparar">
           <History size={14} /> Versões
         </button>
+        {can('automation.workflows.publish') && (
+          <button
+            className="btn-secondary"
+            onClick={workflow.status === 'PUBLISHED' ? doUnpublish : () => setPublishConfirm(true)}
+            disabled={publishing}
+            title={workflow.status === 'PUBLISHED'
+              ? 'Desligar: o fluxo para de rodar (continua salvo)'
+              : 'Ligar: o fluxo passa a rodar quando o gatilho acontecer'}
+          >
+            {publishing
+              ? <Loader2 size={14} className="animate-spin" />
+              : <Power size={14} style={{ color: workflow.status === 'PUBLISHED' ? '#ef4444' : '#10b981' }} />}
+            {workflow.status === 'PUBLISHED' ? 'Despublicar' : 'Publicar'}
+          </button>
+        )}
         {can('automation.workflows.execute') && (
           <button className="btn-secondary" onClick={() => setExecuteOpen(true)} title="Executar manualmente (com opção de simulação)">
             <Play size={14} /> Executar
@@ -671,6 +712,16 @@ function FluxoCanvasInner() {
         onConfirm={removeSelected}
       />
 
+      <ConfirmDialog
+        open={publishConfirm}
+        title="Publicar o fluxo?"
+        message={`O fluxo "${workflow.name}" passa a rodar automaticamente quando o gatilho acontecer.${dirty ? ' Atenção: há alterações não salvas — elas não entram até você salvar uma nova versão.' : ''}`}
+        confirmLabel="Publicar"
+        loading={publishing}
+        onClose={() => setPublishConfirm(false)}
+        onConfirm={doPublish}
+      />
+
       {/* Salvar versão */}
       <Modal
         open={saveOpen}
@@ -689,7 +740,7 @@ function FluxoCanvasInner() {
       >
         <div className="space-y-3">
           <p className="text-xs" style={{ color: 'var(--ap-text-3)' }}>
-            Cada vez que você salva, é criada a v{(versions[0]?.version ?? 0) + 1}. Publicar e reverter ficam no botão Versões.
+            Cada vez que você salva, é criada a v{(versions[0]?.version ?? 0) + 1}. Depois é só clicar em Publicar pra ativar; reverter fica no botão Versões.
           </p>
           <FormField label="Nota da versão" hint="O que mudou (aparece no histórico).">
             <TextInput value={saveNote} onChange={(e) => setSaveNote(e.target.value)} placeholder="Ex.: reorganiza o fluxo e adiciona o assistente" />

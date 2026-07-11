@@ -68,8 +68,17 @@ export class AgentNodes implements OnModuleInit {
             traceId: ctx.traceId,
             scopeKeys,
           });
-          const handle = result.status === 'ERROR' ? 'error' : 'success';
-          await ctx.log(handle === 'error' ? 'warn' : 'info', `Agente ${agentId} → ${result.status} (${result.totalTokens} tokens).`);
+          // Só é SUCESSO se concluiu COM texto. Status ERRO, AWAITING_APPROVAL
+          // (pausou numa tool que exige aprovação — ninguém retoma dentro do
+          // fluxo) ou saída vazia → 'error', pra NÃO mandar mensagem em branco
+          // (o nó de envio seguinte usaria {{vars.assistente.output}} vazio).
+          const text = typeof result.output === 'string' ? result.output.trim() : result.output;
+          const ok = result.status === 'COMPLETED' && !!text;
+          const handle = ok ? 'success' : 'error';
+          await ctx.log(
+            ok ? 'info' : 'warn',
+            `Agente ${agentId} → ${result.status}${ok ? '' : ' (sem resposta utilizável)'} (${result.totalTokens} tokens).`,
+          );
           return {
             handle,
             output: {

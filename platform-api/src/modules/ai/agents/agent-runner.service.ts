@@ -262,10 +262,12 @@ export class AgentRunnerService {
         }
       }
 
-      // Estourou max_steps sem resposta final.
+      // Estourou max_steps sem resposta final → ERRO (não COMPLETED). Antes
+      // devolvia esse texto-placebo como se fosse a resposta, e um fluxo o
+      // enviava ao cliente. Como ERRO, o nó Assistente segue pela saída de erro.
       finalOutput = 'Limite de passos atingido sem conclusão.';
       return this.finishRun(agent, runId, {
-        status: AiRunStatus.COMPLETED,
+        status: AiRunStatus.ERROR,
         output: finalOutput,
         messages,
         promptTokens,

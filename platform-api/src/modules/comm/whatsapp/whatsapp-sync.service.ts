@@ -11,6 +11,7 @@ import { ConnectionsService } from '../../integration/connections/connections.se
 import { IntegrationLogsRepository } from '../../integration/connections/integration-logs.repository';
 import { WhatsappTemplatesService } from './whatsapp-templates.service';
 import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
+import { processorsEnabled } from '../../automation/worker/processors.gate';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { MetaPhoneNumberInfo } from '../../../shared/integration/meta-graph.client';
 
@@ -29,6 +30,9 @@ export class WhatsappSyncService {
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async syncAll(): Promise<void> {
+    // Roda em UM processo só (worker em prod / API no dev com WORKER_INLINE=on).
+    // Sem isto, com CommModule na API E no worker, o sync corria em DOBRO.
+    if (!processorsEnabled()) return;
     if (this.running) return; // sem sobreposicao de execucoes
     this.running = true;
     try {

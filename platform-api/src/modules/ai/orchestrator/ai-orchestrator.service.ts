@@ -69,11 +69,19 @@ export class AiOrchestratorService {
   }
 
   private async activeAiConnections(scope: OrchestratorScope) {
-    const rows = await this.connectionsRepository.findAllByOrg(scope.organizationId, {
+    const scoped = await this.connectionsRepository.findAllByOrg(scope.organizationId, {
       status: ConnectionStatus.ACTIVE,
       workspaceId: scope.workspaceId ?? undefined,
       environmentId: scope.environmentId ?? undefined,
     });
-    return rows.filter((c) => AI_PROVIDER_KEYS.includes(c.provider_key));
+    const ai = scoped.filter((c) => AI_PROVIDER_KEYS.includes(c.provider_key));
+    if (ai.length > 0 || (!scope.workspaceId && !scope.environmentId)) return ai;
+    // Fallback: o escopo (workspace/ambiente) não tinha conexão de IA — procura
+    // na ORG inteira. Sem isto, um assistente escopado num workspace não
+    // enxergava a conexão OpenAI criada em outro escopo e "não respondia".
+    const orgWide = await this.connectionsRepository.findAllByOrg(scope.organizationId, {
+      status: ConnectionStatus.ACTIVE,
+    });
+    return orgWide.filter((c) => AI_PROVIDER_KEYS.includes(c.provider_key));
   }
 }

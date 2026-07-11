@@ -84,13 +84,18 @@ export async function getCurrentBackupOp() {
   try {
     const { data } = await api.get('/console/system/backups/current');
     if (!data) return null;
+    // O backend responde { operation: <row>|null }. Ler data.status direto
+    // devolvia sempre null → o painel de backup/restore nunca mostrava progresso
+    // (mesmo bug do upgrade/current). Desembrulha a operação.
+    const op = data.operation ?? (data.status ? data : null);
+    if (!op) return null;
     return {
-      kind: data.kind || null,
-      status: data.status || null,
-      file_name: data.file_name || data.fileName || null,
-      log_lines: Array.isArray(data.log_lines) ? data.log_lines : (Array.isArray(data.logLines) ? data.logLines : []),
-      error: data.error || null,
-      started_at: data.started_at || data.startedAt || null,
+      kind: op.kind || null,
+      status: op.status || null,
+      file_name: op.file_name || op.fileName || null,
+      log_lines: Array.isArray(op.log_lines) ? op.log_lines : (Array.isArray(op.logLines) ? op.logLines : []),
+      error: op.error || null,
+      started_at: op.started_at || op.startedAt || null,
     };
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao consultar operação em curso')); }
 }

@@ -60,13 +60,19 @@ export class PermissionsGuard implements CanActivate {
     if (cached && cached.expiresAt > now) return cached.permissions;
 
     const set = new Set<string>();
+    // Se a QUERY falhar (blip do Postgres), não cachear o conjunto vazio — senão
+    // o usuário levava 403 em tudo por até 60s mesmo com o banco de volta.
+    let queryFailed = false;
 
     const user = await this.prisma.user
       .findUnique({
         where: { id: userId },
         select: { organization_id: true, profile: { select: { permissions: true, deleted_at: true } } },
       })
-      .catch(() => null);
+      .catch(() => {
+        queryFailed = true;
+        return null;
+      });
     if (user?.profile && !user.profile.deleted_at) {
       for (const p of user.profile.permissions) set.add(p);
     }
@@ -81,7 +87,10 @@ export class PermissionsGuard implements CanActivate {
             workspace: { select: { organization_id: true } },
           },
         })
-        .catch(() => null);
+        .catch(() => {
+          queryFailed = true;
+          return null;
+        });
       // Header apontando pra workspace de OUTRA org e ignorado (nao soma perms).
       if (member && member.workspace.organization_id === user.organization_id) {
         if (member.profile && !member.profile.deleted_at) {
@@ -91,7 +100,7 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const permissions = Array.from(set);
-    this.cache.set(cacheKey, { permissions, expiresAt: now + this.TTL_MS });
+    if (!queryFailed) this.cache.set(cacheKey, { permissions, expiresAt: now + this.TTL_MS });
     return permissions;
   }
 }
