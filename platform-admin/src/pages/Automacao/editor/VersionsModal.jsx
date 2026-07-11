@@ -31,7 +31,7 @@ export default function VersionsModal({ open, onClose, workflow, versions, onPub
     setPublishing(true);
     try {
       const result = await publishWorkflow(workflow.id, confirming.version);
-      toast.success(confirming.isRollback ? `Rollback para v${confirming.version} aplicado.` : `Versão v${confirming.version} publicada.`);
+      toast.success(confirming.isRollback ? `Fluxo revertido para a v${confirming.version}.` : `Versão v${confirming.version} publicada.`);
       (result.warnings || []).forEach((w) => toast.warn(w));
       setConfirming(null);
       onPublished();
@@ -65,11 +65,11 @@ export default function VersionsModal({ open, onClose, workflow, versions, onPub
                 {can('automation.workflows.publish') && !isActive && (
                   <button
                     className="btn-secondary text-xs"
-                    title={isRollback ? 'Rollback: repontar a versão ativa pra esta' : 'Publicar esta versão'}
+                    title={isRollback ? 'Reverter: tornar esta a versão ativa' : 'Publicar esta versão'}
                     onClick={() => setConfirming({ version: v.version, isRollback })}
                   >
                     {isRollback ? <RotateCcw size={13} /> : <Rocket size={13} />}
-                    {isRollback ? 'Rollback' : 'Publicar'}
+                    {isRollback ? 'Reverter' : 'Publicar'}
                   </button>
                 )}
               </div>
@@ -80,7 +80,7 @@ export default function VersionsModal({ open, onClose, workflow, versions, onPub
 
         {versions.length >= 2 && (
           <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-5)' }}>Comparar versões (diff)</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-5)' }}>Comparar versões</p>
             <div className="flex items-center gap-2">
               <Select value={diffA} onChange={(e) => setDiffA(e.target.value)} className="max-w-[120px]">
                 <option value="">de…</option>
@@ -116,10 +116,10 @@ export default function VersionsModal({ open, onClose, workflow, versions, onPub
         open={!!confirming}
         danger={confirming?.isRollback}
         loading={publishing}
-        title={confirming?.isRollback ? 'Rollback de versão' : 'Publicar versão'}
+        title={confirming?.isRollback ? 'Reverter versão' : 'Publicar versão'}
         message={
           confirming?.isRollback
-            ? `Repontar a versão ativa do fluxo para v${confirming?.version}? Gatilhos passam a usar essa versão imediatamente. Nenhuma versão é apagada.`
+            ? `Voltar a versão ativa do fluxo para a v${confirming?.version}? Os gatilhos passam a usar essa versão imediatamente. Nenhuma versão é apagada.`
             : `Publicar a v${confirming?.version}? O fluxo passa a disparar por gatilhos (evento/agendamento/webhook) usando essa versão.`
         }
         confirmLabel={confirming?.isRollback ? 'Aplicar rollback' : 'Publicar'}

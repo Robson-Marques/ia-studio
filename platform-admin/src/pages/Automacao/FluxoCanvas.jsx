@@ -27,6 +27,7 @@ import {
   exportWorkflow, listAutomationTemplates,
 } from '../../services/automation';
 import { listConnections } from '../../services/integrations';
+import { listAgents } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../../lib/toast';
 import { NODE_CATEGORY_ORDER } from './automation.constants';
@@ -64,9 +65,12 @@ function StudioNode({ data, selected }) {
         <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--ap-text-5)' }}>{category}</div>
       )}
       <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--ap-text-1)' }} className="truncate">
-        {data.name || def?.label || data.nodeType}
+        {data.name || def?.label || 'Passo'}
       </div>
-      <div style={{ color: 'var(--ap-text-5)', fontFamily: 'monospace', fontSize: 10 }} className="truncate">{data.nodeType}</div>
+      {/* Descrição amigável em vez do tipo técnico cru (ex.: era "AGENT"). */}
+      {def?.description && (
+        <div style={{ color: 'var(--ap-text-5)', fontSize: 10, lineHeight: 1.25 }} className="line-clamp-2">{def.description}</div>
+      )}
       {outputs.map((out, i) => (
         <Handle
           key={out} type="source" id={out} position={Position.Right}
@@ -203,6 +207,13 @@ function InspectorField({ field, value, jsonDraft, refs, disabled, onChange, onJ
       <Textarea rows={4} className="font-mono text-[11px]" value={jsonDraft ?? ''} placeholder='{ "chave": "valor" }' spellCheck={false}
         onChange={(e) => onJsonDraft(e.target.value)} {...common} />
     );
+  } else if (field.type === 'agent') {
+    control = (
+      <Select className="text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
+        <option value="">— escolha um assistente —</option>
+        {(refs.agents || []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+      </Select>
+    );
   } else if (field.type === 'connection') {
     control = (
       <Select className="text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
@@ -247,7 +258,7 @@ function FluxoCanvasInner() {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [openCat, setOpenCat] = useState(NODE_CATEGORY_ORDER[0]);
   const [jsonDrafts, setJsonDrafts] = useState({}); // { [nodeId]: { [fieldKey]: text } }
-  const [refs, setRefs] = useState({ connections: [], templates: [] });
+  const [refs, setRefs] = useState({ connections: [], templates: [], agents: [] });
   const [removing, setRemoving] = useState(false);
 
   const [triggerOpen, setTriggerOpen] = useState(false);
@@ -288,14 +299,17 @@ function FluxoCanvasInner() {
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Referências (conexões/templates) — carregadas uma vez pros campos do inspector.
+  // Referências (conexões/templates/assistentes) — carregadas uma vez pros campos
+  // do inspector. Sem os assistentes aqui, o campo "Assistente" do nó de IA ficava
+  // vazio (não dava pra escolher).
   useEffect(() => {
     if (!canWrite) return;
     Promise.allSettled([
       listConnections().then((r) => r.items),
       listAutomationTemplates().then((r) => r.items),
-    ]).then(([c, t]) => {
-      setRefs({ connections: c.value || [], templates: t.value || [] });
+      listAgents().then((r) => r.items),
+    ]).then(([c, t, a]) => {
+      setRefs({ connections: c.value || [], templates: t.value || [], agents: a.value || [] });
     });
   }, [canWrite]);
 
@@ -477,16 +491,16 @@ function FluxoCanvasInner() {
           </div>
           {workflow.description && <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{workflow.description}</p>}
         </div>
-        <button className="btn-secondary" onClick={() => navigate(`/automacao/fluxos/${id}/lista`)} title="Abrir o editor em lista (fallback)">
+        <button className="btn-secondary" onClick={() => navigate(`/automacao/fluxos/${id}/lista`)} title="Abrir o editor em modo lista">
           <List size={14} /> Lista
         </button>
-        <button className="btn-secondary" onClick={() => setTriggerOpen(true)} title="Configurar gatilho">
+        <button className="btn-secondary" onClick={() => setTriggerOpen(true)} title="Configurar o que dispara este fluxo">
           <Zap size={14} /> Gatilho
         </button>
-        <button className="btn-secondary" onClick={handleExport} title="Baixar o JSON do fluxo (sem segredos)">
+        <button className="btn-secondary" onClick={handleExport} title="Baixar uma cópia do fluxo (sem senhas nem segredos)">
           <Download size={14} /> Exportar
         </button>
-        <button className="btn-secondary" onClick={openVersions} title="Histórico de versões — publicar/rollback/diff">
+        <button className="btn-secondary" onClick={openVersions} title="Histórico de versões — publicar, reverter e comparar">
           <History size={14} /> Versões
         </button>
         {can('automation.workflows.execute') && (
@@ -495,7 +509,7 @@ function FluxoCanvasInner() {
           </button>
         )}
         {canWrite && (
-          <button className="btn-primary" onClick={openSave} title="Salvar como nova versão imutável">
+          <button className="btn-primary" onClick={openSave} title="Salvar como uma nova versão (o histórico é preservado)">
             <Save size={14} /> Salvar versão
           </button>
         )}
@@ -583,7 +597,7 @@ function FluxoCanvasInner() {
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--ap-text-1)' }}>{selectedDef?.label || selected.data.nodeType}</p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--ap-text-1)' }}>{selectedDef?.label || 'Passo'}</p>
                     {selectedDef?.description && <p className="text-[11px] mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{selectedDef.description}</p>}
                   </div>
 
@@ -596,7 +610,7 @@ function FluxoCanvasInner() {
                     (selectedDef.fields || []).length ? (
                       <div className="space-y-2.5">
                         <p className="text-[10px] mt-1" style={{ color: 'var(--ap-text-5)' }}>
-                          Campos de texto aceitam {'{{variáveis}}'} — ex.: {'{{input.phone}}'}, {'{{vars.passo_1.status}}'}.
+                          Use {'{{ }}'} para inserir dados nos campos de texto — ex.: o telefone do contato ({'{{input.phone}}'}) ou o resultado de um passo anterior.
                         </p>
                         {(selectedDef.fields || []).map((f) => (
                           <InspectorField
@@ -615,7 +629,7 @@ function FluxoCanvasInner() {
                       <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Este passo não precisa de configuração.</p>
                     )
                   ) : (
-                    <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Tipo de passo desconhecido (não está no catálogo atual).</p>
+                    <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Este passo não é mais reconhecido pelo sistema.</p>
                   )}
 
                   {canWrite && (
@@ -624,7 +638,6 @@ function FluxoCanvasInner() {
                     </button>
                   )}
 
-                  <p className="text-[9px] font-mono" style={{ color: 'var(--ap-text-5)' }}>{selected.id} · {selected.data.nodeType}</p>
                 </div>
               )}
             </div>
@@ -635,7 +648,7 @@ function FluxoCanvasInner() {
       </div>
 
       <p className="text-[11px]" style={{ color: 'var(--ap-text-5)' }}>
-        Clique num passo para configurar. Arraste das alças (handles) à direita para ligar os passos; a saída "erro"/"falso" cria a aresta condicional.
+        Clique num passo para configurar. Arraste dos pontos à direita de cada passo para ligá-los; a saída "erro"/"falso" cria um caminho alternativo.
       </p>
 
       {/* Gatilho */}
@@ -676,10 +689,10 @@ function FluxoCanvasInner() {
       >
         <div className="space-y-3">
           <p className="text-xs" style={{ color: 'var(--ap-text-3)' }}>
-            Versões são imutáveis: salvar cria a v{(versions[0]?.version ?? 0) + 1}. Publicar/rollback ficam no botão Versões.
+            Cada vez que você salva, é criada a v{(versions[0]?.version ?? 0) + 1}. Publicar e reverter ficam no botão Versões.
           </p>
           <FormField label="Nota da versão" hint="O que mudou (aparece no histórico).">
-            <TextInput value={saveNote} onChange={(e) => setSaveNote(e.target.value)} placeholder="Ex.: reorganiza o canvas e adiciona nó de agente" />
+            <TextInput value={saveNote} onChange={(e) => setSaveNote(e.target.value)} placeholder="Ex.: reorganiza o fluxo e adiciona o assistente" />
           </FormField>
         </div>
       </Modal>

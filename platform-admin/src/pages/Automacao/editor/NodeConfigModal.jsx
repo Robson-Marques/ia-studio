@@ -85,7 +85,7 @@ export default function NodeConfigModal({ open, node, definition, onClose, onSav
     >
       <div className="space-y-3">
         <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-          {definition.description} Campos de texto aceitam {'{{variáveis}}'} — ex.: {'{{input.phone}}'}, {'{{vars.passo_1.status}}'}.
+          {definition.description} Use {'{{ }}'} para inserir dados — ex.: o telefone do contato ({'{{input.phone}}'}) ou o resultado de um passo anterior.
         </p>
         <FormField label="Nome do passo">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={definition.label} />

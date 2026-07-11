@@ -21,7 +21,7 @@ export default function ExecuteModal({ open, onClose, workflow }) {
     try {
       parsed = input.trim() ? JSON.parse(input) : {};
     } catch {
-      toast.error('Input JSON inválido.');
+      toast.error('Dados de entrada inválidos (JSON).');
       return;
     }
     setRunning(true);
@@ -54,13 +54,13 @@ export default function ExecuteModal({ open, onClose, workflow }) {
       }
     >
       <div className="space-y-3">
-        <FormField label="Input (JSON)" hint="Disponível nos passos como {{input.*}}.">
+        <FormField label="Dados de entrada (JSON)" hint="Ficam disponíveis nos passos como {{input.*}}.">
           <Textarea rows={6} className="font-mono text-xs" value={input} onChange={(e) => setInput(e.target.value)} />
         </FormField>
         <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ap-text-2)' }}>
           <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} className="accent-current w-4 h-4" />
           <span>
-            Dry-run (simulação) — passos com efeito externo (WhatsApp, HTTP, eventos) apenas registram no log, sem executar de verdade.
+            Simulação — passos que enviam algo (WhatsApp, chamadas externas, eventos) apenas registram no histórico, sem executar de verdade.
           </span>
         </label>
         {!dryRun && (

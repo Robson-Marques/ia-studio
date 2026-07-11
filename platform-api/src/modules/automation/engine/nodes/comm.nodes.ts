@@ -24,16 +24,16 @@ export class CommNodes implements OnModuleInit {
       definition: {
         type: 'WHATSAPP_SEND',
         label: 'Enviar WhatsApp',
-        description: 'Envia mensagem via Meta Orchestrator (roteia por tag/departamento — o fluxo nunca conhece o número).',
+        description: 'Envia uma mensagem de WhatsApp. O fluxo escolhe a conexão sozinho — você não precisa saber o número.',
         category: 'Comunicação',
         kind: 'action',
         outputs: ['success', 'error'],
         fields: [
-          { key: 'phone', label: 'Telefone', type: 'text', required: true, placeholder: '{{input.phone}}' },
-          { key: 'text', label: 'Mensagem (texto livre)', type: 'textarea', placeholder: 'Olá {{input.name}}!' },
-          { key: 'template_name', label: 'Template HSM (fora da janela de 24h)', type: 'text', help: 'Se preenchido, envia o template aprovado em vez de texto livre.' },
-          { key: 'template_language', label: 'Idioma do template', type: 'text', default: 'pt_BR' },
-          { key: 'tag', label: 'Tag/Departamento da conexão', type: 'text', help: 'Critério de roteamento do orquestrador (opcional).' },
+          { key: 'phone', label: 'Telefone do destinatário', type: 'text', required: true, placeholder: '{{input.phone}}' },
+          { key: 'text', label: 'Mensagem', type: 'textarea', placeholder: 'Olá {{input.name}}!' },
+          { key: 'template_name', label: 'Modelo aprovado (para mensagens fora das 24h)', type: 'text', help: 'Se preenchido, envia o modelo aprovado em vez de texto livre.' },
+          { key: 'template_language', label: 'Idioma do modelo', type: 'text', default: 'pt_BR' },
+          { key: 'tag', label: 'Departamento (opcional)', type: 'text', help: 'Ajuda a escolher a conexão de envio (opcional).' },
           { key: 'connection_id', label: 'Conexão específica (opcional)', type: 'connection' },
         ],
       },
@@ -84,7 +84,7 @@ export class CommNodes implements OnModuleInit {
         type: 'EMAIL_SEND',
         label: 'Enviar e-mail',
         description:
-          'Envia e-mail via Email Orchestrator (resolve a conexão Gmail/SMTP por conexão explícita ou tag — o fluxo nunca conhece a conta). Suporta template EMAIL do catálogo.',
+          'Envia um e-mail pela conexão configurada (Gmail ou servidor de e-mail). Pode usar um modelo de e-mail do catálogo.',
         category: 'Comunicação',
         kind: 'action',
         outputs: ['success', 'error'],
@@ -168,8 +168,8 @@ export class CommNodes implements OnModuleInit {
     this.registry.register({
       definition: {
         type: 'NOTIFY',
-        label: 'Enviar notificação',
-        description: 'Notifica via Notification Center (canal automático com fallback WhatsApp → e-mail → sino).',
+        label: 'Enviar aviso',
+        description: 'Envia um aviso pelo melhor canal disponível (tenta WhatsApp, depois e-mail, depois o sino do painel).',
         category: 'Comunicação',
         kind: 'action',
         outputs: ['success', 'error'],

@@ -32,19 +32,22 @@ export class CoreNodes implements OnModuleInit {
     this.registry.register({
       definition: {
         type: 'TRIGGER_EVENT',
-        label: 'Gatilho por evento',
-        description: 'Dispara quando um evento é publicado no Event Bus (ex.: whatsapp.inbound.message).',
+        label: 'Quando algo acontece',
+        description: 'Dispara quando algo acontece na plataforma (ex.: uma nova mensagem de WhatsApp chega).',
         category: 'Gatilhos',
         kind: 'trigger',
         outputs: ['success'],
         fields: [
           {
             key: 'event',
-            label: 'Evento',
-            type: 'text',
+            label: 'Acontecimento',
+            type: 'select',
             required: true,
-            placeholder: 'whatsapp.inbound.message',
-            help: 'Nome do evento assinado no bus. Também configure o gatilho do fluxo como "Evento".',
+            options: [
+              { value: 'whatsapp.inbound.message', label: 'Nova mensagem de WhatsApp chegou' },
+              { value: 'ai.agent.run.completed', label: 'Um assistente terminou um atendimento' },
+            ],
+            help: 'O que dispara este fluxo. Configure também o gatilho do fluxo com o mesmo acontecimento.',
           },
         ],
       },
@@ -58,8 +61,8 @@ export class CoreNodes implements OnModuleInit {
     this.registry.register({
       definition: {
         type: 'TRIGGER_SCHEDULE',
-        label: 'Gatilho agendado',
-        description: 'Dispara conforme o agendamento configurado no fluxo (Scheduler).',
+        label: 'Em horários definidos',
+        description: 'Dispara automaticamente nos horários que você definir no gatilho do fluxo.',
         category: 'Gatilhos',
         kind: 'trigger',
         outputs: ['success'],
@@ -74,8 +77,8 @@ export class CoreNodes implements OnModuleInit {
     this.registry.register({
       definition: {
         type: 'TRIGGER_WEBHOOK',
-        label: 'Gatilho por webhook',
-        description: 'Dispara via POST /api/webhooks/flows/:token (token gerado ao publicar).',
+        label: 'Chamada de outro sistema',
+        description: 'Dispara quando um sistema externo chama o endereço seguro deste fluxo (gerado ao publicar).',
         category: 'Gatilhos',
         kind: 'trigger',
         outputs: ['success'],
@@ -91,7 +94,7 @@ export class CoreNodes implements OnModuleInit {
       definition: {
         type: 'CONDITION',
         label: 'Condição',
-        description: 'Ramifica o fluxo entre "true" e "false" conforme uma comparação.',
+        description: 'Segue por um caminho ou outro ("verdadeiro" ou "falso") conforme uma comparação.',
         category: 'Lógica',
         kind: 'action',
         outputs: ['true', 'false'],
@@ -148,8 +151,8 @@ export class CoreNodes implements OnModuleInit {
     this.registry.register({
       definition: {
         type: 'DELAY',
-        label: 'Atraso',
-        description: 'Aguarda um intervalo antes do próximo passo (longo = re-agendado via fila, sem travar o worker).',
+        label: 'Esperar',
+        description: 'Aguarda um tempo antes do próximo passo. Esperas longas não seguram a execução.',
         category: 'Lógica',
         kind: 'action',
         outputs: ['success'],

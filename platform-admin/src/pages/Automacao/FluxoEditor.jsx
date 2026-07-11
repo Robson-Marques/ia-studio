@@ -167,10 +167,10 @@ export default function FluxoEditor() {
           </div>
           {workflow.description && <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{workflow.description}</p>}
         </div>
-        <button className="btn-secondary" onClick={handleExport} title="Baixar o JSON do fluxo (sem segredos)">
+        <button className="btn-secondary" onClick={handleExport} title="Baixar uma cópia do fluxo (sem senhas nem segredos)">
           <Download size={14} /> Exportar
         </button>
-        <button className="btn-secondary" onClick={openVersions} title="Histórico de versões — publicar/rollback/diff">
+        <button className="btn-secondary" onClick={openVersions} title="Histórico de versões — publicar, reverter e comparar">
           <History size={14} /> Versões
         </button>
         {can('automation.workflows.execute') && (
@@ -179,7 +179,7 @@ export default function FluxoEditor() {
           </button>
         )}
         {canWrite && (
-          <button className="btn-primary" onClick={() => setSaveOpen(true)} title="Salvar como nova versão imutável">
+          <button className="btn-primary" onClick={() => setSaveOpen(true)} title="Salvar como uma nova versão (o histórico é preservado)">
             <Save size={14} /> Salvar versão
           </button>
         )}
@@ -232,9 +232,9 @@ export default function FluxoEditor() {
                         {index + 1}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{step.name || def?.label || step.type}</p>
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{step.name || def?.label || 'Passo'}</p>
                         <p className="text-[11px] truncate" style={{ color: 'var(--ap-text-4)' }}>
-                          {def ? `${def.category} · ${def.label}` : step.type}
+                          {def ? `${def.category} · ${def.label}` : 'Passo não reconhecido'}
                         </p>
                       </div>
                       {canWrite && (
@@ -329,7 +329,7 @@ export default function FluxoEditor() {
       >
         <div className="space-y-3">
           <p className="text-xs" style={{ color: 'var(--ap-text-3)' }}>
-            Versões são imutáveis: salvar cria a v{(versions[0]?.version ?? 0) + 1}. Publicar/rollback ficam no botão Versões.
+            Cada vez que você salva, é criada a v{(versions[0]?.version ?? 0) + 1}. Publicar e reverter ficam no botão Versões.
           </p>
           <FormField label="Nota da versão" hint="O que mudou (aparece no histórico).">
             <TextInput value={saveNote} onChange={(e) => setSaveNote(e.target.value)} placeholder="Ex.: adiciona condição de horário" />

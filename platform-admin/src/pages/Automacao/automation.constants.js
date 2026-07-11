@@ -58,7 +58,7 @@ export const WEEKDAYS = [
   { value: 6, label: 'Sábado' },
 ];
 
-export const NODE_CATEGORY_ORDER = ['Gatilhos', 'Lógica', 'Integrações', 'Comunicação', 'Plataforma'];
+export const NODE_CATEGORY_ORDER = ['Gatilhos', 'Lógica', 'IA', 'Comunicação', 'Integrações', 'Plataforma'];
 
 export const NOTIFICATION_STATUS = {
   SENT:      { label: 'Enviada',   variant: 'green' },

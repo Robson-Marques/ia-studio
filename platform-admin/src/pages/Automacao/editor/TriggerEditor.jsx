@@ -45,9 +45,15 @@ export default function TriggerEditor({ trigger, onChange, webhookToken }) {
 
   const TYPES = [
     { id: 'manual', label: 'Manual', Icon: Hand, help: 'Dispara pelo botão Executar.' },
-    { id: 'event', label: 'Evento', Icon: Zap, help: 'Dispara quando um evento é publicado no bus.' },
-    { id: 'schedule', label: 'Agendado', Icon: CalendarClock, help: 'Dispara pelo relógio (Scheduler).' },
-    { id: 'webhook', label: 'Webhook', Icon: Webhook, help: 'Dispara por POST externo com token.' },
+    { id: 'event', label: 'Acontecimento', Icon: Zap, help: 'Dispara quando algo acontece na plataforma (ex.: chega uma mensagem de WhatsApp).' },
+    { id: 'schedule', label: 'Agendado', Icon: CalendarClock, help: 'Dispara automaticamente nos horários definidos.' },
+    { id: 'webhook', label: 'Sistema externo', Icon: Webhook, help: 'Dispara quando um sistema externo chama o endereço do fluxo.' },
+  ];
+
+  // Mesmos acontecimentos do nó "Quando algo acontece" — valor real, rótulo humano.
+  const EVENTOS = [
+    { value: 'whatsapp.inbound.message', label: 'Nova mensagem de WhatsApp chegou' },
+    { value: 'ai.agent.run.completed', label: 'Um assistente terminou um atendimento' },
   ];
 
   return (
@@ -73,18 +79,21 @@ export default function TriggerEditor({ trigger, onChange, webhookToken }) {
       </div>
 
       {t.type === 'event' && (
-        <FormField label="Nome do evento" required hint="Ex.: whatsapp.inbound.message — qualquer evento publicado no Event Bus.">
-          <TextInput value={t.event ?? ''} onChange={(e) => onChange({ ...t, event: e.target.value })} placeholder="whatsapp.inbound.message" />
+        <FormField label="Acontecimento" required hint="O que dispara este fluxo. Use o mesmo no passo de gatilho.">
+          <Select value={t.event ?? ''} onChange={(e) => onChange({ ...t, event: e.target.value })}>
+            <option value="">— escolha um acontecimento —</option>
+            {EVENTOS.map((ev) => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
+          </Select>
         </FormField>
       )}
 
       {t.type === 'webhook' && (
         <div className="rounded-lg p-3 text-xs space-y-1" style={{ border: '1px solid var(--ap-border)', color: 'var(--ap-text-3)' }}>
-          <p>Após publicar, dispare com:</p>
+          <p>Endereço para o sistema externo disparar (depois de publicar):</p>
           <code className="block break-all font-mono" style={{ color: 'var(--ap-text-1)' }}>
-            POST /api/webhooks/flows/{webhookToken || '<token gerado ao publicar>'}
+            POST /api/webhooks/flows/{webhookToken || '<endereço gerado ao publicar>'}
           </code>
-          <p>O corpo JSON vira o {'{{input.*}}'} da execução. Header opcional x-idempotency-key evita disparo duplicado.</p>
+          <p>Os dados enviados ficam disponíveis nos passos como {'{{input.*}}'}. Para evitar disparos duplicados, envie um identificador único.</p>
         </div>
       )}
 

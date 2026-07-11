@@ -59,7 +59,7 @@ export default function Eventos() {
         <div className="flex-1 min-w-[200px]">
           <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Eventos</h1>
           <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-            Trilha do Event Bus — todo evento publicado fica registrado e pode ser reprocessado.
+            Tudo que acontece na plataforma fica registrado aqui e pode ser reprocessado.
           </p>
         </div>
         <TextInput
@@ -75,7 +75,7 @@ export default function Eventos() {
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
       ) : !items.length ? (
-        <div className="card"><EmptyState icon={Zap} title="Nenhum evento" description="Eventos aparecem aqui quando módulos publicam no bus (ex.: mensagens WhatsApp recebidas)." /></div>
+        <div className="card"><EmptyState icon={Zap} title="Nenhum evento" description="Os acontecimentos aparecem aqui (ex.: mensagens de WhatsApp recebidas)." /></div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="hidden md:block">

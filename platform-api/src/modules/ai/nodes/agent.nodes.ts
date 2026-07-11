@@ -19,27 +19,27 @@ export class AgentNodes implements OnModuleInit {
     this.registry.register({
       definition: {
         type: 'AGENT',
-        label: 'Agente de IA',
-        description: 'Executa um agente de IA (loop de raciocínio + ferramentas) com o input do fluxo.',
+        label: 'Assistente de IA',
+        description: 'Usa um assistente de IA para responder ou executar uma tarefa com base nos dados do fluxo.',
         category: 'IA',
         kind: 'action',
         outputs: ['success', 'error'],
         fields: [
-          { key: 'agent_id', label: 'Agente', type: 'select', required: true, help: 'Agente de IA ativo desta organização.' },
-          { key: 'input', label: 'Input', type: 'template', help: 'Texto/pergunta enviada ao agente (aceita {{variáveis}}).' },
+          { key: 'agent_id', label: 'Assistente', type: 'agent', required: true, help: 'Assistente de IA ativo desta organização.' },
+          { key: 'input', label: 'Pergunta / instrução', type: 'template', help: 'Texto enviado ao assistente (aceita {{variáveis}}).' },
           {
             key: 'scope_contact',
             label: 'Identificação do contato',
             type: 'template',
             placeholder: '{{input.phone}}',
-            help: 'Quem está falando (telefone, e-mail, id). Escopo da memória CONTACT e base da identificação do assistente.',
+            help: 'Identifica com quem o assistente está falando (telefone, e-mail ou id). É o que permite ele lembrar desse contato.',
           },
           {
             key: 'scope_session',
             label: 'Identificação da conversa',
             type: 'template',
             placeholder: '{{input.chat_id}}',
-            help: 'Conversa atual. Escopo da memória SESSION — sem ela, o assistente esquece o que já foi dito.',
+            help: 'Identifica a conversa atual. Sem isso, o assistente esquece o que já foi dito nesta conversa.',
           },
         ],
       },

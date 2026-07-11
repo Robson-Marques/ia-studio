@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.9.22 - 2026-07-10 (editor de automação humanizado + 3 buracos corrigidos)
+
+O pente-fino anterior não cobriu o editor de fluxos — que estava cheio de jargão de desenvolvedor na cara. Corrigido, e no caminho apareceram dois buracos funcionais reais.
+
+**Bugs funcionais (não só texto):**
+- **O card do nó mostrava o tipo técnico cru** (`AGENT`, `TRIGGER_EVENT`, `WHATSAPP_SEND`) em fonte monoespaçada abaixo do nome, e o inspetor mostrava `agent_2 · AGENT`. Removido — o card agora mostra a descrição amigável; o tipo é exclusivamente interno.
+- **O campo "Assistente" do nó de IA estava VAZIO** — não dava para escolher o assistente no fluxo. O inspetor carregava conexões e templates, mas nunca os assistentes. Corrigido: novo tipo de campo `agent` + carga dos assistentes no inspetor.
+- **O campo de evento do gatilho era texto livre** que exigia digitar `whatsapp.inbound.message` exatamente — virou um **select** com rótulos humanos ("Nova mensagem de WhatsApp chegou") e o valor real por baixo, tanto no nó quanto no gatilho do fluxo.
+
+**Linguagem (todos os 13 nós + editor):** rótulos e descrições reescritos sem jargão — "Event Bus"→"algo acontece na plataforma", "Meta/Email Orchestrator"→"envia WhatsApp/e-mail", "loop de raciocínio + ferramentas"→"responde ou executa uma tarefa", "Requisição HTTP"→"Chamar sistema externo", "Publicar evento"→"Anunciar acontecimento", "Renderizar template"→"Montar mensagem de um modelo", "Timeout/Headers/Payload"→"Tempo limite/Cabeçalhos/Dados". "Agente de IA"→**Assistente de IA** (nó, paleta, card, inspetor). "Rollback/diff/imutável" e sintaxe crua de variável (`{{vars.passo_1.status}}`) trocados por linguagem de negócio. Grupo "IA" entrou na ordem oficial da paleta.
+
 ## v0.9.21 - 2026-07-10 (tela de Atualização sem pânico + pente-fino passada 2)
 
 - **Tela de Atualização não entra mais em pânico durante o restart.** Ao aplicar um upgrade, o backend reinicia e a API cai por 1–2 min — o polling antes disparava um `toast.error` vermelho a cada 2s, parecendo falha. Agora, durante um upgrade em curso, a falha de rede é tratada como **esperada**: mostra um aviso azul calmo ("Aplicando a atualização e reiniciando os serviços… a página recarrega sozinha") e segue tentando em silêncio. Quando a API volta com status SUCCESS, **recarrega a página sozinha**. Fora de um upgrade, erro de rede continua sendo erro.

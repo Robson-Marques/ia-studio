@@ -40,21 +40,21 @@ export class IntegrationNodes implements OnModuleInit {
     this.registry.register({
       definition: {
         type: 'HTTP_REQUEST',
-        label: 'Requisição HTTP',
-        description: 'Chama um sistema externo por URL direta ou por uma conexão do Integration Manager.',
+        label: 'Chamar sistema externo',
+        description: 'Chama uma API externa por endereço direto ou por uma conexão já configurada nas Integrações.',
         category: 'Integrações',
         kind: 'action',
         outputs: ['success', 'error'],
         fields: [
-          { key: 'connection_id', label: 'Conexão (opcional)', type: 'connection', help: 'Se informada, a chamada roda pela operação http.request do provider (com credenciais do cofre).' },
-          { key: 'url', label: 'URL', type: 'text', placeholder: 'https://api.exemplo.com/recurso' },
+          { key: 'connection_id', label: 'Conexão (opcional)', type: 'connection', help: 'Se informada, a chamada usa as credenciais guardadas com segurança na conexão.' },
+          { key: 'url', label: 'Endereço (URL)', type: 'text', placeholder: 'https://api.exemplo.com/recurso' },
           {
             key: 'method', label: 'Método', type: 'select', default: 'GET',
             options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => ({ value: m, label: m })),
           },
-          { key: 'headers', label: 'Headers (JSON)', type: 'json' },
+          { key: 'headers', label: 'Cabeçalhos (JSON)', type: 'json' },
           { key: 'body', label: 'Corpo (JSON)', type: 'json' },
-          { key: 'timeout_ms', label: 'Timeout (ms)', type: 'number', default: 15000 },
+          { key: 'timeout_ms', label: 'Tempo limite (milissegundos)', type: 'number', default: 15000 },
         ],
       },
       executor: async (ctx) => {
@@ -99,7 +99,7 @@ export class IntegrationNodes implements OnModuleInit {
       definition: {
         type: 'CONNECTION_EXECUTE',
         label: 'Executar operação de conexão',
-        description: 'Chama a porta execute genérica de um provider conectado (ex.: cliente.dados no ERP).',
+        description: 'Executa uma operação específica de um sistema conectado (ex.: consultar dados de cliente no ERP).',
         category: 'Integrações',
         kind: 'action',
         outputs: ['success', 'error'],
