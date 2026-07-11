@@ -85,7 +85,7 @@ export default function BasesConhecimento() {
           <EmptyState
             icon={BookOpen}
             title="Nenhuma base neste ambiente"
-            description="Crie uma base e adicione documentos para consulta pelos agentes."
+            description="Crie uma base e adicione documentos para consulta pelos assistentes."
             action={canWrite && <button className="btn-primary" onClick={() => setCreateOpen(true)}><Plus size={14} /> Nova base</button>}
           />
         </div>

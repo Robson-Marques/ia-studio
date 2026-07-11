@@ -78,7 +78,7 @@ export default function Agentes() {
       a.download = `agente-${(agent.name || 'export').toLowerCase().replace(/\s+/g, '-')}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Agente exportado (sem segredos).');
+      toast.success('Assistente exportado (sem segredos).');
     } catch (err) { toast.error(err.message); }
   }
 
@@ -141,7 +141,7 @@ export default function Agentes() {
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-0.5">
                         {can('ai.agents.execute') && (
-                          <button className="btn-ghost p-1.5" title="Testar o agente" onClick={() => setExecuteAgent_(a)}>
+                          <button className="btn-ghost p-1.5" title="Testar o assistente" onClick={() => setExecuteAgent_(a)}>
                             <Play size={14} className="text-brand" />
                           </button>
                         )}
@@ -205,7 +205,7 @@ export default function Agentes() {
         onClose={() => setImportOpen(false)}
         workspaceId={workspaceId}
         environmentId={environmentId}
-        onImported={() => { setImportOpen(false); toast.success('Agente importado.'); load(); }}
+        onImported={() => { setImportOpen(false); toast.success('Assistente importado.'); load(); }}
       />
 
       <AgentVersionsModal
@@ -232,7 +232,7 @@ function ImportAgentModal({ open, onClose, onImported, workspaceId, environmentI
   async function handleImport() {
     if (!workspaceId || !environmentId) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
     let data;
-    try { data = JSON.parse(json); } catch { toast.error('JSON inválido — cole o conteúdo exportado do agente.'); return; }
+    try { data = JSON.parse(json); } catch { toast.error('Arquivo inválido — cole o conteúdo exportado do assistente.'); return; }
     setSaving(true);
     try {
       await importAgent({ workspace_id: workspaceId, environment_id: environmentId, data });
@@ -248,7 +248,7 @@ function ImportAgentModal({ open, onClose, onImported, workspaceId, environmentI
     <Modal
       open={open}
       onClose={saving ? undefined : onClose}
-      title="Importar agente"
+      title="Importar assistente"
       size="lg"
       dismissable={!saving}
       footer={
@@ -260,7 +260,8 @@ function ImportAgentModal({ open, onClose, onImported, workspaceId, environmentI
         </>
       }
     >
-      <FormField label="JSON exportado" required hint="Exportado pela ação Exportar de um agente (sem segredos).">
+      <FormField label="Conteúdo exportado" required hint="Gerado pela ação Exportar de um assistente (sem segredos).">
+
         <Textarea value={json} onChange={(e) => setJson(e.target.value)} rows={12} className="font-mono text-xs" placeholder='{"schema_version":1,"kind":"iastudio.agent",...}' />
       </FormField>
     </Modal>

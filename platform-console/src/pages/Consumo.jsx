@@ -7,8 +7,8 @@ import { formatNumber, formatLimit } from '../lib/format';
 import { toast } from '../lib/toast';
 
 const METRIC_LABELS = {
-  users: 'Usuários', workspaces: 'Workspaces', agents: 'Agentes', flows: 'Fluxos',
-  executions: 'Execuções', tokens: 'Tokens', whatsapp_numbers: 'Números WhatsApp',
+  users: 'Usuários', workspaces: 'Workspaces', agents: 'Assistentes', flows: 'Fluxos',
+  executions: 'Execuções', tokens: 'Consumo de IA', whatsapp_numbers: 'Números WhatsApp',
   google_accounts: 'Contas Google', connections: 'Conexões',
 };
 

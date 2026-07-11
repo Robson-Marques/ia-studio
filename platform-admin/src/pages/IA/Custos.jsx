@@ -31,7 +31,7 @@ export default function Custos() {
       <div>
         <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Custos de IA</h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Consumo de tokens e custo por provider e agente, com orçamentos e simulador.
+          Consumo de IA e custo por provedor e assistente, com orçamentos e simulador.
         </p>
       </div>
       <Tabs items={PAGE_TABS} active={tab} onChange={setTab} />
@@ -85,7 +85,7 @@ function SummaryTab() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatCard label="Custo total" value={formatUsd(totals.cost_usd ?? totals.total_cost_usd)} icon={DollarSign} color="green" />
             <StatCard label="Tokens" value={formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens)} sub="prompt + resposta" icon={Cpu} color="blue" />
-            <StatCard label="Agentes ativos" value={formatTokens(totals.agent_count ?? rows.length)} icon={Bot} color="purple" />
+            <StatCard label="Assistentes ativos" value={formatTokens(totals.agent_count ?? rows.length)} icon={Bot} color="purple" />
           </div>
 
           <div className="card p-0 overflow-hidden">
@@ -94,9 +94,9 @@ function SummaryTab() {
             ) : (
               <Table>
                 <Thead>
-                  <Th>Provider</Th>
+                  <Th>Provedor</Th>
                   <Th>Modelo</Th>
-                  <Th>Agente</Th>
+                  <Th>Assistente</Th>
                   <Th>Tokens (prompt)</Th>
                   <Th>Tokens (resposta)</Th>
                   <Th>Custo</Th>
@@ -303,7 +303,7 @@ function SimulatorTab() {
     <div className="space-y-4 max-w-2xl">
       <div className="card space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField label="Provider">
+          <FormField label="Provedor">
             <Select value={form.provider_kind} onChange={(e) => patch({ provider_kind: e.target.value })}>
               {PROVIDER_KINDS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </Select>

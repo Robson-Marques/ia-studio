@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.9.20 - 2026-07-10 (pente-fino de UX, passada 1)
+
+Auditoria de linguagem tela a tela (regra máxima: língua do usuário, nunca do desenvolvedor). Confirmado limpo: nenhum `confirm()/alert()` nativo, nenhum banner de erro de submit inline. Corrigido nesta passada (só texto visível — sem mudança de comportamento):
+
+- **Nomenclatura padronizada:** "agente"→**assistente** e "ferramenta"/"tool"→**habilidade** em títulos, botões, toasts, tooltips, colunas e empty states (Assistentes, Habilidades, Custos, Memória, Conhecimento, Pendências, Versões, Incidentes; e no console: Consumo, Dashboard). Antes o produto só tinha renomeado os títulos.
+- **Chaves cruas escondidas:** `provider_key` na coluna "Conector" agora mostra o nome amigável do conector (via marketplace, com fallback prettificado) em vez de `whatsapp-meta`; tooltip de permissão em Perfis não expõe mais a chave `core.users.read`.
+- **Jargão fora:** "Tokens no mês"→**Consumo de IA** (Dashboard/Console), "Builtin"/"Custom"→**Da plataforma**/**Personalizada**, "Último health"→**Última verificação**, "health check" removido, "Rollback"→**Reverter**, "Timeout (ms)"→**Tempo limite (ms)**, "Provider"→**Provedor**.
+- Áreas genuinamente técnicas (Desenvolvedor, API Keys, editor de fluxos avançado, JSON Schema de habilidade custom, MCP endpoint) mantidas — público técnico. Ficam mapeadas para passadas futuras se necessário.
+
 ## v0.9.19 - 2026-07-09 (menu humano + perfis com rótulos legíveis)
 
 - **Bug: a tela de Perfis mostrava a chave crua da permissão (`core.users.read`) num balaio único "permissions 10/83".** O backend sempre mandou grupos + rótulos humanos (`{permissions, groups, labels}`), mas o `normalizeCatalog` do front não tratava esse formato — caía no fallback e imprimia a chave. Corrigido: agora renderiza os grupos ("Usuários e Acessos", "IA"…) com os rótulos humanos ("Ver usuários", "Conceder à IA ações que gravam dados"). As 83 permissões já tinham label no backend. Exemplo clássico de tela feita para desenvolvedor virando tela para usuário.

@@ -51,7 +51,7 @@ export default function Memoria() {
         <div className="flex-1 min-w-[200px]">
           <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Memória</h1>
           <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-            Perfis de memória escopados (sessão/contato/fluxo/agente) com TTL e limite de itens.
+            Perfis de memória por escopo (sessão/contato/fluxo/assistente) com validade e limite de itens.
           </p>
         </div>
         {canWrite && <button className="btn-primary" onClick={() => { setEditing(null); setEditorOpen(true); }}><Plus size={14} /> Novo perfil</button>}
@@ -64,7 +64,7 @@ export default function Memoria() {
           <EmptyState
             icon={Brain}
             title="Nenhum perfil de memória"
-            description="Crie perfis para o agente lembrar contexto entre mensagens."
+            description="Crie perfis para o assistente lembrar contexto entre mensagens."
             action={canWrite && <button className="btn-primary" onClick={() => { setEditing(null); setEditorOpen(true); }}><Plus size={14} /> Novo perfil</button>}
           />
         </div>
@@ -246,7 +246,7 @@ function ProfileModal({ open, profile, onClose, onSaved, workspaceId, environmen
         <FormField label="Nome" required>
           <TextInput value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Ex.: Contexto do contato" />
         </FormField>
-        <FormField label="Escopo" hint="Define a chave de escopo (contato/sessão/fluxo/agente).">
+        <FormField label="Escopo" hint="Define a chave de escopo (contato/sessão/fluxo/assistente).">
           <Select value={form.scope} onChange={(e) => patch({ scope: e.target.value })} disabled={isEdit}>
             {MEMORY_SCOPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </Select>

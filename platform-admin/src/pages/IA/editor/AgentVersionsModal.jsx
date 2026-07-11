@@ -37,7 +37,7 @@ export default function AgentVersionsModal({ open, onClose, agent, versions, onP
   const current = agent?.current_version ?? 0;
 
   return (
-    <Modal open={open} onClose={onClose} title="Versões do agente" size="lg">
+    <Modal open={open} onClose={onClose} title="Versões do assistente" size="lg">
       <div className="space-y-2">
         {(versions || []).map((v) => {
           const isActive = v.version === current && current > 0;
@@ -57,11 +57,11 @@ export default function AgentVersionsModal({ open, onClose, agent, versions, onP
               {can('ai.agents.publish') && !isActive && (
                 <button
                   className="btn-secondary text-xs"
-                  title={isRollback ? 'Rollback: repontar a versão ativa pra esta' : 'Publicar esta versão'}
+                  title={isRollback ? 'Reverter: tornar esta a versão ativa' : 'Publicar esta versão'}
                   onClick={() => setConfirming({ version: v.version, isRollback })}
                 >
                   {isRollback ? <RotateCcw size={13} /> : <Rocket size={13} />}
-                  {isRollback ? 'Rollback' : 'Publicar'}
+                  {isRollback ? 'Reverter' : 'Publicar'}
                 </button>
               )}
             </div>
@@ -69,7 +69,7 @@ export default function AgentVersionsModal({ open, onClose, agent, versions, onP
         })}
         {!(versions || []).length && (
           <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-            Nenhuma versão salva ainda. Salve as configurações do agente para gerar a v1.
+            Nenhuma versão salva ainda. Salve as configurações do assistente para gerar a v1.
           </p>
         )}
       </div>
@@ -78,13 +78,13 @@ export default function AgentVersionsModal({ open, onClose, agent, versions, onP
         open={!!confirming}
         danger={confirming?.isRollback}
         loading={publishing}
-        title={confirming?.isRollback ? 'Rollback de versão' : 'Publicar versão'}
+        title={confirming?.isRollback ? 'Reverter versão' : 'Publicar versão'}
         message={
           confirming?.isRollback
-            ? `Repontar a versão ativa do agente para v${confirming?.version}? As execuções passam a usar essa versão. Nenhuma versão é apagada.`
-            : `Publicar a v${confirming?.version}? O agente passa a executar usando essa versão.`
+            ? `Reverter a versão ativa do assistente para v${confirming?.version}? Os atendimentos passam a usar essa versão. Nenhuma versão é apagada.`
+            : `Publicar a v${confirming?.version}? O assistente passa a atender usando essa versão.`
         }
-        confirmLabel={confirming?.isRollback ? 'Aplicar rollback' : 'Publicar'}
+        confirmLabel={confirming?.isRollback ? 'Reverter' : 'Publicar'}
         onClose={() => setConfirming(null)}
         onConfirm={confirmPublish}
       />

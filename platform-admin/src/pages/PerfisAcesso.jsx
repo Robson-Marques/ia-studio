@@ -306,7 +306,7 @@ function ProfileFormModal({ open, editing, catalog, readOnly, onClose, onSaved }
                             disabled={readOnly}
                             className="accent-[var(--ap-accent)] w-4 h-4 shrink-0"
                           />
-                          <span className="text-sm truncate" style={{ color: 'var(--ap-text-2)' }} title={perm.key}>
+                          <span className="text-sm truncate" style={{ color: 'var(--ap-text-2)' }} title={perm.label}>
                             {perm.label}
                           </span>
                         </label>

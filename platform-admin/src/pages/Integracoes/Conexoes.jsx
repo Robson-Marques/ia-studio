@@ -38,6 +38,9 @@ export default function Conexoes() {
   const [discovery, setDiscovery] = useState(null); // { connection, resources }
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wizardFor, setWizardFor] = useState(null);
+  // Mapa provider_key → nome amigável (o marketplace tem os nomes). Sem isto a
+  // coluna "Conector" mostrava a chave crua (ex.: "whatsapp-meta").
+  const [providerNames, setProviderNames] = useState({});
 
   async function load() {
     setLoading(true);
@@ -51,7 +54,16 @@ export default function Conexoes() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    getMarketplace()
+      .then(({ items }) => setProviderNames(Object.fromEntries((items || []).map((p) => [p.key, p.name]))))
+      .catch(() => {});
+  }, []);
+
+  // Nome amigável do conector; fallback prettifica a chave (ixc → Ixc, whatsapp-meta → Whatsapp Meta).
+  const providerName = (key) =>
+    providerNames[key] || String(key || '').split(/[-_]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   const scopeName = useMemo(() => {
     const map = new Map();
@@ -150,7 +162,7 @@ export default function Conexoes() {
               <Th>Workspace / Ambiente</Th>
               <Th>Tags</Th>
               <Th>Status</Th>
-              <Th>Último health</Th>
+              <Th>Última verificação</Th>
               <Th className="text-right">Ações</Th>
             </Thead>
             <Tbody>
@@ -161,7 +173,7 @@ export default function Conexoes() {
                     <Td>
                       <span className="font-medium" style={{ color: 'var(--ap-text-1)' }}>{c.name}</span>
                     </Td>
-                    <Td>{c.provider_key}</Td>
+                    <Td>{providerName(c.provider_key)}</Td>
                     <Td>{scopeName(c)}</Td>
                     <Td>
                       <div className="flex gap-1 flex-wrap">
@@ -198,7 +210,7 @@ export default function Conexoes() {
                         {can('integrations.connections.write') && (
                           <button
                             className="btn-ghost p-1.5 disabled:opacity-60"
-                            title="Testar conexão (health check)"
+                            title="Testar conexão"
                             disabled={testing === c.id}
                             onClick={() => handleTest(c)}
                           >
@@ -444,7 +456,7 @@ function ConnectionDetailModal({ connection, scopeName, onClose }) {
           <InfoRow label="Status" value={<Badge variant={meta.variant}>{meta.label}</Badge>} />
           <InfoRow label="Detalhe" value={connection.status_detail || '—'} />
           <InfoRow label="Conectada em" value={connection.connected_at ? formatDateTime(connection.connected_at) : '—'} />
-          <InfoRow label="Último health" value={connection.last_health_at ? formatDateTime(connection.last_health_at) : 'nunca'} />
+          <InfoRow label="Última verificação" value={connection.last_health_at ? formatDateTime(connection.last_health_at) : 'nunca'} />
           <InfoRow label="Última utilização" value={connection.last_used_at ? formatDateTime(connection.last_used_at) : 'nunca'} />
           <InfoRow label="Última sincronização" value={connection.last_sync_at ? formatDateTime(connection.last_sync_at) : 'nunca'} />
           <InfoRow label="Prioridade" value={String(connection.priority ?? 0)} />

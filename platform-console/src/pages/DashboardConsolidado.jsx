@@ -59,7 +59,7 @@ export default function DashboardConsolidado() {
             <StatCard label="Execuções" value={formatNumber(data.executions)} sub={`${formatNumber(data.execution_errors)} com erro`} icon={Activity} color="blue" />
             <StatCard label="Erros de execução" value={formatNumber(data.execution_errors)} icon={AlertTriangle} color={data.execution_errors > 0 ? 'red' : 'green'} />
             <StatCard label="Custo IA (USD)" value={formatUsd(data.ai_cost_usd)} sub={`${formatNumber(data.ai_tokens)} tokens`} icon={DollarSign} color="green" />
-            <StatCard label="Tokens IA" value={formatNumber(data.ai_tokens)} icon={Cpu} color="purple" />
+            <StatCard label="Consumo de IA" value={formatNumber(data.ai_tokens)} icon={Cpu} color="purple" />
             <StatCard label="Mensagens WhatsApp" value={formatNumber(data.whatsapp_messages)} icon={MessageCircle} color="green" />
             <StatCard label="E-mails" value={formatNumber(data.emails)} icon={Mail} color="blue" />
           </div>

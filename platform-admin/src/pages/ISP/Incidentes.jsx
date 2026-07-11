@@ -186,7 +186,7 @@ export default function Incidentes() {
           confirm?.kind === 'activate'
             ? (confirm?.incident?.comm_mode !== 'REACTIVE'
                 ? 'Ao ativar em modo proativo/combinado, o informativo será DISPARADO EM MASSA por WhatsApp aos afetados incluídos. Esta ação é irreversível para as mensagens já enviadas. Confirma?'
-                : 'O incidente ficará ativo e o agente informará os clientes que procurarem. Confirma?')
+                : 'O incidente ficará ativo e o assistente informará os clientes que procurarem. Confirma?')
             : 'O incidente será encerrado. Se a notificação de normalização estiver ligada (modo proativo/combinado), um aviso será enviado. Confirma?'
         }
       />
@@ -329,7 +329,7 @@ function IncidentModal({ open, incident, workspaceId, environmentId, onClose, on
         </div>
 
         <div className="space-y-1.5 pt-1">
-          <Toggle label="Suprimir OS duplicada (agente não abre OS para clientes cobertos)" checked={form.suppress_os} onChange={(v) => patch({ suppress_os: v })} />
+          <Toggle label="Suprimir OS duplicada (o assistente não abre OS para clientes cobertos)" checked={form.suppress_os} onChange={(v) => patch({ suppress_os: v })} />
           <Toggle label="Informar previsão ao cliente" checked={form.inform_forecast} onChange={(v) => patch({ inform_forecast: v })} />
           <Toggle label="Avisar normalização ao encerrar (proativo/combinado)" checked={form.notify_normalization} onChange={(v) => patch({ notify_normalization: v })} />
           <Toggle label="Detecção automática de outage (só sugere — nasce desligada)" checked={form.auto_detect} onChange={(v) => patch({ auto_detect: v })} />

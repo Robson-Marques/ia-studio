@@ -30,7 +30,7 @@ export default function Ferramentas() {
       <div>
         <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Habilidades</h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Capacidades que os agentes podem usar — builtin da plataforma, customizadas e descobertas por MCP.
+          O que os assistentes podem fazer — habilidades prontas da plataforma e as que você cadastrar.
         </p>
       </div>
       <Tabs items={PAGE_TABS} active={tab} onChange={setTab} />
@@ -66,21 +66,21 @@ function CatalogTab() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <p className="text-xs flex-1" style={{ color: 'var(--ap-text-4)' }}>
-          Ferramentas builtin não podem ser editadas; crie ferramentas customizadas para operações de conexões.
+          As habilidades prontas não podem ser editadas; crie as suas próprias para operações de conexões.
         </p>
-        {canWrite && <button className="btn-primary" onClick={() => { setEditing(null); setEditorOpen(true); }}><Plus size={14} /> Nova ferramenta</button>}
+        {canWrite && <button className="btn-primary" onClick={() => { setEditing(null); setEditorOpen(true); }}><Plus size={14} /> Nova habilidade</button>}
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
       ) : !items.length ? (
-        <div className="card"><EmptyState icon={Wrench} title="Nenhuma ferramenta" description="O catálogo builtin é carregado no provisionamento." /></div>
+        <div className="card"><EmptyState icon={Wrench} title="Nenhuma habilidade" description="As habilidades prontas já vêm instaladas." /></div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <Table>
             <Thead>
               <Th>Nome</Th>
-              <Th>Chave</Th>
+              <Th>Identificador</Th>
               <Th>Categoria</Th>
               <Th>Origem</Th>
               <Th>Status</Th>
@@ -95,7 +95,7 @@ function CatalogTab() {
                   </Td>
                   <Td><span className="font-mono text-xs" style={{ color: 'var(--ap-text-3)' }}>{t.key}</span></Td>
                   <Td>{t.category || '—'}</Td>
-                  <Td>{t.builtin ? <Badge variant="blue">Builtin</Badge> : <Badge variant="purple">Custom</Badge>}</Td>
+                  <Td>{t.builtin ? <Badge variant="blue">Da plataforma</Badge> : <Badge variant="purple">Personalizada</Badge>}</Td>
                   <Td>{t.is_active === false ? <Badge variant="gray">Desligada</Badge> : <Badge variant="green">Ativa</Badge>}</Td>
                   <Td>{t.requires_approval ? <Badge variant="yellow">Exige</Badge> : <span className="text-xs" style={{ color: 'var(--ap-text-5)' }}>não</span>}</Td>
                   <Td className="text-right">
@@ -185,7 +185,7 @@ function ToolModal({ open, tool, onClose, onSaved }) {
           ...governance,
         });
       }
-      toast.success(isEdit ? 'Ferramenta atualizada.' : 'Ferramenta criada.');
+      toast.success(isEdit ? 'Habilidade atualizada.' : 'Habilidade criada.');
       onSaved();
     } catch (err) {
       toast.error(err.message);
@@ -198,7 +198,7 @@ function ToolModal({ open, tool, onClose, onSaved }) {
     <Modal
       open={open}
       onClose={saving ? undefined : onClose}
-      title={isBuiltin ? `Governança · ${tool?.name ?? ''}` : (isEdit ? 'Editar ferramenta' : 'Nova ferramenta')}
+      title={isBuiltin ? `Ajustes · ${tool?.name ?? ''}` : (isEdit ? 'Editar habilidade' : 'Nova habilidade')}
       size="lg"
       dismissable={!saving}
       footer={
@@ -213,13 +213,13 @@ function ToolModal({ open, tool, onClose, onSaved }) {
       <div className="space-y-3">
         {isBuiltin && (
           <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-            Ferramenta builtin — só é possível ajustar a governança (ligar/desligar, aprovação e timeout).
+            Habilidade pronta da plataforma — você pode ligar/desligar, exigir aprovação e ajustar o tempo limite.
           </p>
         )}
         {!isBuiltin && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <FormField label="Chave (key)" required hint="Única por organização. Não editável depois.">
+              <FormField label="Identificador" required hint="Único, sem espaços. Não muda depois de criado.">
                 <TextInput value={form.key} onChange={(e) => patch({ key: e.target.value })} disabled={isEdit} placeholder="consultar_estoque" />
               </FormField>
               <FormField label="Nome" required>
@@ -241,14 +241,14 @@ function ToolModal({ open, tool, onClose, onSaved }) {
         {isEdit && (
           <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ap-text-2)' }}>
             <input type="checkbox" checked={form.is_active} onChange={(e) => patch({ is_active: e.target.checked })} className="w-4 h-4 accent-current" />
-            Ferramenta ligada (agentes podem usar)
+            Habilidade ligada (os assistentes podem usar)
           </label>
         )}
         <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ap-text-2)' }}>
           <input type="checkbox" checked={form.requires_approval} onChange={(e) => patch({ requires_approval: e.target.checked })} className="w-4 h-4 accent-current" />
           Exige aprovação antes de executar
         </label>
-        <FormField label="Timeout (ms)" hint="Tempo máximo de execução. Vazio = padrão (20000). Mínimo 1000.">
+        <FormField label="Tempo limite (ms)" hint="Tempo máximo de execução. Vazio = padrão (20000). Mínimo 1000.">
           <NumberInput value={form.timeout_ms === '' ? null : Number(form.timeout_ms)} onChange={(v) => patch({ timeout_ms: v == null ? '' : String(v) })} allowEmpty min={1000} step={500} placeholder="20000" />
         </FormField>
       </div>
@@ -287,7 +287,7 @@ function McpTab() {
     try {
       const res = await syncMcpServer(server.id);
       const count = res?.discovered_tools?.length ?? res?.tools?.length ?? res?.count;
-      toast.success(count != null ? `Sincronizado — ${count} tools descobertas.` : 'Servidor sincronizado.');
+      toast.success(count != null ? `Sincronizado — ${count} habilidade(s) descoberta(s).` : 'Servidor sincronizado.');
       load();
     } catch (err) {
       toast.error(err.message);
@@ -308,7 +308,7 @@ function McpTab() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <p className="text-xs flex-1" style={{ color: 'var(--ap-text-4)' }}>
-          Servidores MCP expõem ferramentas externas. Nascem inativos — ative e sincronize para descobrir as tools.
+          Servidores MCP trazem habilidades externas. Nascem inativos — ative e sincronize para descobrir as habilidades.
         </p>
         {canWrite && <button className="btn-primary" onClick={() => setCreateOpen(true)}><Plus size={14} /> Novo servidor</button>}
       </div>
@@ -316,7 +316,7 @@ function McpTab() {
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
       ) : !items.length ? (
-        <div className="card"><EmptyState icon={Server} title="Nenhum servidor MCP" description="Cadastre um servidor MCP para importar ferramentas externas." /></div>
+        <div className="card"><EmptyState icon={Server} title="Nenhum servidor MCP" description="Cadastre um servidor MCP para importar habilidades externas." /></div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <Table>
@@ -338,9 +338,9 @@ function McpTab() {
                   <Td>{formatDateTime(s.last_sync_at)}</Td>
                   <Td className="text-right">
                     <div className="flex items-center justify-end gap-0.5">
-                      <button className="btn-ghost p-1.5" title="Ver tools descobertas" onClick={() => openTools(s)}><Search size={14} /></button>
+                      <button className="btn-ghost p-1.5" title="Ver habilidades descobertas" onClick={() => openTools(s)}><Search size={14} /></button>
                       {canWrite && (
-                        <button className="btn-ghost p-1.5 disabled:opacity-40" title="Sincronizar / descobrir tools" disabled={syncing === s.id} onClick={() => handleSync(s)}>
+                        <button className="btn-ghost p-1.5 disabled:opacity-40" title="Sincronizar / descobrir habilidades" disabled={syncing === s.id} onClick={() => handleSync(s)}>
                           {syncing === s.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} className="text-brand" />}
                         </button>
                       )}
@@ -361,9 +361,9 @@ function McpTab() {
         onSaved={() => { setCreateOpen(false); load(); }}
       />
 
-      <Modal open={!!toolsServer} onClose={() => setToolsServer(null)} title={`Tools de ${toolsServer?.name ?? ''}`} size="lg">
+      <Modal open={!!toolsServer} onClose={() => setToolsServer(null)} title={`Habilidades de ${toolsServer?.name ?? ''}`} size="lg">
         {!tools.length ? (
-          <EmptyState icon={Wrench} title="Nenhuma tool descoberta" description="Sincronize o servidor para descobrir as ferramentas." />
+          <EmptyState icon={Wrench} title="Nenhuma habilidade descoberta" description="Sincronize o servidor para descobrir as habilidades." />
         ) : (
           <div className="space-y-1.5">
             {tools.map((t, i) => (

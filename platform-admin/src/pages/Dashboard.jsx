@@ -84,7 +84,7 @@ export default function Dashboard() {
           color="green"
         />
         <StatCard
-          label="Tokens no mês"
+          label="Consumo de IA no mês"
           value={formatNumber(usage.tokens ?? 0)}
           sub={`Limite: ${formatLimit(limits.tokens)}`}
           icon={Cpu}
