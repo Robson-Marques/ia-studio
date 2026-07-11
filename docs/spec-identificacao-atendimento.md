@@ -17,6 +17,28 @@ Fluxo padrão:
 3. `identificar_cliente({ cpf })` (busca completa — nunca parcial, ver 2.1).
 4. 0 resultados → `on_not_found`. >1 → `on_multiple`. 1 → segue.
 
+### Fluxo aprovado para a Frente B (09/07/2026)
+
+Versão mínima, sem 2º fator (a válvula fica para depois — decisão do Robson):
+
+1. Assistente **pede o CPF** do assinante.
+2. `identificar_cliente({ cpf })` — aceita com/sem máscara.
+3. Achou **1**: "É o(a) **{{nome}}**? Confirma para eu continuar."
+4. Cliente confirma → grava `titular_confirmado=true` na **memória CONTACT** →
+   o **gate** (seção 5) abre. Começam os trabalhos.
+5. Achou **0** → pede o CPF de novo / `handoff` (`on_not_found`).
+   Achou **>1** → desambiguar antes de confirmar (`on_multiple`).
+
+Notas de implementação:
+- `titular_confirmado` é **estado de código** (memória CONTACT), não algo que o
+  LLM "lembra": persiste entre mensagens e sobrevive ao `resume()` (Frente A).
+- A confirmação aqui é **checagem de acerto do registro**, não autenticação — o
+  gate impede o LLM tagarela, não quem tem o CPF alheio (ver ressalva abaixo).
+- A "confirmação por nome" que a seção 2(b) evitava é aceitável neste fluxo:
+  quem informou o CPF já buscou por ele; o nome não vaza mais do que o próprio
+  ato de buscar. Vale só porque a identificação partiu do documento, não do
+  telefone.
+
 ### ⚠️ Ressalva de segurança (registrada, decisão mantida)
 
 Pedir o documento **identifica, não autentica**. CPF é semipúblico no Brasil

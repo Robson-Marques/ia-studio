@@ -22,6 +22,8 @@ import { IspIncidentsService } from './isp-incidents.service';
 import { IspOutageDetectionCron } from './isp-outage-detection.cron';
 import { IspTools } from './isp-tools';
 import { IspController } from './isp.controller';
+import { IspExampleRepository } from './isp-example.repository';
+import { IspExampleAssistantSeed } from './isp-example-assistant.seed';
 
 @Module({
   imports: [IntegrationModule, CommModule, AutomationModule, AiModule],
@@ -35,6 +37,8 @@ import { IspController } from './isp.controller';
     IspIncidentsService,
     IspOutageDetectionCron,
     IspTools,
+    IspExampleRepository,
+    IspExampleAssistantSeed,
   ],
   // IncidentLookupService exportado pra futura reuso (nos de automacao ISP).
   exports: [IncidentLookupService],
