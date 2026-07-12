@@ -23,7 +23,8 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.52** engatilhada (CONSOLIDAÇÃO do agente: fim da duplicidade de lógica + identificação
+- **v0.9.53** engatilhada (abertura reconhece o número na saudação + cumprimenta 1x). **v0.9.52
+  já no ar** = CONSOLIDAÇÃO do agente: fim da duplicidade de lógica + identificação
   determinística `identificado_por` + persona.name funcional + persona padrão NETE/amigável/
   médias + modelo padrão gpt-5.4). **v0.9.51 já no ar** (identidade doc>telefone) e **v0.9.50**
   (frente 1 + funil). LIÇÃO (crítica do Robson, procede): eu vinha empilhando a mesma regra em
@@ -41,7 +42,8 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v19`** (consolidação; v0.9.52). Estrutura FINAL:
+- **Prompt do assistente ISP: `CONTENT_VERSION v20`** (abertura reconhece o número + cumprimenta
+  1x; v0.9.53). Antes: v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação
   determinística via `identificado_por`. Ao mexer no comportamento, editar NA CASA CERTA — não
   reintroduzir a mesma regra em 2 lugares. Antes: v18 (identidade, v0.9.51), v17 (funil, v0.9.50). O passo "chegar até o login" usa a tool `diagnosticar_conexao`, que é a **única

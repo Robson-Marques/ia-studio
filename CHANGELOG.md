@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.53 - 2026-07-12 (Abertura mais natural — reconhece o número na saudação + cumprimenta uma vez só)
+
+Sem `db push`. Backend. Conteúdo do assistente re-aplicado (`v20`).
+
+- **Reconhece o número já na saudação.** Se o WhatsApp é de um número salvo no cadastro de um cliente, a abertura já reconhece na primeira mensagem ("Olá! Vejo que este número está salvo para <nome>. É sobre a conexão dele(a) ou de outro cliente?") em vez de saudar genérico e só identificar depois. Se o número não é conhecido, cumprimenta e pergunta o motivo.
+- **Cumprimenta uma vez só.** A IA saudava duas vezes (na 1ª e na 2ª mensagem) — nada natural. Agora é regra de estilo na persona ("cumprimentar uma única vez, não repetir 'olá/oi'"), numa casa só.
+
 ## v0.9.52 - 2026-07-12 (Consolidação do agente ISP — fim da duplicidade + identificação determinística + persona padrão)
 
 Sem `db push`. Backend. Conteúdo do assistente re-aplicado (`v19`).

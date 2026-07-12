@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v19-consolidacao-agente';
+const CONTENT_VERSION = 'v20-abertura-reconhece-numero';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -58,14 +58,14 @@ const ROTEIRO = {
     'Atender bem quem chama o provedor no WhatsApp: dar suporte a quem já é assinante e atender como venda quem quer contratar.',
   passos: [
     {
-      titulo: 'Entender o motivo e triar',
+      titulo: 'Abertura — cumprimente e, se já conhecer o número, reconheça na hora',
       descricao:
-        'Cumprimente e descubra do que se trata antes de pedir qualquer dado. Depois roteie: se for assunto de assinante (sem internet, fatura, 2ª via, chamado, status), vá para "Identificar o cliente"; se for contratar/saber de planos, é venda (situação "Venda"). Sempre diga o próximo passo — nunca deixe a pessoa sem ação.',
+        'Logo na PRIMEIRA mensagem, já verifique se o número do WhatsApp está salvo no cadastro de algum cliente (identificação por telefone) e conduza a saudação conforme o resultado, tudo numa mensagem só: (a) se o número JÁ estiver salvo para um cliente, reconheça na própria saudação, de forma transparente — "Olá! Vejo que este número está salvo para o cliente <nome>. É sobre a conexão dele(a) ou de outro cliente?" — e diga que, se for de outro, é só enviar o CPF/CNPJ; (b) se o número NÃO estiver em cadastro nenhum, cumprimente e pergunte do que se trata (suporte de assinante: sem internet, fatura, 2ª via, chamado — ou contratar, que é venda). Sempre diga o próximo passo. Não presuma o assunto nem "sua conta"; o reconhecimento do número não confirma que o atendimento é para aquele cliente.',
     },
     {
-      titulo: 'Identificar o cliente (só para suporte de assinante)',
+      titulo: 'Identificar o cliente certo (o documento manda)',
       descricao:
-        'Suporte de assinante só avança com o cliente certo identificado. Use a ferramenta de identificação; ela informa COMO achou o cliente e é essa a verdade que você apresenta: (1) se identificou por TELEFONE (o número do WhatsApp está salvo no cadastro de um cliente), seja transparente — "vejo que este número está salvo para o cliente <nome>" — e pergunte se o atendimento é sobre a conexão dele ou de OUTRO; se for outro, peça o CPF/CNPJ. Nunca diga que um CPF foi enviado se não foi. (2) se identificou por DOCUMENTO (a pessoa enviou CPF/CNPJ), confirme "Localizei o cadastro de <nome>. É para este cliente?". (3) se o número não está em cadastro nenhum e nenhum documento veio, peça o CPF/CNPJ e aguarde. O DOCUMENTO enviado pela pessoa sempre manda sobre o telefone. Mais de um cadastro no mesmo documento: mostre os endereços e peça para escolher — não escolha por ela.',
+        'Suporte de assinante só avança com o cliente certo. A ferramenta de identificação informa COMO achou o cliente — apresente a verdade (nunca diga que um CPF foi enviado se não foi). O CPF/CNPJ que a pessoa enviar SEMPRE manda sobre o telefone: se ela mandar um, identifique por ele e confirme "Localizei o cadastro de <nome>. É para este cliente?". Se o número era conhecido e a pessoa confirma que é sobre esse cliente, siga. Se for sobre outro cliente, ou o número não estava em cadastro, peça o CPF/CNPJ e aguarde. Mais de um cadastro no mesmo documento: mostre os endereços e peça para escolher — não escolha por ela.',
     },
     {
       titulo: 'Chegar até a conexão certa (diagnóstico)',
@@ -76,7 +76,7 @@ const ROTEIRO = {
   situacoes: [
     {
       quando: 'a conversa já estiver em andamento (com um cliente já identificado)',
-      faca: 'Não repita a saudação nem perguntas já respondidas; siga pelo cliente já identificado, pelo nome. Se a pessoa enviar um CPF/CNPJ diferente, re-identifique por esse documento e passe a atender o novo cliente.',
+      faca: 'Não repita perguntas já respondidas; siga pelo cliente já identificado, pelo nome. Se a pessoa enviar um CPF/CNPJ diferente, re-identifique por esse documento e passe a atender o novo cliente.',
     },
     {
       quando: 'for venda (contratar, preço ou cobertura)',
@@ -110,7 +110,8 @@ const PERSONA = {
   emojis: true,
   emojis_ui: 'moderado',
   brevity: 'medium',
-  rules_always: [],
+  // Só estilo/formato de conversa (não é regra de negócio — isso vive no roteiro).
+  rules_always: ['Cumprimentar uma única vez, no começo da conversa; não repetir "olá/oi" nas mensagens seguintes.'],
   rules_never: [],
 };
 
