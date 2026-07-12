@@ -59,6 +59,15 @@ export async function markChatRead(id) {
   } catch { return null; /* best-effort */ }
 }
 
+// Dispara "digitando…" no WhatsApp do cliente enquanto o atendente escreve.
+// Best-effort (UX) — a Meta expira sozinha em ~25s ou ao enviar a resposta.
+export async function sendTyping(id) {
+  try {
+    const { data } = await api.post(`/comm/whatsapp/chats/${id}/typing`);
+    return data;
+  } catch { return null; /* best-effort */ }
+}
+
 // Envio: repassa o erro cru quando for takeover (409) pro caller decidir.
 export async function sendChatMessage(id, body) {
   try {

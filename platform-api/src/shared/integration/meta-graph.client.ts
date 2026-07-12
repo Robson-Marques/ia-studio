@@ -41,6 +41,34 @@ function auth(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
 }
 
+/**
+ * Marca uma mensagem INCOMING como lida (tick azul no WhatsApp do cliente) e,
+ * opcionalmente, dispara o indicador "digitando…". Um único POST /messages faz
+ * as duas coisas (Meta): `status:'read'` + `typing_indicator:{type:'text'}`.
+ * O "digitando" auto-expira em ~25s ou quando a próxima mensagem é enviada, e
+ * é ancorado no wamid (external_id) de uma mensagem incoming — a Meta exige.
+ * Porte do padrão do Aquapark (whatsapp-meta.service.sendTypingIndicator).
+ * Doc: https://developers.facebook.com/docs/whatsapp/cloud-api/typing-indicators
+ */
+export async function markMessageRead(
+  token: string,
+  phoneNumberId: string,
+  externalMessageId: string,
+  opts?: { typing?: boolean },
+): Promise<Record<string, unknown>> {
+  return metaPost(
+    token,
+    `${phoneNumberId}/messages`,
+    {
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: externalMessageId,
+      ...(opts?.typing ? { typing_indicator: { type: 'text' } } : {}),
+    },
+    'marcar mensagem como lida',
+  );
+}
+
 // ─── GET/POST genericos ─────────────────────────────────────────────────
 
 export async function metaGet(token: string, path: string, context: string): Promise<Record<string, unknown>> {

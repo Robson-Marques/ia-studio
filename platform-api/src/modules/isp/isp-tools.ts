@@ -367,12 +367,20 @@ export class IspTools implements OnModuleInit {
         }
 
         // 3) Anti-duplicidade: já existe OS aberta pra este cliente/conexão?
-        const abertas = rows(
-          await this.connections.execute(ctx.organizationId, connectionId, 'os.listar_abertas', {
-            cpf,
-            ...(login ? { id_login: login } : {}),
-          }),
-        );
+        //    Rede de segurança: se a LISTAGEM falhar, NÃO trava a abertura — só
+        //    perde o anti-dup (melhor abrir do que deixar o cliente sem chamado
+        //    por um erro de consulta). Erro silencioso é pior: logamos o warn.
+        let abertas: Record<string, unknown>[] = [];
+        try {
+          abertas = rows(
+            await this.connections.execute(ctx.organizationId, connectionId, 'os.listar_abertas', {
+              cpf,
+              ...(login ? { id_login: login } : {}),
+            }),
+          );
+        } catch (e) {
+          this.logger.warn(`abrir_os: anti-duplicidade falhou (segue e abre): ${(e as Error).message}`);
+        }
         if (abertas.length > 0) {
           const ja = abertas[0];
           return {

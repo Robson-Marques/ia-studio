@@ -207,7 +207,19 @@ export class WhatsappInboxService {
 
   async markRead(organizationId: string, chatId: string): Promise<WhatsappChat> {
     await this.getChat(organizationId, chatId);
+    // Recibo de leitura no WhatsApp do cliente (tick azul) — sem "digitando"
+    // (o atendente só abriu a conversa). Best-effort: nunca quebra a leitura local.
+    await this.orchestrator.markReadByChat(organizationId, chatId, { typing: false }).catch(() => undefined);
     return this.chats.markRead(chatId);
+  }
+
+  // Dispara "digitando…" no WhatsApp do cliente enquanto o atendente escreve.
+  // A Meta ancora no wamid da última incoming; some ao enviar a resposta ou em
+  // ~25s. Best-effort (é UX): devolve {ok} sem lançar.
+  async sendTyping(organizationId: string, chatId: string): Promise<{ ok: boolean }> {
+    await this.getChat(organizationId, chatId);
+    await this.orchestrator.markReadByChat(organizationId, chatId, { typing: true }).catch(() => undefined);
+    return { ok: true };
   }
 
   // ─── Janela de 24h ──────────────────────────────────

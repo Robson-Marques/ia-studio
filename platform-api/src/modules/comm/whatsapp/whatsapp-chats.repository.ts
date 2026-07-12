@@ -174,6 +174,18 @@ export class WhatsappChatsRepository {
     return this.prisma.whatsappMessage.findFirst({ where: { external_id: externalId } });
   }
 
+  // Ultima mensagem INCOMING com external_id (wamid) — ancora do markRead/typing:
+  // a Meta exige um wamid de mensagem recebida pra marcar lida / mostrar "digitando".
+  async findLastIncomingAnchor(chatId: string): Promise<{ external_id: string; connection_id: string } | null> {
+    const msg = await this.prisma.whatsappMessage.findFirst({
+      where: { chat_id: chatId, direction: CommMessageDirection.INCOMING, external_id: { not: null } },
+      orderBy: { created_at: 'desc' },
+      select: { external_id: true, connection_id: true },
+    });
+    if (!msg?.external_id) return null;
+    return { external_id: msg.external_id, connection_id: msg.connection_id };
+  }
+
   async updateMessageStatusByExternalId(
     externalId: string,
     status: string,

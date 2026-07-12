@@ -22,6 +22,7 @@ import {
   getPhoneNumberInfo,
   listWabaPhoneNumbers,
   listWabaTemplates,
+  markMessageRead,
   sendMessage,
   subscribeAppToWaba,
   uploadMedia,
@@ -58,6 +59,7 @@ export class WhatsappMetaProvider extends BaseProvider {
         'execute:createTemplate',
         'execute:syncStatus',
         'execute:downloadMedia',
+        'execute:markRead',
       ],
       wizardSchema: {
         testable: true,
@@ -262,6 +264,14 @@ export class WhatsappMetaProvider extends BaseProvider {
           category: typeof p['category'] === 'string' ? (p['category'] as string) : 'UTILITY',
           components: Array.isArray(p['components']) ? (p['components'] as unknown[]) : [],
         });
+      }
+      case 'markRead': {
+        // Marca uma mensagem incoming como lida (tick azul) e, se typing=true,
+        // dispara o "digitando…". Best-effort: nunca deve quebrar o fluxo de
+        // atendimento — quem chama trata como opcional.
+        const messageId = String(p['message_id'] ?? '');
+        if (!messageId) throw new BadRequestException('markRead exige "message_id".');
+        return markMessageRead(token, phoneNumberId, messageId, { typing: p['typing'] === true });
       }
       case 'syncStatus':
         return getPhoneNumberInfo(token, phoneNumberId);

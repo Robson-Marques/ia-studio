@@ -162,6 +162,36 @@ export class WhatsappOrchestratorService {
     return { wamid: result?.wamid ?? null, connectionId: connection.id, chatId: chat.id };
   }
 
+  // ─── Lida (tick azul) + digitando ──────────────────────────────────
+  // Porte do padrao Aquapark: um POST /messages marca a mensagem incoming como
+  // lida e, com typing=true, mostra "digitando…" no WhatsApp do cliente (some
+  // sozinho em ~25s ou quando enviamos a resposta). Best-effort — UX nunca pode
+  // quebrar o atendimento; engolimos o erro (mas logamos em debug).
+
+  async markRead(
+    organizationId: string,
+    connectionId: string,
+    messageId: string,
+    opts?: { typing?: boolean },
+  ): Promise<void> {
+    if (!messageId) return;
+    try {
+      await this.connections.execute(organizationId, connectionId, 'markRead', {
+        message_id: messageId,
+        typing: opts?.typing === true,
+      });
+    } catch (e) {
+      this.logger.debug(`markRead falhou (ignorado): ${(e as Error).message}`);
+    }
+  }
+
+  /** Como markRead, resolvendo a última mensagem incoming (wamid) do chat. */
+  async markReadByChat(organizationId: string, chatId: string, opts?: { typing?: boolean }): Promise<void> {
+    const anchor = await this.chats.findLastIncomingAnchor(chatId).catch(() => null);
+    if (!anchor) return;
+    await this.markRead(organizationId, anchor.connection_id, anchor.external_id, opts);
+  }
+
   // ─── Janela de 24h ──────────────────────────────────
 
   async windowState(connectionId: string, rawPhone: string): Promise<WindowState> {

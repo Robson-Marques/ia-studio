@@ -147,6 +147,16 @@ export class WhatsappInboxController {
     return this.inbox.markRead(resolveOrganizationId(user, orgQuery), id);
   }
 
+  @Post('chats/:id/typing')
+  @RequirePermissions(...ANY_REPLY)
+  typing(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.inbox.sendTyping(resolveOrganizationId(user, orgQuery), id);
+  }
+
   @Post('chats/:id/send')
   @RequirePermissions(...ANY_REPLY)
   send(

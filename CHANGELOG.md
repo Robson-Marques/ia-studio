@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.9.44 - 2026-07-12 (WhatsApp: tick azul + "digitando" · assistente menos engessado · OS mais robusta)
+
+Sem `db push` (nenhuma mudança de schema). Backend + front do admin.
+
+- **Tick azul (lida) + "digitando…" no WhatsApp do cliente** — porte do padrão do Aquapark pra estrutura do IA Studio (Provider Registry). Um único POST à Meta (`status:'read'` + `typing_indicator`) marca a mensagem como lida e mostra "digitando" (some ao enviar a resposta ou em ~25s), ancorado no wamid da última mensagem recebida.
+  - **A IA** marca lida + "digitando" assim que começa a processar a mensagem (o cliente vê o feedback enquanto a IA pensa).
+  - **O atendente** marca lida ao abrir a conversa (tick azul) e dispara "digitando" enquanto escreve no campo de mensagem (throttle, só dentro da janela de 24h).
+  - Novo: `markMessageRead` no cliente Graph, operação `markRead` no provider `whatsapp-meta`, `markRead`/`markReadByChat` no orquestrador, endpoint `POST /comm/whatsapp/chats/:id/typing`. Tudo best-effort — UX nunca quebra o atendimento.
+- **Assistente menos engessado (continuidade/memória)** — depois de identificar/confirmar o cliente, a IA NÃO recomeça com a saudação nem repergunta "em que posso ajudar" quando o motivo já foi dito: dá andamento ao que a pessoa já pediu. E só informa o **oposto** do normal — não fica anunciando "seu contrato está ativo" (o esperado), só sinaliza bloqueio/cancelamento/incidente.
+- **Múltiplos logins no mesmo contrato** — quando o cadastro tem mais de uma conexão, a IA PERGUNTA a qual login o cliente se refere, **listando o endereço** de cada um, antes de tratar status ou abrir chamado (não age no login errado).
+- **Abertura de OS mais robusta** — a IA passou a **chamar a ferramenta de abrir OS na mesma resposta** ao "sim" (não protela com "já volto com o número"); e a checagem anti-duplicidade agora é **tolerante a falha** (se a listagem de OS abertas der erro, abre mesmo assim em vez de travar — erro silencioso não bloqueia o chamado). Refresh do conteúdo do assistente-exemplo: `v11-continuidade-os`.
+
 ## v0.9.43 - 2026-07-11 (dropdown de Setor da OS: lê empresa_setor, só ativos + fallback)
 
 - **A causa do Setor vazio: eu lia a tabela errada.** A doc do IXC mostra que o campo `setor` da OS (`su_oss_chamado`) referencia **`empresa_setor.id`**, não `su_oss_setor` (que fica vazio em muitas bases). Troquei o discover (e o `atendimento.listar_setor`) para ler `empresa_setor` — agora o dropdown popula com os setores reais, e **só os ativos** (`ativo='S'`).

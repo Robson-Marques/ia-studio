@@ -8,6 +8,7 @@ import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsService } from '../agents/agents.service';
 import { WhatsappMessage } from '@prisma/client';
 import { WhatsappInboxService } from '../../comm/whatsapp/whatsapp-inbox.service';
+import { WhatsappOrchestratorService } from '../../comm/whatsapp/whatsapp-orchestrator.service';
 import { ChatAssignmentService } from '../../comm/attendance/chat-assignment.service';
 
 // Janela de debounce: agrupa mensagens picadas do mesmo contato numa resposta só.
@@ -20,6 +21,7 @@ export class AgentNodes implements OnModuleInit {
     private readonly runner: AgentRunnerService,
     private readonly agents: AgentsService,
     private readonly inbox: WhatsappInboxService,
+    private readonly orchestrator: WhatsappOrchestratorService,
     private readonly assignment: ChatAssignmentService,
   ) {}
 
@@ -75,6 +77,17 @@ export class AgentNodes implements OnModuleInit {
         // mensagem (já com todo o histórico). Evita 3 respostas pra 3 mensagens.
         const inp = (ctx.input ?? {}) as Record<string, unknown>;
         const triggerMsgId = typeof inp['external_id'] === 'string' ? (inp['external_id'] as string) : null;
+        const connId = typeof inp['connection_id'] === 'string' ? (inp['connection_id'] as string) : null;
+
+        // UX imediata: marca a mensagem do cliente como LIDA (tick azul) e mostra
+        // "digitando…" — some sozinho ao enviar a resposta ou em ~25s. Best-effort,
+        // roda antes do debounce pra o cliente ver o feedback enquanto a IA pensa.
+        if (connId && triggerMsgId) {
+          await this.orchestrator
+            .markRead(ctx.organizationId, connId, triggerMsgId, { typing: true })
+            .catch(() => undefined);
+        }
+
         if (session && triggerMsgId) {
           await new Promise((r) => setTimeout(r, DEBOUNCE_MS));
           const latest: WhatsappMessage[] = await this.inbox

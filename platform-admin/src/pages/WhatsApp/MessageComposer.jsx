@@ -15,7 +15,7 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { FormField, TextInput, Select } from '../../components/ui/FormField';
 import { toast } from '../../lib/toast';
-import { sendChatMessage, uploadChatMedia } from '../../services/whatsapp';
+import { sendChatMessage, uploadChatMedia, sendTyping } from '../../services/whatsapp';
 import AudioPlayer from './AudioPlayer';
 
 // Detecta o "kind" da Meta a partir do mime do arquivo.
@@ -89,6 +89,17 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
   const [attachMenu, setAttachMenu] = useState(false);
   const taRef = useRef(null);
   function pickFrom(ref) { setAttachMenu(false); ref.current?.click(); }
+
+  // "Digitando…" no WhatsApp do cliente enquanto o atendente escreve. A Meta
+  // mostra por ~25s (ou some ao enviar); throttle local pra não floodar a API.
+  const lastTypingRef = useRef(0);
+  function notifyTyping() {
+    if (expired || closed || sending) return;
+    const now = Date.now();
+    if (now - lastTypingRef.current < 8000) return;
+    lastTypingRef.current = now;
+    sendTyping(chat.id);
+  }
 
   // Janela de 24h + template (fluxo do IA Studio — mantido).
   const [mediaOpen, setMediaOpen] = useState(false);
@@ -494,7 +505,7 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
           <textarea
             ref={taRef}
             value={text}
-            onChange={(e) => { setText(e.target.value); autoGrow(); }}
+            onChange={(e) => { setText(e.target.value); autoGrow(); notifyTyping(); }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !expired) { e.preventDefault(); send(); }
             }}
