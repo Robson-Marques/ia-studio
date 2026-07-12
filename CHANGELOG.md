@@ -1,9 +1,20 @@
 # Changelog — IA Studio
 
+## v0.9.40 - 2026-07-11 (ajustes finos do assistente: abertura, CPF, status, chamado)
+
+Cumulativa — garante no ar os ajustes de comportamento do assistente-exemplo (alguns já descritos na v0.9.39; esta versão assegura que todos entraram no build):
+
+- **Abertura neutra:** cumprimenta e pergunta o motivo sem presumir que já identificou ("Robson" é só o nome do WhatsApp) — nada de "sua conta" antes de identificar.
+- **Não inventa CPF:** ao não achar pelo telefone, apenas pede o CPF educadamente; não diz "não localizei este CPF" quando ninguém enviou CPF.
+- **Sem contradição de status:** não fala "conexão ativa" e "conexão offline" na mesma frase — separa **contrato ativo** de **conexão offline no momento**.
+- **Chamado sem beco sem saída:** em problema técnico, se a pessoa quer chamado, **encaminha claramente para um atendente humano** abrir a OS (a IA não abre a OS diretamente) — nunca um vago "acompanhe pelo suporte" nem promessa de chamado não aberto.
+
 ## v0.9.39 - 2026-07-11 (CPF com mais de um cadastro/contrato — pergunta qual)
 
 - **Múltiplos cadastros/contratos no mesmo CPF/CNPJ.** O auto-vínculo só liga sozinho quando há **exatamente 1** cadastro. Se a identificação retorna **mais de um** (endereços/instalações diferentes), o assistente **não escolhe sozinho** e **não pede pra a pessoa digitar o endereço** (o que ela escreve pode não bater com o cadastro): ele **apresenta os endereços JÁ CADASTRADOS numa lista numerada** (como vieram do sistema) e a pessoa **escolhe pelo número**; só depois vincula o cadastro escolhido (pelo id). Idem para um cadastro com **vários contratos/conexões**. (Refresh `v9-multiplos-cadastros`.)
 - **Abertura mais clara (sem parecer que já identificou).** A saudação dizia "Olá, Robson! ...suporte com sua conta" dando a entender que já sabia quem era — mas "Robson" é só o nome do WhatsApp e ninguém foi identificado ainda. Agora o assistente cumprimenta de forma **neutra** e pergunta **claramente o motivo**, sem falar "sua conta/seu cadastro" antes de identificar; enquanto o número não está vinculado, trata como desconhecido (descobre se é suporte de assinante ou interesse em contratar).
+- **Fim da mensagem confusa "não localizei este CPF" quando ninguém deu CPF.** O assistente tentava identificar pelo telefone do WhatsApp; ao não achar, dizia "não consegui localizar um cadastro associado a este CPF" — sem a pessoa ter enviado CPF nenhum. Agora, se não encontra pelo telefone, ele apenas **pede o CPF/CNPJ educadamente**; só fala em "cadastro não encontrado" depois de um CPF de verdade não bater.
+- **Suporte técnico: fim da contradição e do beco sem saída.** Não fala mais "conexão ativa" e "conexão offline" na mesma frase (separa **contrato ativo** de **conexão offline no momento**). E, quando é problema técnico e a pessoa quer chamado, em vez de "não posso abrir... acompanhe pelo suporte" (vago), ele **encaminha claramente para um atendente humano** dar sequência/abrir o chamado — nunca promete um chamado que não foi aberto.
 - Cumulativa com a v0.9.38 (auto-vínculo ao identificar) e v0.9.37 (assume da IA + close→pool + fluxo técnico).
 
 ## v0.9.38 - 2026-07-11 (vínculo AUTOMÁTICO ao identificar + garante close→pool)
