@@ -102,6 +102,11 @@ export class IspTools implements OnModuleInit {
           ? await this.connections.execute(ctx.organizationId, connectionId, 'cliente.dados', { cpf })
           : await this.connections.execute(ctx.organizationId, connectionId, 'cliente.por_telefone', { telefone });
         const clientes = rows(raw).map(projectCliente);
+        // Determinístico: o modelo NÃO adivinha como o cliente foi achado. Se veio
+        // por CPF/CNPJ digitado = 'documento'; se foi pelo telefone do WhatsApp =
+        // 'telefone'. O assistente apresenta a verdade (nunca "CPF enviado" quando
+        // a identificação foi pelo número).
+        const identificadoPor = cpf ? 'documento' : 'telefone';
         // Auto-vínculo (determinístico, não depende do modelo chamar outra tool):
         // achou EXATAMENTE 1 cliente e há uma conversa em contexto → grava o
         // vínculo CPF↔WhatsApp. Outro CPF depois re-identifica e re-vincula.
@@ -116,7 +121,7 @@ export class IspTools implements OnModuleInit {
             })
             .catch(() => undefined);
         }
-        return { clientes };
+        return { identificado_por: identificadoPor, clientes };
       },
     });
 

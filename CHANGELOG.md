@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.9.52 - 2026-07-12 (Consolidação do agente ISP — fim da duplicidade + identificação determinística + persona padrão)
+
+Sem `db push`. Backend. Conteúdo do assistente re-aplicado (`v19`).
+
+- **Fim da duplicidade de lógica do agente.** A mesma regra vivia em 3-6 lugares (system_prompt + roteiro passos + roteiro situações + persona) com frases diferentes — o modelo recebia instruções redundantes/conflitantes e produzia respostas sem lógica. Agora cada assunto tem UMA casa: **persona** = só tom/formato; **system_prompt** = 3 guardrails transversais (quem você é / dado é do titular / não invente); **roteiro** = casa única do fluxo (triar → identificar → diagnóstico + situações), cada regra uma vez. Sem regra de negócio na persona nem no system_prompt.
+- **Identificação determinística (raiz do "CPF enviado" fantasma).** A tool `identificar_cliente` passou a devolver COMO identificou (`identificado_por: 'telefone' | 'documento'`). O assistente apresenta a verdade — se foi pelo telefone, diz "este número está salvo para o cliente X"; nunca mais afirma que um CPF foi enviado quando não foi. Mesma filosofia da frente 1 (sistema decide, modelo apresenta).
+- **"Nome que a IA usa" agora funciona.** O campo `name` da persona era ignorado pelo backend (não chegava no prompt). Agora o `compilePersona` injeta "Você se chama <nome>" — o assistente se apresenta pelo nome de verdade (genérico, vale para todo agente).
+- **Persona padrão do exemplo ISP:** nasce como NETE, tom amigável, emojis moderado, respostas médias (4-6 frases) — os padrões pedidos. Como viajam no CONTENT_VERSION, não "resetam" a cada atualização. Modelo padrão do exemplo ajustado para `gpt-5.4` (confirmado respondendo; o `gpt-5.5` não retornou nos testes).
+
 ## v0.9.51 - 2026-07-12 (Identidade — documento manda sobre telefone + transparência na identificação por telefone)
 
 Sem `db push`. Backend. Conteúdo do assistente re-aplicado (`v18`).

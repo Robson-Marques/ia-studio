@@ -2,6 +2,8 @@
 // Aquapark, generico). persona = { tone, emojis, brevity, rules_always[],
 // rules_never[] }. Sem dependencia de segmento.
 export interface AgentPersona {
+  /** Nome com que a IA se apresenta ("Nome que a IA usa" no editor). */
+  name?: string;
   tone?: string;
   emojis?: boolean;
   brevity?: 'short' | 'medium' | 'long' | string;
@@ -20,6 +22,7 @@ export function parsePersona(raw: unknown): AgentPersona {
   if (!raw || typeof raw !== 'object') return {};
   const p = raw as Record<string, unknown>;
   return {
+    name: typeof p['name'] === 'string' ? p['name'] : undefined,
     tone: typeof p['tone'] === 'string' ? p['tone'] : undefined,
     emojis: typeof p['emojis'] === 'boolean' ? p['emojis'] : undefined,
     brevity: typeof p['brevity'] === 'string' ? p['brevity'] : undefined,
@@ -36,6 +39,7 @@ export function parsePersona(raw: unknown): AgentPersona {
 export function compilePersona(raw: unknown): string {
   const persona = parsePersona(raw);
   const lines: string[] = [];
+  if (persona.name) lines.push(`Você se chama ${persona.name} — apresente-se por esse nome quando fizer sentido.`);
   if (persona.tone) lines.push(`Tom de voz: ${persona.tone}.`);
   if (persona.emojis === false) lines.push('Não use emojis.');
   if (persona.emojis === true) lines.push('Pode usar emojis com moderação.');
