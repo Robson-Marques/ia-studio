@@ -471,21 +471,23 @@ export class IxcProvider extends BaseProvider {
   }
 
   /**
-   * Resolve o id NUMERICO de radusuarios a partir do NOME do login (PPPoE). O
-   * su_oss_chamado.id_login e FK pro id, mas o agente/diagnostico trabalha com o
-   * NOME do login. Ja numerico → devolve como esta. Nao encontrou → undefined (a
-   * OS abre sem login, com origem no endereco do cliente, em vez de falhar).
+   * Resolve a conexao (radusuarios) a partir do NOME do login (PPPoE) OU do id.
+   * Devolve o id NUMERICO + o contrato do login + se ele tem endereco proprio — a
+   * OS usa os tres: `id_login`/`id_contrato` sao FKs numericas, e `origem_endereco`
+   * e 'L' so quando o login tem endereco proprio (senao 'C', herda do cliente).
+   * Ja numerico → busca a mesma linha pra ter contrato/endereco. Nao encontrou →
+   * undefined (a OS abre sem login, com origem no cliente, em vez de falhar).
    */
-  private async resolveLoginId(
+  private async resolveLogin(
     ctx: ProviderContext,
     token: string,
     loginArg: string | undefined,
     idCliente?: string,
-  ): Promise<string | undefined> {
+  ): Promise<{ id: string; idContrato?: string; enderecoProprio: boolean } | undefined> {
     const v = loginArg?.trim();
     if (!v) return undefined;
-    if (/^\d+$/.test(v)) return v; // ja e o id numerico
-    const filters: IxcGridFilter[] = [{ TB: `${T.radusuarios}.login`, OP: '=', P: v }];
+    const col = /^\d+$/.test(v) ? `${T.radusuarios}.id` : `${T.radusuarios}.login`;
+    const filters: IxcGridFilter[] = [{ TB: col, OP: '=', P: v }];
     if (idCliente) filters.push({ TB: `${T.radusuarios}.id_cliente`, OP: '=', P: idCliente });
     const rows = await this.list(ctx, token, T.radusuarios, {
       page: '1',
@@ -494,7 +496,14 @@ export class IxcProvider extends BaseProvider {
       sortorder: 'asc',
       grid_param: buildGridParam(filters),
     });
-    return rows[0] ? String(rows[0]['id']) : undefined;
+    const row = rows[0];
+    if (!row) return undefined;
+    return {
+      id: String(row['id']),
+      idContrato: row['id_contrato'] ? String(row['id_contrato']) : undefined,
+      // 'S' = herda o endereco do cliente → origem CLIENTE; diferente de 'S' = proprio.
+      enderecoProprio: String(row['endereco_padrao_cliente'] ?? '').toUpperCase() !== 'S',
+    };
   }
 
   /**
@@ -646,7 +655,7 @@ export class IxcProvider extends BaseProvider {
     });
     // id_login da OS e o id NUMERICO de radusuarios — resolve o nome do login
     // pro id, senao o filtro nunca casa (nome != id) e a anti-dup nao funciona.
-    const login = await this.resolveLoginId(ctx, token, this.str(args, 'id_login'), String(idCliente));
+    const login = (await this.resolveLogin(ctx, token, this.str(args, 'id_login'), String(idCliente)))?.id;
     const setor = this.str(args, 'setor');
     return rows.filter((r) => {
       const status = String(r['status'] ?? '').toUpperCase();
@@ -668,10 +677,15 @@ export class IxcProvider extends BaseProvider {
     const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true));
     const assunto = this.str(args, 'id_assunto') ?? this.str(args, 'motivo');
     const setor = this.str(args, 'setor');
-    // id_login no su_oss_chamado e FK pro id NUMERICO de radusuarios — NAO o nome
-    // PPPoE. O agente conhece o NOME ("torre3pratinha"); resolve pro id aqui, senao
-    // o IXC recusa a abertura (ou abre no ponto errado).
-    const login = await this.resolveLoginId(ctx, token, this.str(args, 'id_login'), String(cliente['id']));
+    // Resolve a conexao (id_login e FK pro id NUMERICO de radusuarios, nao o nome
+    // PPPoE) e traz junto o contrato do login + se ele tem endereco proprio — usados
+    // abaixo pra preencher id_contrato e a origem do endereco deterministicamente.
+    const conexao = await this.resolveLogin(ctx, token, this.str(args, 'id_login'), String(cliente['id']));
+    const login = conexao?.id;
+    // id_contrato: o passado (se numerico) OU, deterministico, o contrato do proprio
+    // login (o login ja diz a qual contrato pertence — o agente nao precisa acertar).
+    const idContratoArg = this.str(args, 'id_contrato');
+    const idContrato = idContratoArg && /^\d+$/.test(idContratoArg) ? idContratoArg : conexao?.idContrato;
     if (!assunto) {
       throw new BadRequestException(
         'Informe "id_assunto" (id do assunto da OS no IXC). Os assuntos disponíveis vêm do Descobrir recursos da conexão.',
@@ -699,17 +713,13 @@ export class IxcProvider extends BaseProvider {
       status: 'A',
       prioridade: 'N',
       melhor_horario_agenda: 'Q',
-      // Origem do endereço: com login informado, usa o endereço do LOGIN ('L');
-      // senão o do CLIENTE ('C'). NUNCA 'M' (manual) — 'M' abria a OS com
-      // endereço/lat-long vazios (era o que acontecia). Sobrescrevível via `extra`.
-      origem_endereco: login ? 'L' : 'C',
+      // Origem do endereço: LOGIN ('L') só quando o login tem endereço PRÓPRIO;
+      // senão CLIENTE ('C') — o login herda o endereço do cadastro (caso comum).
+      // NUNCA 'M' (manual, que abria a OS com endereço/lat-long vazios). Sobrescrevível via `extra`.
+      origem_endereco: conexao?.enderecoProprio ? 'L' : 'C',
       data_abertura: ixcDateTime(),
       ...(login ? { id_login: login } : {}),
-      // id_contrato tambem e o id NUMERICO (FK pra cliente_contrato). O diagnostico
-      // ja entrega o id; a guarda numerica evita mandar plano/nome por engano.
-      ...(this.str(args, 'id_contrato') && /^\d+$/.test(this.str(args, 'id_contrato')!)
-        ? { id_contrato: this.str(args, 'id_contrato') }
-        : {}),
+      ...(idContrato ? { id_contrato: idContrato } : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };
     return this.write(ctx, token, 'POST', T.os, body);

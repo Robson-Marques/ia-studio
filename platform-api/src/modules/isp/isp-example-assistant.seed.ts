@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v21-mostrar-opcoes-escolher';
+const CONTENT_VERSION = 'v22-os-contrato-origem-negrito';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -111,7 +111,10 @@ const PERSONA = {
   emojis_ui: 'moderado',
   brevity: 'medium',
   // Só estilo/formato de conversa (não é regra de negócio — isso vive no roteiro).
-  rules_always: ['Cumprimentar uma única vez, no começo da conversa; não repetir "olá/oi" nas mensagens seguintes.'],
+  rules_always: [
+    'Cumprimentar uma única vez, no começo da conversa; não repetir "olá/oi" nas mensagens seguintes.',
+    'No WhatsApp, negrito é com UM asterisco de cada lado (*assim*), NUNCA dois (**assim**); usar com moderação.',
+  ],
   rules_never: [],
 };
 

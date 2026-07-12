@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.9.56 - 2026-07-12 (OS completa: contrato + origem do endereço automáticos; negrito do WhatsApp)
+
+Sem `db push`. Backend (provider IXC) + conteúdo do assistente (`v22`).
+
+- **OS sai com o contrato preenchido (automático).** Ao resolver o login, o provider já traz o contrato do próprio login (`radusuarios.id_contrato`) e preenche o `id_contrato` da OS — o agente não precisa acertar. (Antes a OS abria com o Contrato vazio.)
+- **Origem do endereço correta.** O `origem_endereco` passa a ser `'L'` (Login) só quando o login tem endereço PRÓPRIO; quando ele herda o endereço do cadastro (`endereco_padrao_cliente='S'`, caso comum), usa `'C'` (Cliente). Antes marcava sempre 'L' quando havia login, mesmo o endereço vindo do cliente. O helper `resolveLoginId` virou `resolveLogin` e devolve id + contrato + flag de endereço próprio.
+- **Negrito do WhatsApp (1 asterisco).** O assistente usava `**texto**` (Markdown), que o WhatsApp mostra literal. Regra de formato na persona: negrito é `*texto*` (um asterisco de cada lado).
+
 ## v0.9.55 - 2026-07-12 (Abrir OS: resolve o login pelo id — não pelo nome)
 
 Sem `db push`. Backend (provider IXC).

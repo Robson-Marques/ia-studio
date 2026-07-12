@@ -23,7 +23,9 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.55** engatilhada (abrir OS resolve login/contrato pelo id, não pelo nome). **v0.9.54 no ar**
+- **v0.9.56** engatilhada (OS preenche contrato + origem do endereço automático; negrito WhatsApp 1
+  asterisco). **v0.9.55 no ar** (abrir OS resolve login pelo id — a OS 36529 abriu com login 3883).
+  **v0.9.54 no ar**
   (fix deploy worker + opções pro cliente escolher). ⚠️ **FRENTE 1 VALIDADA no WhatsApp de ponta a
   ponta** (contrato→login→status offline→oferta de chamado). Só a abertura da OS falhava por passar
   o NOME do login onde o IXC quer o id — corrigido na v0.9.55. **v0.9.55 já reinicia o worker sozinho**
@@ -50,8 +52,8 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v21`** (mostrar opções pro cliente escolher; v0.9.54).
-  Antes: v20 (abertura reconhece o número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
+- **Prompt do assistente ISP: `CONTENT_VERSION v22`** (negrito WhatsApp 1 asterisco; v0.9.56). Antes:
+  v21 (mostrar opções, v0.9.54), v20 (abertura reconhece número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação
   determinística via `identificado_por`. Ao mexer no comportamento, editar NA CASA CERTA — não
   reintroduzir a mesma regra em 2 lugares. Antes: v18 (identidade, v0.9.51), v17 (funil, v0.9.50). O passo "chegar até o login" usa a tool `diagnosticar_conexao`, que é a **única
