@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.9.45 - 2026-07-12 (agrupamento de mensagens na origem (porte Aquapark) + re-aplica prompt do assistente)
+
+Sem `db push`. Backend + front do admin. Corrige o que a v0.9.44 não resolveu.
+
+- **Agrupamento de mensagens picadas refeito — na ORIGEM, igual ao Aquapark.** A v0.9.44 ainda tinha o debounce DENTRO do nó Assistente: cada mensagem virava um run que dormia e comparava ids, e a própria resposta da IA "superava" a mensagem seguinte do cliente — resultado, respondia só a saudação e perdia contexto. Agora o agrupamento é no **dispatch** (`AutomationProcessors`), portando o padrão do SDR do Aquapark: um timer **por conversa** que REINICIA a cada mensagem nova e dispara **UMA vez** quando o cliente para de digitar. Chega **um** run só ao assistente, que lê o histórico completo e responde **juntando tudo**. Janela por `WHATSAPP_DEBOUNCE_MS` (default 8s). O debounce interno do nó foi removido.
+- **Comportamento do assistente movido para o LUGAR CERTO (Passos + Situações).** Antes o comportamento vivia num blocão em "Instruções adicionais (avançado)" — só o dev entendia. Agora vive no **roteiro estruturado** (aba "O que faz"): Passos na ordem (entender motivo · continuar de onde parou · identificar · venda não pede CPF · escolher a conexão certa) e Situações "Quando… faça…" (sem internet, incidente na região, abrir chamado no "sim", 2ª via, venda). O dono do negócio abre o assistente e **lê/edita a lógica nas caixinhas**. "Instruções adicionais" ficou com 3 guardrails gerais só.
+- **Prompt volta a ser re-aplicado no assistente existente.** A v0.9.44 marcou o conteúdo `v11` como semeado, então os ajustes não pegavam (por isso ainda anunciava "contrato ativo"). Bump para `v13-roteiro-estruturado` força a re-aplicação: **não anuncia o normal** (só o oposto — bloqueio/cancelado/incidente), **não recomeça a saudação** depois de identificar, **pergunta qual login** (com o endereço) quando há mais de um, e **abre a OS na mesma resposta** ao "sim".
+- **Tick azul + "digitando"** (já descritos na v0.9.44) seguem: a IA marca lida + "digitando" ao começar; o atendente marca lida ao abrir e dispara "digitando" ao escrever.
+
 ## v0.9.44 - 2026-07-12 (WhatsApp: tick azul + "digitando" · assistente menos engessado · OS mais robusta)
 
 Sem `db push` (nenhuma mudança de schema). Backend + front do admin.

@@ -11,9 +11,6 @@ import { WhatsappInboxService } from '../../comm/whatsapp/whatsapp-inbox.service
 import { WhatsappOrchestratorService } from '../../comm/whatsapp/whatsapp-orchestrator.service';
 import { ChatAssignmentService } from '../../comm/attendance/chat-assignment.service';
 
-// Janela de debounce: agrupa mensagens picadas do mesmo contato numa resposta só.
-const DEBOUNCE_MS = 7000;
-
 @Injectable()
 export class AgentNodes implements OnModuleInit {
   constructor(
@@ -71,33 +68,20 @@ export class AgentNodes implements OnModuleInit {
           return { handle: 'success', output: { simulated: true, agent_id: agentId, scope_keys: scopeKeys } };
         }
 
-        // Debounce (agrupa mensagens picadas): se veio de um inbound de WhatsApp,
-        // espera uma janela curta; se chegou mensagem MAIS NOVA nesta conversa,
-        // esta execução NÃO responde — quem responde é a execução da última
-        // mensagem (já com todo o histórico). Evita 3 respostas pra 3 mensagens.
+        // O agrupamento de mensagens picadas (debounce por conversa) acontece na
+        // ORIGEM do dispatch (AutomationProcessors.handleEvent) — quando o cliente
+        // manda várias mensagens seguidas, chega UM run só aqui, já com todas no
+        // histórico. Aqui só damos o feedback de UX e rodamos.
         const inp = (ctx.input ?? {}) as Record<string, unknown>;
         const triggerMsgId = typeof inp['external_id'] === 'string' ? (inp['external_id'] as string) : null;
         const connId = typeof inp['connection_id'] === 'string' ? (inp['connection_id'] as string) : null;
 
         // UX imediata: marca a mensagem do cliente como LIDA (tick azul) e mostra
-        // "digitando…" — some sozinho ao enviar a resposta ou em ~25s. Best-effort,
-        // roda antes do debounce pra o cliente ver o feedback enquanto a IA pensa.
+        // "digitando…" — some sozinho ao enviar a resposta ou em ~25s. Best-effort.
         if (connId && triggerMsgId) {
           await this.orchestrator
             .markRead(ctx.organizationId, connId, triggerMsgId, { typing: true })
             .catch(() => undefined);
-        }
-
-        if (session && triggerMsgId) {
-          await new Promise((r) => setTimeout(r, DEBOUNCE_MS));
-          const latest: WhatsappMessage[] = await this.inbox
-            .listMessages(ctx.organizationId, session, 1)
-            .catch(() => []);
-          const latestId = latest[0]?.external_id ?? null;
-          if (latestId && latestId !== triggerMsgId) {
-            await ctx.log('info', 'debounce: chegou mensagem mais nova nesta conversa — esta execução não responde.');
-            return { handle: 'error', output: { debounced: true } };
-          }
         }
 
         // Continuidade: se a sessão é uma conversa de WhatsApp (chat_id), carrega

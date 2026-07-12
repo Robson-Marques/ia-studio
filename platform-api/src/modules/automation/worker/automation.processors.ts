@@ -68,10 +68,45 @@ export class AutomationProcessors implements OnApplicationBootstrap {
 
   // ─── Dispatcher de eventos → gatilhos 'event' ───────
 
+  // Debounce por CONVERSA do inbound de WhatsApp (porte do Aquapark
+  // SdrTriggerListener): quando o cliente manda várias mensagens picadas, o
+  // timer REINICIA a cada mensagem e só dispara UMA vez quando ele para de
+  // digitar — o assistente lê o histórico completo e responde juntando tudo.
+  // Sem isto, cada mensagem virava um run isolado (e a IA perdia contexto /
+  // respondia solto). In-memory: coalesce por processo do worker.
+  private static readonly INBOUND_EVENT = 'whatsapp.inbound.message';
+  private static readonly INBOUND_DEBOUNCE_MS = Number(process.env['WHATSAPP_DEBOUNCE_MS'] ?? 8000);
+  private readonly inboundDebounce = new Map<string, ReturnType<typeof setTimeout>>();
+
   private async handleEvent(job: BrokerJob<EventEnvelope>): Promise<void> {
     const envelope = job.data;
     if (!envelope?.event || !envelope.organization_id) return;
 
+    // Agrupa a rajada de mensagens da mesma conversa num único disparo.
+    const chatId =
+      envelope.event === AutomationProcessors.INBOUND_EVENT
+        ? ((envelope.payload as Record<string, unknown> | undefined)?.['chat_id'] as string | undefined)
+        : undefined;
+    if (chatId && AutomationProcessors.INBOUND_DEBOUNCE_MS > 0) {
+      const existing = this.inboundDebounce.get(chatId);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => {
+        this.inboundDebounce.delete(chatId);
+        // Dispara com o envelope da ÚLTIMA mensagem da rajada (as anteriores
+        // estão no histórico que o assistente lê).
+        void this.dispatchEvent(envelope).catch((e) =>
+          this.logger.warn(`Inbound debounce chat ${chatId}: ${(e as Error).message}`),
+        );
+      }, AutomationProcessors.INBOUND_DEBOUNCE_MS);
+      this.inboundDebounce.set(chatId, timer);
+      return; // o run real acontece quando o cliente parar de digitar
+    }
+
+    await this.dispatchEvent(envelope);
+  }
+
+  // Casa o evento com os fluxos publicados de gatilho 'event' e vira execução.
+  private async dispatchEvent(envelope: EventEnvelope): Promise<void> {
     const published = await this.workflowsRepository.findPublishedByOrg(envelope.organization_id);
     for (const workflow of published) {
       // Escopo (diretriz 4): evento com ambiente so dispara fluxo do MESMO ambiente.

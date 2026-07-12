@@ -205,6 +205,15 @@ export class WhatsappInboxService {
     return messages.reverse(); // ordem cronologica pra UI
   }
 
+  // Último wamid de mensagem RECEBIDA do cliente (ignora as de saída) — usado
+  // pelo debounce do assistente pra não se auto-descartar por causa da própria
+  // resposta que acabou de enviar. Best-effort.
+  async lastIncomingExternalId(organizationId: string, chatId: string): Promise<string | null> {
+    await this.getChat(organizationId, chatId); // ownership
+    const anchor = await this.chats.findLastIncomingAnchor(chatId);
+    return anchor?.external_id ?? null;
+  }
+
   async markRead(organizationId: string, chatId: string): Promise<WhatsappChat> {
     await this.getChat(organizationId, chatId);
     // Recibo de leitura no WhatsApp do cliente (tick azul) — sem "digitando"
