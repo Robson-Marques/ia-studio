@@ -34,7 +34,8 @@ export const MESSAGING_LIMIT_LABEL = {
 
 export const CHAT_TABS = [
   { id: 'mine',       label: 'Minhas',          perm: 'comm.whatsapp.view.assigned' },
-  { id: 'unassigned', label: 'Não atribuídas',  perm: 'comm.whatsapp.view.unassigned' },
+  { id: 'unassigned', label: 'Aguardando',      perm: 'comm.whatsapp.view.unassigned' },
+  { id: 'ia',         label: 'IA',              perm: 'comm.whatsapp.view.all' },
   { id: 'team',       label: 'Minha equipe',    perm: 'comm.whatsapp.view.team' },
   { id: 'all',        label: 'Todas',           perm: 'comm.whatsapp.view.all' },
 ];

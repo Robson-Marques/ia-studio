@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.33 - 2026-07-11 (a IA ASSUME a conversa — "atendido pela IA" + regra: inativo vira venda)
+
+- **assignBot: a IA passa a "atender" a conversa (BOT).** Quando o assistente responde de verdade numa conversa de WhatsApp, ele **assume o atendimento** (`current_handler_type=BOT`) — a conversa deixa de ficar solta em "Não atribuídas" e passa a mostrar **"atendido pela IA"**. Não rouba de humano (se um atendente está no comando, a IA não assume); e um humano pode **assumir** a qualquer momento (aí a IA para). Porte do `assignBot` do Aquapark (o schema já suportava BOT — sem `db push`).
+- **Regra de negócio: cadastro/contrato INATIVO → VENDA, não 2ª via.** O assistente aprendeu a diferença: **bloqueado por inadimplência** (suspenso, reativa pagando) → oferece 2ª via; **inativo/cancelado** (contrato encerrado, não reativa pagando boleto antigo) → **não** oferece 2ª via, trata como **venda/negociação** e oferece um novo plano. (Refresh `v4-inativo-venda` no assistente-exemplo.)
+- **Fila do atendente sem confusão: nova aba "IA" + "Aguardando".** As conversas que a IA está conduzindo saem da fila humana e vão pra uma aba **"IA"** própria (não poluem mais). A aba "Não atribuídas" virou **"Aguardando"** (quem realmente espera um humano — sem handler). Então o atendente vê claro: **Minhas** (o que atendo) · **Aguardando** (fila) · **IA** (a IA cuida) · Minha equipe · Todas. "Encerradas" segue no filtro de status (dropdown), não foi removido.
+
 ## v0.9.32 - 2026-07-11 (memória = o registro REAL das conversas + datas — como foi documentado)
 
 A decisão documentada (`aquapark-commercial-memory.md`, textual: *"a memória de conversa efetiva da IA é o histórico real do WhatsApp — manter como fonte primária"*) não tinha sido portada. Agora está:

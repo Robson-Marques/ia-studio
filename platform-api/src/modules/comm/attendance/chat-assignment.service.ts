@@ -86,6 +86,32 @@ export class ChatAssignmentService {
     return after;
   }
 
+  // ─── ASSIGN BOT (a IA assume a conversa) ────────────
+  // Chamado pelo fluxo quando a IA responde: a conversa passa a mostrar
+  // "atendido pela IA" (current_handler_type=BOT). NÃO rouba de humano — se um
+  // atendente está no comando (USER), a IA não assume. Best-effort: não lança.
+  async assignBot(organizationId: string, chatId: string, botId: string): Promise<void> {
+    const now = new Date();
+    await this.chats
+      .updateChatConditional(
+        chatId,
+        {
+          // Assume se NINGUÉM humano está no comando: sem handler (null) OU já é
+          // a própria IA (BOT). `{ not: 'USER' }` num campo anulável excluiria os
+          // nulos no SQL — por isso o OR explícito.
+          OR: [{ current_handler_type: null }, { current_handler_type: 'BOT' }],
+          attendance_status: { not: CommChatStatus.CLOSED },
+        },
+        {
+          current_handler_type: 'BOT',
+          current_handler_id: botId,
+          attendance_status: CommChatStatus.IN_PROGRESS,
+          last_assignment_at: now,
+        },
+      )
+      .catch(() => 0);
+  }
+
   // ─── RELEASE ────────────────────────────────────────
 
   async release(organizationId: string, chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {

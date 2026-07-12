@@ -44,6 +44,7 @@ export default function ChatList({
     if (!scope) return t.id === 'mine';
     if (t.id === 'mine') return scope.view?.assigned || scope.isSuper;
     if (t.id === 'unassigned') return scope.view?.unassigned || scope.isSuper;
+    if (t.id === 'ia') return scope.view?.all || scope.view?.unassigned || scope.isSuper;
     if (t.id === 'team') return (scope.view?.team && (scope.myTeamIds?.length > 0)) || scope.isSuper;
     if (t.id === 'all') return scope.view?.all || scope.isSuper;
     return false;

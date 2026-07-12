@@ -7,6 +7,7 @@ import { NodeRegistryService } from '../../automation/engine/node-registry.servi
 import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsService } from '../agents/agents.service';
 import { WhatsappInboxService } from '../../comm/whatsapp/whatsapp-inbox.service';
+import { ChatAssignmentService } from '../../comm/attendance/chat-assignment.service';
 
 @Injectable()
 export class AgentNodes implements OnModuleInit {
@@ -15,6 +16,7 @@ export class AgentNodes implements OnModuleInit {
     private readonly runner: AgentRunnerService,
     private readonly agents: AgentsService,
     private readonly inbox: WhatsappInboxService,
+    private readonly assignment: ChatAssignmentService,
   ) {}
 
   onModuleInit(): void {
@@ -88,6 +90,12 @@ export class AgentNodes implements OnModuleInit {
             ok ? 'info' : 'warn',
             `Agente ${agentId} → ${result.status}${ok ? '' : ' (sem resposta utilizável)'} (${result.totalTokens} tokens).`,
           );
+          // A IA "assume" a conversa (BOT) quando respondeu de verdade numa
+          // conversa de WhatsApp → aparece "atendido pela IA". Não rouba de
+          // humano (o assignBot checa). Best-effort.
+          if (ok && session) {
+            await this.assignment.assignBot(ctx.organizationId, session, agentId).catch(() => undefined);
+          }
           return {
             handle,
             output: {

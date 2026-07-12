@@ -35,7 +35,7 @@ export interface UploadMediaArgs {
   confirmTakeover?: boolean;
 }
 
-export type ChatTab = 'mine' | 'unassigned' | 'team' | 'all';
+export type ChatTab = 'mine' | 'unassigned' | 'ia' | 'team' | 'all';
 
 export interface ChatView extends WhatsappChat {
   current_handler_name?: string | null;
@@ -99,7 +99,11 @@ export class WhatsappInboxService {
     const views: ChatView[] = items.map((c) => ({
       ...c,
       current_handler_name:
-        c.current_handler_type === 'USER' && c.current_handler_id ? (names.get(c.current_handler_id) ?? null) : null,
+        c.current_handler_type === 'USER' && c.current_handler_id
+          ? (names.get(c.current_handler_id) ?? null)
+          : c.current_handler_type === 'BOT'
+            ? 'IA'
+            : null,
     }));
     return { items: views, total };
   }
@@ -113,7 +117,11 @@ export class WhatsappInboxService {
     if (tab === 'mine') {
       tabWhere = { current_handler_type: 'USER', current_handler_id: scope.userId };
     } else if (tab === 'unassigned') {
+      // "Aguardando" = ninguém atendendo (nem humano nem IA) → fila do humano.
       tabWhere = { current_handler_id: null };
+    } else if (tab === 'ia') {
+      // Conversas que a IA está conduzindo — separadas pra não confundir a fila.
+      tabWhere = { current_handler_type: 'BOT' };
     } else if (tab === 'team') {
       tabWhere = scope.myTeamIds.length ? { team_id: { in: scope.myTeamIds } } : { id: '__none__' };
     }
@@ -132,10 +140,10 @@ export class WhatsappInboxService {
     organizationId: string,
     user: AuthenticatedUser,
     opts: { status?: CommChatStatus; search?: string; environmentId?: string; connectionId?: string } = {},
-  ): Promise<{ mine: number; unassigned: number; team: number; all: number }> {
+  ): Promise<{ mine: number; unassigned: number; ia: number; team: number; all: number }> {
     const scope = await this.scopeResolver.resolve(user);
-    const tabs: ChatTab[] = ['mine', 'unassigned', 'team', 'all'];
-    const [mine, unassigned, team, all] = await Promise.all(
+    const tabs: ChatTab[] = ['mine', 'unassigned', 'ia', 'team', 'all'];
+    const [mine, unassigned, ia, team, all] = await Promise.all(
       tabs.map((tab) =>
         this.chats.countChats({
           organizationId,
@@ -147,14 +155,16 @@ export class WhatsappInboxService {
         }),
       ),
     );
-    return { mine, unassigned, team, all };
+    return { mine, unassigned, ia, team, all };
   }
 
   async getChat(organizationId: string, chatId: string): Promise<ChatView> {
     const chat = await this.chats.findChatById(chatId);
     if (!chat || chat.organization_id !== organizationId) throw new NotFoundException('Conversa não encontrada.');
     let handlerName: string | null = null;
-    if (chat.current_handler_type === 'USER' && chat.current_handler_id) {
+    if (chat.current_handler_type === 'BOT') {
+      handlerName = 'IA';
+    } else if (chat.current_handler_type === 'USER' && chat.current_handler_id) {
       const names = await this.attendance.userNames([chat.current_handler_id]);
       handlerName = names.get(chat.current_handler_id) ?? null;
     }

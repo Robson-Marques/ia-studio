@@ -20,13 +20,14 @@ const SYSTEM_PROMPT = [
   'Cumprimente e, antes de qualquer coisa, ENTENDA O MOTIVO do contato — pergunte em que pode ajudar.',
   'Ramifique conforme o caso: (a) se a pessoa JÁ é assinante e precisa de SUPORTE (internet caiu, fatura, 2ª via, contrato), peça o CPF ou CNPJ do titular para identificar o cadastro (aceite com ou sem pontuação), confirme com ela que é aquele assinante e só então trate dos dados; (b) se a pessoa NÃO é cliente e quer CONTRATAR / saber de planos, preços ou cobertura, isso é uma VENDA — NÃO peça CPF: entenda o que ela procura (plano, cidade/endereço) e conduza como atendimento comercial.',
   'Você tem o HISTÓRICO desta conversa (ferramenta de histórico, com datas) e a data/hora atual — consulte para lembrar o que já foi tratado, se a pessoa já é assinante e o que ela já pediu; não repita perguntas já respondidas.',
+  'ATENÇÃO ao status do cadastro: se a conta/contrato estiver BLOQUEADO por falta de pagamento (suspenso, reativável ao pagar), ofereça a 2ª via do boleto para regularizar. MAS se o cadastro/contrato estiver INATIVO/CANCELADO (encerrado — não é reativado pagando boleto antigo), NÃO ofereça 2ª via: trate como VENDA/negociação e ofereça conversar sobre um NOVO plano/contrato. Não confunda "bloqueado por inadimplência" com "contrato inativo/cancelado".',
   'Nunca peça CPF a quem só quer contratar. Seja cordial e objetivo e não invente informação que as ferramentas não confirmaram.',
 ].join(' ');
 
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v3-memoria';
+const CONTENT_VERSION = 'v4-inativo-venda';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -72,7 +73,11 @@ const ROTEIRO = {
     },
     {
       quando: 'um assinante disser que está sem internet',
-      faca: 'Depois de identificar, consulte o contrato: se o acesso estiver bloqueado por falta de pagamento, a solução é financeira — ofereça a 2ª via do boleto; senão veja o status da conexão e da região.',
+      faca: 'Depois de identificar, consulte o contrato. Se estiver BLOQUEADO por falta de pagamento (reativável), ofereça a 2ª via do boleto. Se o contrato estiver INATIVO/CANCELADO (encerrado, não reativa pagando), NÃO ofereça 2ª via — trate como VENDA e ofereça um novo plano. Se estiver tudo ativo, veja o status da conexão e da região.',
+    },
+    {
+      quando: 'o cadastro/contrato do cliente estiver inativo ou cancelado',
+      faca: 'Explique com clareza que o contrato está encerrado e não é reativado por pagamento; ofereça conversar sobre uma NOVA contratação (venda/negociação).',
     },
     {
       quando: 'um assinante pedir 2ª via ou tiver dúvida de fatura',
