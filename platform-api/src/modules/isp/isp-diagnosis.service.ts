@@ -111,7 +111,7 @@ export class IspDiagnosisService {
       return {
         etapa: 'escolher_contrato',
         total: ativos.length,
-        opcoes: ativos.slice(0, MAX_OPCOES).map((c) => this.contratoOpcao(c)),
+        opcoes: ativos.slice(0, MAX_OPCOES).map((c) => this.contratoOpcao(c, cliente)),
       };
     }
     const contratoId = String(contrato['id']);
@@ -185,10 +185,13 @@ export class IspDiagnosisService {
     };
   }
 
-  private contratoOpcao(c: Record<string, unknown>): ContratoOpcao {
+  private contratoOpcao(c: Record<string, unknown>, cliente: Record<string, unknown>): ContratoOpcao {
     const plano = this.s(c['plano']);
-    // Endereço só quando é PRÓPRIO do contrato — não repetir o do cliente.
-    const endereco = c['endereco_proprio'] === true ? this.fmtEndereco(c) : undefined;
+    // Endereço efetivo do contrato: próprio quando houver, senão o do cliente.
+    // Vai SEMPRE (ajuda a distinguir quando é ponto diferente); o `id_contrato`
+    // é o desempate final quando plano E endereço coincidem (ex.: dois contratos
+    // do mesmo plano no mesmo endereço).
+    const endereco = c['endereco_proprio'] === true ? this.fmtEndereco(c) : this.fmtEndereco(cliente);
     return {
       id_contrato: String(c['id']),
       ...(plano ? { plano } : {}),

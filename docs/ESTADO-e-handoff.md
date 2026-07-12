@@ -23,7 +23,13 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.53** engatilhada (abertura reconhece o número na saudação + cumprimenta 1x). **v0.9.52
+- **v0.9.54** engatilhada (fix deploy: worker reinicia no upgrade + diagnóstico mostra opções pro
+  cliente escolher, contrato com plano+nº+endereço). ⚠️ **FRENTE 1 VALIDADA no WhatsApp** (o
+  diagnóstico listou os 5 contratos da Newnet pra escolher — funcionou de ponta a ponta). O que
+  faltava era o **worker rodando código velho**: o `upgrade.sh` reiniciava só o api, não o worker
+  (19h sem restart) — a tool nova do diagnóstico não existia no worker. Corrigido no upgrade.sh
+  (worker primeiro). **Ao aplicar a v0.9.54, o upgrade.sh EM EXECUÇÃO ainda é o antigo → dar
+  `pm2 restart iastudio-worker` manual UMA vez; da próxima em diante é automático.** **v0.9.53
   já no ar** = CONSOLIDAÇÃO do agente: fim da duplicidade de lógica + identificação
   determinística `identificado_por` + persona.name funcional + persona padrão NETE/amigável/
   médias + modelo padrão gpt-5.4). **v0.9.51 já no ar** (identidade doc>telefone) e **v0.9.50**
@@ -42,8 +48,8 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v20`** (abertura reconhece o número + cumprimenta
-  1x; v0.9.53). Antes: v19 (consolidação, v0.9.52). Estrutura FINAL:
+- **Prompt do assistente ISP: `CONTENT_VERSION v21`** (mostrar opções pro cliente escolher; v0.9.54).
+  Antes: v20 (abertura reconhece o número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação
   determinística via `identificado_por`. Ao mexer no comportamento, editar NA CASA CERTA — não
   reintroduzir a mesma regra em 2 lugares. Antes: v18 (identidade, v0.9.51), v17 (funil, v0.9.50). O passo "chegar até o login" usa a tool `diagnosticar_conexao`, que é a **única

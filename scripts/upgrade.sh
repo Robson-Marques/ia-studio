@@ -170,11 +170,22 @@ SQL
 trap - ERR
 
 # ---------- 13) RESTART ----------
+# WORKER PRIMEIRO, API POR ULTIMO — e cada um em seu proprio comando. O worker
+# roda o assistente/crons e registra as tools em memoria: se ele nao reiniciar,
+# codigo/tool novos NUNCA entram (bug real: o worker ficou 19h sem reiniciar
+# enquanto o api reiniciava a cada deploy, e a tool nova do diagnostico dava
+# "sem handler"). O restart do API e o momento de risco pro proprio upgrade.sh
+# (mesmo detached) — por isso ele fica por ULTIMO, quando o worker ja pegou o
+# codigo novo. Um comando combinado deixava o worker de fora num restart parcial.
 if [ "$DO_RESTART" -eq 1 ]; then
-  echo "[RESTART] pm2 restart iastudio-api iastudio-worker"
-  pm2 restart iastudio-api iastudio-worker --update-env 2>/dev/null \
-    || pm2 start "$API_DIR/ecosystem.config.js" 2>/dev/null \
-    || echo "AVISO: pm2 restart retornou nao-zero (verifique pm2 list)"
+  echo "[RESTART] pm2 restart iastudio-worker"
+  pm2 restart iastudio-worker --update-env 2>/dev/null \
+    || pm2 start "$API_DIR/ecosystem.config.js" --only iastudio-worker 2>/dev/null \
+    || echo "AVISO: restart do iastudio-worker retornou nao-zero (verifique pm2 list)"
+  echo "[RESTART] pm2 restart iastudio-api"
+  pm2 restart iastudio-api --update-env 2>/dev/null \
+    || pm2 start "$API_DIR/ecosystem.config.js" --only iastudio-api 2>/dev/null \
+    || echo "AVISO: restart do iastudio-api retornou nao-zero (verifique pm2 list)"
 else
   echo "[RESTART] pulado (--no-restart)"
 fi

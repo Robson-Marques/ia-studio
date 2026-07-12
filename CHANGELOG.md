@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.54 - 2026-07-12 (Deploy: worker reinicia no upgrade + diagnóstico mostra opções para o cliente escolher)
+
+Sem `db push`. Backend + `scripts/upgrade.sh`. Conteúdo do assistente re-aplicado (`v21`).
+
+- **Bug de deploy: o worker não reiniciava.** O `upgrade.sh` mandava `pm2 restart iastudio-api iastudio-worker` num comando só, com o **api primeiro** — e o worker ficava de fora (rodou 19h sem reiniciar enquanto o api reiniciava a cada deploy). Como o worker roda o assistente e registra as tools **em memória**, a tool nova do diagnóstico (`diagnosticar_conexao`, v0.9.50) nunca entrou nele → dava "sem handler builtin". Agora o upgrade reinicia o **worker primeiro** e o **api por último**, cada um em seu comando (o restart do api é o momento de risco pro próprio script de upgrade). Mudanças de roteiro/persona não sofriam disso (vivem no banco, lidas a cada run); só tool/código novo exigia o restart do worker.
+- **Diagnóstico: mostrar as opções e o cliente escolhe (nunca pedir login/endereço digitado).** O assistente pedia para o cliente digitar o login ou o endereço do ponto — dados que ele pode não saber e que podem não bater com o cadastro. Agora sempre LISTA as opções que a ferramenta traz e o cliente escolhe pelo número. Opções de contrato passam a trazer **plano + número do contrato + endereço** (o número do contrato desempata quando dois têm o mesmo plano, ex.: dois "600 MEGAS FIBRA"); opções de conexão trazem login + referência + endereço.
+
 ## v0.9.53 - 2026-07-12 (Abertura mais natural — reconhece o número na saudação + cumprimenta uma vez só)
 
 Sem `db push`. Backend. Conteúdo do assistente re-aplicado (`v20`).

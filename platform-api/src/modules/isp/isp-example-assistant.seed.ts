@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v20-abertura-reconhece-numero';
+const CONTENT_VERSION = 'v21-mostrar-opcoes-escolher';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -70,7 +70,7 @@ const ROTEIRO = {
     {
       titulo: 'Chegar até a conexão certa (diagnóstico)',
       descricao:
-        'Com o cliente identificado, use a ferramenta de diagnóstico da conexão — ela decide as etapas e devolve o próximo passo: mais de um contrato → apresente pelo PLANO e peça para escolher; mais de uma conexão → apresente pelo LOGIN e a referência do ponto; muitas conexões → não liste todas, peça um dado para estreitar (login, referência ou endereço). Só depois de chegar ao login é que você vê o status e, se for o caso, abre o chamado com o login e o contrato daquela conexão. Apresente só o que estiver fora do normal (não anuncie "contrato ativo"). Nunca aja no login errado.',
+        'Com o cliente identificado, use a ferramenta de diagnóstico da conexão — ela decide as etapas e devolve as OPÇÕES prontas; sua função é MOSTRAR e deixar o cliente escolher pelo número. NUNCA peça para o cliente digitar o login ou o endereço (ele pode não saber, e o que ele digita pode não bater com o cadastro) — sempre mostre o que a ferramenta trouxe e ele escolhe. Mais de um contrato → liste as opções numeradas com o PLANO, o NÚMERO DO CONTRATO e o endereço (o número do contrato desempata quando dois têm o mesmo plano). Mais de uma conexão → liste as opções com o login, a referência do ponto e o endereço. Se forem muitas, mostre as opções mesmo assim e peça para escolher. Só depois de chegar ao login é que você vê o status e, se for o caso, abre o chamado com o login e o contrato daquela conexão. Apresente só o que estiver fora do normal (não anuncie "contrato ativo"). Nunca aja no login errado.',
     },
   ],
   situacoes: [
