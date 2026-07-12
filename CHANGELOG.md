@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.39 - 2026-07-11 (CPF com mais de um cadastro/contrato — pergunta qual)
+
+- **Múltiplos cadastros/contratos no mesmo CPF/CNPJ.** O auto-vínculo só liga sozinho quando há **exatamente 1** cadastro. Se a identificação retorna **mais de um** (endereços/instalações diferentes), o assistente **não escolhe sozinho** e **não pede pra a pessoa digitar o endereço** (o que ela escreve pode não bater com o cadastro): ele **apresenta os endereços JÁ CADASTRADOS numa lista numerada** (como vieram do sistema) e a pessoa **escolhe pelo número**; só depois vincula o cadastro escolhido (pelo id). Idem para um cadastro com **vários contratos/conexões**. (Refresh `v9-multiplos-cadastros`.)
+- **Abertura mais clara (sem parecer que já identificou).** A saudação dizia "Olá, Robson! ...suporte com sua conta" dando a entender que já sabia quem era — mas "Robson" é só o nome do WhatsApp e ninguém foi identificado ainda. Agora o assistente cumprimenta de forma **neutra** e pergunta **claramente o motivo**, sem falar "sua conta/seu cadastro" antes de identificar; enquanto o número não está vinculado, trata como desconhecido (descobre se é suporte de assinante ou interesse em contratar).
+- Cumulativa com a v0.9.38 (auto-vínculo ao identificar) e v0.9.37 (assume da IA + close→pool + fluxo técnico).
+
 ## v0.9.38 - 2026-07-11 (vínculo AUTOMÁTICO ao identificar + garante close→pool)
 
 - **Vínculo agora é determinístico.** Antes dependia do modelo lembrar de chamar a ferramenta `vincular_cliente` — pouco confiável (às vezes não vinculava, e o "desvincular" nem aparecia). Agora a ferramenta **`identificar_cliente`** grava o vínculo automaticamente quando acha **exatamente 1 cliente**: aparece "Cliente: <nome>" + **desvincular** no cabeçalho, e a IA não re-pede o CPF. Outro CPF depois re-identifica e re-vincula sozinho.
