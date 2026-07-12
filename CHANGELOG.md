@@ -1,9 +1,15 @@
 # Changelog — IA Studio
 
+## v0.9.38 - 2026-07-11 (vínculo AUTOMÁTICO ao identificar + garante close→pool)
+
+- **Vínculo agora é determinístico.** Antes dependia do modelo lembrar de chamar a ferramenta `vincular_cliente` — pouco confiável (às vezes não vinculava, e o "desvincular" nem aparecia). Agora a ferramenta **`identificar_cliente`** grava o vínculo automaticamente quando acha **exatamente 1 cliente**: aparece "Cliente: <nome>" + **desvincular** no cabeçalho, e a IA não re-pede o CPF. Outro CPF depois re-identifica e re-vincula sozinho.
+- Cumulativa com a v0.9.37: **garante** no ar o *encerrar solta o atendente → volta pro pool* e o *fluxo de suporte técnico* (nomeia a conexão + oferece chamado), caso não tenham entrado no seu build da v0.9.37.
+
 ## v0.9.37 - 2026-07-11 (atendente assume da IA + fluxo de suporte técnico melhor)
 
 - **"Assumir" numa conversa que a IA está conduzindo dava erro** ("Conversa já foi assumida por outro atendente"), porque o `claim` só aceitava conversa sem atendente (`current_handler_id = null`) e a IA está com ela (handler BOT). Agora o humano pode assumir de **null OU BOT** (tomar a frente da IA — normal, a IA para pelo gate); só bloqueia se **outro humano** já pegou. Corrige os toasts vermelhos ao clicar em Assumir numa conversa da IA.
 - **Fluxo de suporte técnico mais completo (assistente-exemplo).** Ele dizia genérico "uma das conexões está offline" sem nomear e não sugeria chamado. Agora, ao verificar conexão, ele **diz qual conexão caiu (login) e desde quando**, dá a orientação básica, checa a região e **oferece abrir um chamado técnico** para aquela conexão (registrar/encaminhar). Refresh `v8-conexao-chamado`. (Obs.: o exemplo segue em modo leitura — ele *oferece/encaminha* o chamado; pra ele ABRIR a OS de fato precisaria habilitar a ferramenta de escrita `abrir_os`, com confirmação — decisão pendente do Robson.)
+- **Encerrar solta o atendente → a conversa volta pro pool.** Antes, se um humano assumia (ou recebia por transferência) e depois **encerrava**, o handler continuava preso nele — quando o cliente voltava a escrever, a conversa reabria "atribuída" ao humano e a **IA não pegava de volta**. Agora o `close` limpa `current_handler`; ao reabrir por inbound, a conversa está sem atendente (pool) e a IA volta a atender.
 
 ## v0.9.36 - 2026-07-11 (vínculo CPF ↔ WhatsApp — a IA sabe de quem é o número)
 

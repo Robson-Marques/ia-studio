@@ -265,7 +265,15 @@ export class ChatAssignmentService {
     const count = await this.chats.updateChatConditional(
       chatId,
       { attendance_status: chat.attendance_status },
-      { attendance_status: CommChatStatus.CLOSED, closed_at: new Date() },
+      {
+        attendance_status: CommChatStatus.CLOSED,
+        closed_at: new Date(),
+        // Ao encerrar, SOLTA o atendente: assim, quando o cliente voltar a
+        // escrever, a conversa reabre SEM handler (volta pro pool) e a IA pode
+        // pegá-la de novo (o gate só barra quando um humano está no comando).
+        current_handler_type: null,
+        current_handler_id: null,
+      },
     );
     if (count === 0) throw new ConflictException(RACE_MESSAGE);
     const after = await this.loadOr404(organizationId, chatId);

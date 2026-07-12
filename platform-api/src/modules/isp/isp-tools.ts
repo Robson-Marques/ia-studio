@@ -13,6 +13,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ToolRegistryService, ToolExecutionContext } from '../ai/tools/tool-registry.service';
 import { ConnectionsService } from '../integration/connections/connections.service';
+import { WhatsappInboxService } from '../comm/whatsapp/whatsapp-inbox.service';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
 import { IncidentLookupService } from './incident-lookup.service';
@@ -36,6 +37,7 @@ export class IspTools implements OnModuleInit {
     private readonly resolver: IspConnectionResolver,
     private readonly connectivity: IspConnectivityService,
     private readonly lookup: IncidentLookupService,
+    private readonly whatsappInbox: WhatsappInboxService,
   ) {}
 
   /**
@@ -92,7 +94,22 @@ export class IspTools implements OnModuleInit {
         const raw = telefone
           ? await this.connections.execute(ctx.organizationId, connectionId, 'cliente.por_telefone', { telefone })
           : await this.connections.execute(ctx.organizationId, connectionId, 'cliente.dados', { cpf });
-        return { clientes: rows(raw).map(projectCliente) };
+        const clientes = rows(raw).map(projectCliente);
+        // Auto-vínculo (determinístico, não depende do modelo chamar outra tool):
+        // achou EXATAMENTE 1 cliente e há uma conversa em contexto → grava o
+        // vínculo CPF↔WhatsApp. Outro CPF depois re-identifica e re-vincula.
+        const session = ctx.scopeKeys?.['session'];
+        if (clientes.length === 1 && session) {
+          const c = clientes[0];
+          await this.whatsappInbox
+            .linkCustomer(ctx.organizationId, session, {
+              document: typeof c['cpf_cnpj'] === 'string' ? (c['cpf_cnpj'] as string) : null,
+              name: typeof c['nome'] === 'string' ? (c['nome'] as string) : null,
+              ref: typeof c['id'] === 'string' ? (c['id'] as string) : null,
+            })
+            .catch(() => undefined);
+        }
+        return { clientes };
       },
     });
 
