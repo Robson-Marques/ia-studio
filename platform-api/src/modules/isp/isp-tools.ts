@@ -17,6 +17,7 @@ import { WhatsappInboxService } from '../comm/whatsapp/whatsapp-inbox.service';
 import { IspOsConfigService } from './isp-os-config.service';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
+import { IspDiagnosisService } from './isp-diagnosis.service';
 import { IncidentLookupService } from './incident-lookup.service';
 import { SCOPE_KEYS } from './isp.constants';
 import { projectBoleto, projectCliente, projectConexao, projectContrato, rows } from './isp-projections';
@@ -37,6 +38,7 @@ export class IspTools implements OnModuleInit {
     private readonly connections: ConnectionsService,
     private readonly resolver: IspConnectionResolver,
     private readonly connectivity: IspConnectivityService,
+    private readonly diagnosis: IspDiagnosisService,
     private readonly lookup: IncidentLookupService,
     private readonly whatsappInbox: WhatsappInboxService,
     private readonly osConfig: IspOsConfigService,
@@ -112,6 +114,43 @@ export class IspTools implements OnModuleInit {
             .catch(() => undefined);
         }
         return { clientes };
+      },
+    });
+
+    // ─── diagnosticar_conexao (determinístico contrato→login) ──
+    this.registry.register({
+      key: 'diagnosticar_conexao',
+      name: 'Diagnóstico da conexão (ISP)',
+      description:
+        'Chegue ao login/conexão CERTO de um assinante ANTES de ver status ou abrir chamado. ' +
+        'Passe o CPF/CNPJ do titular; a ferramenta decide sozinha as etapas (não raciocine você): ' +
+        'ela suprime contratos/logins inativos e devolve a PRÓXIMA etapa — "escolher_contrato" (mostre as ' +
+        'opções pelo PLANO), "escolher_login" (mostre pelo LOGIN + referência do ponto) ou "resolvido" ' +
+        '(com o status do login e a situação do contrato). Quando "muitos" for verdadeiro, NÃO liste tudo: ' +
+        'peça um dado para estreitar (o login, a referência do ponto ou o endereço). Apresente só o que ' +
+        'estiver FORA do normal — nunca anuncie "contrato ativo". Ao cliente escolher, chame de novo passando ' +
+        'id_contrato (a escolha do contrato) e depois login (a escolha da conexão).',
+      category: 'isp',
+      input_schema: {
+        type: 'object',
+        properties: {
+          cpf: { type: 'string', description: 'CPF ou CNPJ do titular (do cliente já identificado).' },
+          id_contrato: { type: 'string', description: 'Contrato escolhido pelo cliente (na 2ª chamada, após "escolher_contrato").' },
+          login: { type: 'string', description: 'Login escolhido pelo cliente (na chamada final, após "escolher_login").' },
+          connection_id: { type: 'string' },
+          filial: { type: 'string' },
+        },
+        required: ['cpf'],
+      },
+      handler: async (args, ctx) => {
+        const cpf = asString(args['cpf'], 'cpf');
+        if (ctx.dryRun) return { simulated: true, cpf };
+        const connectionId = await this.connectionId(args, ctx);
+        return this.diagnosis.diagnose(ctx.organizationId, connectionId, {
+          cpf,
+          idContrato: typeof args['id_contrato'] === 'string' ? args['id_contrato'] : undefined,
+          login: typeof args['login'] === 'string' ? args['login'] : undefined,
+        });
       },
     });
 

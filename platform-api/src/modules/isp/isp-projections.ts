@@ -85,6 +85,15 @@ export function projectConexao(row: Record<string, unknown>): Record<string, unk
     desconectado_em: str(row['ultima_conexao_final']),
     motivo_desconexao: str(row['motivo_desconexao']),
     id_contrato: str(row['id_contrato']),
+    // Endereco do PONTO (login). So vem preenchido quando o login tem endereco
+    // proprio; a maioria herda o do cliente (endereco_padrao_cliente = 'S') e
+    // deixa estes campos vazios. `referencia` e o rotulo humano do ponto
+    // ("CARTORIO", "PAINEL POSTO") — o melhor desambiguador quando ha varios.
+    referencia: str(row['referencia']),
+    endereco: str(row['endereco']),
+    numero: str(row['numero']),
+    bairro: str(row['bairro']),
+    endereco_proprio: str(row['endereco_padrao_cliente']) === 'N',
   });
 }
 
@@ -100,5 +109,12 @@ export function projectContrato(row: Record<string, unknown>): Record<string, un
     bloqueado_em: str(row['dt_ult_bloq_auto']),
     nao_bloquear_ate: str(row['nao_bloquear_ate']),
     alerta: str(row['alerta_contrato']),
+    // Endereco do contrato: idem login — normalmente herda o do cliente
+    // (endereco_padrao_cliente = 'S', campos vazios). So preenche quando proprio.
+    endereco: str(row['endereco']),
+    numero: str(row['numero']),
+    bairro: str(row['bairro']),
+    referencia: str(row['referencia']),
+    endereco_proprio: str(row['endereco_padrao_cliente']) === 'N',
   });
 }

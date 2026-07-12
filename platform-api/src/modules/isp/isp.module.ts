@@ -16,6 +16,7 @@ import { AiModule } from '../ai/ai.module';
 import { IspRepository } from './isp.repository';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
+import { IspDiagnosisService } from './isp-diagnosis.service';
 import { IncidentLookupService } from './incident-lookup.service';
 import { IspDispatchService } from './isp-dispatch.service';
 import { IspIncidentsService } from './isp-incidents.service';
@@ -35,6 +36,7 @@ import { IspOsConfigController } from './isp-os-config.controller';
     IspRepository,
     IspConnectionResolver,
     IspConnectivityService,
+    IspDiagnosisService,
     IncidentLookupService,
     IspDispatchService,
     IspIncidentsService,

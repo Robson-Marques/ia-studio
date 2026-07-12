@@ -258,7 +258,12 @@ export class ChatAssignmentService {
     const chat = await this.loadOr404(organizationId, chatId);
     if (chat.attendance_status === CommChatStatus.CLOSED) return chat; // no-op idempotente
     if (!scope.can.close) throw new ForbiddenException('Sem permissão para encerrar conversas.');
-    if (!this.canManage(scope, chat) && chat.current_handler_id !== null) {
+    // Só barra quando um HUMANO está no comando. Encerrar uma conversa que a IA
+    // atende (current_handler_type=BOT) ou que está sem handler não rouba
+    // trabalho de ninguém — quem tem permissão de encerrar encerra, sem precisar
+    // assumir antes. Antes o gate tratava o BOT como humano e barrava o admin.
+    const humanoNoComando = chat.current_handler_type === 'USER' && chat.current_handler_id !== null;
+    if (!this.canManage(scope, chat) && humanoNoComando) {
       throw new ForbiddenException('Sem permissão para encerrar esta conversa.');
     }
     assertChatAttendanceTransition(chat.attendance_status, CommChatStatus.CLOSED);

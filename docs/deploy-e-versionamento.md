@@ -1,6 +1,6 @@
-# Deploy, Versionamento, Atualização e Backup — Mapeamento (executar na FASE FINAL)
+# Deploy, Versionamento, Atualização e Backup — runbook
 
-> Mapeado no início do projeto (02/07/2026) a pedido do Robson. Implementação fica para a última etapa do roadmap (task: "Fase final — install/uninstall/upgrade + painel"). Modelo: idêntico ao consagrado no Aquapark.
+> Runbook vivo do deploy do IA Studio (implementado e em produção). Modelo idêntico ao consagrado no Aquapark: produção em `/opt/iastudio`, PM2, release por tag `vX.Y.Z` aplicada pelo painel Configurações > Atualização.
 
 ## Premissas (iguais ao Aquapark)
 
@@ -48,7 +48,7 @@ Aba **Backup e Restauração**:
 - Gerar backup completo, listar, baixar (stream), subir (multipart), excluir, restaurar — com os 5 patrasques (ConfirmDialog, disclaimer, tooltip, loading, permission gate).
 - Perms super-only: `system.backup`, `system.restore`. Guard anti path-traversal no nome do arquivo. 1 operação por vez (lock).
 
-## Models Prisma (fase final)
+## Models Prisma
 
 `SystemUpgrade` (`system_upgrades`: from/to_version, status RUNNING|SUCCESS|FAILED, log_lines, error_step) e `SystemRestore` (`system_restores`: kind BACKUP|RESTORE, status, log_lines, file_name).
 

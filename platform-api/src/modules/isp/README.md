@@ -72,6 +72,7 @@ do agente.
 | `isp.repository.ts` | Porta única ao banco (`isp_incidents`, `isp_incident_targets`, `isp_incident_dispatches`). |
 | `isp-connection.resolver.ts` | Resolve a Connection de ERP ACTIVE do escopo (multi-instância: matriz/filiais; multi-ERP: Altarede/IXC). Nunca expõe a conexão à IA. |
 | `isp-connectivity.service.ts` | Lê `conectividade.listar_com_status` via `ConnectionsService.execute` e agrega % offline. |
+| `isp-diagnosis.service.ts` | **Diagnóstico determinístico contrato→login** (spec §2). Compõe `cliente.dados`+`cliente.planos`+`cliente.acesso`, suprime contratos/logins inativos e devolve a próxima etapa (`escolher_contrato`/`escolher_login`/`resolvido`) — o sistema decide, o modelo só apresenta. Rótulo por plano (contrato) e login+referência (login); endereço só quando é próprio (senão herda o do cliente). |
 | `incident-lookup.service.ts` | **Modo reativo**: `activeFor(customer)` que as tools `abrir_os`/`status_regiao` consultam. |
 | `isp-dispatch.service.ts` | **Modo proativo**: disparo em massa por WhatsApp (Meta Orchestrator) com confirmação + rate limit + log. |
 | `isp-incidents.service.ts` | CRUD de incidentes, resolver afetados, ativar/encerrar, orquestra o disparo. Mutations sensíveis auditadas. |
@@ -108,6 +109,7 @@ chama a API do ERP direto e nunca sabe qual ERP está do outro lado**.
 | Tool | Operação canônica | Aprovação |
 | --- | --- | --- |
 | `identificar_cliente` | `cliente.dados` | — |
+| `diagnosticar_conexao` | `cliente.dados` + `cliente.planos` + `cliente.acesso` | — |
 | `consultar_debitos` | `financeiro.boleto_aberto_todos` + `financeiro.historico` | — |
 | `status_conexao` | `cliente.acesso` | — |
 | `status_regiao` | `conectividade.listar_com_status` (+ checa incidente ativo) | — |
@@ -118,6 +120,27 @@ chama a API do ERP direto e nunca sabe qual ERP está do outro lado**.
 Quando a organização tem **mais de uma** conexão de ERP, a escolha é do operador,
 não do modelo: prioridade da Connection → tag/filial (`filial`) → `connection_id`
 explícito. Nós de workflow podem ainda fixar o ERP com `erp: "ixc" | "altarede"`.
+
+### Diagnóstico determinístico contrato→login (`diagnosticar_conexao`)
+
+A tool tira do modelo a lógica de vários passos (ver `isp-diagnosis.service.ts`).
+Recebe `cpf` (+ opcionalmente `id_contrato` e `login`, as escolhas do cliente) e
+devolve a **próxima etapa**:
+
+1. `cliente_nao_encontrado` — CPF não localiza cadastro.
+2. `sem_contrato_ativo` — nenhum contrato com `status='A'` (tratar como venda/cancelado).
+3. `escolher_contrato` — >1 contrato ativo: opções rotuladas pelo **plano** (endereço
+   só se próprio do contrato). O agente pergunta e re-chama com `id_contrato`.
+4. `escolher_login` — >1 login ativo (`ativo='S'`) daquele contrato: opções por
+   **login + referência** (endereço só se próprio). Traz `muitos=true` quando passa de
+   5 — aí o agente pede um dado para estreitar em vez de listar tudo. Re-chama com `login`.
+5. `resolvido` — login definido: `online` + desde quando + situação do contrato
+   (`bloqueado` = contrato ativo com `status_internet ≠ 'A'`, heurística refinada na
+   Frente Financeiro). O agente apresenta só o que está fora do normal.
+
+**Endereço (DECISÃO A):** contratos/logins quase sempre herdam o endereço do cliente
+(`endereco_padrao_cliente='S'`, campos vazios); só a minoria tem endereço próprio. O
+endereço efetivo do ponto é: próprio do login → próprio do contrato → do cliente.
 
 ## ACL
 

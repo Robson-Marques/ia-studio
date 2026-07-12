@@ -427,18 +427,19 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
               {connections.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.provider_key})</option>)}
             </Select>
           </FormField>
-          <FormField label="Modelo" required hint="Escolha um sugerido ou digite o identificador.">
-            {modelSuggestions.length > 0 && (
-              <Select
-                value={modelSuggestions.some((m) => m.value === form.model) ? form.model : ''}
-                onChange={(e) => e.target.value && patch({ model: e.target.value })}
-                className="mb-2"
-              >
-                <option value="">— escolher um modelo sugerido —</option>
+          <FormField label="Modelo" required hint="Escolha o modelo do assistente.">
+            {modelSuggestions.length > 0 ? (
+              <Select value={form.model || ''} onChange={(e) => patch({ model: e.target.value })}>
+                <option value="" disabled>— escolher um modelo —</option>
                 {modelSuggestions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                {form.model && !modelSuggestions.some((m) => m.value === form.model) && (
+                  <option value={form.model}>{form.model} (atual)</option>
+                )}
               </Select>
+            ) : (
+              // Provider sem lista curada: cai no identificador livre (raro).
+              <TextInput value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
             )}
-            <TextInput value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
           </FormField>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <FormField label="Criatividade" hint="0 = direto ao ponto; 1 = mais criativo.">

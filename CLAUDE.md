@@ -2,7 +2,7 @@
 
 > Plataforma SaaS multi-tenant de Automação Empresarial, Integrações, IA e Comunicação.
 > Toda IA/desenvolvedor que atuar neste projeto DEVE seguir estas regras sem exceção.
-> Documentos normativos: `docs/plano-de-execucao.md`, `docs/diretrizes-arquiteturais.md` (58 diretrizes), `docs/deploy-e-versionamento.md`, `RELATORIO-ANALISE-E-ARQUITETURA.md`.
+> Documentos normativos vivos: `docs/diretrizes-arquiteturais.md` (58 diretrizes), `docs/deploy-e-versionamento.md` (runbook de deploy), `RELATORIO-ANALISE-E-ARQUITETURA.md` (Parte 2 — contrato da API do ERP Altarede). Índice de estado/re-ancoragem: `docs/ESTADO-e-handoff.md`.
 
 ## 🇧🇷 IDIOMA
 Sempre responder em pt-BR. Identificadores de código em inglês (kebab-case arquivos, PascalCase classes, camelCase funções, snake_case tabelas). Mensagens de UI/log em pt-BR.
@@ -83,4 +83,15 @@ Uma feature só está pronta se: service tem a regra (sem lógica em controller)
 - Documentação DURANTE o desenvolvimento: README por módulo + CHANGELOG + docs/ de cada fase. `docs/base-doc-e-portes-aquapark.md` = backlog de amarração da base.
 - Sinais de alarme: endpoint sem `@RequirePermissions`; tabela sem `organization_id`; módulo importando BullMQ/provider direto; secret fora do Secrets Manager; automatismo nascendo ON; `catch` que engole erro e devolve fallback sem sinal; tipo técnico (`TRIGGER_EVENT`, chave crua) renderizado na tela; feature que o Aquapark já tem sendo feita do zero.
 
-*Versão do documento: 1.1.0 — 10/07/2026 (base amarrada via Aquapark: porte-não-reinvente, erro silencioso, arquivar≠excluir, pensar-antes-de-codar, definição-de-pronto)*
+## 🧾 DOCUMENTAÇÃO E CÓDIGO VIVOS — SEM LIXO (padrão obrigatório)
+> Doc e código descrevem o que EXISTE e como funciona HOJE — **não** são depósito de histórico. Embalagem vazia vai pro lixo; se não jogar fora, a casa enche de lixo que confunde.
+
+- **Toda versão/ajuste atualiza a doc afetada NA MESMA leva.** Terminar código e não mexer na doc é dívida na hora. Cada frente só está pronta com a doc batendo com a realidade (faz parte da Definição de Pronto).
+- **Função removida ou substituída por comportamento novo SAI da doc.** Descrição de função que não existe mais é lixo que engana quem lê depois.
+- **Correção terminada NÃO vira "registro de correção" na doc.** O que fica é a descrição da FUNÇÃO: o que faz e como funciona. O histórico do bug/fix mora no CHANGELOG, não na doc de arquitetura/comportamento.
+- **Código: sem código comentado/morto e sem comentário narrando o que foi substituído** ("antes fazia X, agora Y"). Apaga o velho. Comentário explica o que o código FAZ e por quê (quando não é óbvio), não a história dele.
+- **Papéis:** `CHANGELOG.md` = histórico (o que mudou e quando). `docs/` + READMEs + comentários = estado atual (o que existe e como funciona). `docs/ESTADO-e-handoff.md` = índice do estado vigente para re-ancorar entre sessões (a memória do assistente é compactada em sessões longas — a verdade mora no git + nos arquivos, nunca na memória).
+- **Spec de execução é ANDAIME temporário.** Uma spec/plano de uma frente serve para construí-la. Quando a frente conclui E o "como funciona" está documentado (README do módulo + CLAUDE.md/diretrizes), a spec **sai** — não se guarda spec de coisa já feita (é a embalagem vazia). Enquanto a frente NÃO foi feita, a spec fica.
+- **Frente só está PRONTA finalizada até o item mínimo.** Terminar a frente inteira — inclusive o menos prioritário — antes de fechar. Proibido empurrar trivialidade para um "futuro longo" que nunca chega, e proibido inchar a spec de uma frente com escopo de futuro que não será implantado. Escopo que não entra agora não vira "pendência eterna" na spec: ou entra na frente, ou é decisão explícita de outra frente.
+
+*Versão do documento: 1.2.0 — 12/07/2026 (doc/código vivos sem lixo; ESTADO-e-handoff como índice de re-ancoragem). 1.1.0 — 10/07/2026 (base amarrada via Aquapark).*

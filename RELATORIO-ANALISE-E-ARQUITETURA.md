@@ -1,12 +1,10 @@
 # Relatório de Análise e Arquitetura — Nova Plataforma de Automação, Integrações, IA e Comunicação
 
-**Data:** 02/07/2026
-**Fontes analisadas:** `delivery-system/aquapark` (v1.4.0) e `C:\Users\Flowspec\erp` (htdocs)
-**Status:** Aguardando aprovação — nenhum código foi copiado ou escrito.
+> **O que é este doc hoje:** a **PARTE 2 — contrato da API do ERP Altarede** é a referência VIVA da integração ISP (usada pelo provider e pela solução ISP). A **PARTE 1** é a análise pré-build do Aquapark (02/07/2026) que embasou as decisões de porte — material histórico, mantido só como contexto de origem.
 
 ---
 
-## PARTE 1 — ANÁLISE DO AQUAPARK
+## PARTE 1 — ANÁLISE DO AQUAPARK (histórico pré-build)
 
 ### 1.1 Stack e arquitetura atual
 

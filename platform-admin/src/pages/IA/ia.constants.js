@@ -34,7 +34,9 @@ export const MEMORY_SCOPES = [
 // Connection AI (minúsculo). Vazio/desconhecido cai no input livre.
 export const AGENT_MODELS = {
   openai: [
-    { value: 'gpt-4o',       label: 'GPT-4o (mais capaz)' },
+    { value: 'gpt-5.5',      label: 'GPT-5.5 (mais capaz)' },
+    { value: 'gpt-5.4',      label: 'GPT-5.4' },
+    { value: 'gpt-4o',       label: 'GPT-4o' },
     { value: 'gpt-4o-mini',  label: 'GPT-4o mini (rápido e econômico)' },
     { value: 'gpt-4.1-mini', label: 'GPT-4.1 mini' },
   ],

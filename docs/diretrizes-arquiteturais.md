@@ -1,6 +1,6 @@
 # IA Studio — Diretrizes Arquiteturais (revisão do Robson, 02/07/2026)
 
-> 18 diretrizes aprovadas + spec do Connection Wizard. Complementam o `RELATORIO-ANALISE-E-ARQUITETURA.md`. Cada item indica a fase do roadmap onde entra e o impacto no schema (o que nasce na Fase 1 mesmo que a feature venha depois).
+> 58 diretrizes arquiteturais vigentes + spec do Connection Wizard. Complementam o `RELATORIO-ANALISE-E-ARQUITETURA.md` (Parte 2 — API do ERP Altarede). Governam o desenho da plataforma; cada item indica o impacto no schema.
 
 ## 1. Marketplace de Conectores ⭐ (Fase 2)
 O Integration Manager ganha vitrine de **Conectores instaláveis**: Altarede, Gmail, OpenAI, Meta, PostgreSQL, SQL Server, Omie, Bling, Tiny, Digisac, SAP, Protheus, Conta Azul... Instalar um provider novo não exige mudar o core — só registrar no Provider Registry. UI: galeria por categoria com busca, "Instalar/Conectar".
