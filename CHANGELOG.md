@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.55 - 2026-07-12 (Abrir OS: resolve o login pelo id — não pelo nome)
+
+Sem `db push`. Backend (provider IXC).
+
+- **Abertura de OS falhava por causa do login.** O `abrir_os` passava o NOME do login (ex.: "torre3pratinha") em `id_login`, mas no IXC `su_oss_chamado.id_login` é FK pro **id numérico** de `radusuarios` — a abertura era recusada. Agora o provider resolve o nome do login pro id (novo helper `resolveLoginId`) antes de abrir; se não encontrar, abre sem login (origem no endereço do cliente) em vez de falhar. A anti-duplicidade de OS (`os.listar_abertas`) recebeu a mesma tradução — antes o filtro por login nunca casava (nome ≠ id). O agente continua trabalhando com o NOME do login; a tradução pro id é do provider.
+- **`id_contrato` também é id (guarda numérica).** O diagnóstico já entrega o `id_contrato` como id numérico, mas a abertura ganhou uma guarda: só envia `id_contrato` se for numérico — evita mandar o nome do plano por engano (o IXC recusaria, como no login).
+
 ## v0.9.54 - 2026-07-12 (Deploy: worker reinicia no upgrade + diagnóstico mostra opções para o cliente escolher)
 
 Sem `db push`. Backend + `scripts/upgrade.sh`. Conteúdo do assistente re-aplicado (`v21`).

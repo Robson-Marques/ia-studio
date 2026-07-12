@@ -23,9 +23,11 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.54** engatilhada (fix deploy: worker reinicia no upgrade + diagnóstico mostra opções pro
-  cliente escolher, contrato com plano+nº+endereço). ⚠️ **FRENTE 1 VALIDADA no WhatsApp** (o
-  diagnóstico listou os 5 contratos da Newnet pra escolher — funcionou de ponta a ponta). O que
+- **v0.9.55** engatilhada (abrir OS resolve login/contrato pelo id, não pelo nome). **v0.9.54 no ar**
+  (fix deploy worker + opções pro cliente escolher). ⚠️ **FRENTE 1 VALIDADA no WhatsApp de ponta a
+  ponta** (contrato→login→status offline→oferta de chamado). Só a abertura da OS falhava por passar
+  o NOME do login onde o IXC quer o id — corrigido na v0.9.55. **v0.9.55 já reinicia o worker sozinho**
+  (o upgrade.sh worker-first da v0.9.54 já está no servidor). O que
   faltava era o **worker rodando código velho**: o `upgrade.sh` reiniciava só o api, não o worker
   (19h sem restart) — a tool nova do diagnóstico não existia no worker. Corrigido no upgrade.sh
   (worker primeiro). **Ao aplicar a v0.9.54, o upgrade.sh EM EXECUÇÃO ainda é o antigo → dar

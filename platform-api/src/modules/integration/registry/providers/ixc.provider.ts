@@ -471,6 +471,33 @@ export class IxcProvider extends BaseProvider {
   }
 
   /**
+   * Resolve o id NUMERICO de radusuarios a partir do NOME do login (PPPoE). O
+   * su_oss_chamado.id_login e FK pro id, mas o agente/diagnostico trabalha com o
+   * NOME do login. Ja numerico → devolve como esta. Nao encontrou → undefined (a
+   * OS abre sem login, com origem no endereco do cliente, em vez de falhar).
+   */
+  private async resolveLoginId(
+    ctx: ProviderContext,
+    token: string,
+    loginArg: string | undefined,
+    idCliente?: string,
+  ): Promise<string | undefined> {
+    const v = loginArg?.trim();
+    if (!v) return undefined;
+    if (/^\d+$/.test(v)) return v; // ja e o id numerico
+    const filters: IxcGridFilter[] = [{ TB: `${T.radusuarios}.login`, OP: '=', P: v }];
+    if (idCliente) filters.push({ TB: `${T.radusuarios}.id_cliente`, OP: '=', P: idCliente });
+    const rows = await this.list(ctx, token, T.radusuarios, {
+      page: '1',
+      rp: '2',
+      sortname: `${T.radusuarios}.id`,
+      sortorder: 'asc',
+      grid_param: buildGridParam(filters),
+    });
+    return rows[0] ? String(rows[0]['id']) : undefined;
+  }
+
+  /**
    * Desbloqueio de confianca: roda sobre o contrato ATIVO (`status = 'A'`).
    *
    * A rota `desbloqueio_confianca` recebe `id` = id do CONTRATO e e chamada no
@@ -617,7 +644,9 @@ export class IxcProvider extends BaseProvider {
       sortname: `${T.os}.id`,
       sortorder: 'desc',
     });
-    const login = this.str(args, 'id_login');
+    // id_login da OS e o id NUMERICO de radusuarios — resolve o nome do login
+    // pro id, senao o filtro nunca casa (nome != id) e a anti-dup nao funciona.
+    const login = await this.resolveLoginId(ctx, token, this.str(args, 'id_login'), String(idCliente));
     const setor = this.str(args, 'setor');
     return rows.filter((r) => {
       const status = String(r['status'] ?? '').toUpperCase();
@@ -639,7 +668,10 @@ export class IxcProvider extends BaseProvider {
     const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true));
     const assunto = this.str(args, 'id_assunto') ?? this.str(args, 'motivo');
     const setor = this.str(args, 'setor');
-    const login = this.str(args, 'id_login');
+    // id_login no su_oss_chamado e FK pro id NUMERICO de radusuarios — NAO o nome
+    // PPPoE. O agente conhece o NOME ("torre3pratinha"); resolve pro id aqui, senao
+    // o IXC recusa a abertura (ou abre no ponto errado).
+    const login = await this.resolveLoginId(ctx, token, this.str(args, 'id_login'), String(cliente['id']));
     if (!assunto) {
       throw new BadRequestException(
         'Informe "id_assunto" (id do assunto da OS no IXC). Os assuntos disponíveis vêm do Descobrir recursos da conexão.',
@@ -673,7 +705,11 @@ export class IxcProvider extends BaseProvider {
       origem_endereco: login ? 'L' : 'C',
       data_abertura: ixcDateTime(),
       ...(login ? { id_login: login } : {}),
-      ...(this.str(args, 'id_contrato') ? { id_contrato: this.str(args, 'id_contrato') } : {}),
+      // id_contrato tambem e o id NUMERICO (FK pra cliente_contrato). O diagnostico
+      // ja entrega o id; a guarda numerica evita mandar plano/nome por engano.
+      ...(this.str(args, 'id_contrato') && /^\d+$/.test(this.str(args, 'id_contrato')!)
+        ? { id_contrato: this.str(args, 'id_contrato') }
+        : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };
     return this.write(ctx, token, 'POST', T.os, body);
