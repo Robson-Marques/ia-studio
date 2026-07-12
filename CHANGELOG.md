@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.9.37 - 2026-07-11 (atendente assume da IA + fluxo de suporte técnico melhor)
+
+- **"Assumir" numa conversa que a IA está conduzindo dava erro** ("Conversa já foi assumida por outro atendente"), porque o `claim` só aceitava conversa sem atendente (`current_handler_id = null`) e a IA está com ela (handler BOT). Agora o humano pode assumir de **null OU BOT** (tomar a frente da IA — normal, a IA para pelo gate); só bloqueia se **outro humano** já pegou. Corrige os toasts vermelhos ao clicar em Assumir numa conversa da IA.
+- **Fluxo de suporte técnico mais completo (assistente-exemplo).** Ele dizia genérico "uma das conexões está offline" sem nomear e não sugeria chamado. Agora, ao verificar conexão, ele **diz qual conexão caiu (login) e desde quando**, dá a orientação básica, checa a região e **oferece abrir um chamado técnico** para aquela conexão (registrar/encaminhar). Refresh `v8-conexao-chamado`. (Obs.: o exemplo segue em modo leitura — ele *oferece/encaminha* o chamado; pra ele ABRIR a OS de fato precisaria habilitar a ferramenta de escrita `abrir_os`, com confirmação — decisão pendente do Robson.)
+
 ## v0.9.36 - 2026-07-11 (vínculo CPF ↔ WhatsApp — a IA sabe de quem é o número)
 
 Precisa de `db push` (só ADICIONA colunas — não perde dado). Cumulativa com a v0.9.35 (debounce + consistência de status/identidade).

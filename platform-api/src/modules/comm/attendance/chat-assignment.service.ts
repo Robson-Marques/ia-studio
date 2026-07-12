@@ -63,7 +63,13 @@ export class ChatAssignmentService {
     const now = new Date();
     const count = await this.chats.updateChatConditional(
       chatId,
-      { current_handler_id: null, attendance_status: { not: CommChatStatus.CLOSED } },
+      {
+        // Pode assumir se ninguém humano está no comando: conversa sem atendente
+        // (null) OU sendo conduzida pela IA (BOT). Assumir da IA é normal — o
+        // humano toma a frente e a IA para. Só bloqueia se OUTRO humano já pegou.
+        OR: [{ current_handler_type: null }, { current_handler_type: 'BOT' }],
+        attendance_status: { not: CommChatStatus.CLOSED },
+      },
       {
         current_handler_type: 'USER',
         current_handler_id: scope.userId,
