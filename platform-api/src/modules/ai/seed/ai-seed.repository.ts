@@ -34,4 +34,11 @@ export class AiSeedRepository {
   createTool(data: Prisma.AiToolUncheckedCreateInput) {
     return this.prisma.aiTool.create({ data });
   }
+
+  updateTool(organizationId: string, key: string, data: Prisma.AiToolUncheckedUpdateInput) {
+    return this.prisma.aiTool.update({
+      where: { organization_id_key: { organization_id: organizationId, key } },
+      data,
+    });
+  }
 }

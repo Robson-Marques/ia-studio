@@ -596,7 +596,9 @@ export class IxcProvider extends BaseProvider {
 
   /** OS ABERTAS do cliente (anti-duplicidade). Heurística de status: tudo que
    *  NÃO está finalizado/cancelado conta como aberta. Se `id_login` vier, filtra
-   *  as OS daquela conexão. */
+   *  as OS daquela conexão. Se `setor` vier, considera só as OS DAQUELE SETOR —
+   *  uma OS de outro setor (ex.: financeiro) não deve bloquear um chamado de
+   *  suporte. */
   private async osAbertas(
     ctx: ProviderContext,
     token: string,
@@ -616,10 +618,13 @@ export class IxcProvider extends BaseProvider {
       sortorder: 'desc',
     });
     const login = this.str(args, 'id_login');
+    const setor = this.str(args, 'setor');
     return rows.filter((r) => {
       const status = String(r['status'] ?? '').toUpperCase();
       if (IxcProvider.OS_CLOSED_STATUS.has(status)) return false;
       if (login && r['id_login'] && String(r['id_login']) !== login) return false;
+      // Escopo por setor: só conta como duplicada a OS do MESMO setor da abertura.
+      if (setor && r['setor'] && String(r['setor']) !== String(setor)) return false;
       return true;
     });
   }

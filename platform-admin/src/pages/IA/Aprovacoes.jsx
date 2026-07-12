@@ -67,7 +67,7 @@ function QueueTab() {
   async function confirmApprove() {
     setApproveLoading(true);
     try {
-      await decideApproval(approving.id, { decision: 'APPROVED' });
+      await decideApproval(approving.id, { approve: true });
       toast.success('Ação aprovada — o assistente retoma o atendimento.');
       setApproving(null);
       load();
@@ -99,7 +99,7 @@ function QueueTab() {
                 return (
                   <Tr key={a.id}>
                     <Td>
-                      <span className="font-medium" style={{ color: 'var(--ap-text-1)' }}>{a.target}</span>
+                      <span className="font-medium" style={{ color: 'var(--ap-text-1)' }}>{friendlyTarget(a.target)}</span>
                       {a.context && <p className="text-[11px] font-mono truncate max-w-[320px]" style={{ color: 'var(--ap-text-4)' }}>{JSON.stringify(a.context)}</p>}
                     </Td>
                     <Td><Badge variant={st.variant}>{st.label}</Badge></Td>
@@ -137,7 +137,7 @@ function QueueTab() {
         open={!!approving}
         loading={approveLoading}
         title="Aprovar ação"
-        message={`Aprovar a execução de "${approving?.target}"? A ação será executada de verdade e o assistente prossegue. Verifique o contexto antes de confirmar.`}
+        message={`Aprovar a execução de "${friendlyTarget(approving?.target)}"? A ação será executada de verdade e o assistente prossegue. Verifique o contexto antes de confirmar.`}
         confirmLabel="Aprovar e executar"
         onClose={() => setApproving(null)}
         onConfirm={confirmApprove}
@@ -151,6 +151,17 @@ function QueueTab() {
   );
 }
 
+// Nome amigável da ação (o usuário não deve ver a chave técnica crua).
+const TARGET_LABELS = {
+  abrir_os: 'Abrir chamado',
+  desbloqueio_confianca: 'Desbloqueio de confiança',
+  enviar_whatsapp: 'Enviar WhatsApp',
+  executar_sql: 'Executar SQL',
+};
+function friendlyTarget(key) {
+  return TARGET_LABELS[key] || key;
+}
+
 function RejectModal({ approval, onClose, onRejected }) {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -160,7 +171,7 @@ function RejectModal({ approval, onClose, onRejected }) {
   async function handleReject() {
     setSaving(true);
     try {
-      await decideApproval(approval.id, { decision: 'REJECTED', reject_reason: reason.trim() || undefined });
+      await decideApproval(approval.id, { approve: false, reject_reason: reason.trim() || undefined });
       toast.success('Ação rejeitada — o atendimento do assistente foi encerrado.');
       onRejected();
     } catch (err) {
@@ -192,7 +203,7 @@ function RejectModal({ approval, onClose, onRejected }) {
     >
       <div className="space-y-3">
         <p className="text-sm" style={{ color: 'var(--ap-text-2)' }}>
-          Rejeitar "{approval?.target}"? A ação não será executada e o atendimento do assistente é encerrado. Ação destrutiva — não pode ser desfeita.
+          Rejeitar "{friendlyTarget(approval?.target)}"? A ação NÃO será executada e o assistente encerra este atendimento. Nada é alterado no sistema — é só recusar a execução. Se quiser, registre o motivo abaixo.
         </p>
         <FormField label="Motivo (opcional)">
           <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: destinatários incorretos" />

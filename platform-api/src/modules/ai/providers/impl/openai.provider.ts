@@ -44,9 +44,17 @@ export class OpenAiLlmProvider implements ILlmProvider {
     const body: Record<string, unknown> = {
       model: req.model,
       messages: req.messages.map((m) => this.toOpenAiMessage(m)),
-      temperature: req.temperature ?? 0.3,
     };
-    if (req.maxTokens) body['max_tokens'] = req.maxTokens;
+    // Porte do Aquapark: modelos GPT-5.x e da série "o" (raciocínio) SÓ aceitam
+    // temperature padrão (1) — qualquer valor custom retorna 400
+    // (unsupported_value) — e usam `max_completion_tokens` no lugar de
+    // `max_tokens`. Para esses, omitimos a temperature; para os demais
+    // (gpt-4o/4/3.5) mandamos normal.
+    const reasoningModel = /^(gpt-5|o\d)/i.test(req.model ?? '');
+    if (!reasoningModel) body['temperature'] = req.temperature ?? 0.3;
+    if (req.maxTokens) {
+      body[reasoningModel ? 'max_completion_tokens' : 'max_tokens'] = req.maxTokens;
+    }
     if (req.tools && req.tools.length > 0) {
       body['tools'] = req.tools.map((t) => ({
         type: 'function',

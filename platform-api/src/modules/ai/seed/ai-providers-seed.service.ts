@@ -80,7 +80,25 @@ export class AiProvidersSeedService implements OnApplicationBootstrap {
       for (const org of orgs) {
         for (const def of builtin) {
           const existing = await this.repository.findTool(org.id, def.key);
-          if (existing) continue;
+          if (existing) {
+            // Tool builtin é definida NO CÓDIGO — o código é a fonte da verdade.
+            // Sincroniza os campos code-owned (inclui requires_approval): assim
+            // mudar o flag no registry PROPAGA pro catálogo (antes era
+            // create-if-missing e o valor antigo ficava preso no banco — foi o que
+            // deixou o abrir_os "aguardando aprovação" mesmo com o código em false).
+            // NÃO toca em is_active (o usuário pode ter desligado a tool). Aprovação
+            // é opt-in por Política, não pelo flag da tool builtin.
+            await this.repository.updateTool(org.id, def.key, {
+              name: def.name,
+              description: def.description,
+              category: def.category,
+              input_schema: (def.input_schema ?? {}) as Prisma.InputJsonValue,
+              builtin_handler: def.key,
+              requires_approval: def.requires_approval ?? false,
+              timeout_ms: def.timeout_ms ?? 20000,
+            });
+            continue;
+          }
           await this.repository.createTool({
             organization_id: org.id,
             key: def.key,

@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.9.46 - 2026-07-12 (suporte a GPT-5.x na API (porte Aquapark) + guardrails sucinto/nome≠CPF)
+
+Sem `db push`. Backend. O modelo do assistente troca-se na aba Ajustes (sem deploy).
+
+- **Suporte aos modelos GPT-5.x / série "o" na chamada da OpenAI (porte do Aquapark).** Esses modelos mudam o contrato da API: só aceitam `temperature` padrão (qualquer valor custom → HTTP 400) e usam `max_completion_tokens` em vez de `max_tokens`. O provider da OpenAI agora detecta `gpt-5*`/`o<n>*` e **omite a temperature** + usa o parâmetro certo. Sem isto, escolher um modelo GPT-5.x quebrava a chamada. Agora dá pra apontar o assistente pra um modelo mais forte na aba **Ajustes** (o gpt-4o-mini é fraco pra nuance — foi o que fez ele reler "sou o cliente Fabricia" como "cliente da Fabricia" e alucinar um CPF que ninguém enviou).
+- **Guardrails do assistente (re-aplicados, `v14`):** responder **em 1–3 frases**, direto; **nome não é CPF** — se a pessoa diz o próprio nome ("sou o cliente Fabricia Bastos") ela está se identificando (ela É essa pessoa), e ainda assim é preciso o CPF/CNPJ pra localizar; **nunca** dizer "não localizei com o CPF informado" quando nenhum CPF foi enviado.
+- **Lógica de conversação (fluidez).** A abertura já orienta: "se for sobre a conta de um assinante (sem internet, fatura, 2ª via, chamado), me envie o CPF/CNPJ do titular; se for para contratar, não precisa". E o gate fica explícito no roteiro: **assunto de assinante só avança com o CPF** — se não veio, pede e aguarda, sem tentar consultar/resolver antes de identificar. Assim a pessoa manda o CPF de imediato, sem a IA ficar repetindo "em que posso ajudar".
+- **Abrir OS volta a ser AUTOMÁTICO (aprovação é opt-in).** O `abrir_os` estava caindo em "Pendências" (aguardando aprovação) porque o catálogo de tools era *create-if-missing*: o `requires_approval` antigo ficava preso no banco e a mudança pra `false` no código nunca propagava. Agora o seed **sincroniza os campos code-owned das tools builtin** (o código é a fonte da verdade) — o `abrir_os` abre direto. Quem quiser revisão antes de executar liga uma **Política** em IA Studio → Pendências → Políticas (opt-in), sem mexer no código.
+- **Anti-duplicidade de OS escopada por SETOR.** Antes de abrir, a IA **sempre** verifica se já existe chamado aberto para o cliente — mas agora só conta como duplicado o chamado **do mesmo setor** da abertura. Uma OS aberta em outro setor (ex.: financeiro) não bloqueia mais um chamado de suporte. Se existir um no mesmo setor, a IA informa o número em vez de abrir outro.
+- **Pendências (Aprovações) — aprovar/rejeitar quebrado corrigido.** O front mandava `{ decision: 'APPROVED'/'REJECTED' }` mas o backend espera `{ approve: boolean }` — dava o erro "property decision should not exist, approve must be a boolean value" e nada acontecia. Corrigido para `approve: true/false`. Também: a ação passa a aparecer com **nome amigável** (ex.: "Abrir chamado" em vez de `abrir_os`) e o texto de rejeitar foi corrigido — rejeitar **não** é destrutivo (só recusa a execução, nada é alterado), a redação anterior dizia o contrário.
+
 ## v0.9.45 - 2026-07-12 (agrupamento de mensagens na origem (porte Aquapark) + re-aplica prompt do assistente)
 
 Sem `db push`. Backend + front do admin. Corrige o que a v0.9.44 não resolveu.

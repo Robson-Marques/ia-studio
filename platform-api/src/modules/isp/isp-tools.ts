@@ -366,15 +366,18 @@ export class IspTools implements OnModuleInit {
           };
         }
 
-        // 3) Anti-duplicidade: já existe OS aberta pra este cliente/conexão?
-        //    Rede de segurança: se a LISTAGEM falhar, NÃO trava a abertura — só
-        //    perde o anti-dup (melhor abrir do que deixar o cliente sem chamado
-        //    por um erro de consulta). Erro silencioso é pior: logamos o warn.
+        // 3) Anti-duplicidade ESCOPADA POR SETOR: sempre checa se já existe OS
+        //    aberta pra este cliente NO MESMO SETOR da abertura — uma OS de outro
+        //    setor/assunto (ex.: financeiro) NÃO deve bloquear um chamado de
+        //    suporte. Rede de segurança: se a LISTAGEM falhar, NÃO trava a abertura
+        //    (melhor abrir do que deixar sem chamado por erro de consulta), mas
+        //    loga o warn — erro silencioso é pior.
         let abertas: Record<string, unknown>[] = [];
         try {
           abertas = rows(
             await this.connections.execute(ctx.organizationId, connectionId, 'os.listar_abertas', {
               cpf,
+              setor,
               ...(login ? { id_login: login } : {}),
             }),
           );
@@ -386,7 +389,7 @@ export class IspTools implements OnModuleInit {
           return {
             os_aberta: false,
             duplicada: true,
-            motivo: 'Já existe um chamado técnico aberto para esta conexão.',
+            motivo: 'Já existe um chamado aberto para este cliente neste setor.',
             chamado: { id: ja['id'] ?? null, status: ja['status'] ?? null, assunto: ja['id_assunto'] ?? null },
           };
         }
