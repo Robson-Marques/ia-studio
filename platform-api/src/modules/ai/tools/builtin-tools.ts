@@ -3,6 +3,7 @@
 // As tools de negocio (ISP, ERP) entram via Providers/Tools custom no catalogo,
 // nunca aqui. Handlers acessam servicos injetados — nunca Prisma direto.
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { WhatsappMessage } from '@prisma/client';
 import { ToolRegistryService, ToolExecutionContext } from './tool-registry.service';
 import { httpRequest } from '../../../shared/integration/http.util';
 import { ConnectionsService } from '../../integration/connections/connections.service';
@@ -159,7 +160,9 @@ export class BuiltinTools implements OnModuleInit {
         const chatId = ctx.scopeKeys?.['session'];
         if (!chatId) return { detail: 'Sem uma conversa em contexto.' };
         const take = Math.min(Math.max(Number(args['limite']) || 30, 1), 100);
-        const msgs = await this.whatsappInbox.listMessages(ctx.organizationId, chatId, take).catch(() => []);
+        const msgs: WhatsappMessage[] = await this.whatsappInbox
+          .listMessages(ctx.organizationId, chatId, take)
+          .catch(() => []);
         return {
           mensagens: msgs
             .filter((m) => (m.content ?? '').trim())

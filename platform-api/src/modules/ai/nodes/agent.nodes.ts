@@ -6,6 +6,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { NodeRegistryService } from '../../automation/engine/node-registry.service';
 import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsService } from '../agents/agents.service';
+import { WhatsappMessage } from '@prisma/client';
 import { WhatsappInboxService } from '../../comm/whatsapp/whatsapp-inbox.service';
 import { ChatAssignmentService } from '../../comm/attendance/chat-assignment.service';
 
@@ -129,7 +130,7 @@ export class AgentNodes implements OnModuleInit {
     session: string,
   ): Promise<{ role: 'user' | 'assistant'; content: string }[] | undefined> {
     if (!session) return undefined;
-    const rows = await this.inbox.listMessages(organizationId, session, 16).catch(() => []);
+    const rows: WhatsappMessage[] = await this.inbox.listMessages(organizationId, session, 16).catch(() => []);
     if (!rows.length) return undefined;
     // listMessages já vem em ordem cronológica (antiga→nova). Tira a última
     // (a mensagem atual, que já vai no input).
