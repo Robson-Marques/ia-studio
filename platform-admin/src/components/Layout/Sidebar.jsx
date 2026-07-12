@@ -33,6 +33,7 @@ const NAV = [
     label: 'ISP (Provedores)', icon: Network,
     children: [
       { label: 'Incidentes', icon: Radio, path: '/isp/incidentes', perm: 'isp.incidents.read' },
+      { label: 'Abertura de chamado', icon: Wrench, path: '/isp/abertura-chamado', perm: 'isp.incidents.read' },
     ],
   },
   {

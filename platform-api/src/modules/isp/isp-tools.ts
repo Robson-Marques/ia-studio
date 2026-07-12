@@ -14,6 +14,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ToolRegistryService, ToolExecutionContext } from '../ai/tools/tool-registry.service';
 import { ConnectionsService } from '../integration/connections/connections.service';
 import { WhatsappInboxService } from '../comm/whatsapp/whatsapp-inbox.service';
+import { IspOsConfigService } from './isp-os-config.service';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
 import { IncidentLookupService } from './incident-lookup.service';
@@ -38,6 +39,7 @@ export class IspTools implements OnModuleInit {
     private readonly connectivity: IspConnectivityService,
     private readonly lookup: IncidentLookupService,
     private readonly whatsappInbox: WhatsappInboxService,
+    private readonly osConfig: IspOsConfigService,
   ) {}
 
   /**
@@ -311,17 +313,18 @@ export class IspTools implements OnModuleInit {
       description:
         'Abre uma OS no ERP do provedor. Antes, checa incidente ativo no escopo do cliente: se houver manutenção com supressão de OS, informa e NÃO abre OS duplicada.',
       category: 'isp',
-      requires_approval: true,
+      // Abre direto (decisão do operador): os ids de setor/assunto vêm da CONFIG
+      // curada, mais o guard de incidente + o anti-duplicidade abaixo.
+      requires_approval: false,
       input_schema: {
         type: 'object',
         properties: {
-          cpf: { type: 'string' },
-          customer_ref: { type: 'string', description: 'Login/CPF do cliente (checagem de incidente ativo).' },
-          setor: { type: 'string', description: 'Id do setor de OS. OBRIGATÓRIO no IXC (vem do "Descobrir recursos" da conexão).' },
-          motivo: { type: 'string', description: 'Assunto/motivo da OS. No IXC é o id do assunto (su_oss_assunto).' },
-          id_assunto: { type: 'string', description: 'Id do assunto da OS (IXC). OBRIGATÓRIO no IXC; vem do "Descobrir recursos" da conexão.' },
-          id_filial: { type: 'string', description: 'Filial da OS. Se omitido, usa a filial do cadastro do cliente.' },
-          descricao: { type: 'string' },
+          cpf: { type: 'string', description: 'CPF/CNPJ do titular (do cliente já identificado).' },
+          descricao: { type: 'string', description: 'Descrição do problema do cliente (vai na observação da OS).' },
+          login: { type: 'string', description: 'Login da conexão com problema (identifica a instalação; use quando houver mais de uma).' },
+          contrato: { type: 'string', description: 'Id/nº do contrato da conexão com problema (quando houver mais de um).' },
+          setor: { type: 'string', description: 'OPCIONAL — normalmente vem da config; só informe para sobrescrever.' },
+          id_assunto: { type: 'string', description: 'OPCIONAL — normalmente vem da config; só informe para sobrescrever.' },
           connection_id: { type: 'string' }, filial: { type: 'string' },
         },
         required: ['cpf', 'descricao'],
@@ -329,13 +332,16 @@ export class IspTools implements OnModuleInit {
       handler: async (args, ctx) => {
         const cpf = asString(args['cpf'], 'cpf');
         const descricao = asString(args['descricao'], 'descricao');
-        // Checagem reativa de incidente ativo → suprime OS duplicada.
-        const ref = typeof args['customer_ref'] === 'string' && args['customer_ref'].trim() ? args['customer_ref'] : cpf;
+        const login = typeof args['login'] === 'string' && args['login'].trim() ? args['login'].trim() : undefined;
+        const contrato = typeof args['contrato'] === 'string' && args['contrato'].trim() ? args['contrato'].trim() : undefined;
+
+        // 1) Incidente ativo com supressão → não abre OS duplicada de região.
+        const ref = login ?? cpf;
         const incident = await this.lookup.activeFor(ctx.organizationId, ref);
         if (incident && incident.suppress_os) {
           return {
-            os_suppressed: true,
-            reason: 'Cliente coberto por incidente ativo com supressão de OS.',
+            os_aberta: false,
+            motivo: 'Cliente coberto por incidente ativo com supressão de OS.',
             incident: {
               title: incident.title,
               message: incident.message,
@@ -344,14 +350,49 @@ export class IspTools implements OnModuleInit {
           };
         }
         if (ctx.dryRun) return { simulated: true, cpf };
+
         const connectionId = await this.connectionId(args, ctx);
-        const params: Record<string, unknown> = { cpf, descricao };
-        if (typeof args['setor'] === 'string') params['setor'] = args['setor'];
-        if (typeof args['motivo'] === 'string') params['motivo'] = args['motivo'];
-        if (typeof args['id_assunto'] === 'string') params['id_assunto'] = args['id_assunto'];
-        if (typeof args['id_filial'] === 'string') params['id_filial'] = args['id_filial'];
-        const os = await this.connections.execute(ctx.organizationId, connectionId, 'os.cadastrar', params);
-        return { os_suppressed: false, os, active_incident: incident };
+
+        // 2) Setor + assunto da CONFIG curada (a IA não chuta ids). Override
+        //    opcional se a IA mandar setor/id_assunto explicitamente.
+        const cfg = await this.osConfig.defaultForSupport(ctx.organizationId, connectionId);
+        const setor = (typeof args['setor'] === 'string' && args['setor']) || cfg?.setor_id;
+        const idAssunto = (typeof args['id_assunto'] === 'string' && args['id_assunto']) || cfg?.assunto_id;
+        if (!setor || !idAssunto) {
+          return {
+            os_aberta: false,
+            motivo:
+              'A abertura de OS ainda não foi configurada para esta conexão (setor/assunto). Encaminhe para um atendente humano abrir o chamado.',
+          };
+        }
+
+        // 3) Anti-duplicidade: já existe OS aberta pra este cliente/conexão?
+        const abertas = rows(
+          await this.connections.execute(ctx.organizationId, connectionId, 'os.listar_abertas', {
+            cpf,
+            ...(login ? { id_login: login } : {}),
+          }),
+        );
+        if (abertas.length > 0) {
+          const ja = abertas[0];
+          return {
+            os_aberta: false,
+            duplicada: true,
+            motivo: 'Já existe um chamado técnico aberto para esta conexão.',
+            chamado: { id: ja['id'] ?? null, status: ja['status'] ?? null, assunto: ja['id_assunto'] ?? null },
+          };
+        }
+
+        // 4) Abre a OS com o que a IA sabe + a config.
+        const os = await this.connections.execute(ctx.organizationId, connectionId, 'os.cadastrar', {
+          cpf,
+          descricao,
+          setor,
+          id_assunto: idAssunto,
+          ...(login ? { id_login: login } : {}),
+          ...(contrato ? { id_contrato: contrato } : {}),
+        });
+        return { os_aberta: true, os, active_incident: incident };
       },
     });
 

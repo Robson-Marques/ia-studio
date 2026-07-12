@@ -27,6 +27,7 @@ const BREADCRUMBS = {
   '/whatsapp/templates': 'WhatsApp / Templates',
   '/whatsapp/equipes':   'WhatsApp / Equipes e Filas',
   '/whatsapp/numeros':   'WhatsApp / Números',
+  '/isp/abertura-chamado': 'ISP / Abertura de chamado',
   '/whatsapp/atendimento-ia': 'WhatsApp / Atendimento por IA',
   '/automacao/fluxos':       'Automação / Fluxos',
   '/automacao/agendamentos': 'Automação / Agendamentos',

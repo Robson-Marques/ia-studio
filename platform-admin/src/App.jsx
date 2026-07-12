@@ -38,6 +38,7 @@ import Ferramentas from './pages/IA/Ferramentas';
 import Aprovacoes from './pages/IA/Aprovacoes';
 import Custos from './pages/IA/Custos';
 import Incidentes from './pages/ISP/Incidentes';
+import AberturaChamado from './pages/ISP/AberturaChamado';
 import Mapeamentos from './pages/Recursos/Mapeamentos';
 import Explorer from './pages/Recursos/Explorer';
 import ConsoleDev from './pages/Desenvolvedor/Console';
@@ -99,6 +100,7 @@ export default function App() {
                 <Route path="/ia/aprovacoes" element={<PermissionRoute perm="ai.approvals.read"><Aprovacoes /></PermissionRoute>} />
                 <Route path="/ia/custos" element={<PermissionRoute perm="ai.costs.read"><Custos /></PermissionRoute>} />
                 <Route path="/isp/incidentes" element={<PermissionRoute perm="isp.incidents.read"><Incidentes /></PermissionRoute>} />
+                <Route path="/isp/abertura-chamado" element={<PermissionRoute perm="isp.incidents.read"><AberturaChamado /></PermissionRoute>} />
                 <Route path="/recursos/mapeamentos" element={<PermissionRoute perm="resource.mappings.read"><Mapeamentos /></PermissionRoute>} />
                 <Route path="/recursos/explorer" element={<PermissionRoute perm="resource.explore.read"><Explorer /></PermissionRoute>} />
                 <Route path="/desenvolvedor/console" element={<PermissionRoute perm="devtools.use"><ConsoleDev /></PermissionRoute>} />

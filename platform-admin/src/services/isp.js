@@ -7,6 +7,30 @@ import { normalizeList } from './users';
 
 // ─── Incidentes / Manutenção ─────────────────────────────────
 
+// ─── Config de abertura de OS (setor↔assunto por conexão) ───────────────
+export async function discoverOsResources(connectionId) {
+  try {
+    const { data } = await api.get('/isp/os-config/discover', {
+      params: connectionId ? { connection_id: connectionId } : {},
+    });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao descobrir setores/assuntos do ERP')); }
+}
+
+export async function getOsConfig(connectionId) {
+  try {
+    const { data } = await api.get('/isp/os-config', { params: { connection_id: connectionId } });
+    return normalizeList(data);
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar a configuração de OS')); }
+}
+
+export async function saveOsConfig(connectionId, pairs) {
+  try {
+    const { data } = await api.put('/isp/os-config', { connection_id: connectionId, pairs });
+    return normalizeList(data);
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar a configuração de OS')); }
+}
+
 export async function listIncidents(params = {}) {
   try {
     const { data } = await api.get('/isp/incidents', { params });

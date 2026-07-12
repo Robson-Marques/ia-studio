@@ -24,10 +24,13 @@ import { IspTools } from './isp-tools';
 import { IspController } from './isp.controller';
 import { IspExampleRepository } from './isp-example.repository';
 import { IspExampleAssistantSeed } from './isp-example-assistant.seed';
+import { IspOsConfigRepository } from './isp-os-config.repository';
+import { IspOsConfigService } from './isp-os-config.service';
+import { IspOsConfigController } from './isp-os-config.controller';
 
 @Module({
   imports: [IntegrationModule, CommModule, AutomationModule, AiModule],
-  controllers: [IspController],
+  controllers: [IspController, IspOsConfigController],
   providers: [
     IspRepository,
     IspConnectionResolver,
@@ -39,8 +42,11 @@ import { IspExampleAssistantSeed } from './isp-example-assistant.seed';
     IspTools,
     IspExampleRepository,
     IspExampleAssistantSeed,
+    IspOsConfigRepository,
+    IspOsConfigService,
   ],
   // IncidentLookupService exportado pra futura reuso (nos de automacao ISP).
-  exports: [IncidentLookupService],
+  // IspOsConfigService exportado pra Etapa 3 (a tool abrir_os usa a config).
+  exports: [IncidentLookupService, IspOsConfigService],
 })
 export class IspModule {}

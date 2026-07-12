@@ -80,6 +80,7 @@ const OPERATIONS = [
   'financeiro.boleto_base64',
   'conectividade.listar_com_status',
   'os.cadastrar',
+  'os.listar_abertas',
   'atendimento.listar_setor',
   'atendimento.listar_motivo_atendimento',
   // Acesso generico a qualquer tabela do IXC
@@ -99,6 +100,10 @@ const MAX_PAGES = 20;
 @Injectable()
 export class IxcProvider extends BaseProvider {
   private readonly logger = new Logger(IxcProvider.name);
+
+  // Status de OS FINALIZADA/cancelada no IXC (o resto conta como "aberta" pro
+  // anti-duplicidade). Ajuste conforme o setup do provedor, se necessário.
+  private static readonly OS_CLOSED_STATUS = new Set(['F', 'C', 'CA', 'RAG', 'X']);
 
   metadata(): ProviderMetadata {
     return {
@@ -247,6 +252,9 @@ export class IxcProvider extends BaseProvider {
 
       case 'os.cadastrar':
         return this.abrirOs(ctx, token, args);
+
+      case 'os.listar_abertas':
+        return { data: await this.osAbertas(ctx, token, args) };
 
       case 'atendimento.listar_setor':
         return { data: await this.list(ctx, token, T.osSetor, { rp: '200', sortname: `${T.osSetor}.id` }) };
@@ -579,6 +587,36 @@ export class IxcProvider extends BaseProvider {
     });
   }
 
+  /** OS ABERTAS do cliente (anti-duplicidade). Heurística de status: tudo que
+   *  NÃO está finalizado/cancelado conta como aberta. Se `id_login` vier, filtra
+   *  as OS daquela conexão. */
+  private async osAbertas(
+    ctx: ProviderContext,
+    token: string,
+    args: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
+    let idCliente = this.str(args, 'id_cliente');
+    if (!idCliente) {
+      const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true)!);
+      idCliente = String(cliente['id']);
+    }
+    const rows = await this.list(ctx, token, T.os, {
+      qtype: `${T.os}.id_cliente`,
+      query: String(idCliente),
+      oper: '=',
+      rp: '50',
+      sortname: `${T.os}.id`,
+      sortorder: 'desc',
+    });
+    const login = this.str(args, 'id_login');
+    return rows.filter((r) => {
+      const status = String(r['status'] ?? '').toUpperCase();
+      if (IxcProvider.OS_CLOSED_STATUS.has(status)) return false;
+      if (login && r['id_login'] && String(r['id_login']) !== login) return false;
+      return true;
+    });
+  }
+
   /**
    * Abertura de OS. `id_assunto`/`setor` vêm do discover() — não são texto livre.
    * Os defaults (`tipo`, `prioridade`, `melhor_horario_agenda`, `origem_endereco`)
@@ -620,6 +658,7 @@ export class IxcProvider extends BaseProvider {
       origem_endereco: 'M',
       data_abertura: ixcDateTime(),
       ...(login ? { id_login: login } : {}),
+      ...(this.str(args, 'id_contrato') ? { id_contrato: this.str(args, 'id_contrato') } : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };
     return this.write(ctx, token, 'POST', T.os, body);

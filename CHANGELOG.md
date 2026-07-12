@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.9.41 - 2026-07-11 (a IA ABRE o chamado — config de setor/assunto + anti-duplicidade)
+
+Precisa de `db push` (nova tabela `isp_os_config` — só adiciona). Fecha o ciclo de suporte técnico.
+
+- **Config de abertura de OS (curada pelo operador).** Nova tela **ISP → Abertura de chamado**: um botão descobre os **setores e assuntos** direto do ERP (IXC), o operador escolhe quais a IA pode usar (pares setor↔assunto) e marca um como **padrão de suporte**. Assim a IA nunca chuta id — só usa valores válidos.
+- **A IA abre a OS de verdade.** A ferramenta `abrir_os` foi habilitada no assistente-exemplo e **abre direto** (sem aprovação) após o cliente confirmar: preenche **setor+assunto pela config**, **CPF+filial** do cadastro, **login+contrato** da conexão com problema (essencial quando há mais de uma) e a **descrição** do problema (que a IA resume). Refresh `v10-abre-os`.
+- **Sem duplicidade + guard de incidente.** Antes de abrir, checa se já existe **OS aberta** pra essa conexão/cliente (nova operação `os.listar_abertas` no IXC) — se existir, passa o número existente em vez de abrir outra. E o guard de incidente ativo já evitava OS duplicada em manutenção de região. Se a config não estiver pronta, a IA encaminha para um humano.
+- Provider IXC: `os.listar_abertas` (anti-dup) + `id_contrato` na abertura de OS.
+
 ## v0.9.40 - 2026-07-11 (ajustes finos do assistente: abertura, CPF, status, chamado)
 
 Cumulativa — garante no ar os ajustes de comportamento do assistente-exemplo (alguns já descritos na v0.9.39; esta versão assegura que todos entraram no build):

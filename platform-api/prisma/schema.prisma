@@ -1692,6 +1692,27 @@ model IspIncidentDispatch {
   @@map("isp_incident_dispatches")
 }
 
+// Config de abertura de OS pela IA: pares setor↔assunto VÁLIDOS (curados do
+// "Descobrir recursos" do ERP), por conexão. A IA nunca chuta id — só usa os
+// pares ativos aqui. `is_default` marca o par usado no suporte técnico.
+model IspOsConfig {
+  id              String   @id @default(uuid())
+  organization_id String
+  connection_id   String
+  setor_id        String
+  setor_nome      String?
+  assunto_id      String
+  assunto_nome    String?
+  is_default      Boolean  @default(false)
+  active          Boolean  @default(true)
+  created_by      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([organization_id, connection_id])
+  @@map("isp_os_config")
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Resource Model + Mapper (Fase 7 — diretrizes 9/23/24/25). A plataforma NAO
 // e dona de dados de negocio: os TIPOS canonicos (Customer/Invoice/...) vivem
