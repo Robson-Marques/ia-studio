@@ -108,15 +108,26 @@ export default function AberturaChamado() {
 
           {pairs.map((p, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">
-              <select
-                className="input text-sm flex-1 min-w-[160px]"
-                value={p.setor_id}
-                disabled={!canManage}
-                onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
-              >
-                <option value="">Setor…</option>
-                {setores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              {setores.length > 0 ? (
+                <select
+                  className="input text-sm flex-1 min-w-[160px]"
+                  value={p.setor_id}
+                  disabled={!canManage}
+                  onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
+                >
+                  <option value="">Setor…</option>
+                  {setores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              ) : (
+                <input
+                  className="input text-sm flex-1 min-w-[160px]"
+                  value={p.setor_id}
+                  disabled={!canManage}
+                  placeholder="Id do setor no IXC"
+                  title="Nenhum setor foi descoberto — informe o id do setor de OS do seu IXC."
+                  onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
+                />
+              )}
               <select
                 className="input text-sm flex-1 min-w-[160px]"
                 value={p.assunto_id}

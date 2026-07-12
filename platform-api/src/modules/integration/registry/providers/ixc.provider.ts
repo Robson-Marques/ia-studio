@@ -61,7 +61,9 @@ const T = {
   radusuarios: 'radusuarios',
   os: 'su_oss_chamado',
   osAssunto: 'su_oss_assunto',
-  osSetor: 'su_oss_setor',
+  // O campo `setor` da OS (su_oss_chamado) referencia empresa_setor.id — NÃO
+  // su_oss_setor (que fica vazio em muitas bases). Confirmado na doc do IXC.
+  osSetor: 'empresa_setor',
   plano: 'vd_contratos',
 } as const;
 
@@ -306,7 +308,12 @@ export class IxcProvider extends BaseProvider {
     const resources: DiscoveredResource[] = [];
     // A ordem dos rotulos e POR TABELA: em `vd_contratos` o rotulo que o
     // operador ve na tela do IXC (coluna "Plano") e `nome`, nao `descricao`.
-    resources.push(...(await this.discoverList(ctx, token, T.osSetor, 'setor', ['setor', 'nome', 'descricao'])));
+    // Setores (empresa_setor): só os ATIVOS (ativo='S') — não poluir com setores
+    // desativados no IXC.
+    const setores = (await this.discoverList(ctx, token, T.osSetor, 'setor', ['setor', 'nome', 'descricao'])).filter(
+      (r) => String((r.meta as Record<string, unknown> | undefined)?.['ativo'] ?? 'S').toUpperCase() !== 'N',
+    );
+    resources.push(...setores);
     resources.push(...(await this.discoverList(ctx, token, T.osAssunto, 'motivo_atendimento', ['assunto', 'descricao', 'nome'])));
     resources.push(...(await this.discoverList(ctx, token, T.plano, 'plano', ['nome', 'descricao'])));
     return { resources };

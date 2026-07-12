@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.43 - 2026-07-11 (dropdown de Setor da OS: lê empresa_setor, só ativos + fallback)
+
+- **A causa do Setor vazio: eu lia a tabela errada.** A doc do IXC mostra que o campo `setor` da OS (`su_oss_chamado`) referencia **`empresa_setor.id`**, não `su_oss_setor` (que fica vazio em muitas bases). Troquei o discover (e o `atendimento.listar_setor`) para ler `empresa_setor` — agora o dropdown popula com os setores reais, e **só os ativos** (`ativo='S'`).
+- **Fallback** (rede de segurança): se ainda assim nenhum setor for descoberto, o campo vira um **input pra digitar o id do setor** — não trava a config.
+- Backend + front do admin, sem `db push`.
+
 ## v0.9.42 - 2026-07-11 (fix: ".map is not a function" na tela de Abertura de chamado)
 
 - A tela de Abertura de chamado quebrava ao carregar a config: `getOsConfig`/`saveOsConfig` devolviam o envelope `{ items }` do `normalizeList` em vez do array, e a página fazia `.map` no objeto. Corrigido para devolver `.items` (o array). Só front do admin, sem `db push`.
