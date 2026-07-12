@@ -10,6 +10,9 @@ import { WhatsappMessage } from '@prisma/client';
 import { WhatsappInboxService } from '../../comm/whatsapp/whatsapp-inbox.service';
 import { ChatAssignmentService } from '../../comm/attendance/chat-assignment.service';
 
+// Janela de debounce: agrupa mensagens picadas do mesmo contato numa resposta só.
+const DEBOUNCE_MS = 7000;
+
 @Injectable()
 export class AgentNodes implements OnModuleInit {
   constructor(
@@ -66,15 +69,37 @@ export class AgentNodes implements OnModuleInit {
           return { handle: 'success', output: { simulated: true, agent_id: agentId, scope_keys: scopeKeys } };
         }
 
+        // Debounce (agrupa mensagens picadas): se veio de um inbound de WhatsApp,
+        // espera uma janela curta; se chegou mensagem MAIS NOVA nesta conversa,
+        // esta execução NÃO responde — quem responde é a execução da última
+        // mensagem (já com todo o histórico). Evita 3 respostas pra 3 mensagens.
+        const inp = (ctx.input ?? {}) as Record<string, unknown>;
+        const triggerMsgId = typeof inp['external_id'] === 'string' ? (inp['external_id'] as string) : null;
+        if (session && triggerMsgId) {
+          await new Promise((r) => setTimeout(r, DEBOUNCE_MS));
+          const latest: WhatsappMessage[] = await this.inbox
+            .listMessages(ctx.organizationId, session, 1)
+            .catch(() => []);
+          const latestId = latest[0]?.external_id ?? null;
+          if (latestId && latestId !== triggerMsgId) {
+            await ctx.log('info', 'debounce: chegou mensagem mais nova nesta conversa — esta execução não responde.');
+            return { handle: 'error', output: { debounced: true } };
+          }
+        }
+
         // Continuidade: se a sessão é uma conversa de WhatsApp (chat_id), carrega
         // os turnos anteriores e passa como histórico — senão cada mensagem vira
         // um run sem memória e o assistente "esquece" o que já foi dito.
         const history = await this.loadChatHistory(ctx.organizationId, session);
+        // Cliente já vinculado a este WhatsApp? Injeta no contexto pra o assistente
+        // não re-pedir CPF nem misturar identidade.
+        const linkedNote = await this.loadLinkedNote(ctx.organizationId, session);
+        const effectiveInput = linkedNote ? `${linkedNote}\n\n${input}` : input;
 
         try {
           const result = await this.runner.run({
             agentId,
-            input,
+            input: effectiveInput,
             executionId: ctx.executionId,
             traceId: ctx.traceId,
             scopeKeys,
@@ -120,6 +145,19 @@ export class AgentNodes implements OnModuleInit {
   /** Catalogo auxiliar: agentes ativos pro select do no (usado pelo front). */
   activeAgents(organizationId: string, workspaceId?: string, environmentId?: string) {
     return this.agents.findActive(organizationId, { workspaceId, environmentId });
+  }
+
+  /** Nota de contexto quando este WhatsApp já tem um cliente vinculado — pro
+   *  assistente não re-pedir CPF nem confundir identidade. Best-effort. */
+  private async loadLinkedNote(organizationId: string, session: string): Promise<string | null> {
+    if (!session) return null;
+    const chat = await this.inbox.getChat(organizationId, session).catch(() => null);
+    if (!chat || (!chat.linked_customer_name && !chat.linked_customer_document)) return null;
+    const doc = chat.linked_customer_document ? ` (CPF/CNPJ ${chat.linked_customer_document})` : '';
+    return (
+      `Contexto: esta conversa já está vinculada ao cliente ${chat.linked_customer_name ?? ''}${doc}. ` +
+      'Trate os assuntos como sendo desse cliente e NÃO peça o CPF de novo. Se a pessoa quiser atender OUTRO cliente, ela deve enviar o novo CPF (aí re-vincule).'
+    );
   }
 
   /** Carrega os turnos anteriores de uma conversa de WhatsApp (quando a sessão é

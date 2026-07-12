@@ -1,5 +1,21 @@
 # Changelog — IA Studio
 
+## v0.9.36 - 2026-07-11 (vínculo CPF ↔ WhatsApp — a IA sabe de quem é o número)
+
+Precisa de `db push` (só ADICIONA colunas — não perde dado). Cumulativa com a v0.9.35 (debounce + consistência de status/identidade).
+
+- **Vínculo estruturado (raiz da confusão de identidade).** `WhatsappChat` ganhou `linked_customer_document/ref/name/linked_at` (o telefone → titular). A IA, depois de identificar e **confirmar** o CPF, chama a ferramenta **`vincular_cliente`** → o número fica ligado àquele cliente. Nas conversas seguintes ela **não pede o CPF de novo** e não mistura identidade (o nó Assistente injeta "esta conversa é do cliente X" no contexto).
+- **Trocar de cliente:** se a pessoa quiser atender OUTRO cliente, o assistente avisa "é só me enviar o CPF" e, ao receber, **re-vincula** ao novo titular.
+- **Desvincular pelo atendente:** no cabeçalho da conversa aparece "Cliente: <nome>" com um botão **desvincular** (perm `comm.whatsapp.claim`) — endpoint `POST /comm/whatsapp/chats/:id/unlink-customer`.
+- Ferramenta `vincular_cliente` adicionada ao assistente-exemplo (refresh `v7-vinculo-cliente`). Sem válvula de segurança de CPF por ora (decisão do Robson) — o 2º fator pode ser plugado depois, como a spec previa.
+
+## v0.9.35 - 2026-07-11 (debounce: agrupa mensagens picadas numa resposta só)
+
+- **A IA deixa de responder 3x pra 3 mensagens seguidas.** Quando o assistente vai responder um inbound de WhatsApp, ele espera uma janela curta (~7s); se nesse meio-tempo chegou uma mensagem MAIS NOVA na conversa, esta execução não responde — quem responde é a execução da última mensagem, já com todo o histórico junto. Uma resposta por rajada. O evento inbound passou a carregar o `external_id` (wamid) pra essa comparação. (Porte do debounce do SDR do Aquapark.)
+- **Assistente mais consistente sobre status.** Ele estava se contradizendo ("cadastro está ativo" e logo depois "sua conta está inativa") e concluindo "inativo" só porque não havia conexão ativa. Agora o system_prompt manda basear a conclusão no **status do CONTRATO** (não na mera ausência de conexão): sem conexão pode ser problema técnico (contrato ativo), bloqueio por pagamento, OU cancelamento — verificar antes de afirmar, e não dizer "inativa" se o cadastro está ativo.
+- **Não misturar identidades.** Quando a pessoa no WhatsApp consulta o CPF de OUTRA pessoa (ex.: Robson pergunta pelo CPF da Fabricia), o assistente estava misturando ("Robson, sua conta..."). Agora ele separa: quem está no WhatsApp ≠ titular do cadastro consultado; refere-se ao titular pelo nome e não atribui a conta/conexão a quem está falando. (Refresh `v6-status-identidade`.)
+- Sobe em cima da v0.9.34 (que já está em produção): adiciona debounce + os dois ajustes de comportamento acima.
+
 ## v0.9.34 - 2026-07-11 (corrige o TS que barrou a v0.9.33)
 
 - **A v0.9.33 falhou no `API_BUILD`** (erro de tipo em `builtin-tools.ts`: `.catch(() => [])` fazia o TS inferir `never[]`, então `m.content` não existia em `never`). O painel de Atualização **mostrou a falha** e a produção ficou na versão anterior (fail-safe funcionando). Corrigido tipando o retorno como `WhatsappMessage[]` (em `builtin-tools.ts` e `agent.nodes.ts`). Cumulativa — traz tudo da v0.9.33 (IA assume conversa, aba IA/Aguardando, inativo→venda).

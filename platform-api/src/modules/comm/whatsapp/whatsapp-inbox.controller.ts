@@ -99,6 +99,17 @@ export class WhatsappInboxController {
     return this.inbox.getChat(resolveOrganizationId(user, orgQuery), id);
   }
 
+  /** Desvincula o cliente deste WhatsApp (ação do atendente). */
+  @Post('chats/:id/unlink-customer')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_CLAIM)
+  unlinkCustomer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.inbox.unlinkCustomer(resolveOrganizationId(user, orgQuery), id);
+  }
+
   @Get('chats/:id/messages')
   @RequirePermissions(...ANY_VIEW)
   listMessages(

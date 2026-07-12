@@ -24,6 +24,13 @@ export async function getChatCounts(params = {}) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar contagem de conversas')); }
 }
 
+export async function unlinkCustomer(id) {
+  try {
+    const { data } = await api.post(`/comm/whatsapp/chats/${id}/unlink-customer`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao desvincular o cliente')); }
+}
+
 export async function getChat(id) {
   try {
     const { data } = await api.get(`/comm/whatsapp/chats/${id}`);

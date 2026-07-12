@@ -8,7 +8,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../../lib/toast';
 import {
-  claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia,
+  claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia, unlinkCustomer,
 } from '../../services/whatsapp';
 import { ATTENDANCE_STATUS, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
@@ -167,6 +167,23 @@ export default function ChatWindow({
             {formatPhone(chat.phone)}
             {chat.current_handler_name ? ` — atendido por ${chat.current_handler_name}` : ' — sem atendente'}
           </p>
+          {chat.linked_customer_name && (
+            <p className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--ap-accent, #6366f1)' }}>
+              <span>Cliente: {chat.linked_customer_name}{chat.linked_customer_document ? ` (${chat.linked_customer_document})` : ''}</span>
+              {can('comm.whatsapp.claim') && (
+                <button
+                  type="button"
+                  title="Desvincular este cliente do WhatsApp"
+                  disabled={acting}
+                  onClick={() => run(() => unlinkCustomer(chat.id), 'Cliente desvinculado.')}
+                  className="hover:underline disabled:opacity-50"
+                  style={{ color: 'var(--ap-text-4)' }}
+                >
+                  desvincular
+                </button>
+              )}
+            </p>
+          )}
         </div>
         <Badge variant={st.variant}>{st.label}</Badge>
 

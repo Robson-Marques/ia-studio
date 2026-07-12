@@ -139,6 +139,9 @@ export class WhatsappInboundService {
           phone: from,
           type,
           content,
+          // Id da mensagem (wamid) — o nó Assistente usa pra DEBOUNCE: só
+          // responde se nenhuma mensagem mais nova chegou nesta conversa.
+          external_id: externalId,
           // Nome do contato e quem atende agora (USER = humano no teclado,
           // BOT = IA, null = ninguém). O fluxo "IA responde no WhatsApp" usa
           // handler_type numa condição pra NÃO responder por cima de um humano

@@ -171,6 +171,33 @@ export class WhatsappInboxService {
     return { ...chat, current_handler_name: handlerName };
   }
 
+  /** Vincula o cliente (titular do cadastro) a este WhatsApp — grava o CPF/ref/
+   *  nome no chat. Trocável: outro CPF re-vincula. Usado pela tool da IA. */
+  async linkCustomer(
+    organizationId: string,
+    chatId: string,
+    data: { document?: string | null; ref?: string | null; name?: string | null },
+  ): Promise<WhatsappChat> {
+    await this.getChat(organizationId, chatId); // ownership
+    return this.chats.updateChat(chatId, {
+      linked_customer_document: data.document ?? null,
+      linked_customer_ref: data.ref ?? null,
+      linked_customer_name: data.name ?? null,
+      linked_at: new Date(),
+    });
+  }
+
+  /** Desvincula o cliente deste WhatsApp (ação do atendente). */
+  async unlinkCustomer(organizationId: string, chatId: string): Promise<WhatsappChat> {
+    await this.getChat(organizationId, chatId); // ownership
+    return this.chats.updateChat(chatId, {
+      linked_customer_document: null,
+      linked_customer_ref: null,
+      linked_customer_name: null,
+      linked_at: null,
+    });
+  }
+
   async listMessages(organizationId: string, chatId: string, take = 50, before?: string): Promise<WhatsappMessage[]> {
     await this.getChat(organizationId, chatId); // ownership
     const beforeDate = before ? new Date(before) : undefined;

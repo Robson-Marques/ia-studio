@@ -643,6 +643,13 @@ model WhatsappChat {
   last_assignment_at   DateTime?
   first_response_at    DateTime?
   closed_at            DateTime?
+  // Cliente vinculado a este WhatsApp (o telefone → titular do cadastro). Fica
+  // gravado ao identificar+confirmar o CPF, pra não re-perguntar e não misturar
+  // identidade. Trocável (outro CPF re-vincula) e removível (atendente desvincula).
+  linked_customer_document String?
+  linked_customer_ref      String?
+  linked_customer_name     String?
+  linked_at                DateTime?
   created_at           DateTime         @default(now())
   updated_at           DateTime         @updatedAt
 

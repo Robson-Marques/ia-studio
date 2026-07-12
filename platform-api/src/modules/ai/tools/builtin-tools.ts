@@ -193,6 +193,38 @@ export class BuiltinTools implements OnModuleInit {
       },
     });
 
+    // ─── vincular_cliente ─────────────────────────────
+    // Depois de identificar+confirmar o CPF, a IA vincula o titular a este
+    // WhatsApp — assim o sistema "sabe" de quem é o número (não re-pergunta, não
+    // mistura identidade). Enviar outro CPF re-vincula. O atendente pode desfazer.
+    this.registry.register({
+      key: 'vincular_cliente',
+      name: 'Vincular cliente ao WhatsApp',
+      description:
+        'Depois de identificar e confirmar o titular pelo CPF/CNPJ, vincule-o a esta conversa. Assim você não precisa pedir o CPF de novo nas próximas mensagens. Se a pessoa quiser atender OUTRO cliente, chame de novo com o novo CPF.',
+      category: 'comunicacao',
+      input_schema: {
+        type: 'object',
+        properties: {
+          documento: { type: 'string', description: 'CPF ou CNPJ do titular (só números ou formatado).' },
+          nome: { type: 'string', description: 'Nome do titular do cadastro.' },
+          id_cliente: { type: 'string', description: 'Id do cliente no sistema (se você tiver).' },
+        },
+        required: ['documento', 'nome'],
+      },
+      handler: async (args, ctx) => {
+        const chatId = ctx.scopeKeys?.['session'];
+        if (!chatId) return { detail: 'Sem uma conversa em contexto.' };
+        if (ctx.dryRun) return { detail: '[simulado] vincularia o cliente.' };
+        await this.whatsappInbox.linkCustomer(ctx.organizationId, chatId, {
+          document: typeof args['documento'] === 'string' ? args['documento'] : null,
+          name: typeof args['nome'] === 'string' ? args['nome'] : null,
+          ref: typeof args['id_cliente'] === 'string' ? args['id_cliente'] : null,
+        });
+        return { ok: true, vinculado: args['nome'] ?? args['documento'] };
+      },
+    });
+
     // ─── http_request ─────────────────────────────────
     this.registry.register({
       key: 'http_request',
