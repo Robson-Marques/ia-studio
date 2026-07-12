@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.9.47 - 2026-07-12 (aprovar executa de verdade + OS com endereço + saudação/login/72h + fixes de contrato)
+
+Sem `db push`. Backend + front do admin. Conteúdo do assistente re-aplicado (`v15`).
+
+- **Aprovar agora EXECUTA a ação (bug crítico).** O `decide` só mudava o status para APROVADO e **nunca rodava a ação** (a OS nunca abria no IXC mesmo após aprovar). Agora, ao aprovar, a ação é executada de verdade sob o mesmo escopo do run (via `ToolRuntime.runApproved`), com o escopo (workspace/ambiente/conexão) guardado no pedido de aprovação. Falha na execução fica registrada no próprio pedido. (Com o `abrir_os` automático da v0.9.46 isso nem é mais o caminho comum — mas o botão Aprovar precisava funcionar.)
+- **OS sai com o endereço certo.** O provider abria a OS com `origem_endereco = Manual` (endereço/lat-long vazios). Agora usa o endereço do **login** (quando informado) ou do **cliente** — nunca Manual. E o roteiro leva a IA a chegar até o **login específico** (um cliente pode ter 2 contratos e vários logins por contrato) e passar o login/contrato daquela conexão na abertura.
+- **Saudação e fluidez.** A abertura fala em "conexão/internet de um assinante" (não "conta") e, na venda, **orienta o próximo passo** (escrever cidade/endereço + plano que procura) em vez de só dizer "não precisa de CPF". Guardrail de **quebra de linha**: separar pontos/passos em linhas para ficar legível no WhatsApp (o envio já preserva `\n`; era o modelo escrevendo grudado).
+- **Fechamento do chamado.** Ao abrir, a IA informa o número, o prazo de **até 72h** e que vai deixar o atendimento na fila da supervisão. (A ação de mover a conversa para a fila da supervisão + a mensagem automática de "seu chamado está na fila de supervisão" é uma capacidade nova de atendimento — **fica para a próxima versão**; nesta a IA só comunica.)
+- **Varredura de contratos front↔back (parcial).** Corrigidos os 400 de whitelist em **Custos** (criar/editar orçamento não mistura mais `is_active`/`period_kind`; simulador manda `runs_per_month` sem `provider_kind`). Restam da varredura: MCP/Política/Memória (campo a mais no create/update), Incidente (`auto_detect`), Ambiente (`type`→`kind`), Workspace (`slug` obrigatório sem campo na UI) — **fila da próxima versão**.
+
 ## v0.9.46 - 2026-07-12 (suporte a GPT-5.x na API (porte Aquapark) + guardrails sucinto/nome≠CPF)
 
 Sem `db push`. Backend. O modelo do assistente troca-se na aba Ajustes (sem deploy).

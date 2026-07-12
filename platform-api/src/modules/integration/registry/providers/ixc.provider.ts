@@ -667,7 +667,10 @@ export class IxcProvider extends BaseProvider {
       status: 'A',
       prioridade: 'N',
       melhor_horario_agenda: 'Q',
-      origem_endereco: 'M',
+      // Origem do endereço: com login informado, usa o endereço do LOGIN ('L');
+      // senão o do CLIENTE ('C'). NUNCA 'M' (manual) — 'M' abria a OS com
+      // endereço/lat-long vazios (era o que acontecia). Sobrescrevível via `extra`.
+      origem_endereco: login ? 'L' : 'C',
       data_abertura: ixcDateTime(),
       ...(login ? { id_login: login } : {}),
       ...(this.str(args, 'id_contrato') ? { id_contrato: this.str(args, 'id_contrato') } : {}),

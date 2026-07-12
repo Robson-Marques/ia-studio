@@ -216,15 +216,16 @@ function BudgetModal({ open, budget, onClose, onSaved, workspaceId, environmentI
     if (!isEdit && (!workspaceId || !environmentId)) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
     setSaving(true);
     try {
-      const body = {
+      // Corpos separados: o create aceita period_kind (imutável) mas não é_active;
+      // o update aceita is_active mas não period_kind (imutável). Enviar o campo
+      // "do outro lado" dava 400 (whitelist).
+      const base = {
         limit_usd: form.limit_usd,
         alert_threshold_pct: form.alert_threshold_pct,
         block_on_exceed: form.block_on_exceed,
-        is_active: form.is_active,
-        period_kind: 'MONTHLY',
       };
-      if (isEdit) await updateBudget(budget.id, body);
-      else await createBudget({ ...body, workspace_id: workspaceId, environment_id: environmentId });
+      if (isEdit) await updateBudget(budget.id, { ...base, is_active: form.is_active });
+      else await createBudget({ ...base, is_active: form.is_active, period_kind: 'MONTHLY', workspace_id: workspaceId, environment_id: environmentId });
       toast.success(isEdit ? 'Orçamento atualizado.' : 'Orçamento criado.');
       onSaved();
     } catch (err) {
@@ -285,11 +286,10 @@ function SimulatorTab() {
     setResult(null);
     try {
       const res = await simulateCost({
-        provider_kind: form.provider_kind,
         model: form.model.trim(),
         prompt_tokens: form.prompt_tokens,
         completion_tokens: form.completion_tokens,
-        runs: form.runs,
+        runs_per_month: form.runs,
       });
       setResult(res);
     } catch (err) {

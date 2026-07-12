@@ -7,12 +7,15 @@
 // AgentRunner (evita dependencia circular). Quem decide dispara, em separado, o
 // runner.resume via front/worker — a decisao aqui apenas persiste o veredito.
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { AiActionApproval, AiApprovalStatus, Prisma } from '@prisma/client';
 import { ApprovalsRepository, ApprovalFilters } from './approvals.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { assertSameOrg, validateWorkspaceScope } from '../../../shared/auth/tenant.util';
 import { CreateApprovalPolicyDto, UpdateApprovalPolicyDto } from './dto/approvals.dtos';
+import { ToolRuntimeService } from '../tools/tool-runtime.service';
+import { ToolExecutionContext } from '../tools/tool-registry.service';
 
 /** Entrada da criacao de aprovacao (usada pelo ToolRuntime, nao pelo controller). */
 export interface CreateApprovalInput {
@@ -39,6 +42,10 @@ export class ApprovalsService {
     private readonly repository: ApprovalsRepository,
     private readonly audit: AuditLogService,
     private readonly prisma: PrismaService,
+    // ModuleRef pra resolver o ToolRuntime SEM ciclo (ToolRuntime injeta este
+    // service pra criar a aprovação; resolvê-lo lazy aqui evita a dependência
+    // circular no construtor).
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   // ─── Politicas (CRUD generico) ──────────────────────
@@ -120,6 +127,40 @@ export class ApprovalsService {
   }
 
   /**
+   * Executa de fato a ação aprovada, reconstruindo o escopo do run guardado no
+   * context (workspace/ambiente/scopeKeys) e com bypass do gate (runApproved).
+   */
+  private async executeApproved(approval: AiActionApproval): Promise<void> {
+    const ctxJson = (approval.context ?? {}) as {
+      arguments?: Record<string, unknown>;
+      scope?: {
+        workspaceId?: string | null;
+        environmentId?: string | null;
+        scopeKeys?: Record<string, string>;
+        memoryProfileIds?: string[];
+        agentRunId?: string;
+      };
+    };
+    const args = (ctxJson.arguments ?? {}) as Record<string, unknown>;
+    const scope = ctxJson.scope ?? {};
+    const runtime = this.moduleRef.get(ToolRuntimeService, { strict: false });
+    const execCtx: ToolExecutionContext = {
+      organizationId: approval.organization_id,
+      workspaceId: scope.workspaceId ?? null,
+      environmentId: scope.environmentId ?? null,
+      agentRunId: approval.agent_run_id ?? scope.agentRunId ?? '',
+      scopeKeys: scope.scopeKeys ?? {},
+      memoryProfileIds: scope.memoryProfileIds ?? [],
+      dryRun: false,
+    };
+    const result = await runtime.runApproved(approval.target, args, execCtx);
+    if (result.status === 'error') {
+      throw new Error(result.error ?? 'Erro desconhecido ao executar a ação.');
+    }
+    this.logger.log(`Ação aprovada ${approval.id} (${approval.target}) executada com sucesso.`);
+  }
+
+  /**
    * Cria uma aprovacao PENDING. Chamado pelo ToolRuntime quando uma acao exige
    * revisao humana; nao passa pelo controller (sem endpoint de create direto).
    */
@@ -162,6 +203,22 @@ export class ApprovalsService {
       decided_at: new Date(),
       reject_reason: decision.approve ? null : (decision.rejectReason ?? null),
     });
+
+    // APROVAR EXECUTA DE VERDADE. Antes o decide só mudava o status e nada
+    // rodava (a ação — ex.: abrir OS no IXC — nunca acontecia). Agora executamos
+    // a tool aprovada sob o MESMO escopo que gerou a solicitação, com bypass do
+    // gate (já foi aprovada). Falha na execução NÃO reverte a decisão: registra
+    // o erro na própria aprovação pra ficar visível.
+    if (decision.approve) {
+      try {
+        await this.executeApproved(updated);
+      } catch (e) {
+        this.logger.error(`Falha ao executar ação aprovada ${id}: ${(e as Error).message}`);
+        await this.repository
+          .updateApproval(id, { reject_reason: `Falha na execução: ${(e as Error).message}` })
+          .catch(() => undefined);
+      }
+    }
 
     await this.audit.record({
       action: 'ai.approval.decide',

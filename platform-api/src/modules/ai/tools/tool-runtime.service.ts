@@ -66,7 +66,19 @@ export class ToolRuntimeService {
         agentRunId: ctx.agentRunId,
         requestedBy: null,
         target: toolKey,
-        context: { arguments: args },
+        // Guarda os args E o escopo do run — ao APROVAR, a ação é executada de
+        // verdade (ToolRuntime.runApproved) e precisa do mesmo escopo (workspace/
+        // ambiente/scopeKeys) pra resolver conexão etc.
+        context: {
+          arguments: args,
+          scope: {
+            workspaceId: ctx.workspaceId ?? null,
+            environmentId: ctx.environmentId ?? null,
+            scopeKeys: ctx.scopeKeys ?? {},
+            memoryProfileIds: ctx.memoryProfileIds ?? [],
+            agentRunId: ctx.agentRunId,
+          },
+        },
         expiresAfterSeconds: policyEval.policy?.expires_after_seconds ?? undefined,
       });
       this.logger.log(`Tool "${toolKey}" aguardando aprovação (${approval.id}).`);
