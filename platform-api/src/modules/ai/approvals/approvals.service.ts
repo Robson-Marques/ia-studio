@@ -131,14 +131,17 @@ export class ApprovalsService {
    * context (workspace/ambiente/scopeKeys) e com bypass do gate (runApproved).
    */
   private async executeApproved(approval: AiActionApproval): Promise<void> {
-    const ctxJson = (approval.context ?? {}) as {
+    const ctxJson = (approval.context ?? {}) as unknown as {
       arguments?: Record<string, unknown>;
       scope?: {
         workspaceId?: string | null;
         environmentId?: string | null;
         scopeKeys?: Record<string, string>;
         memoryProfileIds?: string[];
+        agentId?: string;
         agentRunId?: string;
+        traceId?: string;
+        executionId?: string | null;
       };
     };
     const args = (ctxJson.arguments ?? {}) as Record<string, unknown>;
@@ -148,7 +151,10 @@ export class ApprovalsService {
       organizationId: approval.organization_id,
       workspaceId: scope.workspaceId ?? null,
       environmentId: scope.environmentId ?? null,
+      agentId: scope.agentId ?? '',
       agentRunId: approval.agent_run_id ?? scope.agentRunId ?? '',
+      traceId: scope.traceId ?? '',
+      executionId: scope.executionId ?? null,
       scopeKeys: scope.scopeKeys ?? {},
       memoryProfileIds: scope.memoryProfileIds ?? [],
       dryRun: false,

@@ -1,8 +1,8 @@
 # Changelog — IA Studio
 
-## v0.9.47 - 2026-07-12 (aprovar executa de verdade + OS com endereço + saudação/login/72h + fixes de contrato)
+## v0.9.48 - 2026-07-12 (fix do build da v0.9.47 + aprovar executa + OS com endereço + saudação/login/72h)
 
-Sem `db push`. Backend + front do admin. Conteúdo do assistente re-aplicado (`v15`).
+Sem `db push`. Backend + front do admin. Conteúdo do assistente re-aplicado (`v15`). **Substitui a v0.9.47**, cujo build abortou (fail-safe manteve a produção na v0.9.46): o contexto de execução da ação aprovada não incluía `agentId`/`traceId` (obrigatórios em `ToolExecutionContext`) — corrigido guardando-os no pedido de aprovação e reconstruindo-os na execução.
 
 - **Aprovar agora EXECUTA a ação (bug crítico).** O `decide` só mudava o status para APROVADO e **nunca rodava a ação** (a OS nunca abria no IXC mesmo após aprovar). Agora, ao aprovar, a ação é executada de verdade sob o mesmo escopo do run (via `ToolRuntime.runApproved`), com o escopo (workspace/ambiente/conexão) guardado no pedido de aprovação. Falha na execução fica registrada no próprio pedido. (Com o `abrir_os` automático da v0.9.46 isso nem é mais o caminho comum — mas o botão Aprovar precisava funcionar.)
 - **OS sai com o endereço certo.** O provider abria a OS com `origem_endereco = Manual` (endereço/lat-long vazios). Agora usa o endereço do **login** (quando informado) ou do **cliente** — nunca Manual. E o roteiro leva a IA a chegar até o **login específico** (um cliente pode ter 2 contratos e vários logins por contrato) e passar o login/contrato daquela conexão na abertura.
