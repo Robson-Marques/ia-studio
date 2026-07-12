@@ -149,7 +149,13 @@ export class IspExampleRepository {
    *  system_prompt/goal). É um EXEMPLO — pode evoluir com o produto. */
   refreshAgentContent(
     agentId: string,
-    content: { roteiro: unknown; persona: unknown; systemPrompt: string; goal: string },
+    content: {
+      roteiro: unknown;
+      persona: unknown;
+      systemPrompt: string;
+      goal: string;
+      allowedTools?: string[];
+    },
   ) {
     return this.prisma.aiAgent.update({
       where: { id: agentId },
@@ -158,6 +164,7 @@ export class IspExampleRepository {
         persona: content.persona as Prisma.InputJsonValue,
         system_prompt: content.systemPrompt,
         goal: content.goal,
+        ...(content.allowedTools ? { allowed_tools: content.allowedTools } : {}),
       },
     });
   }

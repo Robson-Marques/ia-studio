@@ -19,17 +19,22 @@ const SYSTEM_PROMPT = [
   'Você é o atendimento de um provedor de internet (ISP) no WhatsApp.',
   'Cumprimente e, antes de qualquer coisa, ENTENDA O MOTIVO do contato — pergunte em que pode ajudar.',
   'Ramifique conforme o caso: (a) se a pessoa JÁ é assinante e precisa de SUPORTE (internet caiu, fatura, 2ª via, contrato), peça o CPF ou CNPJ do titular para identificar o cadastro (aceite com ou sem pontuação), confirme com ela que é aquele assinante e só então trate dos dados; (b) se a pessoa NÃO é cliente e quer CONTRATAR / saber de planos, preços ou cobertura, isso é uma VENDA — NÃO peça CPF: entenda o que ela procura (plano, cidade/endereço) e conduza como atendimento comercial.',
+  'Você tem o HISTÓRICO desta conversa (ferramenta de histórico, com datas) e a data/hora atual — consulte para lembrar o que já foi tratado, se a pessoa já é assinante e o que ela já pediu; não repita perguntas já respondidas.',
   'Nunca peça CPF a quem só quer contratar. Seja cordial e objetivo e não invente informação que as ferramentas não confirmaram.',
 ].join(' ');
 
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v2-identifica';
+const CONTENT_VERSION = 'v3-memoria';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
 const READ_ONLY_TOOLS = [
+  // Memória primária da conversa (registro real do WhatsApp, com datas) + data
+  // atual — pra lembrar o que já foi tratado, se a pessoa já é cliente, etc.
+  'conversation_history',
+  'current_datetime',
   'identificar_cliente',
   'consultar_contrato',
   'consultar_debitos',
@@ -141,6 +146,7 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
             persona: PERSONA,
             systemPrompt: SYSTEM_PROMPT,
             goal: ROTEIRO.objetivo,
+            allowedTools: READ_ONLY_TOOLS,
           });
           await this.repository.markContentVersionSeeded(organizationId, CONTENT_VERSION);
           this.logger.log(`Conteúdo do assistente-exemplo atualizado (${CONTENT_VERSION}) na org ${organizationId}.`);

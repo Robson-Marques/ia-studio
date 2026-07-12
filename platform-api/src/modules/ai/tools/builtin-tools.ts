@@ -10,6 +10,7 @@ import { KnowledgeService } from '../knowledge/knowledge.service';
 import { MemoryService } from '../memory/memory.service';
 import { MemoryRepository } from '../memory/memory.repository';
 import { WhatsappOrchestratorService } from '../../comm/whatsapp/whatsapp-orchestrator.service';
+import { WhatsappInboxService } from '../../comm/whatsapp/whatsapp-inbox.service';
 import { EmailOrchestratorService } from '../../comm/email/email-orchestrator.service';
 import { NotificationCenterService } from '../../automation/notifications/notification-center.service';
 import { StorageService } from '../../integration/storage/storage.service';
@@ -55,6 +56,7 @@ export class BuiltinTools implements OnModuleInit {
     private readonly memory: MemoryService,
     private readonly memoryRepository: MemoryRepository,
     private readonly whatsapp: WhatsappOrchestratorService,
+    private readonly whatsappInbox: WhatsappInboxService,
     private readonly email: EmailOrchestratorService,
     private readonly notifications: NotificationCenterService,
     private readonly storage: StorageService,
@@ -134,6 +136,57 @@ export class BuiltinTools implements OnModuleInit {
         if (ctx.dryRun) return { detail: `[simulado] memorizaria "${key}".` };
         await this.memory.writeKey(profile, scopeKey, key, args['value']);
         return { ok: true, key };
+      },
+    });
+
+    // ─── conversation_history ─────────────────────────
+    // MEMÓRIA PRIMÁRIA DA CONVERSA (decisão documentada, aquapark-commercial-
+    // memory.md): a IA lê o REGISTRO REAL das mensagens deste WhatsApp — quantas
+    // interações atrás precisar — COM data e hora, pra lembrar o que já foi dito.
+    this.registry.register({
+      key: 'conversation_history',
+      name: 'Histórico da conversa',
+      description:
+        'Lê as mensagens anteriores DESTA conversa de WhatsApp, com data e hora. Use para lembrar o que já foi dito, inclusive interações de dias atrás.',
+      category: 'comunicacao',
+      input_schema: {
+        type: 'object',
+        properties: {
+          limite: { type: 'number', description: 'Quantas mensagens buscar (padrão 30, máx 100).' },
+        },
+      },
+      handler: async (args, ctx) => {
+        const chatId = ctx.scopeKeys?.['session'];
+        if (!chatId) return { detail: 'Sem uma conversa em contexto.' };
+        const take = Math.min(Math.max(Number(args['limite']) || 30, 1), 100);
+        const msgs = await this.whatsappInbox.listMessages(ctx.organizationId, chatId, take).catch(() => []);
+        return {
+          mensagens: msgs
+            .filter((m) => (m.content ?? '').trim())
+            .map((m) => ({
+              de: m.direction === 'INCOMING' ? 'cliente' : 'atendimento',
+              data: m.created_at,
+              texto: m.content,
+            })),
+        };
+      },
+    });
+
+    // ─── current_datetime ─────────────────────────────
+    this.registry.register({
+      key: 'current_datetime',
+      name: 'Data e hora atual',
+      description:
+        'Retorna a data e a hora de agora (para raciocinar sobre prazos e sobre as datas do histórico da conversa).',
+      category: 'sistema',
+      input_schema: { type: 'object', properties: {} },
+      handler: async () => {
+        const now = new Date();
+        return {
+          iso: now.toISOString(),
+          data_hora_br: now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+          timezone: 'America/Sao_Paulo',
+        };
       },
     });
 

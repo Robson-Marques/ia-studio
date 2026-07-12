@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.9.32 - 2026-07-11 (memória = o registro REAL das conversas + datas — como foi documentado)
+
+A decisão documentada (`aquapark-commercial-memory.md`, textual: *"a memória de conversa efetiva da IA é o histórico real do WhatsApp — manter como fonte primária"*) não tinha sido portada. Agora está:
+
+- **Ferramenta `conversation_history`** (memória primária): a IA lê o **registro real** das mensagens desta conversa de WhatsApp — quantas interações atrás precisar — **com data e hora**. É assim que ela lembra o que já foi tratado, se a pessoa **já é cliente**, o que ela já pediu, etc. Porte do `conversation_history` dos agentes do Aquapark.
+- **Ferramenta `current_datetime`**: a IA sabe "hoje" (fuso America/Sao_Paulo) — pra raciocinar sobre prazos e sobre as datas do histórico ("você falou com a gente há 3 dias"). Porte do `current_datetime`.
+- As duas entram no **assistente-exemplo** (`allowed_tools`) e o system prompt instrui a consultá-las. Aplica no assistente já criado (refresh `v3-memoria`). Sem `db push`.
+- Continua valendo a injeção automática dos últimos turnos (v0.9.31) para continuidade imediata; o `conversation_history` é a leitura sob demanda, mais profunda e com datas — a **fonte primária** documentada. Os perfis de memória (chave-valor CONTACT/SESSION) seguem para **fatos estruturados** (ex.: "titular confirmado"), não para a transcrição.
+
 ## v0.9.31 - 2026-07-11 (assistente com MEMÓRIA da conversa — continuidade)
 
 - **A raiz do "coloquei um CPF que não existe e ele não soube tratar": cada mensagem virava um run STATELESS.** O assistente esquecia o que já tinha sido dito (pediu CPF → recebeu CPF → mas já tinha "esquecido" o "estou sem internet" → voltava a cumprimentar). Agora o nó Assistente **carrega os turnos anteriores da conversa** (do chat de WhatsApp, via `scope_session=chat_id`) e injeta como histórico no assistente. Com contexto, ele: lembra do problema, chama a ferramenta de identificar quando o CPF chega e, se o CPF não existir, sabe responder "não localizei esse cadastro".
