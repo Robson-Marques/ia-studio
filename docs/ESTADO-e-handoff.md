@@ -23,8 +23,10 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.50** engatilhada (frente 1 + funil + modelo forte + fix encerrar-IA), **aguardando
-  deploy pelo painel**. ⚠️ A **v0.9.49 QUEIMOU**: a tag caiu no commit da v0.9.48 porque um
+- **v0.9.51** engatilhada (identidade: documento manda sobre telefone + transparência na
+  identificação por telefone). **v0.9.50 já no ar** (frente 1 + funil + modelo forte + fix
+  encerrar-IA) — confirmado pela query (tool `diagnosticar_conexao` no catálogo). Falta o
+  teste limpo do CNPJ (estava contaminado por identificação-por-telefone → Fabricia). ⚠️ A **v0.9.49 QUEIMOU**: a tag caiu no commit da v0.9.48 porque um
   `.git/index.lock` órfão travou o `git commit` local — nada da frente 1 subiu (confirmado:
   `isp-diagnosis.service.ts` não existia no servidor, `CONTENT_VERSION` em v14). **Lição:** se
   um commit "não pega" (tag aponta pro commit velho), checar `.git/index.lock` e apagar antes.
@@ -36,8 +38,8 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v17`** (funil do diagnóstico; engatilhado na
-  v0.9.50). O passo "chegar até o login" usa a tool `diagnosticar_conexao`, que é a **única
+- **Prompt do assistente ISP: `CONTENT_VERSION v18`** (identidade telefone→documento; v0.9.51).
+  Antes: v17 (funil do diagnóstico, v0.9.50). O passo "chegar até o login" usa a tool `diagnosticar_conexao`, que é a **única
   porta** (removidos `consultar_contrato`/`status_conexao` deste assistente — funil). Exemplo
   novo nasce com `gpt-5.5`; o campo Modelo virou dropdown curado (sem texto livre). A v0.9.46
   já deixou a API compatível com gpt-5.x.

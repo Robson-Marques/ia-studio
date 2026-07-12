@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.51 - 2026-07-12 (Identidade — documento manda sobre telefone + transparência na identificação por telefone)
+
+Sem `db push`. Backend. Conteúdo do assistente re-aplicado (`v18`).
+
+- **CPF/CNPJ digitado tem PRIORIDADE sobre o telefone.** A tool `identificar_cliente` buscava por telefone com precedência ("o dado que o atendimento possui") — mas o número do WhatsApp pode estar salvo no cadastro de OUTRA pessoa no ERP. Resultado real: o cliente enviava um CNPJ e a IA respondia com o titular do telefone (outra pessoa), ignorando o documento. Agora, se há um CPF/CNPJ informado, a identificação é por ele; o telefone só vale quando nenhum documento foi enviado (1º contato).
+- **Transparência na identificação por telefone.** Quando o número está salvo no cadastro de um cliente, o assistente não presume mais que o atendimento é para ele: informa "vejo que este número está salvo para o cliente <nome>" e pergunta se é sobre a conexão desse cliente ou de outro — se for outro, pede o CPF/CNPJ para localizar. Roteiro (`v18`) + system_prompt atualizados; a situação "número salvo/vinculado" passou a exigir a confirmação antes de seguir.
+
 ## v0.9.50 - 2026-07-12 (Frente 1 — diagnóstico determinístico + funil + modelo forte + encerrar conversa da IA)
 
 Sem `db push`. Backend + front do admin. Conteúdo do assistente re-aplicado (`v17`). Primeira frente do redesenho do assistente ISP (spec-assistente-isp §2). **Substitui a v0.9.49**, cuja tag caiu no commit da v0.9.48 (um `index.lock` órfão travou o commit local, então a frente 1 nunca subiu — nenhuma linha desta frente estava em produção).

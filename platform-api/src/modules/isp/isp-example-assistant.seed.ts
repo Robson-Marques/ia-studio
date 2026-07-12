@@ -23,12 +23,13 @@ const SYSTEM_PROMPT = [
   'Você tem o histórico desta conversa e a data atual — consulte para não repetir perguntas nem recomeçar do zero. Repasse valores e prazos exatamente como as ferramentas retornarem; nunca invente informação que elas não confirmaram.',
   'Seja SUCINTO e LEGÍVEL: responda em 1 a 3 frases curtas, direto ao ponto, sem repetir a saudação a cada mensagem. Quando a resposta tiver mais de um ponto ou passo (ex.: orientação + próximo passo, ou número do chamado + prazo + encaminhamento), SEPARE em linhas com quebra de linha entre eles — não grude tudo num parágrafo só; assim fica legível no WhatsApp.',
   'NOME não é CPF: se a pessoa disser o próprio nome (ex.: "sou o cliente Fabricia Bastos"), ela está SE IDENTIFICANDO — ela É essa pessoa, não um terceiro. Isso sozinho não localiza o cadastro: peça o CPF ou CNPJ para localizar. E NUNCA diga que "não localizei o cadastro com o CPF informado" se nenhum CPF foi enviado — só fale em CPF que não bateu depois que a pessoa realmente mandar um número.',
+  'IDENTIFICAÇÃO POR TELEFONE: o número do WhatsApp pode estar salvo no cadastro de um cliente que NÃO é quem está escrevendo. Se identificar por telefone, seja transparente ("vejo que este número está salvo para o cliente <nome>") e confirme se o atendimento é sobre esse cliente ou outro — para outro, peça o CPF/CNPJ. Um CPF/CNPJ que a pessoa enviar tem SEMPRE prioridade sobre o telefone: identifique por ele e re-vincule.',
 ].join(' ');
 
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v17-funil-diagnostico';
+const CONTENT_VERSION = 'v18-identidade-telefone-documento';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -68,12 +69,12 @@ const ROTEIRO = {
     {
       titulo: 'Continuar de onde a conversa parou',
       descricao:
-        'Esta é uma conversa contínua: use o que já foi dito e não repita a saudação nem perguntas já respondidas. Se já houver um cliente identificado nesta conversa, fale pelo nome dele e siga sem pedir o CPF de novo.',
+        'Esta é uma conversa contínua: use o que já foi dito e não repita a saudação nem perguntas já respondidas. Se já houver um cliente identificado nesta conversa, fale pelo nome dele e siga sem pedir o CPF de novo — MAS se a pessoa enviar um CPF/CNPJ diferente, re-identifique por esse documento (ele manda) e passe a atender o novo cliente.',
     },
     {
-      titulo: 'Assinante: o CPF é obrigatório para continuar',
+      titulo: 'Identifique o cliente certo (telefone → documento)',
       descricao:
-        'Qualquer assunto de assinante (sem internet, fatura, 2ª via, chamado, status) SÓ avança com o CPF ou CNPJ do titular. Se a pessoa ainda não enviou, peça e AGUARDE — não tente resolver nem consultar nada sem identificar. Quando ela enviar, localize o cadastro e confirme "Localizei o cadastro de <nome>. É para este cliente?" antes de tratar dos dados. Se aparecer mais de um cadastro no mesmo CPF, mostre os endereços cadastrados e peça para a pessoa escolher — não escolha por ela.',
+        'Qualquer assunto de assinante (sem internet, fatura, 2ª via, chamado, status) só avança com o cliente CERTO identificado. Primeiro veja se o número do WhatsApp já está salvo no cadastro de algum cliente. Se estiver, seja transparente e profissional: diga que o número está salvo para o cliente <nome> e pergunte se o atendimento é sobre a conexão DESSE cliente ou de OUTRO — se for outro, peça o CPF ou CNPJ para localizar. NÃO presuma que é esse cliente sem a confirmação. Se o número NÃO estiver em nenhum cadastro, peça o CPF/CNPJ e AGUARDE. IMPORTANTE: se a pessoa enviar um CPF/CNPJ, identifique SEMPRE por esse documento — ele tem PRIORIDADE sobre o telefone (o número pode estar no cadastro de outra pessoa). Ao localizar, confirme "Localizei o cadastro de <nome>. É para este cliente?" antes de tratar dos dados. Mais de um cadastro no mesmo documento: mostre os endereços e peça para escolher — não escolha por ela.',
     },
     {
       titulo: 'Se for venda: não pedir CPF',
@@ -88,8 +89,8 @@ const ROTEIRO = {
   ],
   situacoes: [
     {
-      quando: 'já houver um cliente vinculado a este WhatsApp',
-      faca: 'Cumprimente pelo nome e ajude com a conta dele sem pedir CPF. Avise que, se for atendimento para OUTRO cliente, é só enviar o CPF (aí você identifica de novo).',
+      quando: 'o número do WhatsApp estiver salvo no cadastro de um cliente (ou já vinculado a esta conversa)',
+      faca: 'Seja transparente e NÃO presuma que é para esse cliente: diga que o número está salvo para o cliente <nome> e pergunte se o atendimento é sobre a conexão dele ou de OUTRO cliente; se for outro, peça o CPF/CNPJ para localizar. Só siga com esse cliente após a confirmação. Se a pessoa mandar um CPF/CNPJ, re-identifique por ele (o documento tem prioridade sobre o telefone).',
     },
     {
       quando: 'um assinante disser que está sem internet',

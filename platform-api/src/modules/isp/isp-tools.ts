@@ -77,7 +77,7 @@ export class IspTools implements OnModuleInit {
       key: 'identificar_cliente',
       name: 'Identificar cliente (ISP)',
       description:
-        'Busca o cadastro de um cliente do provedor por CPF/CNPJ ou por telefone. No atendimento por WhatsApp, comece pelo telefone — o cliente raramente digita o CPF.',
+        'Busca o cadastro de um cliente do provedor por CPF/CNPJ ou por telefone. No 1º contato sem documento, busque pelo telefone do WhatsApp. Mas se o cliente informar um CPF/CNPJ, identifique SEMPRE por ele — o documento tem prioridade sobre o telefone (o número pode estar salvo no cadastro de outra pessoa).',
       category: 'isp',
       input_schema: {
         type: 'object',
@@ -94,10 +94,13 @@ export class IspTools implements OnModuleInit {
         if (!cpf && !telefone) throw new Error('Informe cpf ou telefone.');
         if (ctx.dryRun) return { simulated: true, cpf, telefone };
         const connectionId = await this.connectionId(args, ctx);
-        // Telefone tem precedencia: e o dado que o atendimento realmente possui.
-        const raw = telefone
-          ? await this.connections.execute(ctx.organizationId, connectionId, 'cliente.por_telefone', { telefone })
-          : await this.connections.execute(ctx.organizationId, connectionId, 'cliente.dados', { cpf });
+        // CPF/CNPJ tem PRECEDENCIA: se o cliente digitou um documento, e ele quem
+        // identifica — nunca o telefone. O numero so vale quando NENHUM documento
+        // foi informado (1o contato); ele pode estar salvo no cadastro de OUTRA
+        // pessoa, entao nao pode sobrepor um documento explicito do cliente.
+        const raw = cpf
+          ? await this.connections.execute(ctx.organizationId, connectionId, 'cliente.dados', { cpf })
+          : await this.connections.execute(ctx.organizationId, connectionId, 'cliente.por_telefone', { telefone });
         const clientes = rows(raw).map(projectCliente);
         // Auto-vínculo (determinístico, não depende do modelo chamar outra tool):
         // achou EXATAMENTE 1 cliente e há uma conversa em contexto → grava o
