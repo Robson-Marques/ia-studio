@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.9.73 - 2026-07-13 (Frente 5: link público de pagamento — 2ª via gerada no chat, expira sozinha)
+
+⚠️ **`db push` (destrutivo)** — modelo novo `IspPaymentLink`. Backend + frontend + `CONTENT_VERSION` v29.
+
+- **Página pública de 2ª via, sem login** (`/pagar/:token`). A IA gera na hora um link tokenizado (48 chars, inguessável) com o **snapshot** dos boletos em aberto; o link **expira por tempo** (janela configurável, padrão 24h) e não pede dados de acesso. Porte do `PortalAccessToken` do Aquapark — **sem** a sessão JWT. Rota pública espelha o `/convite/:token`.
+- **Backend:** `IspPaymentLink` (schema), `IspPaymentLinkService` (cria com TTL+snapshot; resolve com **410 Gone** genérico se expirou/inválido — sem enumerar tokens) + repository + `IspPaymentLinkController` (`@Public GET /isp/pagamento/:token`, throttle 30/min). A org sai do próprio token.
+- **IA:** tool `gerar_link_pagamento` (busca os boletos em aberto → cria o token → devolve a URL). Roteiro (bloqueio + 2ª via/fatura) passou a **preferir o link de pagamento**; se a ferramenta devolver `error` (ex.: URL pública não configurada), cai na linha digitável direto — degradação graciosa, sem inventar link.
+- **Config (ISP → Abertura de chamado):** card "Link de pagamento" com validade (1h/6h/24h/48h) + endereço público do sistema. Em `system_settings` (`isp.pagamento.ttl_horas` / `isp.pagamento.base_url`), viaja no backup. A URL vem da config (a IA roda no worker, sem request — nunca de env manual).
+- **Decisões do Robson:** janela de tempo + TTL configurável (24h) + snapshot.
+
 ## v0.9.72 - 2026-07-13 (Assistente não inventa "assunto em andamento" na 1ª identificação)
 
 Sem `db push`. Backend (roteiro do assistente-exemplo) + `CONTENT_VERSION` v28.

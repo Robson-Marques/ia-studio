@@ -98,4 +98,24 @@ export class IspOsConfigController {
   ) {
     return { max: await this.service.setBoletoMax(resolveOrganizationId(user, orgQuery), Number(body?.max ?? 0)) };
   }
+
+  /** Config do link público de pagamento (validade + URL pública). */
+  @Get('pagamento')
+  @ApiOperation({ summary: 'Config do link de pagamento (TTL + URL pública)' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
+  getPagamento(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
+    return this.service.getPagamentoConfig(resolveOrganizationId(user, orgQuery));
+  }
+
+  /** Salva a config do link de pagamento. */
+  @Put('pagamento')
+  @ApiOperation({ summary: 'Salva a config do link de pagamento' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
+  setPagamento(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { ttl_horas?: number; base_url?: string },
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.service.setPagamentoConfig(resolveOrganizationId(user, orgQuery), body ?? {});
+  }
 }

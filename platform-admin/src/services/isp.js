@@ -61,6 +61,29 @@ export async function saveBoletoMax(max) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar o limite de boletos')); }
 }
 
+// ─── Link de pagamento (2ª via pública) — config admin ─────────────────
+export async function getPagamentoConfig() {
+  try {
+    const { data } = await api.get('/isp/os-config/pagamento');
+    return data || { ttl_horas: 24, base_url: '' };
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar a config de pagamento')); }
+}
+
+export async function savePagamentoConfig(cfg) {
+  try {
+    const { data } = await api.put('/isp/os-config/pagamento', cfg);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar a config de pagamento')); }
+}
+
+// Público (sem auth): dados da página /pagar/:token.
+export async function getPublicPayment(token) {
+  try {
+    const { data } = await api.get(`/isp/pagamento/${token}`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Este link de pagamento expirou ou não é mais válido.')); }
+}
+
 export async function listIncidents(params = {}) {
   try {
     const { data } = await api.get('/isp/incidents', { params });

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Wrench, Star, Users, Receipt } from 'lucide-react';
+import { Loader2, Plus, Trash2, Wrench, Star, Users, Receipt, Link2 } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../../lib/toast';
-import { discoverOsResources, getOsConfig, saveOsConfig, getFilaMapping, saveFilaMapping, getBoletoMax, saveBoletoMax } from '../../services/isp';
+import { discoverOsResources, getOsConfig, saveOsConfig, getFilaMapping, saveFilaMapping, getBoletoMax, saveBoletoMax, getPagamentoConfig, savePagamentoConfig } from '../../services/isp';
 import { listQueues } from '../../services/whatsapp';
 
 // Configura a abertura de OS pela IA: pares setor↔assunto do ERP (descobertos),
@@ -23,6 +23,9 @@ export default function AberturaChamado() {
   const [savingFilas, setSavingFilas] = useState(false);
   const [boletoMax, setBoletoMax] = useState(3);
   const [savingBoleto, setSavingBoleto] = useState(false);
+  const [pagTtl, setPagTtl] = useState(24);
+  const [pagBaseUrl, setPagBaseUrl] = useState('');
+  const [savingPag, setSavingPag] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -35,11 +38,13 @@ export default function AberturaChamado() {
         const cfg = await getOsConfig(disc.connection_id);
         setPairs((cfg || []).map((c) => ({ setor_id: c.setor_id, assunto_id: c.assunto_id, is_default: !!c.is_default })));
       }
-      const [qs, map, bmax] = await Promise.all([listQueues(), getFilaMapping(), getBoletoMax()]);
+      const [qs, map, bmax, pag] = await Promise.all([listQueues(), getFilaMapping(), getBoletoMax(), getPagamentoConfig()]);
       setQueues(qs || []);
       setFilaSuporte(map?.suporte || '');
       setFilaFinanceiro(map?.financeiro || '');
       setBoletoMax(Number.isFinite(bmax) ? bmax : 3);
+      setPagTtl(pag?.ttl_horas || 24);
+      setPagBaseUrl(pag?.base_url || '');
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -69,6 +74,21 @@ export default function AberturaChamado() {
       toast.error(err.message);
     } finally {
       setSavingBoleto(false);
+    }
+  }
+
+  async function handleSavePag() {
+    const url = pagBaseUrl.trim();
+    if (url && !/^https?:\/\//i.test(url)) { toast.error('O endereço público deve começar com http:// ou https://'); return; }
+    setSavingPag(true);
+    try {
+      const saved = await savePagamentoConfig({ ttl_horas: Number(pagTtl), base_url: url });
+      if (saved) { setPagTtl(saved.ttl_horas || 24); setPagBaseUrl(saved.base_url || ''); }
+      toast.success('Link de pagamento salvo.');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingPag(false);
     }
   }
 
@@ -275,6 +295,48 @@ export default function AberturaChamado() {
           <div className="flex justify-end pt-1">
             <button type="button" className="btn-primary disabled:opacity-60" onClick={handleSaveBoleto} disabled={savingBoleto}>
               {savingBoleto ? <Loader2 size={14} className="animate-spin" /> : null} Salvar
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Link de pagamento: a IA gera um link temporário com a 2ª via (sem login). */}
+      <div className="rounded-lg p-4 space-y-3" style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface)' }}>
+        <div>
+          <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--ap-text-1)' }}>
+            <Link2 size={16} /> Link de pagamento
+          </h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
+            A IA gera um link temporário com a 2ª via para o cliente pagar sem login. Escolha por quanto tempo o link vale e informe o endereço público do sistema (onde a página de pagamento abre).
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-xs space-y-1 block">
+            <span style={{ color: 'var(--ap-text-3)' }}>Validade do link</span>
+            <select className="input text-sm w-full" value={String(pagTtl)} disabled={!canManage}
+              onChange={(e) => setPagTtl(Number(e.target.value))}>
+              <option value="1">1 hora</option>
+              <option value="6">6 horas</option>
+              <option value="24">24 horas</option>
+              <option value="48">48 horas</option>
+            </select>
+          </label>
+          <label className="text-xs space-y-1 block">
+            <span style={{ color: 'var(--ap-text-3)' }}>Endereço público do sistema</span>
+            <input className="input text-sm w-full" value={pagBaseUrl} disabled={!canManage}
+              placeholder="https://seu-dominio.com.br"
+              onChange={(e) => setPagBaseUrl(e.target.value)} />
+          </label>
+        </div>
+        {!pagBaseUrl && (
+          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+            Sem o endereço público, a IA não consegue gerar o link (ela avisa e manda a linha digitável direto).
+          </p>
+        )}
+        {canManage && (
+          <div className="flex justify-end pt-1">
+            <button type="button" className="btn-primary disabled:opacity-60" onClick={handleSavePag} disabled={savingPag}>
+              {savingPag ? <Loader2 size={14} className="animate-spin" /> : null} Salvar
             </button>
           </div>
         )}

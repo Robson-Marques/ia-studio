@@ -23,7 +23,20 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.71 engatilhada (aguardando release) — FIX regressão + FRENTE 4:**
+- **v0.9.73 engatilhada (aguardando release) — FRENTE 5: link público de pagamento (2ª via):**
+  ⚠️ **`db push` destrutivo** (modelo novo `IspPaymentLink`). Página pública `/pagar/:token` SEM login
+  (`PaginaPagamento.jsx`, rota espelha `/convite/:token`): a IA gera na hora um token (48 chars) com
+  SNAPSHOT dos boletos; expira por tempo (config, padrão 24h). Backend: `IspPaymentLinkService`
+  (cria/resolve, 410 genérico) + repo + `IspPaymentLinkController` (`@Public GET /isp/pagamento/:token`,
+  throttle). Tool `gerar_link_pagamento`; roteiro (bloqueio + 2ª via) prefere o link, cai na linha
+  digitável se `error`. Config na tela ISP (validade + URL pública, em `isp.pagamento.*`). `CONTENT_VERSION`
+  v29. Decisões do Robson: janela + TTL configurável (24h) + snapshot. **VALIDADO até a v0.9.72:** marcação
+  da IA (aba IA "Em andamento"), frente 4 ponta a ponta (bloqueio→desbloqueio→2ª via→Financeiro).
+  **BACKLOG do provider IXC** (docs que o Robson subiu, mapear em frentes futuras): viabilidade por
+  endereço + inserir LEAD (venda/cobertura); desconectar login + limpar MAC (troubleshooting); criar
+  tarefa/interações/disparar-finalizar (atendimento); receber título (baixa manual, admin — não é da IA);
+  consultar dados do boleto com juro/multa (valor atualizado — refino da 2ª via).
+- **v0.9.71/72 no ar — FIX regressão + FRENTE 4:**
   (A) **FIX:** a IA voltou a marcar a conversa como "atendido pela IA". `assignBot`
   (`chat-assignment.service.ts`) usava `NOT: { owner_type: 'QUEUE' }` — gotcha de NULL no SQL
   (owner nulo da conversa NOVA → 0 linhas → não marcava BOT; caía em "Aguardando/sem atendente").
@@ -97,7 +110,7 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v28`** (não inventa "assunto em andamento" na 1ª identificação; v0.9.72). Antes: v27 (frente 4: bloqueio por inadimplência + rotina proativa; v0.9.71), v26 (avisa quando há mais boletos que o limite; v0.9.70), v25 (carrega a intenção ao trocar de CPF + boleto vencido/em atraso; v0.9.69), v24 (negrito sem e-mail/link; v0.9.62). Antes:
+- **Prompt do assistente ISP: `CONTENT_VERSION v29`** (frente 5: prefere o link de pagamento na 2ª via/bloqueio; v0.9.73). Antes: v28 (não inventa "assunto em andamento"; v0.9.72), v27 (frente 4: bloqueio por inadimplência + rotina proativa; v0.9.71), v26 (avisa quando há mais boletos que o limite; v0.9.70), v25 (carrega a intenção ao trocar de CPF + boleto vencido/em atraso; v0.9.69), v24 (negrito sem e-mail/link; v0.9.62). Antes:
   v23 (handoff fila, v0.9.60), v22 (negrito WhatsApp, v0.9.56),
   v21 (mostrar opções, v0.9.54), v20 (abertura reconhece número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação

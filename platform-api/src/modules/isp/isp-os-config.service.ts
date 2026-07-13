@@ -5,7 +5,14 @@ import { ConnectionsService } from '../integration/connections/connections.servi
 import { SettingsService } from '../core/settings/settings.service';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspOsConfigRepository, OsConfigPair } from './isp-os-config.repository';
-import { ISP_QUEUE_SETTING_KEYS, ISP_BOLETO_MAX_SETTING_KEY, ISP_BOLETO_MAX_DEFAULT } from './isp.constants';
+import {
+  ISP_QUEUE_SETTING_KEYS,
+  ISP_BOLETO_MAX_SETTING_KEY,
+  ISP_BOLETO_MAX_DEFAULT,
+  ISP_PAGAMENTO_TTL_SETTING_KEY,
+  ISP_PAGAMENTO_TTL_DEFAULT,
+  ISP_PAGAMENTO_BASE_URL_SETTING_KEY,
+} from './isp.constants';
 
 export interface DiscoveredOption {
   id: string;
@@ -61,6 +68,35 @@ export class IspOsConfigService {
     if (n < 0 || n > 20) throw new BadRequestException('Informe um número entre 0 (todos) e 20.');
     await this.settings.set(organizationId, ISP_BOLETO_MAX_SETTING_KEY, String(n));
     return n;
+  }
+
+  /** Config do link público de pagamento (TTL em horas + URL pública base). */
+  async getPagamentoConfig(organizationId: string): Promise<{ ttl_horas: number; base_url: string }> {
+    const ttl = await this.settings.getValue(organizationId, ISP_PAGAMENTO_TTL_SETTING_KEY);
+    const base = await this.settings.getValue(organizationId, ISP_PAGAMENTO_BASE_URL_SETTING_KEY);
+    const n = typeof ttl === 'string' ? Number.parseInt(ttl, 10) : NaN;
+    return {
+      ttl_horas: Number.isFinite(n) && n > 0 ? n : ISP_PAGAMENTO_TTL_DEFAULT,
+      base_url: typeof base === 'string' ? base : '',
+    };
+  }
+
+  /** Grava TTL (1..168h) e URL pública (http/https). Valores vazios = limpar. */
+  async setPagamentoConfig(
+    organizationId: string,
+    cfg: { ttl_horas?: number; base_url?: string },
+  ): Promise<{ ttl_horas: number; base_url: string }> {
+    if (cfg.ttl_horas !== undefined) {
+      const n = Math.trunc(Number(cfg.ttl_horas));
+      if (!Number.isFinite(n) || n <= 0 || n > 168) throw new BadRequestException('Validade inválida (1 a 168 horas).');
+      await this.settings.set(organizationId, ISP_PAGAMENTO_TTL_SETTING_KEY, String(n));
+    }
+    if (cfg.base_url !== undefined) {
+      const url = String(cfg.base_url).trim();
+      if (url && !/^https?:\/\//i.test(url)) throw new BadRequestException('A URL pública deve começar com http:// ou https://.');
+      await this.settings.set(organizationId, ISP_PAGAMENTO_BASE_URL_SETTING_KEY, url.replace(/\/$/, ''));
+    }
+    return this.getPagamentoConfig(organizationId);
   }
 
   private async resolveConnectionId(organizationId: string, connectionId?: string): Promise<string> {

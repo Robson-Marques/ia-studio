@@ -17,6 +17,7 @@ import { WhatsappInboxService } from '../comm/whatsapp/whatsapp-inbox.service';
 import { ChatAssignmentService } from '../comm/attendance/chat-assignment.service';
 import { SettingsService } from '../core/settings/settings.service';
 import { IspOsConfigService } from './isp-os-config.service';
+import { IspPaymentLinkService } from './isp-payment-link.service';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
 import { IspDiagnosisService } from './isp-diagnosis.service';
@@ -46,6 +47,7 @@ export class IspTools implements OnModuleInit {
     private readonly osConfig: IspOsConfigService,
     private readonly chatAssignment: ChatAssignmentService,
     private readonly settings: SettingsService,
+    private readonly paymentLinks: IspPaymentLinkService,
   ) {}
 
   /**
@@ -330,6 +332,53 @@ export class IspTools implements OnModuleInit {
         const max = await this.osConfig.getBoletoMax(ctx.organizationId);
         const boletosProj = rows(raw).map((b) => projectBoleto(b));
         return { boletos: limitBoletos(boletosProj, max), total_em_aberto: boletosProj.length };
+      },
+    });
+
+    // ─── gerar_link_pagamento (frente 5 — página pública de 2ª via) ──
+    this.registry.register({
+      key: 'gerar_link_pagamento',
+      name: 'Gerar link de pagamento (ISP)',
+      description:
+        'Gera um LINK público e temporário com a 2ª via dos boletos em aberto do cliente, para ele pagar SEM precisar de login. ' +
+        'Use quando o cliente quer pagar/regularizar (ex.: em atraso ou bloqueado). O link expira sozinho; mande a URL que a ferramenta devolver. ' +
+        'Se devolver "error", não invente link — avise o motivo. Passe o CPF/CNPJ do titular já identificado.',
+      category: 'isp',
+      input_schema: {
+        type: 'object',
+        properties: {
+          cpf: { type: 'string', description: 'CPF/CNPJ do titular (do cliente já identificado).' },
+        },
+        required: ['cpf'],
+      },
+      handler: async (args, ctx) => {
+        const cpf = asString(args['cpf'], 'cpf');
+        if (ctx.dryRun) return { simulated: true, cpf };
+        const connectionId = await this.connectionId(args, ctx);
+        // Boletos EM ABERTO (TODOS — a página mostra tudo; o limite do chat não vale aqui).
+        const abertos = rows(
+          await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_aberto_todos', { cpf }),
+        ).map((b) => projectBoleto(b));
+        // Nome do titular só pra exibir na página (determinístico, vem do ERP; opcional).
+        let nome: string | null = null;
+        try {
+          const cli = rows(await this.connections.execute(ctx.organizationId, connectionId, 'cliente.dados', { cpf })).map(
+            projectCliente,
+          )[0];
+          nome = cli && typeof cli['nome'] === 'string' ? (cli['nome'] as string) : null;
+        } catch {
+          /* nome é opcional — segue sem ele */
+        }
+        return this.paymentLinks.createLink({
+          organizationId: ctx.organizationId,
+          workspaceId: ctx.workspaceId ?? undefined,
+          environmentId: ctx.environmentId ?? undefined,
+          connectionId,
+          customerRef: cpf,
+          customerName: nome,
+          boletos: abertos,
+          createdBy: 'ia',
+        });
       },
     });
 

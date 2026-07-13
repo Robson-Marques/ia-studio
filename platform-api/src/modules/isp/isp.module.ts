@@ -29,10 +29,13 @@ import { IspExampleAssistantSeed } from './isp-example-assistant.seed';
 import { IspOsConfigRepository } from './isp-os-config.repository';
 import { IspOsConfigService } from './isp-os-config.service';
 import { IspOsConfigController } from './isp-os-config.controller';
+import { IspPaymentLinkRepository } from './isp-payment-link.repository';
+import { IspPaymentLinkService } from './isp-payment-link.service';
+import { IspPaymentLinkController } from './isp-payment-link.controller';
 
 @Module({
   imports: [IntegrationModule, CommModule, AutomationModule, AiModule, SettingsModule],
-  controllers: [IspController, IspOsConfigController],
+  controllers: [IspController, IspOsConfigController, IspPaymentLinkController],
   providers: [
     IspRepository,
     IspConnectionResolver,
@@ -47,6 +50,8 @@ import { IspOsConfigController } from './isp-os-config.controller';
     IspExampleAssistantSeed,
     IspOsConfigRepository,
     IspOsConfigService,
+    IspPaymentLinkRepository,
+    IspPaymentLinkService,
   ],
   // IncidentLookupService exportado pra futura reuso (nos de automacao ISP).
   // IspOsConfigService exportado pra Etapa 3 (a tool abrir_os usa a config).

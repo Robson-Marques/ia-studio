@@ -27,6 +27,16 @@ export const ISP_BOLETO_MAX_SETTING_KEY = 'isp.boleto.max_envio';
 export const ISP_BOLETO_MAX_DEFAULT = 3;
 
 /**
+ * Link público de pagamento (frente 5), em `system_settings` por organização.
+ * `ttl_horas` = validade do link (janela de tempo); `base_url` = endereço público
+ * onde a página `/pagar/:token` é servida (a IA roda no worker, sem request HTTP,
+ * então a URL não dá pra derivar — vem da config, nunca de env manual).
+ */
+export const ISP_PAGAMENTO_TTL_SETTING_KEY = 'isp.pagamento.ttl_horas';
+export const ISP_PAGAMENTO_TTL_DEFAULT = 24;
+export const ISP_PAGAMENTO_BASE_URL_SETTING_KEY = 'isp.pagamento.base_url';
+
+/**
  * ERPs de provedor suportados. Todos implementam o MESMO contrato canonico de
  * operacoes (`cliente.dados`, `financeiro.*`, `os.cadastrar`,
  * `conectividade.listar_com_status`...), traduzido internamente por cada

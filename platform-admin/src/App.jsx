@@ -9,6 +9,7 @@ import UIToastContainer from './components/ui/UIToastContainer';
 
 import Login from './pages/Login';
 import AcceptInvite from './pages/AcceptInvite';
+import PaginaPagamento from './pages/PaginaPagamento';
 import Dashboard from './pages/Dashboard';
 import Usuarios from './pages/Usuarios';
 import PerfisAcesso from './pages/PerfisAcesso';
@@ -62,6 +63,7 @@ export default function App() {
               {/* Publicas */}
               <Route path="/login" element={<Login />} />
               <Route path="/convite/:token" element={<AcceptInvite />} />
+              <Route path="/pagar/:token" element={<PaginaPagamento />} />
 
               {/* Autenticadas */}
               <Route

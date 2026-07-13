@@ -1713,6 +1713,35 @@ model IspOsConfig {
   @@map("isp_os_config")
 }
 
+// Link público de pagamento (2ª via) gerado pela IA no chat: token aleatório,
+// expira por tempo (TTL), sem login. `snapshot` congela os boletos em aberto no
+// instante da geração (decisão do Robson: janela + snapshot). A org sai do
+// próprio token na rota pública. Porte do PortalAccessToken do Aquapark, SEM a
+// sessão JWT — a página só mostra a 2ª via e morre no vencimento do link.
+model IspPaymentLink {
+  id              String    @id @default(uuid())
+  organization_id String
+  workspace_id    String?
+  environment_id  String?
+  connection_id   String
+  token           String    @unique
+  // Rastreio (não é login): documento/nome do titular do snapshot.
+  customer_ref    String?
+  customer_name   String?
+  // Boletos em aberto congelados na geração (lista projetada — payload, Json ok).
+  snapshot        Json
+  expires_at      DateTime
+  opened_at       DateTime?
+  open_count      Int       @default(0)
+  revoked_at      DateTime?
+  created_by      String?
+  created_at      DateTime  @default(now())
+
+  @@index([organization_id, connection_id])
+  @@index([expires_at])
+  @@map("isp_payment_links")
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Resource Model + Mapper (Fase 7 — diretrizes 9/23/24/25). A plataforma NAO
 // e dona de dados de negocio: os TIPOS canonicos (Customer/Invoice/...) vivem

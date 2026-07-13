@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v28-nao-inventar-assunto-em-andamento';
+const CONTENT_VERSION = 'v29-link-pagamento-2via';
 
 // Ferramentas do assistente ISP: consulta (diagnóstico, débitos, 2ª via, região)
 // + ações controladas — abrir OS (config curada + guards), desbloqueio de
@@ -50,6 +50,9 @@ const ASSISTANT_TOOLS = [
   'consultar_debitos',
   'status_regiao',
   'segunda_via_boleto',
+  // Frente 5: link público de pagamento (2ª via) gerado na hora, expira sozinho,
+  // sem login. A IA manda a URL pra o cliente pagar.
+  'gerar_link_pagamento',
   // Escrita controlada: abre a OS com setor/assunto da CONFIG curada + anti-dup +
   // guard de incidente. A IA só chama após o cliente confirmar.
   'abrir_os',
@@ -98,7 +101,7 @@ const ROTEIRO = {
     },
     {
       quando: 'o diagnóstico mostrar o contrato BLOQUEADO por inadimplência',
-      faca: 'Não é problema técnico e NÃO abre chamado de suporte. Informe com clareza que a conexão está bloqueada por falta de pagamento. Tente o desbloqueio de confiança — a ferramenta executa e o PRÓPRIO provedor decide: se liberar, avise que é um acesso TEMPORÁRIO até o pagamento; se o provedor não permitir (a ferramenta volta sem liberar), não prometa o desbloqueio. Em qualquer caso, ofereça a 2ª via/boleto (linha digitável + link) para regularizar. Ao final, encaminhe a conversa para a fila do FINANCEIRO para um atendente acompanhar.',
+      faca: 'Não é problema técnico e NÃO abre chamado de suporte. Informe com clareza que a conexão está bloqueada por falta de pagamento. Tente o desbloqueio de confiança — a ferramenta executa e o PRÓPRIO provedor decide: se liberar, avise que é um acesso TEMPORÁRIO até o pagamento; se o provedor não permitir (a ferramenta volta sem liberar), não prometa o desbloqueio. Em qualquer caso, ofereça o pagamento para regularizar: gere o LINK DE PAGAMENTO (página pública com a 2ª via, que expira sozinha) e mande a URL que a ferramenta devolver; se ela devolver "error" (ex.: URL pública não configurada), passe então a linha digitável e o link do boleto direto, sem inventar link. Ao final, encaminhe a conversa para a fila do FINANCEIRO para um atendente acompanhar.',
     },
     {
       quando: 'houver manutenção ou incidente na região do cliente',
@@ -110,7 +113,7 @@ const ROTEIRO = {
     },
     {
       quando: 'pedir 2ª via ou tiver dúvida de fatura',
-      faca: 'Após identificar o cliente, veja os débitos e gere a 2ª via (linha digitável e link do boleto). O sistema já marca cada boleto VENCIDO (e há quantos dias) — se houver, diga com clareza que o cliente está EM ATRASO (ex.: "esse boleto está vencido desde 10/07, 3 dias em atraso") e ofereça a 2ª via para regularizar; nunca apresente boleto vencido como se estivesse tudo em dia. NÃO afirme que o acesso está bloqueado só por causa do atraso — o contrato pode seguir ativo; bloqueio só se confirma pelo diagnóstico. O sistema já limita quantos boletos mostrar (os mais relevantes, vencidos primeiro) — se houver mais em aberto do que os que apareceram, avise que há outros e ofereça enviar o restante; nunca invente boletos além dos que o sistema retornou.',
+      faca: 'Após identificar o cliente, veja os débitos e gere a 2ª via (linha digitável e link do boleto). O sistema já marca cada boleto VENCIDO (e há quantos dias) — se houver, diga com clareza que o cliente está EM ATRASO (ex.: "esse boleto está vencido desde 10/07, 3 dias em atraso") e ofereça a 2ª via para regularizar; nunca apresente boleto vencido como se estivesse tudo em dia. NÃO afirme que o acesso está bloqueado só por causa do atraso — o contrato pode seguir ativo; bloqueio só se confirma pelo diagnóstico. O sistema já limita quantos boletos mostrar (os mais relevantes, vencidos primeiro) — se houver mais em aberto do que os que apareceram, avise que há outros e ofereça enviar o restante; nunca invente boletos além dos que o sistema retornou. Para o cliente PAGAR, prefira gerar o LINK DE PAGAMENTO (uma página com a 2ª via que expira sozinha) e mandar a URL; só se a ferramenta devolver "error" é que você manda a linha digitável e o link do boleto direto.',
     },
   ],
 };
