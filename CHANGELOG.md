@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.9.64 - 2026-07-13 (Remove o log de debug do su_ticket)
+
+Sem `db push`. Backend (provider IXC). Tira o `[DBG-OS]` temporário da v0.9.63.
+
+- **Debug removido.** O log do corpo do `su_ticket` (v0.9.63) confirmou que o body é o correto (`id_ticket_setor=2`, `id_wfl_processo=1`) e a OS abre (chamado 3943). O "Departamento destino" que aparecia era o **worker rodando estado antigo** (config `setor=4` de antes do re-pick / código desatualizado) — o restart do deploy o atualizou. Não há cache de config no código (lê do banco a cada abertura), então mudar só a config já vale sem deploy; mudar código exige o restart do worker (que o `upgrade.sh` worker-first já faz).
+
+## v0.9.63 - 2026-07-13 (debug temporário — log do corpo do su_ticket) [substituída pela v0.9.64]
+
 ## v0.9.62 - 2026-07-13 (Config de OS = departamento do atendimento + negrito sem e-mail/link)
 
 Sem `db push`. Backend (conteúdo `v24`) + front do admin.

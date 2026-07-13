@@ -741,9 +741,6 @@ export class IxcProvider extends BaseProvider {
       ...(idContrato ? { id_contrato: idContrato } : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };
-    // DEBUG TEMPORARIO (v0.9.63): loga o corpo real do su_ticket pra comparar com o
-    // recon que funcionou. Remover quando a abertura estabilizar.
-    this.logger.warn(`[DBG-OS] su_ticket body: ${JSON.stringify(body)}`);
     return this.write(ctx, token, 'POST', T.ticket, body);
   }
 
