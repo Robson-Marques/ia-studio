@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.67 - 2026-07-13 (Intermitência da OS resolvida de vez: setor/assunto SÓ da config)
+
+Sem `db push`. Backend (tool `abrir_os` + provider). Remove o debug da v0.9.66.
+
+- **A causa REAL da intermitência: o modelo passava `setor="suporte"` (a palavra).** O log de debug pegou o body: `id_ticket_setor:"suporte"` em vez de `"2"`. O `abrir_os` deixava o modelo **sobrescrever** o setor/assunto (params opcionais "para sobrescrever"), e às vezes o modelo mandava a palavra "suporte" — que o IXC recusa como departamento ("Departamento destino"). Quando não mandava, usava a config (id "2") e abria — daí a intermitência. Agora **setor e assunto vêm SÓ da config** (ids curados); os params de override saíram do schema — o modelo só decide CPF/descrição/login. (O `id_wfl_processo=1` sempre esteve certo — o retry da v0.9.66 era defesa extra, mantido; não era a causa.)
+
 ## v0.9.66 - 2026-07-13 (Intermitência da OS: retry na leitura do processo do assunto + debug)
 
 Sem `db push`. Backend (provider IXC). Inclui o fix do assignBot da v0.9.65.

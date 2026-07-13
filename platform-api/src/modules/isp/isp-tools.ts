@@ -374,8 +374,6 @@ export class IspTools implements OnModuleInit {
           descricao: { type: 'string', description: 'Descrição do problema do cliente (vai na observação da OS).' },
           login: { type: 'string', description: 'Login da conexão com problema (identifica a instalação; use quando houver mais de uma).' },
           contrato: { type: 'string', description: 'Id/nº do contrato da conexão com problema (quando houver mais de um).' },
-          setor: { type: 'string', description: 'OPCIONAL — normalmente vem da config; só informe para sobrescrever.' },
-          id_assunto: { type: 'string', description: 'OPCIONAL — normalmente vem da config; só informe para sobrescrever.' },
           connection_id: { type: 'string' }, filial: { type: 'string' },
         },
         required: ['cpf', 'descricao'],
@@ -407,8 +405,12 @@ export class IspTools implements OnModuleInit {
         // 2) Setor + assunto da CONFIG curada (a IA não chuta ids). Override
         //    opcional se a IA mandar setor/id_assunto explicitamente.
         const cfg = await this.osConfig.defaultForSupport(ctx.organizationId, connectionId);
-        const setor = (typeof args['setor'] === 'string' && args['setor']) || cfg?.setor_id;
-        const idAssunto = (typeof args['id_assunto'] === 'string' && args['id_assunto']) || cfg?.assunto_id;
+        // Setor/assunto vêm SÓ da CONFIG (ids curados) — o modelo NÃO sobrescreve.
+        // Ele chegava a passar setor="suporte" (a palavra), que o IXC recusa como
+        // departamento ("Departamento destino"), causando a intermitência. A config
+        // é a fonte da verdade; o modelo só decide CPF/descrição/login.
+        const setor = cfg?.setor_id;
+        const idAssunto = cfg?.assunto_id;
         if (!setor || !idAssunto) {
           return {
             os_aberta: false,

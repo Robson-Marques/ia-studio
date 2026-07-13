@@ -741,17 +741,7 @@ export class IxcProvider extends BaseProvider {
       ...(idContrato ? { id_contrato: idContrato } : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };
-    // DEBUG TEMPORARIO: confirma a hipotese da intermitencia (id_wfl_processo as
-    // vezes some porque a leitura do assunto erra calado). Remover apos confirmar.
-    this.logger.warn(`[DBG-OS] proc=${JSON.stringify(idProcesso)} body=${JSON.stringify(body)}`);
-    try {
-      const resp = await this.write(ctx, token, 'POST', T.ticket, body);
-      this.logger.warn('[DBG-OS] OK');
-      return resp;
-    } catch (e) {
-      this.logger.warn(`[DBG-OS] FALHOU: ${(e as Error).message}`);
-      throw e;
-    }
+    return this.write(ctx, token, 'POST', T.ticket, body);
   }
 
   /**
