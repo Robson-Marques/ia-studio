@@ -23,6 +23,10 @@
 
 ## ✅ Versão em produção
 
+- **v0.9.60** engatilhada (FRENTE 3 — handoff bot→fila de setor). Tool `encaminhar_para_fila` +
+  `handoffToQueue`; seed cria "Fila Setor de Suporte/Financeiro" + mapeia em `system_settings`
+  (`isp.fila.suporte`/`isp.fila.financeiro`). A IA encaminha de verdade após abrir o chamado.
+  Aguardando validação (testar: abrir chamado → conversa vai pra fila de Suporte).
 - **v0.9.59 NO AR — FRENTE 2 VALIDADA** (chamado 3935 abriu no IXC com contrato+endereço+tudo certo).
   OS nasce do `su_ticket` (atendimento) → processo do assunto (O.S. OPA SUITE) abre a OS. Fixes até
   fechar: v0.9.57 (fluxo), v0.9.58 (`titulo` obrigatório), v0.9.59 (`id_wfl_processo` do assunto).
@@ -58,7 +62,8 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v22`** (negrito WhatsApp 1 asterisco; v0.9.56). Antes:
+- **Prompt do assistente ISP: `CONTENT_VERSION v23`** (handoff pra fila de setor; v0.9.60). Antes:
+  v22 (negrito WhatsApp, v0.9.56),
   v21 (mostrar opções, v0.9.54), v20 (abertura reconhece número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação
   determinística via `identificado_por`. Ao mexer no comportamento, editar NA CASA CERTA — não
@@ -96,8 +101,11 @@ Decisões travadas: **A** = endereço do login se houver, senão do contrato ·
    LENTIDÃO → processo 1 O.S. OPA SUITE). **Setor = `su_ticket_setor`** (departamento: Financeiro=1,
    Suporte=2), NÃO `empresa_setor`. Métodos: `abrirAtendimento` + `gerarProtocolo` no ixc.provider.
    **PENDÊNCIA de config:** re-descobrir recursos + re-escolher setor(departamento)+assunto(com processo).
-3. Filas de setor (Financeiro/Suporte) + handoff do bot para a fila.
-4. Desbloqueio de confiança pela IA + oferta PIX/boleto; bloqueado → fila financeiro.
+3. **Filas de setor (Financeiro/Suporte) + handoff do bot para a fila** — ✅ IMPLEMENTADA (v0.9.60,
+   aguardando validação). `encaminhar_para_fila` + `handoffToQueue` (bot-autorizado) + seed das filas
+   + mapa setor→fila em `system_settings`. A IA envia a msg de "aguarde" e a tool move pra fila.
+   Pendência menor: UI de re-mapeamento setor→fila (hoje o seed auto-mapeia; ajuste via settings).
+4. Desbloqueio de confiança pela IA + oferta PIX/boleto; bloqueado → fila financeiro (a fila já existe).
 5. Página pública de 2ª via/pagamento (porte Aquapark) — junto com a frente do financeiro.
 6. Alerta de incidentes (registrar + previsão + notificar equipe via WhatsApp).
 

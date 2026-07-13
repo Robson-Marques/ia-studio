@@ -12,6 +12,7 @@ import { IntegrationModule } from '../integration/integration.module';
 import { CommModule } from '../comm/comm.module';
 import { AutomationModule } from '../automation/automation.module';
 import { AiModule } from '../ai/ai.module';
+import { SettingsModule } from '../core/settings/settings.module';
 
 import { IspRepository } from './isp.repository';
 import { IspConnectionResolver } from './isp-connection.resolver';
@@ -30,7 +31,7 @@ import { IspOsConfigService } from './isp-os-config.service';
 import { IspOsConfigController } from './isp-os-config.controller';
 
 @Module({
-  imports: [IntegrationModule, CommModule, AutomationModule, AiModule],
+  imports: [IntegrationModule, CommModule, AutomationModule, AiModule, SettingsModule],
   controllers: [IspController, IspOsConfigController],
   providers: [
     IspRepository,

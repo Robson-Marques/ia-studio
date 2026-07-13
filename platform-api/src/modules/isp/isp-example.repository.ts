@@ -5,7 +5,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, ConnectionStatus, ProviderCategory } from '@prisma/client';
 import { PrismaService } from '../../shared/prisma/prisma.service';
-import { ISP_ERP_PROVIDER_KEYS } from './isp.constants';
+import { ISP_ERP_PROVIDER_KEYS, ISP_QUEUE_SETTING_KEYS } from './isp.constants';
 
 const SEED_FLAG_KEY = 'isp_example_assistant_seeded';
 const AUTOREPLY_FLAG_KEY = 'isp_example_autoreply_seeded';
@@ -123,6 +123,38 @@ export class IspExampleRepository {
   markSeeded(organizationId: string) {
     return this.prisma.systemSetting.create({
       data: { organization_id: organizationId, key: SEED_FLAG_KEY, value: true as unknown as Prisma.InputJsonValue },
+    });
+  }
+
+  // ─── Filas de setor (frente 3) ──────────────────────
+  /** Já criei/mapeei as filas de setor desta org? (a chave de suporte é o marcador.) */
+  async sectorQueuesSeeded(organizationId: string): Promise<boolean> {
+    const row = await this.prisma.systemSetting.findFirst({
+      where: { organization_id: organizationId, key: ISP_QUEUE_SETTING_KEYS.suporte },
+      select: { id: true },
+    });
+    return !!row;
+  }
+
+  /** Cria as filas "Setor de Suporte" e "Setor Financeiro" e mapeia setor→fila. */
+  async seedSectorQueues(organizationId: string, workspaceId: string, environmentId: string): Promise<void> {
+    const mk = async (name: string): Promise<string> => {
+      const q = await this.prisma.attendanceQueue.create({
+        data: { organization_id: organizationId, workspace_id: workspaceId, environment_id: environmentId, name, is_active: true },
+      });
+      return q.id;
+    };
+    const suporteId = await mk('Fila Setor de Suporte');
+    const financeiroId = await mk('Fila Setor Financeiro');
+    await this.setSetting(organizationId, ISP_QUEUE_SETTING_KEYS.suporte, suporteId);
+    await this.setSetting(organizationId, ISP_QUEUE_SETTING_KEYS.financeiro, financeiroId);
+  }
+
+  private setSetting(organizationId: string, key: string, value: string) {
+    return this.prisma.systemSetting.upsert({
+      where: { organization_id_key: { organization_id: organizationId, key } },
+      create: { organization_id: organizationId, key, value: value as unknown as Prisma.InputJsonValue },
+      update: { value: value as unknown as Prisma.InputJsonValue },
     });
   }
 

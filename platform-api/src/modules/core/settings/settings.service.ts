@@ -20,6 +20,12 @@ export class SettingsService {
     return setting;
   }
 
+  /** Valor da config ou `null` se não existir (uso interno — não lança). */
+  async getValue(orgId: string, key: string): Promise<unknown> {
+    const setting = await this.repository.findByKey(orgId, key);
+    return setting ? setting.value : null;
+  }
+
   async set(orgId: string, key: string, value: unknown) {
     const before = await this.repository.findByKey(orgId, key);
     const setting = await this.repository.upsert(orgId, key, value as Prisma.InputJsonValue);

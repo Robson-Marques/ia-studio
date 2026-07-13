@@ -5,6 +5,19 @@ export const ALTAREDE_PROVIDER_KEY = 'altarede';
 export const IXC_PROVIDER_KEY = 'ixc';
 
 /**
+ * Mapeamento setor→fila (frente 3), em `system_settings` por organização. A IA
+ * encaminha a conversa pra fila certa (Suporte/Financeiro) via `encaminhar_para_fila`.
+ * Guarda o id da AttendanceQueue. Escolha por config (DECISÃO B) — o seed cria as
+ * filas e mapeia por padrão; o operador re-mapeia na tela de Equipes e Filas.
+ */
+export const ISP_QUEUE_SETTING_KEYS = {
+  suporte: 'isp.fila.suporte',
+  financeiro: 'isp.fila.financeiro',
+} as const;
+
+export type IspQueueSetor = keyof typeof ISP_QUEUE_SETTING_KEYS;
+
+/**
  * ERPs de provedor suportados. Todos implementam o MESMO contrato canonico de
  * operacoes (`cliente.dados`, `financeiro.*`, `os.cadastrar`,
  * `conectividade.listar_com_status`...), traduzido internamente por cada

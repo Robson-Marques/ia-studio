@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v22-os-contrato-origem-negrito';
+const CONTENT_VERSION = 'v23-handoff-fila-setor';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -49,6 +49,9 @@ const READ_ONLY_TOOLS = [
   // Escrita controlada: abre a OS com setor/assunto da CONFIG curada + anti-dup +
   // guard de incidente. A IA só chama após o cliente confirmar.
   'abrir_os',
+  // Handoff bot→fila de setor (frente 3): move a conversa pra fila de Suporte/
+  // Financeiro pra um atendente humano assumir.
+  'encaminhar_para_fila',
 ];
 
 // Roteiro ESTRUTURADO (aba "O que faz"): objetivo + passos + situações. Nasce
@@ -92,7 +95,7 @@ const ROTEIRO = {
     },
     {
       quando: 'o cliente aceitar abrir o chamado (um "sim", "pode", "abre")',
-      faca: 'Abra na MESMA resposta e retorne com o número. Informe: (1) o número do chamado; (2) prazo de até 72 horas; (3) que vai deixar o atendimento na fila do setor responsável. Se a ferramenta indicar que JÁ EXISTE chamado aberto naquele setor, não abra outro — passe o número do existente. Nunca diga "já volto com o número" e pare. Se a abertura não estiver configurada, avise que vai encaminhar para um atendente.',
+      faca: 'Abra na MESMA resposta e retorne com o número. Informe: (1) o número do chamado; (2) prazo de até 72 horas; (3) que vai deixar o atendimento na fila do setor de Suporte para um atendente acompanhar. Depois de informar isso, use a ferramenta de encaminhar para a fila de SUPORTE (é ela que move a conversa de verdade para a fila — não basta dizer). Se a ferramenta indicar que JÁ EXISTE chamado aberto naquele setor, não abra outro — passe o número do existente. Nunca diga "já volto com o número" e pare. Se a abertura não estiver configurada, avise que vai encaminhar para um atendente.',
     },
     {
       quando: 'pedir 2ª via ou tiver dúvida de fatura',
@@ -136,6 +139,13 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
       }
 
       for (const [organizationId, scope] of byOrg) {
+        // Filas de setor (frente 3): cria "Setor de Suporte" e "Setor Financeiro"
+        // e mapeia setor→fila em system_settings. Idempotente (não recria se já há).
+        if (!(await this.repository.sectorQueuesSeeded(organizationId))) {
+          await this.repository.seedSectorQueues(organizationId, scope.workspace_id, scope.environment_id);
+          this.logger.log(`Filas de setor (Suporte/Financeiro) criadas na organização ${organizationId}.`);
+        }
+
         const existing = await this.repository.agentExists(organizationId, AGENT_NAME);
         let agentId: string | null = existing?.id ?? null;
 

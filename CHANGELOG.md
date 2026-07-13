@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.9.60 - 2026-07-12 (Frente 3 — handoff do bot para a fila de setor (Suporte/Financeiro))
+
+Sem `db push`. Backend. Conteúdo do assistente re-aplicado (`v23`).
+
+- **A IA agora ENCAMINHA de verdade para a fila do setor** (antes só dizia "vou deixar na fila"). Nova tool `encaminhar_para_fila(setor)` + método `ChatAssignmentService.handoffToQueue` (bot-autorizado, ação segura: devolve ao time humano; solta o handler, põe a conversa na fila `owner=QUEUE`, volta pra OPEN pra um atendente assumir; grava evento `TRANSFERRED` ator=BOT). A mensagem de "está na fila, aguarde" a própria IA envia na resposta (não é envio de sistema — não fura o reply gate). Roteiro (`v23`): ao abrir o chamado, informa nº+72h+fila e **chama `encaminhar_para_fila('suporte')`**.
+- **Filas de setor por config (DECISÃO B).** O seed cria "Fila Setor de Suporte" e "Fila Setor Financeiro" (vazias) e mapeia setor→fila em `system_settings` (`isp.fila.suporte`/`isp.fila.financeiro` = id da AttendanceQueue). Idempotente. O operador pode re-mapear/renomear na tela WhatsApp → Equipes e Filas. Se a fila não estiver configurada, a tool devolve "não configurada" e a IA encaminha para um atendente genérico.
+- A fila do Financeiro já fica pronta para a frente 4 (bloqueio/inadimplência → fila financeiro). Sem UI dedicada de mapeamento ainda (o seed auto-mapeia; ajuste via settings) — pendência menor.
+
 ## v0.9.59 - 2026-07-12 (Atendimento: envia o processo do assunto (id_wfl_processo))
 
 Sem `db push`. Backend (provider IXC). Fix da v0.9.57/58.

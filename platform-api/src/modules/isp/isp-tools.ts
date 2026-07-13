@@ -14,12 +14,14 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ToolRegistryService, ToolExecutionContext } from '../ai/tools/tool-registry.service';
 import { ConnectionsService } from '../integration/connections/connections.service';
 import { WhatsappInboxService } from '../comm/whatsapp/whatsapp-inbox.service';
+import { ChatAssignmentService } from '../comm/attendance/chat-assignment.service';
+import { SettingsService } from '../core/settings/settings.service';
 import { IspOsConfigService } from './isp-os-config.service';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
 import { IspDiagnosisService } from './isp-diagnosis.service';
 import { IncidentLookupService } from './incident-lookup.service';
-import { SCOPE_KEYS } from './isp.constants';
+import { SCOPE_KEYS, ISP_QUEUE_SETTING_KEYS, IspQueueSetor } from './isp.constants';
 import { projectBoleto, projectCliente, projectConexao, projectContrato, rows } from './isp-projections';
 
 function asString(value: unknown, field: string): string {
@@ -42,6 +44,8 @@ export class IspTools implements OnModuleInit {
     private readonly lookup: IncidentLookupService,
     private readonly whatsappInbox: WhatsappInboxService,
     private readonly osConfig: IspOsConfigService,
+    private readonly chatAssignment: ChatAssignmentService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -451,6 +455,43 @@ export class IspTools implements OnModuleInit {
           ...(contrato ? { id_contrato: contrato } : {}),
         });
         return { os_aberta: true, os, active_incident: incident };
+      },
+    });
+
+    // ─── encaminhar_para_fila (handoff bot → fila de setor) ──
+    this.registry.register({
+      key: 'encaminhar_para_fila',
+      name: 'Encaminhar para a fila do setor (ISP)',
+      description:
+        'Move a conversa para a FILA de um setor (suporte ou financeiro) para um atendente humano assumir. ' +
+        'Use ao FIM do atendimento pela IA — ex.: depois de abrir o chamado (fila de suporte) ou quando o ' +
+        'caso é financeiro/bloqueio. ANTES de chamar, envie UMA mensagem curta avisando o cliente que vai ' +
+        'deixar na fila do setor e que um atendente continua. Não use no meio de um diagnóstico.',
+      category: 'isp',
+      input_schema: {
+        type: 'object',
+        properties: {
+          setor: { type: 'string', enum: ['suporte', 'financeiro'], description: 'Fila de destino: suporte ou financeiro.' },
+          motivo: { type: 'string', description: 'Motivo curto do encaminhamento (ex.: chamado aberto; caso financeiro).' },
+        },
+        required: ['setor'],
+      },
+      handler: async (args, ctx) => {
+        const setor = (typeof args['setor'] === 'string' ? args['setor'].trim().toLowerCase() : '') as IspQueueSetor;
+        if (setor !== 'suporte' && setor !== 'financeiro') throw new Error('Setor inválido — use "suporte" ou "financeiro".');
+        const chatId = ctx.scopeKeys?.['session'];
+        if (!chatId) return { encaminhado: false, motivo: 'Sem conversa em contexto para encaminhar.' };
+        if (ctx.dryRun) return { simulated: true, setor };
+        const queueId = await this.settings.getValue(ctx.organizationId, ISP_QUEUE_SETTING_KEYS[setor]);
+        if (typeof queueId !== 'string' || !queueId) {
+          return {
+            encaminhado: false,
+            motivo: `A fila do setor "${setor}" ainda não foi configurada. Avise que vai encaminhar para um atendente.`,
+          };
+        }
+        const motivo = typeof args['motivo'] === 'string' ? args['motivo'] : undefined;
+        await this.chatAssignment.handoffToQueue(ctx.organizationId, chatId, queueId, motivo);
+        return { encaminhado: true, setor };
       },
     });
 

@@ -118,6 +118,56 @@ export class ChatAssignmentService {
       .catch(() => 0);
   }
 
+  // ─── HANDOFF BOT → FILA DE SETOR (frente 3) ─────────
+  // A IA entrega a conversa para uma FILA de setor (Suporte/Financeiro). Ação
+  // segura (devolve ao time humano) — SEM permissão de usuário, quem chama é a IA.
+  // Solta o handler, põe a conversa na fila (owner=QUEUE) e volta pra OPEN pra um
+  // atendente da fila assumir. A mensagem de "aguarde" a própria IA envia na
+  // resposta dela (não é envio de sistema — não fura o reply gate).
+  async handoffToQueue(
+    organizationId: string,
+    chatId: string,
+    queueId: string,
+    reason?: string,
+  ): Promise<WhatsappChat> {
+    const chat = await this.loadOr404(organizationId, chatId);
+    if (chat.attendance_status === CommChatStatus.CLOSED) {
+      throw new ConflictException('Conversa encerrada. Reabra primeiro.');
+    }
+    const queue = await this.repository.findQueueById(queueId);
+    if (!queue || queue.organization_id !== organizationId || !queue.is_active) {
+      throw new ConflictException('Fila inexistente ou inativa.');
+    }
+    assertChatAttendanceTransition(chat.attendance_status, CommChatStatus.OPEN);
+    const count = await this.chats.updateChatConditional(
+      chatId,
+      { attendance_status: chat.attendance_status },
+      {
+        owner_type: 'QUEUE',
+        owner_id: queue.id,
+        queue_id: queue.id,
+        team_id: queue.team_id ?? null,
+        current_handler_type: null,
+        current_handler_id: null,
+        attendance_status: CommChatStatus.OPEN,
+        last_assignment_at: new Date(),
+      },
+    );
+    if (count === 0) throw new ConflictException(RACE_MESSAGE);
+    const after = await this.loadOr404(organizationId, chatId);
+    await this.events.record({
+      organizationId,
+      chatId,
+      eventType: 'TRANSFERRED',
+      actorType: 'BOT',
+      reason: reason ?? null,
+      before: snapshotChat(chat),
+      after: snapshotChat(after),
+      metadata: { queue_id: queue.id, via: 'bot_handoff' },
+    });
+    return after;
+  }
+
   // ─── RELEASE ────────────────────────────────────────
 
   async release(organizationId: string, chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
