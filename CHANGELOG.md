@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.9.66 - 2026-07-13 (Intermitência da OS: retry na leitura do processo do assunto + debug)
+
+Sem `db push`. Backend (provider IXC). Inclui o fix do assignBot da v0.9.65.
+
+- **Corrige a intermitência do "Departamento destino".** A OS abria às vezes e falhava às vezes com a MESMA config. Causa: `processoDoAssunto` lê o `id_processo` do assunto a cada abertura, e a API do IXC **erra calado** (a listagem às vezes volta vazia). Sem o `id_processo`, o ticket saía sem `id_wfl_processo` → o assunto "obriga processo" → o IXC tentava anexar sozinho e pedia o "Departamento destino". Agora a leitura **repete até 3x** quando a lista vem vazia. Log `[DBG-OS]` temporário pra confirmar (removido na próxima).
+- (v0.9.65) **Handoff pra fila não é reassumido pela IA:** o `assignBot` do nó do agente não reassume conversa com `owner=QUEUE`.
+
+## v0.9.65 - 2026-07-13 (Handoff pra fila não é mais "roubado" de volta pela IA)
+
+Sem `db push`. Backend.
+
+- **A conversa fica na fila depois do handoff.** A IA encaminhava pra fila (`encaminhar_para_fila` → `handoffToQueue` → `owner=QUEUE`, solta o handler), mas o nó do Agente chama `assignBot` ao FIM do turno para marcar "atendido pela IA" — e isso rodava DEPOIS do handoff, reassumindo a conversa pro BOT (ela voltava pra aba "IA"). Agora o `assignBot` **não reassume conversa com `owner=QUEUE`** (`NOT owner_type QUEUE` no lock condicional): entregou pra fila, fica na fila para o atendente humano.
+
 ## v0.9.64 - 2026-07-13 (Remove o log de debug do su_ticket)
 
 Sem `db push`. Backend (provider IXC). Tira o `[DBG-OS]` temporário da v0.9.63.

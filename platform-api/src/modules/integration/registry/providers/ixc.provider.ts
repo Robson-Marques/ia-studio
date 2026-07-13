@@ -741,7 +741,17 @@ export class IxcProvider extends BaseProvider {
       ...(idContrato ? { id_contrato: idContrato } : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };
-    return this.write(ctx, token, 'POST', T.ticket, body);
+    // DEBUG TEMPORARIO: confirma a hipotese da intermitencia (id_wfl_processo as
+    // vezes some porque a leitura do assunto erra calado). Remover apos confirmar.
+    this.logger.warn(`[DBG-OS] proc=${JSON.stringify(idProcesso)} body=${JSON.stringify(body)}`);
+    try {
+      const resp = await this.write(ctx, token, 'POST', T.ticket, body);
+      this.logger.warn('[DBG-OS] OK');
+      return resp;
+    } catch (e) {
+      this.logger.warn(`[DBG-OS] FALHOU: ${(e as Error).message}`);
+      throw e;
+    }
   }
 
   /**
@@ -770,10 +780,20 @@ export class IxcProvider extends BaseProvider {
    * que abre a OS ao criar o ticket. `0`/vazio → undefined (assunto sem processo).
    */
   private async processoDoAssunto(ctx: ProviderContext, token: string, idAssunto: string): Promise<string | undefined> {
-    const rows = await this.list(ctx, token, T.osAssunto, this.eq(`${T.osAssunto}.id`, idAssunto, `${T.osAssunto}.id`));
-    const p = rows[0]?.['id_processo'];
-    const v = p === undefined || p === null ? '' : String(p);
-    return v && v !== '0' ? v : undefined;
+    // A leitura do assunto no IXC ERRA CALADO (a listagem às vezes volta VAZIA sem
+    // erro). Sem o `id_processo`, o ticket sai sem `id_wfl_processo` e o IXC pede o
+    // "Departamento destino" (a intermitência observada). Repete a leitura quando a
+    // lista vier vazia — o assunto/processo em si é estável.
+    for (let tentativa = 0; tentativa < 3; tentativa++) {
+      const rows = await this.list(ctx, token, T.osAssunto, this.eq(`${T.osAssunto}.id`, idAssunto, `${T.osAssunto}.id`));
+      if (rows.length > 0) {
+        const p = rows[0]['id_processo'];
+        const v = p === undefined || p === null ? '' : String(p);
+        return v && v !== '0' ? v : undefined;
+      }
+      // lista vazia = possível "erra calado" do IXC → tenta de novo
+    }
+    return undefined;
   }
 
   // ─── Transporte ─────────────────────────────────────

@@ -107,6 +107,10 @@ export class ChatAssignmentService {
           // nulos no SQL — por isso o OR explícito.
           OR: [{ current_handler_type: null }, { current_handler_type: 'BOT' }],
           attendance_status: { not: CommChatStatus.CLOSED },
+          // NÃO reassumir conversa já ENTREGUE a uma FILA (handoff): o nó do agente
+          // chama assignBot ao fim do turno, e sem isto ele roubava de volta pro BOT
+          // a conversa que a IA acabou de encaminhar pra fila de setor.
+          NOT: { owner_type: 'QUEUE' },
         },
         {
           current_handler_type: 'BOT',
