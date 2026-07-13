@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v25-carrega-intencao-e-marca-atraso';
+const CONTENT_VERSION = 'v26-limite-boletos-avisa-mais';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -99,7 +99,7 @@ const ROTEIRO = {
     },
     {
       quando: 'pedir 2ª via ou tiver dúvida de fatura',
-      faca: 'Após identificar o cliente, veja os débitos e gere a 2ª via (linha digitável e link do boleto). O sistema já marca cada boleto VENCIDO (e há quantos dias) — se houver, diga com clareza que o cliente está EM ATRASO (ex.: "esse boleto está vencido desde 10/07, 3 dias em atraso") e ofereça a 2ª via para regularizar; nunca apresente boleto vencido como se estivesse tudo em dia. NÃO afirme que o acesso está bloqueado só por causa do atraso — o contrato pode seguir ativo; bloqueio só se confirma pelo diagnóstico.',
+      faca: 'Após identificar o cliente, veja os débitos e gere a 2ª via (linha digitável e link do boleto). O sistema já marca cada boleto VENCIDO (e há quantos dias) — se houver, diga com clareza que o cliente está EM ATRASO (ex.: "esse boleto está vencido desde 10/07, 3 dias em atraso") e ofereça a 2ª via para regularizar; nunca apresente boleto vencido como se estivesse tudo em dia. NÃO afirme que o acesso está bloqueado só por causa do atraso — o contrato pode seguir ativo; bloqueio só se confirma pelo diagnóstico. O sistema já limita quantos boletos mostrar (os mais relevantes, vencidos primeiro) — se houver mais em aberto do que os que apareceram, avise que há outros e ofereça enviar o restante; nunca invente boletos além dos que o sistema retornou.',
     },
   ],
 };

@@ -23,7 +23,16 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.69 engatilhada (aguardando release):** dois ajustes de comportamento do assistente
+- **v0.9.70 engatilhada (aguardando release) — config de limite de boletos:** decisão do Robson
+  (frente do financeiro, feita ANTES da frente 4). Config "Envio de boletos" na tela ISP → Abertura
+  de chamado (dropdown 1/2/3/5/10/Todos, sem campo livre) → `system_settings` `isp.boleto.max_envio`
+  (default 3, 0=todos). Determinístico: `limitBoletos` (`isp-projections.ts`) ordena vencidos primeiro
+  e corta no limite; `consultar_debitos`/`segunda_via_boleto` aplicam + devolvem `total_em_aberto`.
+  `CONTENT_VERSION` v26 (roteiro avisa quando há mais boletos que o limite). Endpoints
+  `GET/PUT /isp/os-config/boleto-max`. **PRÓXIMO: frente 4** (desbloqueio de confiança — decisão do
+  Robson: **IA faz sozinha quando o provedor permitir**; bloqueado→fila Financeiro; oferta de
+  pagamento = linha/link do boleto, IXC não tem PIX copia-e-cola).
+- **v0.9.69 no ar (VALIDADO por print):** dois ajustes de comportamento do assistente
   (`CONTENT_VERSION` v25) + 1 determinístico. (1) **Boleto vencido marcado pelo sistema:**
   `projectBoleto` (`isp-projections.ts`) calcula `vencido`/`dias_em_atraso` (vencimento < data do
   servidor, só data); roteiro avisa "em atraso há X dias" e oferece 2ª via — SEM afirmar bloqueio
@@ -81,7 +90,7 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v25`** (carrega a intenção ao trocar de CPF + roteiro avisa boleto vencido/em atraso; v0.9.69). Antes: v24 (negrito sem e-mail/link; v0.9.62). Antes:
+- **Prompt do assistente ISP: `CONTENT_VERSION v26`** (roteiro avisa quando há mais boletos que o limite; v0.9.70). Antes: v25 (carrega a intenção ao trocar de CPF + boleto vencido/em atraso; v0.9.69), v24 (negrito sem e-mail/link; v0.9.62). Antes:
   v23 (handoff fila, v0.9.60), v22 (negrito WhatsApp, v0.9.56),
   v21 (mostrar opções, v0.9.54), v20 (abertura reconhece número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação

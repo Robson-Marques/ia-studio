@@ -46,6 +46,21 @@ export async function saveFilaMapping(mapping) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar as filas de setor')); }
 }
 
+// ─── Limite de boletos que a IA envia (0 = todos) ──────────────────────
+export async function getBoletoMax() {
+  try {
+    const { data } = await api.get('/isp/os-config/boleto-max');
+    return Number.isFinite(data?.max) ? data.max : 3;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar o limite de boletos')); }
+}
+
+export async function saveBoletoMax(max) {
+  try {
+    const { data } = await api.put('/isp/os-config/boleto-max', { max });
+    return data?.max;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar o limite de boletos')); }
+}
+
 export async function listIncidents(params = {}) {
   try {
     const { data } = await api.get('/isp/incidents', { params });

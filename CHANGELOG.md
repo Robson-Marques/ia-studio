@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.70 - 2026-07-13 (Config: quantos boletos a IA envia — vencidos primeiro)
+
+Sem `db push`. Backend (config + projeção + tools) + frontend (tela ISP) + `CONTENT_VERSION` v26.
+
+- **Nova config "Envio de boletos" (ISP → Abertura de chamado).** Dropdown "Máximo por mensagem" (1, 2, 3, 5, 10, Todos) — sem campo livre. Guardado em `system_settings` (`isp.boleto.max_envio`, default 3; 0 = todos), viaja no backup, ACL `isp.incidents.read/write`. Endpoints `GET/PUT /isp/os-config/boleto-max`.
+- **Aplicação determinística (o modelo não decide o número).** As tools `consultar_debitos` e `segunda_via_boleto` ordenam os boletos em aberto por `limitBoletos` (vencidos primeiro, o mais atrasado no topo; depois por vencimento) e cortam no limite. Retornam `total_em_aberto` pra IA avisar quando há mais do que o mostrado. Histórico não entra no limite. Roteiro atualizado: mostra os vencidos primeiro e, se houver mais, avisa e oferece enviar o restante.
+
 ## v0.9.69 - 2026-07-13 (Assistente carrega a intenção ao trocar de CPF + marca boleto vencido)
 
 Sem `db push`. Backend (projeção de boleto + roteiro do assistente-exemplo; `CONTENT_VERSION` v25 re-aplica no boot).

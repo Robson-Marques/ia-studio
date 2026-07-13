@@ -78,4 +78,24 @@ export class IspOsConfigController {
   ) {
     return this.service.setQueueMapping(resolveOrganizationId(user, orgQuery), body ?? {});
   }
+
+  /** Máximo de boletos em aberto que a IA envia numa mensagem (0 = todos). */
+  @Get('boleto-max')
+  @ApiOperation({ summary: 'Máximo de boletos que a IA envia' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
+  async getBoletoMax(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
+    return { max: await this.service.getBoletoMax(resolveOrganizationId(user, orgQuery)) };
+  }
+
+  /** Salva o máximo de boletos (0 a 20; 0 = todos os em aberto). */
+  @Put('boleto-max')
+  @ApiOperation({ summary: 'Salva o máximo de boletos que a IA envia' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
+  async setBoletoMax(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { max?: number },
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return { max: await this.service.setBoletoMax(resolveOrganizationId(user, orgQuery), Number(body?.max ?? 0)) };
+  }
 }

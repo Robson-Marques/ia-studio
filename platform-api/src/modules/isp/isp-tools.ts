@@ -22,7 +22,7 @@ import { IspConnectivityService } from './isp-connectivity.service';
 import { IspDiagnosisService } from './isp-diagnosis.service';
 import { IncidentLookupService } from './incident-lookup.service';
 import { SCOPE_KEYS, ISP_QUEUE_SETTING_KEYS, IspQueueSetor } from './isp.constants';
-import { projectBoleto, projectCliente, projectConexao, projectContrato, rows } from './isp-projections';
+import { projectBoleto, projectCliente, projectConexao, projectContrato, rows, limitBoletos } from './isp-projections';
 
 function asString(value: unknown, field: string): string {
   if (typeof value !== 'string' || !value.trim()) {
@@ -189,7 +189,12 @@ export class IspTools implements OnModuleInit {
           'financeiro.boleto_aberto_todos',
           { cpf },
         );
-        const out: Record<string, unknown> = { abertos: rows(abertos).map((b) => projectBoleto(b)) };
+        // Limite curado (config): vencidos primeiro, corta no máximo. Só os EM
+        // ABERTO — o histórico não entra no limite.
+        const max = await this.osConfig.getBoletoMax(ctx.organizationId);
+        const abertosProj = rows(abertos).map((b) => projectBoleto(b));
+        // `total_em_aberto` deixa o assistente avisar quando há mais do que o limite.
+        const out: Record<string, unknown> = { abertos: limitBoletos(abertosProj, max), total_em_aberto: abertosProj.length };
         if (args['incluir_historico'] === true) {
           const historico = await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.historico', { cpf });
           out['historico'] = rows(historico).map((b) => projectBoleto(b));
@@ -322,7 +327,9 @@ export class IspTools implements OnModuleInit {
           return this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_por_email', { cpf, email });
         }
         const raw = await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_aberto', { cpf });
-        return { boletos: rows(raw).map((b) => projectBoleto(b)) };
+        const max = await this.osConfig.getBoletoMax(ctx.organizationId);
+        const boletosProj = rows(raw).map((b) => projectBoleto(b));
+        return { boletos: limitBoletos(boletosProj, max), total_em_aberto: boletosProj.length };
       },
     });
 

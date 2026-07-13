@@ -91,6 +91,24 @@ export function projectBoleto(row: Record<string, unknown>, hoje: Date = new Dat
   });
 }
 
+/**
+ * Ordena boletos "vencidos primeiro" (o mais atrasado no topo), depois os a
+ * vencer por data de vencimento, e corta no máximo configurado. Determinístico:
+ * o SISTEMA decide quantos e quais o assistente vê — não o modelo. `max <= 0` =
+ * sem limite. Recebe boletos JÁ projetados (têm `dias_em_atraso`/`vencimento`).
+ */
+export function limitBoletos(boletos: Record<string, unknown>[], max: number): Record<string, unknown>[] {
+  const atraso = (b: Record<string, unknown>): number => (typeof b['dias_em_atraso'] === 'number' ? (b['dias_em_atraso'] as number) : -1);
+  const venc = (b: Record<string, unknown>): string => (typeof b['vencimento'] === 'string' ? (b['vencimento'] as string) : '9999-12-31');
+  const ordered = [...boletos].sort((a, b) => {
+    const da = atraso(a);
+    const db = atraso(b);
+    if (da !== db) return db - da; // vencido primeiro; mais atrasado no topo; a vencer (-1) por último
+    return venc(a).localeCompare(venc(b)); // empate → vencimento ascendente (mais próximo primeiro)
+  });
+  return max > 0 ? ordered.slice(0, max) : ordered;
+}
+
 /** Conexao do assinante: estado atual e ultima sessao. Sem senha, sem config. */
 export function projectConexao(row: Record<string, unknown>): Record<string, unknown> {
   return compact({

@@ -18,6 +18,15 @@ export const ISP_QUEUE_SETTING_KEYS = {
 export type IspQueueSetor = keyof typeof ISP_QUEUE_SETTING_KEYS;
 
 /**
+ * Quantos boletos EM ABERTO a IA envia numa mensagem, em `system_settings` por
+ * organização. Config curada (o modelo não decide o número): a tool ordena
+ * "vencidos primeiro, depois por vencimento" e corta neste limite. `0` = sem
+ * limite (todos os em aberto). Ausente/ inválido → `ISP_BOLETO_MAX_DEFAULT`.
+ */
+export const ISP_BOLETO_MAX_SETTING_KEY = 'isp.boleto.max_envio';
+export const ISP_BOLETO_MAX_DEFAULT = 3;
+
+/**
  * ERPs de provedor suportados. Todos implementam o MESMO contrato canonico de
  * operacoes (`cliente.dados`, `financeiro.*`, `os.cadastrar`,
  * `conectividade.listar_com_status`...), traduzido internamente por cada

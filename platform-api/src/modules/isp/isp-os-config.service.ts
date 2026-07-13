@@ -5,7 +5,7 @@ import { ConnectionsService } from '../integration/connections/connections.servi
 import { SettingsService } from '../core/settings/settings.service';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspOsConfigRepository, OsConfigPair } from './isp-os-config.repository';
-import { ISP_QUEUE_SETTING_KEYS } from './isp.constants';
+import { ISP_QUEUE_SETTING_KEYS, ISP_BOLETO_MAX_SETTING_KEY, ISP_BOLETO_MAX_DEFAULT } from './isp.constants';
 
 export interface DiscoveredOption {
   id: string;
@@ -45,6 +45,22 @@ export class IspOsConfigService {
       await this.settings.set(organizationId, ISP_QUEUE_SETTING_KEYS.financeiro, mapping.financeiro ?? '');
     }
     return this.getQueueMapping(organizationId);
+  }
+
+  /** Máximo de boletos em aberto que a IA envia (0 = sem limite). Determinístico. */
+  async getBoletoMax(organizationId: string): Promise<number> {
+    const raw = await this.settings.getValue(organizationId, ISP_BOLETO_MAX_SETTING_KEY);
+    if (typeof raw !== 'string' || !raw.trim()) return ISP_BOLETO_MAX_DEFAULT;
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? n : ISP_BOLETO_MAX_DEFAULT;
+  }
+
+  /** Grava o máximo de boletos. Aceita 0 (todos) até um teto de segurança (20). */
+  async setBoletoMax(organizationId: string, max: number): Promise<number> {
+    const n = Number.isFinite(max) ? Math.trunc(max) : ISP_BOLETO_MAX_DEFAULT;
+    if (n < 0 || n > 20) throw new BadRequestException('Informe um número entre 0 (todos) e 20.');
+    await this.settings.set(organizationId, ISP_BOLETO_MAX_SETTING_KEY, String(n));
+    return n;
   }
 
   private async resolveConnectionId(organizationId: string, connectionId?: string): Promise<string> {
