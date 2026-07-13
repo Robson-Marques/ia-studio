@@ -23,15 +23,23 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.68 engatilhada (à prova de erro de id — LER):** dois fixes da MESMA lição
+- **v0.9.69 engatilhada (aguardando release):** dois ajustes de comportamento do assistente
+  (`CONTENT_VERSION` v25) + 1 determinístico. (1) **Boleto vencido marcado pelo sistema:**
+  `projectBoleto` (`isp-projections.ts`) calcula `vencido`/`dias_em_atraso` (vencimento < data do
+  servidor, só data); roteiro avisa "em atraso há X dias" e oferece 2ª via — SEM afirmar bloqueio
+  (contrato pode seguir ativo). Era a Faiani: boleto venc. 10/07 mostrado neutro. (2) **Carrega a
+  intenção ao trocar de CPF:** se já pediram algo (boleto etc.) e mandam outro CPF, segue a MESMA
+  solicitação pro novo assinante em vez de voltar ao menu genérico. ⚠️ callers de `projectBoleto`
+  passam a data via arrow (`.map((b) => projectBoleto(b))`) pra não passar o índice como data.
+- **v0.9.68 no ar (à prova de erro de id — LER):** dois fixes da MESMA lição
   (o modelo/config não escolhe id de infra). (1) **Conexão de ERP não vem mais do modelo** —
   removidos `connection_id`/`filial` do schema de TODAS as tools ISP (`isp-tools.ts`); o agente
   auto-resolve pelo escopo (`IspConnectionResolver`, prioridade/tag). Era o bug "Conexão de ERP
   informada não está ativa neste escopo": o modelo passava o LOGIN ("torre3pratinha") como
   conexão. (2) **discover do IXC traz só assunto com processo vinculado** (`ixc.provider.ts`,
   `id_processo`≠0) → operador não escolhe assunto que quebraria a abertura. Regra gravada no
-  CLAUDE.md (Governança: "ID DE INFRA A IA NUNCA ESCOLHE"). ⚠️ **Aguardando release** (tag +
-  painel) — ao aplicar, o seed re-sincroniza `input_schema` das tools no boot do worker.
+  CLAUDE.md (Governança: "ID DE INFRA A IA NUNCA ESCOLHE"). VALIDADO: chamado 3946 abriu e caiu
+  na fila de Suporte (o erro "não está ativa neste escopo" sumiu).
 - **v0.9.67 no ar** (tag confirmada): `abrir_os` — setor/assunto SÓ da config (modelo não
   sobrescreve); era o bug intermitente "Departamento destino" (o modelo passava setor="suporte").
 - **v0.9.60** (FRENTE 3 — handoff bot→fila de setor). Tool `encaminhar_para_fila` +
@@ -73,7 +81,7 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v24`** (negrito sem e-mail/link; v0.9.62). Antes:
+- **Prompt do assistente ISP: `CONTENT_VERSION v25`** (carrega a intenção ao trocar de CPF + roteiro avisa boleto vencido/em atraso; v0.9.69). Antes: v24 (negrito sem e-mail/link; v0.9.62). Antes:
   v23 (handoff fila, v0.9.60), v22 (negrito WhatsApp, v0.9.56),
   v21 (mostrar opções, v0.9.54), v20 (abertura reconhece número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação

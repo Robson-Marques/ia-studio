@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.69 - 2026-07-13 (Assistente carrega a intenção ao trocar de CPF + marca boleto vencido)
+
+Sem `db push`. Backend (projeção de boleto + roteiro do assistente-exemplo; `CONTENT_VERSION` v25 re-aplica no boot).
+
+- **Boleto vencido é marcado pelo SISTEMA (determinístico).** `projectBoleto` passou a calcular `vencido` + `dias_em_atraso` comparando a data de vencimento com a data do servidor (só por data, sem hora, imune a fuso) — o modelo não compara datas. Só aparecem quando o boleto está de fato vencido. O roteiro (situação "2ª via/fatura") manda avisar com clareza que o cliente está EM ATRASO (há quantos dias) e oferecer a 2ª via pra regularizar — sem afirmar que o acesso está bloqueado (o contrato pode seguir ativo; bloqueio só se confirma pelo diagnóstico). Era o caso da Faiani: boleto vencido em 10/07 mostrado neutro como "em aberto".
+- **Ao trocar de CPF no meio, o assistente carrega a solicitação em curso.** Situação "conversa em andamento": se a pessoa já tinha pedido algo (boleto, 2ª via, sem internet, chamado) e envia outro CPF, o assistente re-identifica e **segue com a MESMA solicitação** pro novo assinante (ou confirma específico: "Quer o boleto do(a) <nome>?") — não volta pro menu genérico "o que você precisa?".
+
 ## v0.9.68 - 2026-07-13 (À prova de erro: o modelo não escolhe conexão nem assunto inválido)
 
 Sem `db push`. Backend (provider IXC + schema das tools ISP; worker re-sincroniza o catálogo no boot).

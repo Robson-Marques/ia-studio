@@ -56,14 +56,33 @@ export function projectCliente(row: Record<string, unknown>): Record<string, unk
   });
 }
 
-/** Boleto: o que o cliente precisa pra pagar, e o atendente pra explicar. */
-export function projectBoleto(row: Record<string, unknown>): Record<string, unknown> {
+/** Dias que o boleto está vencido em relação a `hoje` (comparação só por DATA,
+ *  sem hora, pra não sofrer com fuso). >0 = em atraso; retorna undefined quando
+ *  não está vencido (vence hoje ou no futuro) ou quando não há data. */
+function diasEmAtraso(vencimento: string | undefined, hoje: Date): number | undefined {
+  if (!vencimento) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(vencimento);
+  if (!m) return undefined;
+  const venc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const dia = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const dias = Math.floor((dia - venc) / 86_400_000);
+  return dias > 0 ? dias : undefined;
+}
+
+/** Boleto: o que o cliente precisa pra pagar, e o atendente pra explicar.
+ *  `hoje` é injetado pela tool (data do servidor) — o SISTEMA marca o atraso
+ *  (vencimento < hoje), o modelo não compara datas. */
+export function projectBoleto(row: Record<string, unknown>, hoje: Date = new Date()): Record<string, unknown> {
+  const atraso = diasEmAtraso(str(row['data_vencimento']), hoje);
   return compact({
     id: str(row['id']),
     documento: str(row['documento']),
     valor: str(row['valor']),
     valor_aberto: str(row['valor_aberto']),
     vencimento: str(row['data_vencimento']),
+    // Determinístico: só aparecem quando o boleto está de fato vencido.
+    vencido: atraso !== undefined ? true : undefined,
+    dias_em_atraso: atraso,
     status: str(row['status']),
     linha_digitavel: str(row['linha_digitavel']),
     link_boleto: str(row['gateway_link']),

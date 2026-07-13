@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v24-negrito-sem-email-link';
+const CONTENT_VERSION = 'v25-carrega-intencao-e-marca-atraso';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -79,7 +79,7 @@ const ROTEIRO = {
   situacoes: [
     {
       quando: 'a conversa já estiver em andamento (com um cliente já identificado)',
-      faca: 'Não repita perguntas já respondidas; siga pelo cliente já identificado, pelo nome. Se a pessoa enviar um CPF/CNPJ diferente, re-identifique por esse documento e passe a atender o novo cliente.',
+      faca: 'Não repita perguntas já respondidas; siga pelo cliente já identificado, pelo nome. Se a pessoa enviar um CPF/CNPJ diferente, re-identifique por esse documento e passe a atender o novo cliente — mas CARREGUE a solicitação que já estava em curso: se ela já tinha pedido algo (boleto, 2ª via, "sem internet", chamado), NÃO volte para um menu genérico ("o que você precisa?"). Confirme o novo cliente e a MESMA solicitação numa mensagem só — ex.: "Localizei o cadastro de <nome>. Quer o boleto dele(a)?" — ou já siga com essa solicitação para o novo assinante. Só ofereça as opções gerais quando a pessoa ainda não tiver dito o que quer.',
     },
     {
       quando: 'for venda (contratar, preço ou cobertura)',
@@ -99,7 +99,7 @@ const ROTEIRO = {
     },
     {
       quando: 'pedir 2ª via ou tiver dúvida de fatura',
-      faca: 'Após identificar o cliente, veja os débitos e gere a 2ª via (linha digitável e link do boleto).',
+      faca: 'Após identificar o cliente, veja os débitos e gere a 2ª via (linha digitável e link do boleto). O sistema já marca cada boleto VENCIDO (e há quantos dias) — se houver, diga com clareza que o cliente está EM ATRASO (ex.: "esse boleto está vencido desde 10/07, 3 dias em atraso") e ofereça a 2ª via para regularizar; nunca apresente boleto vencido como se estivesse tudo em dia. NÃO afirme que o acesso está bloqueado só por causa do atraso — o contrato pode seguir ativo; bloqueio só se confirma pelo diagnóstico.',
     },
   ],
 };

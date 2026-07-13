@@ -189,10 +189,10 @@ export class IspTools implements OnModuleInit {
           'financeiro.boleto_aberto_todos',
           { cpf },
         );
-        const out: Record<string, unknown> = { abertos: rows(abertos).map(projectBoleto) };
+        const out: Record<string, unknown> = { abertos: rows(abertos).map((b) => projectBoleto(b)) };
         if (args['incluir_historico'] === true) {
           const historico = await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.historico', { cpf });
-          out['historico'] = rows(historico).map(projectBoleto);
+          out['historico'] = rows(historico).map((b) => projectBoleto(b));
         }
         return out;
       },
@@ -322,7 +322,7 @@ export class IspTools implements OnModuleInit {
           return this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_por_email', { cpf, email });
         }
         const raw = await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_aberto', { cpf });
-        return { boletos: rows(raw).map(projectBoleto) };
+        return { boletos: rows(raw).map((b) => projectBoleto(b)) };
       },
     });
 
