@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.62 - 2026-07-13 (Config de OS = departamento do atendimento + negrito sem e-mail/link)
+
+Sem `db push`. Backend (conteúdo `v24`) + front do admin.
+
+- **Rótulo da config de OS clarificado.** Depois da frente 2 o "Setor" da config passou a ser o **departamento do atendimento** (`su_ticket_setor`: Suporte/Financeiro), não o `empresa_setor` antigo. A tela ISP → Abertura de chamado agora explica isso e pede para re-escolher o departamento se a config é anterior à atualização. (Quem tinha o id antigo — ex.: `4` — recebia do IXC "Preencha o campo Departamento destino" ao abrir; a correção é re-escolher o departamento na tela.)
+- **Negrito não vaza em e-mail/login/link.** O login pode ser um e-mail (`x@dominio.com`); o WhatsApp linkifica e o `*negrito*` em volta aparece literal. Regra na persona (`v24`): não usar negrito em texto com `@` ou `http`.
+
 ## v0.9.61 - 2026-07-12 (Frente 3 — UI de mapeamento setor→fila)
 
 Sem `db push`. Backend + front do admin.

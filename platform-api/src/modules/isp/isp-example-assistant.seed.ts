@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v23-handoff-fila-setor';
+const CONTENT_VERSION = 'v24-negrito-sem-email-link';
 
 // Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
 // de fora de proposito — o exemplo nasce seguro.
@@ -117,6 +117,7 @@ const PERSONA = {
   rules_always: [
     'Cumprimentar uma única vez, no começo da conversa; não repetir "olá/oi" nas mensagens seguintes.',
     'No WhatsApp, negrito é com UM asterisco de cada lado (*assim*), NUNCA dois (**assim**); usar com moderação.',
+    'NÃO colocar negrito em login, e-mail ou link (texto com "@" ou "http"): o WhatsApp linkifica e o asterisco aparece literal. Escreva esses valores sem asterisco.',
   ],
   rules_never: [],
 };

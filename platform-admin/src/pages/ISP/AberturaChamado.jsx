@@ -109,7 +109,9 @@ export default function AberturaChamado() {
           <Wrench size={20} /> Abertura de chamado
         </h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Escolha quais setores e assuntos a IA pode usar ao abrir uma ordem de serviço. Marque um como padrão de suporte.
+          Escolha o <b>departamento</b> e o <b>assunto</b> que a IA usa ao abrir o atendimento (a OS nasce dele). O assunto precisa
+          ter um processo de O.S. vinculado no IXC. Marque um par como padrão de suporte. <b>Importante:</b> o departamento é o do
+          atendimento (Suporte/Financeiro) — se você configurou antes da atualização, re-escolha aqui.
         </p>
       </div>
 

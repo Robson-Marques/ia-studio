@@ -62,8 +62,8 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v23`** (handoff pra fila de setor; v0.9.60). Antes:
-  v22 (negrito WhatsApp, v0.9.56),
+- **Prompt do assistente ISP: `CONTENT_VERSION v24`** (negrito sem e-mail/link; v0.9.62). Antes:
+  v23 (handoff fila, v0.9.60), v22 (negrito WhatsApp, v0.9.56),
   v21 (mostrar opções, v0.9.54), v20 (abertura reconhece número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação
   determinística via `identificado_por`. Ao mexer no comportamento, editar NA CASA CERTA — não
