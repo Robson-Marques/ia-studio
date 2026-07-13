@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.72 - 2026-07-13 (Assistente não inventa "assunto em andamento" na 1ª identificação)
+
+Sem `db push`. Backend (roteiro do assistente-exemplo) + `CONTENT_VERSION` v28.
+
+- **Corrige o texto:** ao identificar um cliente na PRIMEIRA vez (a pessoa só mandou o CPF, sem ter pedido nada antes), o assistente não diz mais "já sigo no mesmo assunto que estava em andamento" — não havia assunto. Agora só carrega uma solicitação anterior quando ela EXISTE de fato; na 1ª identificação, confirma o cliente e segue a rotina normal (diagnóstico).
+
 ## v0.9.71 - 2026-07-13 (Fix: IA volta a marcar a conversa + Frente 4: bloqueio por inadimplência)
 
 Sem `db push`. Backend (attendance + tools + roteiro) + `CONTENT_VERSION` v27.

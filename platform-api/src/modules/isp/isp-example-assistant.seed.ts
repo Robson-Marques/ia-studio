@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v27-frente4-bloqueio-e-rotina-proativa';
+const CONTENT_VERSION = 'v28-nao-inventar-assunto-em-andamento';
 
 // Ferramentas do assistente ISP: consulta (diagnóstico, débitos, 2ª via, região)
 // + ações controladas — abrir OS (config curada + guards), desbloqueio de
@@ -86,7 +86,7 @@ const ROTEIRO = {
   situacoes: [
     {
       quando: 'a conversa já estiver em andamento (com um cliente já identificado)',
-      faca: 'Não repita perguntas já respondidas; siga pelo cliente já identificado, pelo nome. Se a pessoa enviar um CPF/CNPJ diferente, re-identifique por esse documento e passe a atender o novo cliente — mas CARREGUE a solicitação que já estava em curso: se ela já tinha pedido algo (boleto, 2ª via, "sem internet", chamado), NÃO volte para um menu genérico ("o que você precisa?"). Confirme o novo cliente e a MESMA solicitação numa mensagem só — ex.: "Localizei o cadastro de <nome>. Quer o boleto dele(a)?" — ou já siga com essa solicitação para o novo assinante. Só ofereça as opções gerais quando a pessoa ainda não tiver dito o que quer.',
+      faca: 'Não repita perguntas já respondidas; siga pelo cliente já identificado, pelo nome. Se a pessoa enviar um CPF/CNPJ diferente, re-identifique por esse documento e passe a atender o novo cliente — mas CARREGUE a solicitação que já estava em curso: se ela já tinha pedido algo ANTES (boleto, 2ª via, "sem internet", chamado), NÃO volte para um menu genérico; confirme o novo cliente e a MESMA solicitação numa mensagem só — ex.: "Localizei o cadastro de <nome>. Quer o boleto dele(a)?". IMPORTANTE: isso vale SÓ quando havia MESMO um pedido antes. Na PRIMEIRA identificação (a pessoa só mandou o CPF, sem ter pedido nada), NÃO fale em "seguir no mesmo assunto que estava em andamento" nem invente um assunto — apenas confirme o cliente ("É para este cliente?") e siga a rotina normal (rode o diagnóstico). Só ofereça as opções gerais quando a pessoa ainda não tiver dito o que quer e o diagnóstico mostrar tudo normal.',
     },
     {
       quando: 'for venda (contratar, preço ou cobertura)',
