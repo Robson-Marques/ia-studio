@@ -101,10 +101,10 @@ Decisões travadas: **A** = endereço do login se houver, senão do contrato ·
    LENTIDÃO → processo 1 O.S. OPA SUITE). **Setor = `su_ticket_setor`** (departamento: Financeiro=1,
    Suporte=2), NÃO `empresa_setor`. Métodos: `abrirAtendimento` + `gerarProtocolo` no ixc.provider.
    **PENDÊNCIA de config:** re-descobrir recursos + re-escolher setor(departamento)+assunto(com processo).
-3. **Filas de setor (Financeiro/Suporte) + handoff do bot para a fila** — ✅ IMPLEMENTADA (v0.9.60,
+3. **Filas de setor (Financeiro/Suporte) + handoff do bot para a fila** — ✅ IMPLEMENTADA (v0.9.60–61,
    aguardando validação). `encaminhar_para_fila` + `handoffToQueue` (bot-autorizado) + seed das filas
-   + mapa setor→fila em `system_settings`. A IA envia a msg de "aguarde" e a tool move pra fila.
-   Pendência menor: UI de re-mapeamento setor→fila (hoje o seed auto-mapeia; ajuste via settings).
+   + mapa setor→fila em `system_settings` + **UI de mapeamento** (ISP → Abertura de chamado, seletores
+   Suporte/Financeiro). A IA envia a msg de "aguarde" e a tool move pra fila. Endpoints `/isp/os-config/filas`.
 4. Desbloqueio de confiança pela IA + oferta PIX/boleto; bloqueado → fila financeiro (a fila já existe).
 5. Página pública de 2ª via/pagamento (porte Aquapark) — junto com a frente do financeiro.
 6. Alerta de incidentes (registrar + previsão + notificar equipe via WhatsApp).

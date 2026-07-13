@@ -31,6 +31,21 @@ export async function saveOsConfig(connectionId, pairs) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar a configuração de OS')); }
 }
 
+// ─── Mapa setor→fila (para onde a IA encaminha a conversa) ──────────────
+export async function getFilaMapping() {
+  try {
+    const { data } = await api.get('/isp/os-config/filas');
+    return data || { suporte: null, financeiro: null };
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar as filas de setor')); }
+}
+
+export async function saveFilaMapping(mapping) {
+  try {
+    const { data } = await api.put('/isp/os-config/filas', mapping);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar as filas de setor')); }
+}
+
 export async function listIncidents(params = {}) {
   try {
     const { data } = await api.get('/isp/incidents', { params });

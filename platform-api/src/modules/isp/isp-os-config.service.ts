@@ -2,12 +2,19 @@
 // os pares que o operador ativou. A IA nunca chuta id — usa só o que está aqui.
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConnectionsService } from '../integration/connections/connections.service';
+import { SettingsService } from '../core/settings/settings.service';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspOsConfigRepository, OsConfigPair } from './isp-os-config.repository';
+import { ISP_QUEUE_SETTING_KEYS } from './isp.constants';
 
 export interface DiscoveredOption {
   id: string;
   name: string;
+}
+
+export interface QueueMapping {
+  suporte: string | null;
+  financeiro: string | null;
 }
 
 @Injectable()
@@ -16,7 +23,29 @@ export class IspOsConfigService {
     private readonly repo: IspOsConfigRepository,
     private readonly connections: ConnectionsService,
     private readonly resolver: IspConnectionResolver,
+    private readonly settings: SettingsService,
   ) {}
+
+  /** Mapa setor→fila (Suporte/Financeiro) da organização. */
+  async getQueueMapping(organizationId: string): Promise<QueueMapping> {
+    const suporte = await this.settings.getValue(organizationId, ISP_QUEUE_SETTING_KEYS.suporte);
+    const financeiro = await this.settings.getValue(organizationId, ISP_QUEUE_SETTING_KEYS.financeiro);
+    return {
+      suporte: typeof suporte === 'string' && suporte ? suporte : null,
+      financeiro: typeof financeiro === 'string' && financeiro ? financeiro : null,
+    };
+  }
+
+  /** Grava o mapa setor→fila. Valor vazio/null = "não configurado". */
+  async setQueueMapping(organizationId: string, mapping: Partial<QueueMapping>): Promise<QueueMapping> {
+    if (mapping.suporte !== undefined) {
+      await this.settings.set(organizationId, ISP_QUEUE_SETTING_KEYS.suporte, mapping.suporte ?? '');
+    }
+    if (mapping.financeiro !== undefined) {
+      await this.settings.set(organizationId, ISP_QUEUE_SETTING_KEYS.financeiro, mapping.financeiro ?? '');
+    }
+    return this.getQueueMapping(organizationId);
+  }
 
   private async resolveConnectionId(organizationId: string, connectionId?: string): Promise<string> {
     if (connectionId) return connectionId;

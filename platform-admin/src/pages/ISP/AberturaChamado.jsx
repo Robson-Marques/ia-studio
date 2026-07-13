@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Wrench, Star } from 'lucide-react';
+import { Loader2, Plus, Trash2, Wrench, Star, Users } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../../lib/toast';
-import { discoverOsResources, getOsConfig, saveOsConfig } from '../../services/isp';
+import { discoverOsResources, getOsConfig, saveOsConfig, getFilaMapping, saveFilaMapping } from '../../services/isp';
+import { listQueues } from '../../services/whatsapp';
 
 // Configura a abertura de OS pela IA: pares setor↔assunto do ERP (descobertos),
 // com um marcado como padrão de suporte. A IA só usa o que está aqui.
@@ -16,6 +17,10 @@ export default function AberturaChamado() {
   const [setores, setSetores] = useState([]);
   const [assuntos, setAssuntos] = useState([]);
   const [pairs, setPairs] = useState([]); // { setor_id, assunto_id, is_default }
+  const [queues, setQueues] = useState([]);
+  const [filaSuporte, setFilaSuporte] = useState('');
+  const [filaFinanceiro, setFilaFinanceiro] = useState('');
+  const [savingFilas, setSavingFilas] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -28,10 +33,26 @@ export default function AberturaChamado() {
         const cfg = await getOsConfig(disc.connection_id);
         setPairs((cfg || []).map((c) => ({ setor_id: c.setor_id, assunto_id: c.assunto_id, is_default: !!c.is_default })));
       }
+      const [qs, map] = await Promise.all([listQueues(), getFilaMapping()]);
+      setQueues(qs || []);
+      setFilaSuporte(map?.suporte || '');
+      setFilaFinanceiro(map?.financeiro || '');
     } catch (err) {
       toast.error(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSaveFilas() {
+    setSavingFilas(true);
+    try {
+      await saveFilaMapping({ suporte: filaSuporte || null, financeiro: filaFinanceiro || null });
+      toast.success('Filas de setor salvas.');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingFilas(false);
     }
   }
 
@@ -167,6 +188,48 @@ export default function AberturaChamado() {
           )}
         </div>
       )}
+
+      {/* Filas de setor: para onde a IA encaminha a conversa (handoff bot→fila). */}
+      <div className="rounded-lg p-4 space-y-3" style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface)' }}>
+        <div>
+          <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--ap-text-1)' }}>
+            <Users size={16} /> Filas de setor
+          </h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
+            Para qual fila a IA encaminha a conversa ao fim do atendimento. Crie ou renomeie as filas em WhatsApp → Equipes e Filas.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-xs space-y-1 block">
+            <span style={{ color: 'var(--ap-text-3)' }}>Fila de Suporte (chamados técnicos)</span>
+            <select className="input text-sm w-full" value={filaSuporte} disabled={!canManage}
+              onChange={(e) => setFilaSuporte(e.target.value)}>
+              <option value="">— não encaminhar —</option>
+              {queues.map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs space-y-1 block">
+            <span style={{ color: 'var(--ap-text-3)' }}>Fila do Financeiro (bloqueio / 2ª via)</span>
+            <select className="input text-sm w-full" value={filaFinanceiro} disabled={!canManage}
+              onChange={(e) => setFilaFinanceiro(e.target.value)}>
+              <option value="">— não encaminhar —</option>
+              {queues.map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
+            </select>
+          </label>
+        </div>
+        {!queues.length && (
+          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+            Nenhuma fila cadastrada. Crie as filas em WhatsApp → Equipes e Filas e volte aqui para mapear.
+          </p>
+        )}
+        {canManage && (
+          <div className="flex justify-end pt-1">
+            <button type="button" className="btn-primary disabled:opacity-60" onClick={handleSaveFilas} disabled={savingFilas}>
+              {savingFilas ? <Loader2 size={14} className="animate-spin" /> : null} Salvar filas
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

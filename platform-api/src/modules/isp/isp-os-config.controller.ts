@@ -58,4 +58,24 @@ export class IspOsConfigController {
       Array.isArray(body.pairs) ? body.pairs : [],
     );
   }
+
+  /** Mapa setor→fila (Suporte/Financeiro) — para onde a IA encaminha a conversa. */
+  @Get('filas')
+  @ApiOperation({ summary: 'Mapa setor→fila (para o handoff do bot)' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
+  getFilas(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
+    return this.service.getQueueMapping(resolveOrganizationId(user, orgQuery));
+  }
+
+  /** Salva o mapa setor→fila. Cada valor é o id de uma AttendanceQueue (ou vazio). */
+  @Put('filas')
+  @ApiOperation({ summary: 'Salva o mapa setor→fila' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
+  setFilas(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { suporte?: string | null; financeiro?: string | null },
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.service.setQueueMapping(resolveOrganizationId(user, orgQuery), body ?? {});
+  }
 }

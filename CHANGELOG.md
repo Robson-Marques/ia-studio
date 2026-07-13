@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.61 - 2026-07-12 (Frente 3 — UI de mapeamento setor→fila)
+
+Sem `db push`. Backend + front do admin.
+
+- **Tela para mapear setor→fila** (em ISP → Abertura de chamado). Dois seletores — "Fila de Suporte" e "Fila do Financeiro" — populados com as filas cadastradas (WhatsApp → Equipes e Filas); salva o mapa em `system_settings` (`isp.fila.suporte`/`isp.fila.financeiro`). Antes só o seed auto-mapeava e ajustar exigia mexer no settings na mão. Endpoints `GET/PUT /isp/os-config/filas` (perm `isp.incidents.read/write`); `IspOsConfigService.getQueueMapping/setQueueMapping`.
+
 ## v0.9.60 - 2026-07-12 (Frente 3 — handoff do bot para a fila de setor (Suporte/Financeiro))
 
 Sem `db push`. Backend. Conteúdo do assistente re-aplicado (`v23`).
