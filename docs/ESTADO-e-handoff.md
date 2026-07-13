@@ -23,9 +23,10 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.57** engatilhada (FRENTE 2 — OS via atendimento `su_ticket`+processo, para vir com contrato+
-  endereço). ⚠️ Ao aplicar: **RE-configurar o setor da OS** (Descobrir recursos → o setor agora é
-  `su_ticket_setor`/departamento, não `empresa_setor`; assunto = um com processo, ex.: LENTIDÃO/27).
+- **v0.9.59 NO AR — FRENTE 2 VALIDADA** (chamado 3935 abriu no IXC com contrato+endereço+tudo certo).
+  OS nasce do `su_ticket` (atendimento) → processo do assunto (O.S. OPA SUITE) abre a OS. Fixes até
+  fechar: v0.9.57 (fluxo), v0.9.58 (`titulo` obrigatório), v0.9.59 (`id_wfl_processo` do assunto).
+  Config: setor = `su_ticket_setor` (departamento); assunto = um com processo vinculado.
 - **v0.9.56 NO AR** (confirmado no teste: OS 36530 abriu com origem=Cliente, o fix da origem = v0.9.56).
   OS abre com login/setor/status/origem corretos; **contrato e endereço da OS ainda NÃO preenchem**
   no insert direto → é a frente 2 (OS via atendimento/protocolo). Negrito 1 asterisco OK (um login
@@ -86,7 +87,8 @@ Decisões travadas: **A** = endereço do login se houver, senão do contrato ·
    isp + CHANGELOG v0.9.50–v0.9.56. **Recon fixado (base Newnet, cliente id 2):** contrato ativo =
    `status='A'`; login ativo = `radusuarios.ativo='S'`; login→contrato via `id_contrato`; endereço
    quase sempre HERDADO (`endereco_padrao_cliente='S'`); `online` erra calado ("SS").
-2. **Abrir OS via ATENDIMENTO do IXC** — ✅ IMPLEMENTADA (v0.9.57, aguardando validação). O
+2. **Abrir OS via ATENDIMENTO do IXC** — ✅ **FEITA E VALIDADA** (v0.9.57–59; chamado 3935 abriu com
+   contrato+endereço+tudo certo no IXC). O
    `os.cadastrar` do IXC agora faz `gerar_protocolo_atendimento` → insere `su_ticket` com o
    **assunto que tem processo vinculado** ("O.S. OPA SUITE") → o processo abre a OS com contrato+
    endereço. **Recon fixado:** o processo NÃO vem em `id_wfl_processo` (nem é exposto `su_wfl_processo`)
