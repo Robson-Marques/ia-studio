@@ -23,9 +23,11 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.56** engatilhada (OS preenche contrato + origem do endereço automático; negrito WhatsApp 1
-  asterisco). **v0.9.55 no ar** (abrir OS resolve login pelo id — a OS 36529 abriu com login 3883).
-  **v0.9.54 no ar**
+- **v0.9.56 NO AR** (confirmado no teste: OS 36530 abriu com origem=Cliente, o fix da origem = v0.9.56).
+  OS abre com login/setor/status/origem corretos; **contrato e endereço da OS ainda NÃO preenchem**
+  no insert direto → é a frente 2 (OS via atendimento/protocolo). Negrito 1 asterisco OK (um login
+  escapou uma vez — regra na persona, se persistir fazer normalize `**`→`*` no envio). **v0.9.55 no ar**
+  (login pelo id — OS 36529). **v0.9.54 no ar**
   (fix deploy worker + opções pro cliente escolher). ⚠️ **FRENTE 1 VALIDADA no WhatsApp de ponta a
   ponta** (contrato→login→status offline→oferta de chamado). Só a abertura da OS falhava por passar
   o NOME do login onde o IXC quer o id — corrigido na v0.9.55. **v0.9.55 já reinicia o worker sozinho**
@@ -73,18 +75,27 @@ Decisões travadas: **A** = endereço do login se houver, senão do contrato ·
 
 ## 📋 Frentes (ordem aprovada)
 
-1. **Diagnóstico determinístico (contrato→login)** — ✅ FEITA (v0.9.49, aguardando
-   validação no WhatsApp). Tool `diagnosticar_conexao` + `IspDiagnosisService`: sistema
-   decide as etapas, modelo só apresenta. Ver README do módulo isp + CHANGELOG v0.9.49.
-   **Recon fixado (base real Newnet, cliente id 2):** contrato ativo = `status='A'`;
-   login ativo = `radusuarios.ativo='S'`; login→contrato via `id_contrato`; endereço
-   quase sempre HERDADO (`endereco_padrao_cliente='S'`, campos vazios) → rótulo por
-   plano/login+referência, endereço só se próprio. `online` erra calado ("SS"). Borda
-   conhecida: contratos com plano idêntico ficam com rótulo igual (revisar se incomodar).
-2. **PRÓXIMA:** Filas de setor (Financeiro/Suporte) + handoff do bot para a fila.
-3. Desbloqueio de confiança pela IA + oferta PIX/boleto; bloqueado → fila financeiro.
-4. Página pública de 2ª via/pagamento (porte Aquapark) — junto com a frente 3.
-5. Alerta de incidentes (registrar + previsão + notificar equipe via WhatsApp).
+1. **Diagnóstico determinístico (contrato→login)** — ✅ **FEITA E VALIDADA no WhatsApp de ponta a
+   ponta** (v0.9.50→v0.9.56). Tool `diagnosticar_conexao` + `IspDiagnosisService`: sistema decide
+   as etapas, modelo só apresenta. Fluxo completo confirmado: saudação reconhece o número →
+   identifica (documento manda sobre telefone) → escolhe contrato (plano+nº+endereço) → escolhe
+   login → status offline/desde → abre OS (login/setor/status certos, origem=Cliente). Ver README
+   isp + CHANGELOG v0.9.50–v0.9.56. **Recon fixado (base Newnet, cliente id 2):** contrato ativo =
+   `status='A'`; login ativo = `radusuarios.ativo='S'`; login→contrato via `id_contrato`; endereço
+   quase sempre HERDADO (`endereco_padrao_cliente='S'`); `online` erra calado ("SS").
+2. **PRÓXIMA — Abrir OS via ATENDIMENTO/PROTOCOLO do IXC (OpaSuite).** ⚠️ NOVA frente que saiu do
+   teste da frente 1. Hoje abrimos OS por **insert direto** em `su_oss_chamado` — a OS abre, mas o
+   IXC **ignora o `id_contrato`** (mandamos `3279`, ficou vazio) e **não copia o endereço** (origem=C
+   setada, campos de endereço vazios). O jeito nativo do IXC é: **`gerar_protocolo_atendimento`** →
+   criar o **atendimento** com o protocolo → o atendimento **gera a OS** já com contrato+endereço no
+   contexto (o 2º print da OS mostra "ID do atendimento" + "Protocolo da OS" + descrição estruturada).
+   **Recon a fazer ANTES de codar:** mapear a cadeia na base IXC (gerar_protocolo → tabela/rota do
+   atendimento → como gera a OS → onde entram contrato/endereço). Robson tem o PHP `gerar_protocolo_
+   atendimento` (só a geração do protocolo). É `abrirOs` do `ixc.provider.ts` que muda.
+3. Filas de setor (Financeiro/Suporte) + handoff do bot para a fila.
+4. Desbloqueio de confiança pela IA + oferta PIX/boleto; bloqueado → fila financeiro.
+5. Página pública de 2ª via/pagamento (porte Aquapark) — junto com a frente do financeiro.
+6. Alerta de incidentes (registrar + previsão + notificar equipe via WhatsApp).
 
 ## 🧹 Pendências técnicas conhecidas (não urgentes)
 
