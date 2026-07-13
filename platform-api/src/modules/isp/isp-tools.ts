@@ -49,10 +49,13 @@ export class IspTools implements OnModuleInit {
   ) {}
 
   /**
-   * Resolve a conexao de ERP do escopo do run (aceita connection_id/tag
-   * opcionais). `erp` nao entra no schema das tools de proposito: escolher o
-   * ERP e decisao de operador (prioridade da conexao / tag), nao do modelo —
-   * mas nos de workflow podem passa-lo explicitamente.
+   * Resolve a conexao de ERP do escopo do run. `connection_id`, `filial` e `erp`
+   * NAO entram no schema das tools de proposito: escolher a conexao/ERP e decisao
+   * de OPERADOR (prioridade da conexao / tag), nunca do modelo — ele confundia o
+   * LOGIN do assinante com a conexao e passava `connection_id` invalido ("nao esta
+   * ativa neste escopo"). O agente sempre auto-resolve pelo escopo; so nos de
+   * workflow podem injetar esses args explicitamente (por isso o handler ainda os
+   * le, mas nenhuma tool os anuncia ao modelo).
    */
   private async connectionId(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<string> {
     const connection = await this.resolver.resolve({
@@ -88,8 +91,6 @@ export class IspTools implements OnModuleInit {
         properties: {
           cpf: { type: 'string', description: 'CPF ou CNPJ do cliente (com ou sem máscara).' },
           telefone: { type: 'string', description: 'Telefone do cliente, inclusive no formato do WhatsApp (5527999998888). Só no IXC.' },
-          connection_id: { type: 'string', description: 'Conexão do ERP (opcional; resolvida automaticamente).' },
-          filial: { type: 'string', description: 'Tag/filial quando há múltiplas conexões de ERP (opcional).' },
         },
       },
       handler: async (args, ctx) => {
@@ -149,8 +150,6 @@ export class IspTools implements OnModuleInit {
           cpf: { type: 'string', description: 'CPF ou CNPJ do titular (do cliente já identificado).' },
           id_contrato: { type: 'string', description: 'Contrato escolhido pelo cliente (na 2ª chamada, após "escolher_contrato").' },
           login: { type: 'string', description: 'Login escolhido pelo cliente (na chamada final, após "escolher_login").' },
-          connection_id: { type: 'string' },
-          filial: { type: 'string' },
         },
         required: ['cpf'],
       },
@@ -177,8 +176,6 @@ export class IspTools implements OnModuleInit {
         properties: {
           cpf: { type: 'string' },
           incluir_historico: { type: 'boolean', description: 'Também retorna o histórico financeiro.' },
-          connection_id: { type: 'string' },
-          filial: { type: 'string' },
         },
         required: ['cpf'],
       },
@@ -212,7 +209,6 @@ export class IspTools implements OnModuleInit {
         type: 'object',
         properties: {
           cpf: { type: 'string' },
-          connection_id: { type: 'string' }, filial: { type: 'string' },
         },
         required: ['cpf'],
       },
@@ -236,8 +232,6 @@ export class IspTools implements OnModuleInit {
         properties: {
           cpf: { type: 'string' },
           login: { type: 'string', description: 'Login PPPoE (alternativa ao CPF).' },
-          connection_id: { type: 'string' },
-          filial: { type: 'string' },
         },
       },
       handler: async (args, ctx) => {
@@ -275,7 +269,6 @@ export class IspTools implements OnModuleInit {
           bairro: { type: 'string', description: 'Geografia: proxy ruim de topologia (vizinhos podem estar em PONs distintas).' },
           cidade: { type: 'string', description: 'Geografia: use só se nada mais estiver disponível.' },
           customer_ref: { type: 'string', description: 'Login/CPF do cliente (para checar incidente ativo).' },
-          connection_id: { type: 'string' }, filial: { type: 'string' },
         },
       },
       handler: async (args, ctx) => {
@@ -313,7 +306,6 @@ export class IspTools implements OnModuleInit {
             description: 'linha (padrão), pdf (base64) ou email. O IXC não suporta "email" — use linha ou pdf.',
           },
           email: { type: 'string', description: 'Destino quando formato=email.' },
-          connection_id: { type: 'string' }, filial: { type: 'string' },
         },
         required: ['cpf'],
       },
@@ -345,7 +337,6 @@ export class IspTools implements OnModuleInit {
         type: 'object',
         properties: {
           cpf: { type: 'string' },
-          connection_id: { type: 'string' }, filial: { type: 'string' },
         },
         required: ['cpf'],
       },
@@ -374,7 +365,6 @@ export class IspTools implements OnModuleInit {
           descricao: { type: 'string', description: 'Descrição do problema do cliente (vai na observação da OS).' },
           login: { type: 'string', description: 'Login da conexão com problema (identifica a instalação; use quando houver mais de uma).' },
           contrato: { type: 'string', description: 'Id/nº do contrato da conexão com problema (quando houver mais de um).' },
-          connection_id: { type: 'string' }, filial: { type: 'string' },
         },
         required: ['cpf', 'descricao'],
       },

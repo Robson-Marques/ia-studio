@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.9.68 - 2026-07-13 (À prova de erro: o modelo não escolhe conexão nem assunto inválido)
+
+Sem `db push`. Backend (provider IXC + schema das tools ISP; worker re-sincroniza o catálogo no boot).
+
+- **A conexão de ERP NÃO vem mais do modelo.** Todas as tools ISP expunham `connection_id`/`filial` no schema, e o modelo confundia o **login** do assinante (ex.: "torre3pratinha") com a **conexão de ERP** e passava um `connection_id` inválido → "Conexão de ERP informada não está ativa neste escopo". Removidos `connection_id`/`filial` do schema de todas as tools ISP: o agente **sempre auto-resolve** a conexão pelo escopo (org/workspace/ambiente + prioridade); só nós de workflow podem injetar explicitamente. Mesmo padrão da v0.9.67 (setor/assunto): o modelo decide só o que é dele (CPF/descrição/login), nunca ids de infraestrutura.
+- **O "Descobrir recursos" traz SÓ os assuntos com processo de O.S. vinculado** (`id_processo` ≠ 0). É o processo que abre a OS a partir do atendimento; assunto sem processo faz o IXC recusar ("Departamento destino"). Filtrando na origem, o operador **não consegue escolher** um assunto inválido na config de abertura de chamado — prevenção em vez de validação depois. (O setor já era filtrado por `su_ticket_setor` ativos.)
+- Regra registrada no CLAUDE.md: id que a IA consome (conexão, setor, assunto) nunca é texto livre nem escolha do modelo — vem da CONFIG curada ou é auto-resolvido; as OPÇÕES da config vêm filtradas da fonte (só as utilizáveis); config/infra quebrada → degradação graciosa (encaminha pra fila), nunca erro críptico ao cliente.
+
 ## v0.9.67 - 2026-07-13 (Intermitência da OS resolvida de vez: setor/assunto SÓ da config)
 
 Sem `db push`. Backend (tool `abrir_os` + provider). Remove o debug da v0.9.66.

@@ -6,7 +6,7 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-07-12.
+> Última atualização: 2026-07-13.
 
 ## 🔴 REGRA DE OURO (o furo recorrente)
 
@@ -23,7 +23,18 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.60** engatilhada (FRENTE 3 — handoff bot→fila de setor). Tool `encaminhar_para_fila` +
+- **v0.9.68 engatilhada (à prova de erro de id — LER):** dois fixes da MESMA lição
+  (o modelo/config não escolhe id de infra). (1) **Conexão de ERP não vem mais do modelo** —
+  removidos `connection_id`/`filial` do schema de TODAS as tools ISP (`isp-tools.ts`); o agente
+  auto-resolve pelo escopo (`IspConnectionResolver`, prioridade/tag). Era o bug "Conexão de ERP
+  informada não está ativa neste escopo": o modelo passava o LOGIN ("torre3pratinha") como
+  conexão. (2) **discover do IXC traz só assunto com processo vinculado** (`ixc.provider.ts`,
+  `id_processo`≠0) → operador não escolhe assunto que quebraria a abertura. Regra gravada no
+  CLAUDE.md (Governança: "ID DE INFRA A IA NUNCA ESCOLHE"). ⚠️ **Aguardando release** (tag +
+  painel) — ao aplicar, o seed re-sincroniza `input_schema` das tools no boot do worker.
+- **v0.9.67 no ar** (tag confirmada): `abrir_os` — setor/assunto SÓ da config (modelo não
+  sobrescreve); era o bug intermitente "Departamento destino" (o modelo passava setor="suporte").
+- **v0.9.60** (FRENTE 3 — handoff bot→fila de setor). Tool `encaminhar_para_fila` +
   `handoffToQueue`; seed cria "Fila Setor de Suporte/Financeiro" + mapeia em `system_settings`
   (`isp.fila.suporte`/`isp.fila.financeiro`). A IA encaminha de verdade após abrir o chamado.
   Aguardando validação (testar: abrir chamado → conversa vai pra fila de Suporte).

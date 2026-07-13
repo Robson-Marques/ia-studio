@@ -319,7 +319,18 @@ export class IxcProvider extends BaseProvider {
       (r) => String((r.meta as Record<string, unknown> | undefined)?.['ativo'] ?? 'S').toUpperCase() !== 'N',
     );
     resources.push(...setores);
-    resources.push(...(await this.discoverList(ctx, token, T.osAssunto, 'motivo_atendimento', ['assunto', 'descricao', 'nome'])));
+    // Assuntos: SÓ os que têm PROCESSO de O.S. vinculado (`id_processo` ≠ 0). É o
+    // processo que abre a OS a partir do ticket; sem ele o IXC recusa a abertura
+    // ("Departamento destino"). Trazer só os válidos evita o operador escolher um
+    // assunto que quebraria a abertura (prevenção, não validação depois).
+    const assuntos = (await this.discoverList(ctx, token, T.osAssunto, 'motivo_atendimento', ['assunto', 'descricao', 'nome'])).filter(
+      (r) => {
+        const p = (r.meta as Record<string, unknown> | undefined)?.['id_processo'];
+        const v = p === undefined || p === null ? '' : String(p).trim();
+        return v !== '' && v !== '0';
+      },
+    );
+    resources.push(...assuntos);
     resources.push(...(await this.discoverList(ctx, token, T.plano, 'plano', ['nome', 'descricao'])));
     return { resources };
   }
