@@ -40,7 +40,6 @@ import {
   extractRegistros,
   isValidIxcToken,
   isYes,
-  ixcDateTime,
   ixcErrorMessage,
   phoneCandidates,
   redactRow,
@@ -65,6 +64,12 @@ const T = {
   // su_oss_setor (que fica vazio em muitas bases). Confirmado na doc do IXC.
   osSetor: 'empresa_setor',
   plano: 'vd_contratos',
+  // Atendimento: a OS "de verdade" nasce de um su_ticket cujo ASSUNTO tem um
+  // processo vinculado (O.S. OPA SUITE) — o processo abre a OS com contrato e
+  // endereco no contexto. O setor do ticket e su_ticket_setor (departamento),
+  // NAO empresa_setor.
+  ticket: 'su_ticket',
+  ticketSetor: 'su_ticket_setor',
 } as const;
 
 // Catalogo de operacoes (sem path arbitrario — a chave decide o que roda).
@@ -253,13 +258,13 @@ export class IxcProvider extends BaseProvider {
         return { data: await this.conectividade(ctx, token, args) };
 
       case 'os.cadastrar':
-        return this.abrirOs(ctx, token, args);
+        return this.abrirAtendimento(ctx, token, args);
 
       case 'os.listar_abertas':
         return { data: await this.osAbertas(ctx, token, args) };
 
       case 'atendimento.listar_setor':
-        return { data: await this.list(ctx, token, T.osSetor, { rp: '200', sortname: `${T.osSetor}.id` }) };
+        return { data: await this.list(ctx, token, T.ticketSetor, { rp: '200', sortname: `${T.ticketSetor}.id` }) };
 
       case 'atendimento.listar_motivo_atendimento':
         return { data: await this.list(ctx, token, T.osAssunto, { rp: '200', sortname: `${T.osAssunto}.id` }) };
@@ -308,9 +313,9 @@ export class IxcProvider extends BaseProvider {
     const resources: DiscoveredResource[] = [];
     // A ordem dos rotulos e POR TABELA: em `vd_contratos` o rotulo que o
     // operador ve na tela do IXC (coluna "Plano") e `nome`, nao `descricao`.
-    // Setores (empresa_setor): só os ATIVOS (ativo='S') — não poluir com setores
-    // desativados no IXC.
-    const setores = (await this.discoverList(ctx, token, T.osSetor, 'setor', ['setor', 'nome', 'descricao'])).filter(
+    // Setor = su_ticket_setor (departamento do ATENDIMENTO — a OS nasce do ticket);
+    // só os ATIVOS (ativo='S'), pra não poluir com departamentos desativados.
+    const setores = (await this.discoverList(ctx, token, T.ticketSetor, 'setor', ['setor', 'nome', 'descricao'])).filter(
       (r) => String((r.meta as Record<string, unknown> | undefined)?.['ativo'] ?? 'S').toUpperCase() !== 'N',
     );
     resources.push(...setores);
@@ -656,73 +661,97 @@ export class IxcProvider extends BaseProvider {
     // id_login da OS e o id NUMERICO de radusuarios — resolve o nome do login
     // pro id, senao o filtro nunca casa (nome != id) e a anti-dup nao funciona.
     const login = (await this.resolveLogin(ctx, token, this.str(args, 'id_login'), String(idCliente)))?.id;
-    const setor = this.str(args, 'setor');
+    // Anti-dup por LOGIN (quando informado): uma OS aberta para aquela conexao.
+    // O escopo por setor saiu porque a OS agora nasce do atendimento (su_ticket) —
+    // o setor do ticket (su_ticket_setor) nao e o `setor` da OS (empresa_setor),
+    // entao comparar os dois nunca casava.
     return rows.filter((r) => {
       const status = String(r['status'] ?? '').toUpperCase();
       if (IxcProvider.OS_CLOSED_STATUS.has(status)) return false;
       if (login && r['id_login'] && String(r['id_login']) !== login) return false;
-      // Escopo por setor: só conta como duplicada a OS do MESMO setor da abertura.
-      if (setor && r['setor'] && String(r['setor']) !== String(setor)) return false;
       return true;
     });
   }
 
   /**
-   * Abertura de OS. `id_assunto`/`setor` vêm do discover() — não são texto livre.
-   * Os defaults (`tipo`, `prioridade`, `melhor_horario_agenda`, `origem_endereco`)
-   * seguem a collection oficial da API do IXC (CRUD su_oss_chamado); `extra`
-   * permite sobrescrever qualquer um deles sem tocar no provider.
+   * Abre a OS pelo fluxo NATIVO do IXC (OpaSuite): gera um protocolo de
+   * atendimento e insere um `su_ticket` cujo ASSUNTO tem um processo vinculado
+   * ("O.S. OPA SUITE") — o processo abre a OS com CONTRATO e ENDERECO no contexto.
+   * Isso preenche o que o insert direto em `su_oss_chamado` deixava vazio. O
+   * `id_assunto` (com processo) e o `setor` (departamento = `su_ticket_setor`) vem
+   * da config; `extra` sobrescreve qualquer campo do ticket.
    */
-  private async abrirOs(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
+  private async abrirAtendimento(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
     const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true));
     const assunto = this.str(args, 'id_assunto') ?? this.str(args, 'motivo');
-    const setor = this.str(args, 'setor');
-    // Resolve a conexao (id_login e FK pro id NUMERICO de radusuarios, nao o nome
-    // PPPoE) e traz junto o contrato do login + se ele tem endereco proprio — usados
-    // abaixo pra preencher id_contrato e a origem do endereco deterministicamente.
+    const setor = this.str(args, 'setor'); // id_ticket_setor (departamento)
+    // Conexao: id_login NUMERICO + contrato do login + se tem endereco proprio.
     const conexao = await this.resolveLogin(ctx, token, this.str(args, 'id_login'), String(cliente['id']));
     const login = conexao?.id;
-    // id_contrato: o passado (se numerico) OU, deterministico, o contrato do proprio
-    // login (o login ja diz a qual contrato pertence — o agente nao precisa acertar).
+    // id_contrato: o passado (se numerico) OU o contrato do proprio login.
     const idContratoArg = this.str(args, 'id_contrato');
     const idContrato = idContratoArg && /^\d+$/.test(idContratoArg) ? idContratoArg : conexao?.idContrato;
     if (!assunto) {
       throw new BadRequestException(
-        'Informe "id_assunto" (id do assunto da OS no IXC). Os assuntos disponíveis vêm do Descobrir recursos da conexão.',
+        'Informe "id_assunto" (assunto com processo de OS vinculado). Os assuntos vêm do Descobrir recursos da conexão.',
       );
     }
-    // O IXC exige Setor e Filial ("Preencha Filial<br />Preencha Setor").
-    // Setor e decisao de operacao — nao ha default sensato. Filial vem do cadastro
-    // do cliente, entao so precisa ser informada quando o cadastro nao a tiver.
     if (!setor) {
       throw new BadRequestException(
-        'Informe "setor" (id do setor de OS no IXC) — é obrigatório. Os setores disponíveis vêm do Descobrir recursos da conexão.',
+        'Informe "setor" (departamento do atendimento) — obrigatório. Os departamentos vêm do Descobrir recursos da conexão.',
       );
     }
     const idFilial = this.str(args, 'id_filial') ?? this.str(cliente, 'filial_id');
     if (!idFilial) {
       throw new BadRequestException('Cliente sem filial no cadastro do IXC — informe "id_filial".');
     }
+    const protocolo = await this.gerarProtocolo(ctx, token);
     const body: Record<string, unknown> = {
       tipo: 'C',
+      ...(protocolo ? { protocolo } : {}),
       id_cliente: String(cliente['id']),
       id_filial: idFilial,
       id_assunto: assunto,
-      setor,
-      mensagem: this.str(args, 'descricao', true),
-      status: 'A',
-      prioridade: 'N',
-      melhor_horario_agenda: 'Q',
-      // Origem do endereço: LOGIN ('L') só quando o login tem endereço PRÓPRIO;
-      // senão CLIENTE ('C') — o login herda o endereço do cadastro (caso comum).
-      // NUNCA 'M' (manual, que abria a OS com endereço/lat-long vazios). Sobrescrevível via `extra`.
+      id_ticket_setor: setor,
+      // Origem do endereco: LOGIN ('L') so quando o login tem endereco PROPRIO;
+      // senao CLIENTE ('C') — o login herda o endereco do cadastro. O ticket copia
+      // o endereco pro contexto e o processo leva pra OS.
       origem_endereco: conexao?.enderecoProprio ? 'L' : 'C',
-      data_abertura: ixcDateTime(),
+      menssagem: this.str(args, 'descricao', true), // grafia da API do IXC ("menssagem")
+      su_status: 'N',
+      status: 'T',
+      prioridade: 'N',
+      id_ticket_origem: 'I',
+      interacao_pendente: 'N',
+      origem_cadastro: 'P',
+      atualizar_cliente: 'S',
+      atualizar_login: 'S',
       ...(login ? { id_login: login } : {}),
       ...(idContrato ? { id_contrato: idContrato } : {}),
       ...(args['extra'] && typeof args['extra'] === 'object' ? (args['extra'] as Record<string, unknown>) : {}),
     };
-    return this.write(ctx, token, 'POST', T.os, body);
+    return this.write(ctx, token, 'POST', T.ticket, body);
+  }
+
+  /**
+   * Gera um novo protocolo de atendimento (rota dedicada, modo LISTAR — igual ao
+   * `desbloqueio_confianca`). Tolera formatos (campo comum ou corpo cru). Sem
+   * protocolo o ticket ainda abre; o IXC apenas prefere um.
+   */
+  private async gerarProtocolo(ctx: ProviderContext, token: string): Promise<string | undefined> {
+    try {
+      const res = (await this.callListar(ctx, token, 'gerar_protocolo_atendimento', {})) as unknown;
+      if (typeof res === 'string') return res.trim() || undefined;
+      if (res && typeof res === 'object') {
+        const o = res as Record<string, unknown>;
+        const v = o['protocolo'] ?? o['retorno'] ?? o['message'] ?? o['mensagem'];
+        if (typeof v === 'string' && v.trim()) return v.trim();
+        if (typeof v === 'number') return String(v);
+      }
+      return undefined;
+    } catch {
+      return undefined; // sem protocolo o ticket ainda abre
+    }
   }
 
   // ─── Transporte ─────────────────────────────────────

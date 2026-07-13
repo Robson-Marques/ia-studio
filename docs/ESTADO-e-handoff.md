@@ -23,6 +23,9 @@
 
 ## ✅ Versão em produção
 
+- **v0.9.57** engatilhada (FRENTE 2 — OS via atendimento `su_ticket`+processo, para vir com contrato+
+  endereço). ⚠️ Ao aplicar: **RE-configurar o setor da OS** (Descobrir recursos → o setor agora é
+  `su_ticket_setor`/departamento, não `empresa_setor`; assunto = um com processo, ex.: LENTIDÃO/27).
 - **v0.9.56 NO AR** (confirmado no teste: OS 36530 abriu com origem=Cliente, o fix da origem = v0.9.56).
   OS abre com login/setor/status/origem corretos; **contrato e endereço da OS ainda NÃO preenchem**
   no insert direto → é a frente 2 (OS via atendimento/protocolo). Negrito 1 asterisco OK (um login
@@ -83,15 +86,14 @@ Decisões travadas: **A** = endereço do login se houver, senão do contrato ·
    isp + CHANGELOG v0.9.50–v0.9.56. **Recon fixado (base Newnet, cliente id 2):** contrato ativo =
    `status='A'`; login ativo = `radusuarios.ativo='S'`; login→contrato via `id_contrato`; endereço
    quase sempre HERDADO (`endereco_padrao_cliente='S'`); `online` erra calado ("SS").
-2. **PRÓXIMA — Abrir OS via ATENDIMENTO/PROTOCOLO do IXC (OpaSuite).** ⚠️ NOVA frente que saiu do
-   teste da frente 1. Hoje abrimos OS por **insert direto** em `su_oss_chamado` — a OS abre, mas o
-   IXC **ignora o `id_contrato`** (mandamos `3279`, ficou vazio) e **não copia o endereço** (origem=C
-   setada, campos de endereço vazios). O jeito nativo do IXC é: **`gerar_protocolo_atendimento`** →
-   criar o **atendimento** com o protocolo → o atendimento **gera a OS** já com contrato+endereço no
-   contexto (o 2º print da OS mostra "ID do atendimento" + "Protocolo da OS" + descrição estruturada).
-   **Recon a fazer ANTES de codar:** mapear a cadeia na base IXC (gerar_protocolo → tabela/rota do
-   atendimento → como gera a OS → onde entram contrato/endereço). Robson tem o PHP `gerar_protocolo_
-   atendimento` (só a geração do protocolo). É `abrirOs` do `ixc.provider.ts` que muda.
+2. **Abrir OS via ATENDIMENTO do IXC** — ✅ IMPLEMENTADA (v0.9.57, aguardando validação). O
+   `os.cadastrar` do IXC agora faz `gerar_protocolo_atendimento` → insere `su_ticket` com o
+   **assunto que tem processo vinculado** ("O.S. OPA SUITE") → o processo abre a OS com contrato+
+   endereço. **Recon fixado:** o processo NÃO vem em `id_wfl_processo` (nem é exposto `su_wfl_processo`)
+   — vem do ASSUNTO (`su_oss_assunto.id_processo` + `obrigar_processo_atendimento`; ex.: assunto 27
+   LENTIDÃO → processo 1 O.S. OPA SUITE). **Setor = `su_ticket_setor`** (departamento: Financeiro=1,
+   Suporte=2), NÃO `empresa_setor`. Métodos: `abrirAtendimento` + `gerarProtocolo` no ixc.provider.
+   **PENDÊNCIA de config:** re-descobrir recursos + re-escolher setor(departamento)+assunto(com processo).
 3. Filas de setor (Financeiro/Suporte) + handoff do bot para a fila.
 4. Desbloqueio de confiança pela IA + oferta PIX/boleto; bloqueado → fila financeiro.
 5. Página pública de 2ª via/pagamento (porte Aquapark) — junto com a frente do financeiro.

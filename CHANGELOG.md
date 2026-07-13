@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.9.57 - 2026-07-12 (Frente 2 — abrir OS pelo fluxo de ATENDIMENTO do IXC (su_ticket + processo))
+
+Sem `db push`. Backend (provider IXC). **Exige RE-CONFIGURAR o setor da OS após o deploy** (ver abaixo).
+
+- **OS nasce do atendimento (`su_ticket`), não mais do insert direto.** O insert direto em `su_oss_chamado` abria a OS mas o IXC ignorava o contrato e não copiava o endereço. Agora o `os.cadastrar` do provider IXC: `gerar_protocolo_atendimento` → insere um `su_ticket` cujo **assunto tem um processo vinculado** ("O.S. OPA SUITE") → **o processo abre a OS com contrato + endereço no contexto** (do jeito OpaSuite). Campos do ticket: protocolo, tipo=C, id_cliente, id_login (id num), id_contrato (id num do login), id_filial, id_assunto, id_ticket_setor, origem_endereco (L se login tem endereço próprio, senão C), menssagem (descrição), su_status=N, status=T, atualizar_cliente/login=S.
+- **Setor agora é o DEPARTAMENTO do atendimento (`su_ticket_setor`), não `empresa_setor`.** O "Descobrir recursos" passou a listar `su_ticket_setor` (ex.: Financeiro=1, Suporte=2). ⚠️ **A config de OS precisa ser RE-CONFIGURADA:** rodar "Descobrir recursos" na conexão IXC e escolher de novo o **setor (departamento)** e o **assunto** (um com processo vinculado, ex.: LENTIDÃO). O `assunto_id` antigo (su_oss_assunto) continua válido; o `setor_id` antigo (empresa_setor) precisa virar um `su_ticket_setor`.
+- **Anti-duplicidade agora por login** (o setor do ticket ≠ setor da OS, então o escopo por setor saiu). O helper `abrirOs` virou `abrirAtendimento`; novo `gerarProtocolo`. Tabelas novas no provider: `su_ticket`, `su_ticket_setor`.
+
 ## v0.9.56 - 2026-07-12 (OS completa: contrato + origem do endereço automáticos; negrito do WhatsApp)
 
 Sem `db push`. Backend (provider IXC) + conteúdo do assistente (`v22`).
