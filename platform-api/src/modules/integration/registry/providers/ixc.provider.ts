@@ -705,6 +705,7 @@ export class IxcProvider extends BaseProvider {
     if (!idFilial) {
       throw new BadRequestException('Cliente sem filial no cadastro do IXC — informe "id_filial".');
     }
+    const descricao = this.str(args, 'descricao', true)!;
     const protocolo = await this.gerarProtocolo(ctx, token);
     const body: Record<string, unknown> = {
       tipo: 'C',
@@ -713,11 +714,15 @@ export class IxcProvider extends BaseProvider {
       id_filial: idFilial,
       id_assunto: assunto,
       id_ticket_setor: setor,
+      // `titulo` = "Descrição do assunto" (OBRIGATORIO no IXC — sem ele o ticket
+      // recusa com "faltando a descrição do assunto"). Curto; a mensagem completa
+      // vai em `menssagem`.
+      titulo: descricao.length > 200 ? descricao.slice(0, 200) : descricao,
       // Origem do endereco: LOGIN ('L') so quando o login tem endereco PROPRIO;
       // senao CLIENTE ('C') — o login herda o endereco do cadastro. O ticket copia
       // o endereco pro contexto e o processo leva pra OS.
       origem_endereco: conexao?.enderecoProprio ? 'L' : 'C',
-      menssagem: this.str(args, 'descricao', true), // grafia da API do IXC ("menssagem")
+      menssagem: descricao, // grafia da API do IXC ("menssagem")
       su_status: 'N',
       status: 'T',
       prioridade: 'N',

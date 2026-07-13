@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.58 - 2026-07-12 (Atendimento: `titulo` obrigatório no su_ticket)
+
+Sem `db push`. Backend (provider IXC). Fix da v0.9.57.
+
+- **`su_ticket` recusava com "faltando a descrição do assunto".** Faltava o campo `titulo` (a "Descrição do assunto", obrigatório no IXC). Agora o ticket manda `titulo` (a descrição do problema, curta até 200 chars); a mensagem completa segue em `menssagem`.
+
 ## v0.9.57 - 2026-07-12 (Frente 2 — abrir OS pelo fluxo de ATENDIMENTO do IXC (su_ticket + processo))
 
 Sem `db push`. Backend (provider IXC). **Exige RE-CONFIGURAR o setor da OS após o deploy** (ver abaixo).
