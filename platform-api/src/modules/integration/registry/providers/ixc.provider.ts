@@ -706,6 +706,11 @@ export class IxcProvider extends BaseProvider {
       throw new BadRequestException('Cliente sem filial no cadastro do IXC — informe "id_filial".');
     }
     const descricao = this.str(args, 'descricao', true)!;
+    // O assunto obriga um processo ("Obrigar processo no atendimento"=Sim). Via API
+    // o IXC exige `id_wfl_processo` explicito ("Por favor preencha um processo!") —
+    // e o processo que abre a OS e o configurado NO PROPRIO assunto (`id_processo`,
+    // ex.: O.S. OPA SUITE). Busca-o do assunto (deterministico).
+    const idProcesso = await this.processoDoAssunto(ctx, token, assunto);
     const protocolo = await this.gerarProtocolo(ctx, token);
     const body: Record<string, unknown> = {
       tipo: 'C',
@@ -714,6 +719,7 @@ export class IxcProvider extends BaseProvider {
       id_filial: idFilial,
       id_assunto: assunto,
       id_ticket_setor: setor,
+      ...(idProcesso ? { id_wfl_processo: idProcesso } : {}),
       // `titulo` = "Descrição do assunto" (OBRIGATORIO no IXC — sem ele o ticket
       // recusa com "faltando a descrição do assunto"). Curto; a mensagem completa
       // vai em `menssagem`.
@@ -757,6 +763,17 @@ export class IxcProvider extends BaseProvider {
     } catch {
       return undefined; // sem protocolo o ticket ainda abre
     }
+  }
+
+  /**
+   * Lê o processo vinculado a um assunto (`su_oss_assunto.id_processo`) — o processo
+   * que abre a OS ao criar o ticket. `0`/vazio → undefined (assunto sem processo).
+   */
+  private async processoDoAssunto(ctx: ProviderContext, token: string, idAssunto: string): Promise<string | undefined> {
+    const rows = await this.list(ctx, token, T.osAssunto, this.eq(`${T.osAssunto}.id`, idAssunto, `${T.osAssunto}.id`));
+    const p = rows[0]?.['id_processo'];
+    const v = p === undefined || p === null ? '' : String(p);
+    return v && v !== '0' ? v : undefined;
   }
 
   // ─── Transporte ─────────────────────────────────────

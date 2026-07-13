@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.9.59 - 2026-07-12 (Atendimento: envia o processo do assunto (id_wfl_processo))
+
+Sem `db push`. Backend (provider IXC). Fix da v0.9.57/58.
+
+- **`su_ticket` recusava com "Por favor preencha um processo!".** O assunto tem "Obrigar processo no atendimento"=Sim, então via API o IXC exige `id_wfl_processo` explícito. Agora o provider lê o processo configurado no próprio assunto (`su_oss_assunto.id_processo`, ex.: O.S. OPA SUITE) e o envia — determinístico, sem config extra. Novo helper `processoDoAssunto`.
+
 ## v0.9.58 - 2026-07-12 (Atendimento: `titulo` obrigatório no su_ticket)
 
 Sem `db push`. Backend (provider IXC). Fix da v0.9.57.
