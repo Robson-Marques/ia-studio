@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.71 - 2026-07-13 (Fix: IA volta a marcar a conversa + Frente 4: bloqueio por inadimplência)
+
+Sem `db push`. Backend (attendance + tools + roteiro) + `CONTENT_VERSION` v27.
+
+- **FIX (regressão da v0.9.66): a IA voltou a marcar a conversa como "atendido pela IA".** `assignBot` usava `NOT: { owner_type: 'QUEUE' }` — gotcha de NULL no SQL: `NOT (owner_type = 'QUEUE')` com `owner_type` NULO (toda conversa NOVA) dá NULL = falso, então o update casava 0 linhas e a conversa não virava BOT (ficava em "Aguardando / sem atendente" em vez da aba IA). Trocado por OR null-safe (`AND [ OR(handler null|BOT), OR(owner null|BOT) ]`). Mesmo gotcha que o comentário do `current_handler_type` já alertava.
+- **FRENTE 4 — cliente bloqueado por inadimplência.** (1) **Rotina proativa:** ao identificar o cliente, o assistente roda o diagnóstico e conduz pela situação — não devolve mais um menu genérico quando dá pra já verificar (a não ser pedido só de fatura/2ª via). (2) **Bloqueio:** o diagnóstico já expõe `contrato.bloqueado` (contrato ativo com `status_internet` ≠ 'A'); nova situação no roteiro — não trata como problema técnico, não abre chamado de suporte, tenta o desbloqueio, oferece a 2ª via e encaminha pra fila do **Financeiro**. (3) **Desbloqueio de confiança AUTÔNOMO:** `desbloqueio_confianca` entra no assistente com `requires_approval: false` — a IA executa e o **próprio ERP é o porteiro** (recusa se a regra do provedor não permitir; nesse caso a IA não promete o desbloqueio, segue com o pagamento). Constante `ASSISTANT_TOOLS` renomeada (não é mais "read only").
+
 ## v0.9.70 - 2026-07-13 (Config: quantos boletos a IA envia — vencidos primeiro)
 
 Sem `db push`. Backend (config + projeção + tools) + frontend (tela ISP) + `CONTENT_VERSION` v26.

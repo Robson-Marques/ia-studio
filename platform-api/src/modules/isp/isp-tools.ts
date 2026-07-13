@@ -333,13 +333,19 @@ export class IspTools implements OnModuleInit {
       },
     });
 
-    // ─── desbloqueio_confianca (destrutivo → aprovacao) ──
+    // ─── desbloqueio_confianca (frente 4) ──
+    // AUTÔNOMO por decisão do operador: a IA executa direto e o PRÓPRIO ERP é o
+    // porteiro — recusa (erra) quando a regra do provedor não permite (ex.: já
+    // usou o desbloqueio no período). Sem aprovação humana (`requires_approval`
+    // false), igual ao abrir_os. Só o resultado do ERP diz se liberou.
     this.registry.register({
       key: 'desbloqueio_confianca',
       name: 'Desbloqueio de confiança (ISP)',
-      description: 'Libera temporariamente o acesso de um cliente em atraso (desbloqueio de confiança) no ERP do provedor.',
+      description:
+        'Libera TEMPORARIAMENTE o acesso de um cliente bloqueado por inadimplência (desbloqueio de confiança) no ERP do provedor. ' +
+        'O provedor decide se permite — se a regra dele não deixar, a ferramenta volta sem liberar; nesse caso, não prometa o desbloqueio, siga com a 2ª via/pagamento.',
       category: 'isp',
-      requires_approval: true,
+      requires_approval: false,
       input_schema: {
         type: 'object',
         properties: {

@@ -23,15 +23,22 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.70 engatilhada (aguardando release) — config de limite de boletos:** decisão do Robson
-  (frente do financeiro, feita ANTES da frente 4). Config "Envio de boletos" na tela ISP → Abertura
-  de chamado (dropdown 1/2/3/5/10/Todos, sem campo livre) → `system_settings` `isp.boleto.max_envio`
-  (default 3, 0=todos). Determinístico: `limitBoletos` (`isp-projections.ts`) ordena vencidos primeiro
-  e corta no limite; `consultar_debitos`/`segunda_via_boleto` aplicam + devolvem `total_em_aberto`.
-  `CONTENT_VERSION` v26 (roteiro avisa quando há mais boletos que o limite). Endpoints
-  `GET/PUT /isp/os-config/boleto-max`. **PRÓXIMO: frente 4** (desbloqueio de confiança — decisão do
-  Robson: **IA faz sozinha quando o provedor permitir**; bloqueado→fila Financeiro; oferta de
-  pagamento = linha/link do boleto, IXC não tem PIX copia-e-cola).
+- **v0.9.71 engatilhada (aguardando release) — FIX regressão + FRENTE 4:**
+  (A) **FIX:** a IA voltou a marcar a conversa como "atendido pela IA". `assignBot`
+  (`chat-assignment.service.ts`) usava `NOT: { owner_type: 'QUEUE' }` — gotcha de NULL no SQL
+  (owner nulo da conversa NOVA → 0 linhas → não marcava BOT; caía em "Aguardando/sem atendente").
+  Trocado por OR null-safe. Regressão da v0.9.66.
+  (B) **FRENTE 4 (bloqueio por inadimplência):** rotina PROATIVA (identificou → roda diagnóstico,
+  não menu genérico); nova situação no roteiro pra `contrato.bloqueado` (o diagnóstico já expõe:
+  contrato ativo com `status_internet`≠'A') → não abre chamado de suporte, tenta desbloqueio, oferece
+  2ª via, encaminha pra fila Financeiro; `desbloqueio_confianca` habilitado com `requires_approval:false`
+  (AUTÔNOMO — o ERP é o porteiro). `ASSISTANT_TOOLS` (ex-`READ_ONLY_TOOLS`). `CONTENT_VERSION` v27.
+  ⚠️ **Nota de ambiente:** o git do sandbox mostrou working-tree STALE (diff falso de -607 linhas +
+  arquivos não tocados) — o mount do shell diverge dos canônicos; confiar no Read/Edit pro conteúdo e
+  nos tags/log do git pra versão. **PRÓXIMO: frente 5** (página pública de 2ª via/pagamento — porte Aquapark).
+- **v0.9.70 no ar — config de limite de boletos** (`CONTENT_VERSION` v26): "Envio de boletos" na tela
+  ISP → Abertura de chamado (dropdown 1/2/3/5/10/Todos) → `isp.boleto.max_envio` (default 3, 0=todos);
+  `limitBoletos` (vencidos primeiro) em `consultar_debitos`/`segunda_via_boleto` + `total_em_aberto`.
 - **v0.9.69 no ar (VALIDADO por print):** dois ajustes de comportamento do assistente
   (`CONTENT_VERSION` v25) + 1 determinístico. (1) **Boleto vencido marcado pelo sistema:**
   `projectBoleto` (`isp-projections.ts`) calcula `vencido`/`dias_em_atraso` (vencimento < data do
@@ -90,7 +97,7 @@
   tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
   agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
   API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v26`** (roteiro avisa quando há mais boletos que o limite; v0.9.70). Antes: v25 (carrega a intenção ao trocar de CPF + boleto vencido/em atraso; v0.9.69), v24 (negrito sem e-mail/link; v0.9.62). Antes:
+- **Prompt do assistente ISP: `CONTENT_VERSION v27`** (frente 4: bloqueio por inadimplência + rotina proativa na identificação; v0.9.71). Antes: v26 (avisa quando há mais boletos que o limite; v0.9.70), v25 (carrega a intenção ao trocar de CPF + boleto vencido/em atraso; v0.9.69), v24 (negrito sem e-mail/link; v0.9.62). Antes:
   v23 (handoff fila, v0.9.60), v22 (negrito WhatsApp, v0.9.56),
   v21 (mostrar opções, v0.9.54), v20 (abertura reconhece número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
   persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação

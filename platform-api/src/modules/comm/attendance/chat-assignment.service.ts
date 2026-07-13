@@ -102,15 +102,20 @@ export class ChatAssignmentService {
       .updateChatConditional(
         chatId,
         {
-          // Assume se NINGUÉM humano está no comando: sem handler (null) OU já é
-          // a própria IA (BOT). `{ not: 'USER' }` num campo anulável excluiria os
-          // nulos no SQL — por isso o OR explícito.
-          OR: [{ current_handler_type: null }, { current_handler_type: 'BOT' }],
+          // Dois campos ANULÁVEIS → dois OR explícitos dentro de um AND. Regra de
+          // ouro: `{ not: X }`/`NOT` num campo anulável EXCLUI os NULOS no SQL
+          // (NULL = X → NULL → falso), então NUNCA usar `not` aqui — sempre OR com
+          // `null` no ramo. (Foi o furo: `NOT owner_type=QUEUE` derrubava toda
+          // conversa NOVA — owner_type nulo — e a IA parava de marcar como BOT.)
+          AND: [
+            // Assume se NINGUÉM humano está no comando: sem handler OU já é a IA.
+            { OR: [{ current_handler_type: null }, { current_handler_type: 'BOT' }] },
+            // NÃO reassumir conversa ENTREGUE a uma FILA (owner=QUEUE): o nó do
+            // agente chama assignBot ao fim do turno; sem isto ele roubava de volta
+            // pro BOT a conversa recém-encaminhada. Nulo (nova) ou BOT = pode; QUEUE bloqueia.
+            { OR: [{ owner_type: null }, { owner_type: 'BOT' }] },
+          ],
           attendance_status: { not: CommChatStatus.CLOSED },
-          // NÃO reassumir conversa já ENTREGUE a uma FILA (handoff): o nó do agente
-          // chama assignBot ao fim do turno, e sem isto ele roubava de volta pro BOT
-          // a conversa que a IA acabou de encaminhar pra fila de setor.
-          NOT: { owner_type: 'QUEUE' },
         },
         {
           current_handler_type: 'BOT',

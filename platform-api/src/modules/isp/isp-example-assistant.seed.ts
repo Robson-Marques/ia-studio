@@ -3,7 +3,9 @@
 //   * nasce SO em org que ja tem conexao ISP ativa (sinal de que quer ISP);
 //   * marca-se como semeado em system_settings → NAO ressuscita se for apagado;
 //   * e um AiAgent normal — 100% editavel e removivel no painel.
-// Modo LEITURA: allowed_tools nao inclui abrir_os nem desbloqueio_confianca.
+// Atua ponta a ponta: consulta + abre OS (config curada) + desbloqueio de
+// confiança (autônomo — o ERP recusa se a regra do provedor não permitir) +
+// handoff pra fila de setor. Nasce seguro pela CONFIG, não por lista curta.
 // A logica de identificacao (pede CPF → confirma → atende) vive no system_prompt
 // por enquanto; a Frente B a tornara estrutural (coluna identification + gate).
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
@@ -25,11 +27,13 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v26-limite-boletos-avisa-mais';
+const CONTENT_VERSION = 'v27-frente4-bloqueio-e-rotina-proativa';
 
-// Só ferramentas de LEITURA. Escrita (abrir_os) e destrutivo (desbloqueio) ficam
-// de fora de proposito — o exemplo nasce seguro.
-const READ_ONLY_TOOLS = [
+// Ferramentas do assistente ISP: consulta (diagnóstico, débitos, 2ª via, região)
+// + ações controladas — abrir OS (config curada + guards), desbloqueio de
+// confiança (autônomo; o ERP recusa se a regra do provedor não permitir) e
+// handoff pra fila de setor.
+const ASSISTANT_TOOLS = [
   // Memória primária da conversa (registro real do WhatsApp, com datas) + data
   // atual — pra lembrar o que já foi tratado, se a pessoa já é cliente, etc.
   'conversation_history',
@@ -49,6 +53,9 @@ const READ_ONLY_TOOLS = [
   // Escrita controlada: abre a OS com setor/assunto da CONFIG curada + anti-dup +
   // guard de incidente. A IA só chama após o cliente confirmar.
   'abrir_os',
+  // Frente 4: desbloqueio de confiança para cliente bloqueado por inadimplência.
+  // Autônomo — o ERP recusa se a regra do provedor não permitir.
+  'desbloqueio_confianca',
   // Handoff bot→fila de setor (frente 3): move a conversa pra fila de Suporte/
   // Financeiro pra um atendente humano assumir.
   'encaminhar_para_fila',
@@ -73,7 +80,7 @@ const ROTEIRO = {
     {
       titulo: 'Chegar até a conexão certa (diagnóstico)',
       descricao:
-        'Com o cliente identificado, use a ferramenta de diagnóstico da conexão — ela decide as etapas e devolve as OPÇÕES prontas; sua função é MOSTRAR e deixar o cliente escolher pelo número. NUNCA peça para o cliente digitar o login ou o endereço (ele pode não saber, e o que ele digita pode não bater com o cadastro) — sempre mostre o que a ferramenta trouxe e ele escolhe. Mais de um contrato → liste as opções numeradas com o PLANO, o NÚMERO DO CONTRATO e o endereço (o número do contrato desempata quando dois têm o mesmo plano). Mais de uma conexão → liste as opções com o login, a referência do ponto e o endereço. Se forem muitas, mostre as opções mesmo assim e peça para escolher. Só depois de chegar ao login é que você vê o status e, se for o caso, abre o chamado com o login e o contrato daquela conexão. Apresente só o que estiver fora do normal (não anuncie "contrato ativo"). Nunca aja no login errado.',
+        'Com o cliente identificado, rode o diagnóstico da conexão PROATIVAMENTE — assim que localizar o cliente, NÃO devolva um menu genérico "o que você precisa?" quando dá pra já verificar a situação (a exceção é quando a pessoa já pediu só fatura/2ª via: aí vá direto ao financeiro). Lidere pelo que estiver FORA do normal: se o diagnóstico trouxer o contrato BLOQUEADO por inadimplência, conduza pela situação de bloqueio (ver nas situações). A ferramenta de diagnóstico decide as etapas e devolve as OPÇÕES prontas; sua função é MOSTRAR e deixar o cliente escolher pelo número. NUNCA peça para o cliente digitar o login ou o endereço (ele pode não saber, e o que ele digita pode não bater com o cadastro) — sempre mostre o que a ferramenta trouxe e ele escolhe. Mais de um contrato → liste as opções numeradas com o PLANO, o NÚMERO DO CONTRATO e o endereço (o número do contrato desempata quando dois têm o mesmo plano). Mais de uma conexão → liste as opções com o login, a referência do ponto e o endereço. Se forem muitas, mostre as opções mesmo assim e peça para escolher. Só depois de chegar ao login é que você vê o status e, se for o caso, abre o chamado com o login e o contrato daquela conexão. Apresente só o que estiver fora do normal (não anuncie "contrato ativo"). Nunca aja no login errado.',
     },
   ],
   situacoes: [
@@ -87,7 +94,11 @@ const ROTEIRO = {
     },
     {
       quando: 'o assinante disser que está sem internet',
-      faca: 'Conduza pela situação do contrato/conexão do diagnóstico: se bloqueado por falta de pagamento, ofereça a 2ª via; se cancelado/encerrado (não reativa pagando), trate como venda de um novo plano; se está tudo certo e só a conexão caiu, diga qual conexão e desde quando, oriente reiniciar o modem, verifique a região e, se não for problema geral, ofereça abrir um chamado.',
+      faca: 'Conduza pela situação do contrato/conexão do diagnóstico: se estiver BLOQUEADO por falta de pagamento, trate como bloqueio (situação própria abaixo — não é problema técnico); se cancelado/encerrado (não reativa pagando), trate como venda de um novo plano; se está tudo certo e só a conexão caiu, diga qual conexão e desde quando, oriente reiniciar o modem, verifique a região e, se não for problema geral, ofereça abrir um chamado.',
+    },
+    {
+      quando: 'o diagnóstico mostrar o contrato BLOQUEADO por inadimplência',
+      faca: 'Não é problema técnico e NÃO abre chamado de suporte. Informe com clareza que a conexão está bloqueada por falta de pagamento. Tente o desbloqueio de confiança — a ferramenta executa e o PRÓPRIO provedor decide: se liberar, avise que é um acesso TEMPORÁRIO até o pagamento; se o provedor não permitir (a ferramenta volta sem liberar), não prometa o desbloqueio. Em qualquer caso, ofereça a 2ª via/boleto (linha digitável + link) para regularizar. Ao final, encaminhe a conversa para a fila do FINANCEIRO para um atendente acompanhar.',
     },
     {
       quando: 'houver manutenção ou incidente na região do cliente',
@@ -173,7 +184,7 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
             persona: PERSONA,
             systemPrompt: SYSTEM_PROMPT,
             goal: ROTEIRO.objetivo,
-            allowedTools: READ_ONLY_TOOLS,
+            allowedTools: ASSISTANT_TOOLS,
           });
           await this.repository.markContentVersionSeeded(organizationId, CONTENT_VERSION);
           this.logger.log(`Conteúdo do assistente-exemplo atualizado (${CONTENT_VERSION}) na org ${organizationId}.`);
@@ -227,7 +238,7 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
       goal: ROTEIRO.objetivo,
       temperature: 0.3,
       max_steps: 8,
-      allowed_tools: READ_ONLY_TOOLS,
+      allowed_tools: ASSISTANT_TOOLS,
       is_active: true,
       created_by: 'seed:isp-exemplo',
     });
