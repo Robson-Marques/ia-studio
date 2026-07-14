@@ -23,7 +23,13 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.73 engatilhada (aguardando release) — FRENTE 5: link público de pagamento (2ª via):**
+- **v0.9.74 engatilhada (aguardando release) — PIX na página de pagamento:** op canônica
+  `financeiro.boleto_pix` (get_boleto tipo=dados → `findPixEmv` detecta o BR Code pelo FORMATO,
+  sem chutar campo) + merge no snapshot da tool + PIX copia-e-cola copiável em `PaginaPagamento.jsx`.
+  Sem `db push`, sem CONTENT_VERSION. ⚠️ **A confirmar no teste:** se o `get_boleto` tipo=dados do
+  IXC não carregar o EMV, a página fica só com linha+link (o botão "Abrir boleto" já leva à página
+  da Efí com QR/PIX) — nesse caso reconhecer o endpoint exato do "Copiar código PIX" do IXC.
+- **v0.9.73 NO AR (VALIDADO por print) — FRENTE 5: link público de pagamento (2ª via):**
   ⚠️ **`db push` destrutivo** (modelo novo `IspPaymentLink`). Página pública `/pagar/:token` SEM login
   (`PaginaPagamento.jsx`, rota espelha `/convite/:token`): a IA gera na hora um token (48 chars) com
   SNAPSHOT dos boletos; expira por tempo (config, padrão 24h). Backend: `IspPaymentLinkService`

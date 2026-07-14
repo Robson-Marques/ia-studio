@@ -38,6 +38,7 @@ import {
   cpfCnpjCandidates,
   IN_CHUNK_SIZE,
   extractRegistros,
+  findPixEmv,
   isValidIxcToken,
   isYes,
   ixcErrorMessage,
@@ -85,6 +86,7 @@ const OPERATIONS = [
   'financeiro.boleto_aberto_todos',
   'financeiro.historico',
   'financeiro.boleto_base64',
+  'financeiro.boleto_pix',
   'conectividade.listar_com_status',
   'os.cadastrar',
   'os.listar_abertas',
@@ -253,6 +255,9 @@ export class IxcProvider extends BaseProvider {
 
       case 'financeiro.boleto_base64':
         return this.boletoPdf(ctx, token, this.str(args, 'cpf', true));
+
+      case 'financeiro.boleto_pix':
+        return { data: await this.boletosPix(ctx, token, this.str(args, 'cpf', true)) };
 
       case 'conectividade.listar_com_status':
         return { data: await this.conectividade(ctx, token, args) };
@@ -599,6 +604,36 @@ export class IxcProvider extends BaseProvider {
       tipo_boleto: 'arquivo',
       base64: 'S',
     });
+  }
+
+  /**
+   * PIX copia-e-cola (BR Code) dos boletos em aberto. O IXC não guarda o EMV na
+   * linha de `fn_areceber`; ele vem do `get_boleto` (tipo=dados), como o botão
+   * "Copiar código PIX" do IXC. O código é detectado pelo FORMATO (começa com
+   * "0002" + contém o GUI "BR.GOV.BCB.PIX"), sem depender do nome do campo — o
+   * IXC/gateway varia. Uma chamada por boleto (teto de segurança). Devolve só os
+   * que têm PIX; sem PIX → não entra (degradação graciosa, cai no boleto).
+   */
+  private async boletosPix(ctx: ProviderContext, token: string, cpf?: string): Promise<Record<string, unknown>[]> {
+    const abertos = await this.boletosAbertos(ctx, token, cpf, '100');
+    const ids = abertos.map((b) => String(b['id'] ?? '')).filter(Boolean).slice(0, 12);
+    const out: Record<string, unknown>[] = [];
+    for (const id of ids) {
+      try {
+        const resp = await this.write(ctx, token, 'POST', 'get_boleto', {
+          boletos: id,
+          juros: 'N',
+          multa: 'N',
+          atualiza_boleto: 'N',
+          tipo_boleto: 'dados',
+        });
+        const pix = findPixEmv(resp);
+        if (pix) out.push({ id, pix_copia_cola: pix });
+      } catch (e) {
+        this.logger.warn(`IXC boleto_pix ${id}: ${(e as Error).message}`);
+      }
+    }
+    return out;
   }
 
   /**

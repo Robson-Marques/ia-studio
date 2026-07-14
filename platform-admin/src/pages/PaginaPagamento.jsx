@@ -17,24 +17,24 @@ function fmtValor(v) {
   return Number.isFinite(n) ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : `R$ ${v}`;
 }
 
-function LinhaDigitavel({ valor }) {
+function CopyField({ label, value, strip }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     try {
-      await navigator.clipboard.writeText(String(valor).replace(/\s/g, ''));
+      await navigator.clipboard.writeText(strip ? String(value).replace(/\s/g, '') : String(value));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch { /* clipboard indisponível — o usuário copia manualmente */ }
   }
   return (
     <div className="space-y-1">
-      <span className="text-xs" style={{ color: 'var(--ap-text-4)' }}>Linha digitável</span>
+      <span className="text-xs" style={{ color: 'var(--ap-text-4)' }}>{label}</span>
       <div className="flex items-stretch gap-2">
         <code className="flex-1 text-xs p-2 rounded break-all"
           style={{ backgroundColor: 'var(--ap-bg-page)', border: '1px solid var(--ap-border)', color: 'var(--ap-text-1)' }}>
-          {valor}
+          {value}
         </code>
-        <button type="button" onClick={copy} title="Copiar linha digitável"
+        <button type="button" onClick={copy} title={`Copiar ${label}`}
           className="btn-secondary px-3 min-h-[44px] shrink-0">
           {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
         </button>
@@ -116,12 +116,18 @@ export default function PaginaPagamento() {
               )}
             </div>
 
-            {b.linha_digitavel && <LinhaDigitavel valor={b.linha_digitavel} />}
+            {b.pix_copia_cola && (
+              <div className="rounded-lg p-2" style={{ backgroundColor: 'rgba(50,120,110,0.08)' }}>
+                <CopyField label="PIX copia e cola" value={b.pix_copia_cola} />
+              </div>
+            )}
+
+            {b.linha_digitavel && <CopyField label="Linha digitável" value={b.linha_digitavel} strip />}
 
             {b.link_boleto && (
               <a href={b.link_boleto} target="_blank" rel="noopener noreferrer"
                 className="btn-primary w-full justify-center min-h-[44px]">
-                <ExternalLink size={16} /> Abrir boleto para pagar
+                <ExternalLink size={16} /> Abrir boleto ou pagar com QR Code
               </a>
             )}
           </div>

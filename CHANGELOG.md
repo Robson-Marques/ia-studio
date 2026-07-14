@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.9.74 - 2026-07-13 (PIX copia-e-cola na página de pagamento)
+
+Sem `db push`. Backend (provider IXC + tool) + frontend (página pública).
+
+- **PIX copia-e-cola na página `/pagar/:token`.** Nova op canônica `financeiro.boleto_pix`: para cada boleto em aberto, chama o `get_boleto` (tipo=dados, como o botão "Copiar código PIX" do IXC) e extrai o BR Code. **Detecção determinística pelo FORMATO** (`findPixEmv`): o EMV começa com "0002" e contém `BR.GOV.BCB.PIX` — não depende do nome do campo (o IXC/gateway varia), respeitando o "não chutar IXC". A tool `gerar_link_pagamento` faz merge do PIX no snapshot por id do boleto.
+- **Página:** mostra o **PIX copia e cola** (copiável, em destaque) + linha digitável + botão "Abrir boleto ou pagar com QR Code" (a página do gateway já traz o QR). Degradação graciosa: se o ERP não devolver o PIX, a página fica só com linha digitável + link.
+
 ## v0.9.73 - 2026-07-13 (Frente 5: link público de pagamento — 2ª via gerada no chat, expira sozinha)
 
 ⚠️ **`db push` (destrutivo)** — modelo novo `IspPaymentLink`. Backend + frontend + `CONTENT_VERSION` v29.

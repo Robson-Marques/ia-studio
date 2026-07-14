@@ -264,3 +264,31 @@ export function phoneCandidates(raw: string): string[] {
   const masked = formatPhone(digits);
   return [...new Set([masked, trimmed, digits].filter((v): v is string => !!v))];
 }
+
+/**
+ * Acha o 1o PIX copia-e-cola (BR Code EMV) em qualquer lugar de uma resposta do
+ * IXC, SEM depender do nome do campo (o IXC/gateway varia). Deterministico pelo
+ * FORMATO: o BR Code comeca com "0002" (payload format indicator "01") e carrega
+ * o GUI "BR.GOV.BCB.PIX". Nao "chuta" campo — casa o padrao inequivoco do EMV.
+ */
+export function findPixEmv(obj: unknown, depth = 0): string | undefined {
+  if (depth > 6 || obj == null) return undefined;
+  if (typeof obj === 'string') {
+    const s = obj.trim();
+    return /^0002\d{2}/.test(s) && /br\.gov\.bcb\.pix/i.test(s) ? s : undefined;
+  }
+  if (Array.isArray(obj)) {
+    for (const it of obj) {
+      const f = findPixEmv(it, depth + 1);
+      if (f) return f;
+    }
+    return undefined;
+  }
+  if (typeof obj === 'object') {
+    for (const v of Object.values(obj as Record<string, unknown>)) {
+      const f = findPixEmv(v, depth + 1);
+      if (f) return f;
+    }
+  }
+  return undefined;
+}

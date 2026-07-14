@@ -359,6 +359,21 @@ export class IspTools implements OnModuleInit {
         const abertos = rows(
           await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_aberto_todos', { cpf }),
         ).map((b) => projectBoleto(b));
+        // PIX copia-e-cola por boleto (get_boleto tipo=dados; detectado pelo FORMATO
+        // do BR Code). Opcional: se o ERP não devolver, a página fica só com linha
+        // digitável + link do boleto (o gateway já oferece PIX na página dele).
+        try {
+          const pixList = rows(
+            await this.connections.execute(ctx.organizationId, connectionId, 'financeiro.boleto_pix', { cpf }),
+          );
+          const pixById = new Map(pixList.map((p) => [String(p['id'] ?? ''), p['pix_copia_cola']]));
+          for (const b of abertos) {
+            const pix = pixById.get(String(b['id'] ?? ''));
+            if (typeof pix === 'string' && pix) b['pix_copia_cola'] = pix;
+          }
+        } catch (e) {
+          this.logger.warn(`gerar_link_pagamento: PIX indisponível (segue sem): ${(e as Error).message}`);
+        }
         // Nome do titular só pra exibir na página (determinístico, vem do ERP; opcional).
         let nome: string | null = null;
         try {
