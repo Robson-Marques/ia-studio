@@ -23,108 +23,39 @@
 
 ## ✅ Versão em produção
 
-- **v0.9.74 engatilhada (aguardando release) — PIX na página de pagamento:** op canônica
-  `financeiro.boleto_pix` (get_boleto tipo=dados → `findPixEmv` detecta o BR Code pelo FORMATO,
-  sem chutar campo) + merge no snapshot da tool + PIX copia-e-cola copiável em `PaginaPagamento.jsx`.
-  Sem `db push`, sem CONTENT_VERSION. ⚠️ **A confirmar no teste:** se o `get_boleto` tipo=dados do
-  IXC não carregar o EMV, a página fica só com linha+link (o botão "Abrir boleto" já leva à página
-  da Efí com QR/PIX) — nesse caso reconhecer o endpoint exato do "Copiar código PIX" do IXC.
-- **v0.9.73 NO AR (VALIDADO por print) — FRENTE 5: link público de pagamento (2ª via):**
-  ⚠️ **`db push` destrutivo** (modelo novo `IspPaymentLink`). Página pública `/pagar/:token` SEM login
-  (`PaginaPagamento.jsx`, rota espelha `/convite/:token`): a IA gera na hora um token (48 chars) com
-  SNAPSHOT dos boletos; expira por tempo (config, padrão 24h). Backend: `IspPaymentLinkService`
-  (cria/resolve, 410 genérico) + repo + `IspPaymentLinkController` (`@Public GET /isp/pagamento/:token`,
-  throttle). Tool `gerar_link_pagamento`; roteiro (bloqueio + 2ª via) prefere o link, cai na linha
-  digitável se `error`. Config na tela ISP (validade + URL pública, em `isp.pagamento.*`). `CONTENT_VERSION`
-  v29. Decisões do Robson: janela + TTL configurável (24h) + snapshot. **VALIDADO até a v0.9.72:** marcação
-  da IA (aba IA "Em andamento"), frente 4 ponta a ponta (bloqueio→desbloqueio→2ª via→Financeiro).
-  **BACKLOG do provider IXC** (docs que o Robson subiu, mapear em frentes futuras): viabilidade por
-  endereço + inserir LEAD (venda/cobertura); desconectar login + limpar MAC (troubleshooting); criar
-  tarefa/interações/disparar-finalizar (atendimento); receber título (baixa manual, admin — não é da IA);
-  consultar dados do boleto com juro/multa (valor atualizado — refino da 2ª via).
-- **v0.9.71/72 no ar — FIX regressão + FRENTE 4:**
-  (A) **FIX:** a IA voltou a marcar a conversa como "atendido pela IA". `assignBot`
-  (`chat-assignment.service.ts`) usava `NOT: { owner_type: 'QUEUE' }` — gotcha de NULL no SQL
-  (owner nulo da conversa NOVA → 0 linhas → não marcava BOT; caía em "Aguardando/sem atendente").
-  Trocado por OR null-safe. Regressão da v0.9.66.
-  (B) **FRENTE 4 (bloqueio por inadimplência):** rotina PROATIVA (identificou → roda diagnóstico,
-  não menu genérico); nova situação no roteiro pra `contrato.bloqueado` (o diagnóstico já expõe:
-  contrato ativo com `status_internet`≠'A') → não abre chamado de suporte, tenta desbloqueio, oferece
-  2ª via, encaminha pra fila Financeiro; `desbloqueio_confianca` habilitado com `requires_approval:false`
-  (AUTÔNOMO — o ERP é o porteiro). `ASSISTANT_TOOLS` (ex-`READ_ONLY_TOOLS`). `CONTENT_VERSION` v27.
-  ⚠️ **Nota de ambiente:** o git do sandbox mostrou working-tree STALE (diff falso de -607 linhas +
-  arquivos não tocados) — o mount do shell diverge dos canônicos; confiar no Read/Edit pro conteúdo e
-  nos tags/log do git pra versão. **PRÓXIMO: frente 5** (página pública de 2ª via/pagamento — porte Aquapark).
-- **v0.9.70 no ar — config de limite de boletos** (`CONTENT_VERSION` v26): "Envio de boletos" na tela
-  ISP → Abertura de chamado (dropdown 1/2/3/5/10/Todos) → `isp.boleto.max_envio` (default 3, 0=todos);
-  `limitBoletos` (vencidos primeiro) em `consultar_debitos`/`segunda_via_boleto` + `total_em_aberto`.
-- **v0.9.69 no ar (VALIDADO por print):** dois ajustes de comportamento do assistente
-  (`CONTENT_VERSION` v25) + 1 determinístico. (1) **Boleto vencido marcado pelo sistema:**
-  `projectBoleto` (`isp-projections.ts`) calcula `vencido`/`dias_em_atraso` (vencimento < data do
-  servidor, só data); roteiro avisa "em atraso há X dias" e oferece 2ª via — SEM afirmar bloqueio
-  (contrato pode seguir ativo). Era a Faiani: boleto venc. 10/07 mostrado neutro. (2) **Carrega a
-  intenção ao trocar de CPF:** se já pediram algo (boleto etc.) e mandam outro CPF, segue a MESMA
-  solicitação pro novo assinante em vez de voltar ao menu genérico. ⚠️ callers de `projectBoleto`
-  passam a data via arrow (`.map((b) => projectBoleto(b))`) pra não passar o índice como data.
-- **v0.9.68 no ar (à prova de erro de id — LER):** dois fixes da MESMA lição
-  (o modelo/config não escolhe id de infra). (1) **Conexão de ERP não vem mais do modelo** —
-  removidos `connection_id`/`filial` do schema de TODAS as tools ISP (`isp-tools.ts`); o agente
-  auto-resolve pelo escopo (`IspConnectionResolver`, prioridade/tag). Era o bug "Conexão de ERP
-  informada não está ativa neste escopo": o modelo passava o LOGIN ("torre3pratinha") como
-  conexão. (2) **discover do IXC traz só assunto com processo vinculado** (`ixc.provider.ts`,
-  `id_processo`≠0) → operador não escolhe assunto que quebraria a abertura. Regra gravada no
-  CLAUDE.md (Governança: "ID DE INFRA A IA NUNCA ESCOLHE"). VALIDADO: chamado 3946 abriu e caiu
-  na fila de Suporte (o erro "não está ativa neste escopo" sumiu).
-- **v0.9.67 no ar** (tag confirmada): `abrir_os` — setor/assunto SÓ da config (modelo não
-  sobrescreve); era o bug intermitente "Departamento destino" (o modelo passava setor="suporte").
-- **v0.9.60** (FRENTE 3 — handoff bot→fila de setor). Tool `encaminhar_para_fila` +
-  `handoffToQueue`; seed cria "Fila Setor de Suporte/Financeiro" + mapeia em `system_settings`
-  (`isp.fila.suporte`/`isp.fila.financeiro`). A IA encaminha de verdade após abrir o chamado.
-  Aguardando validação (testar: abrir chamado → conversa vai pra fila de Suporte).
-- **v0.9.59 NO AR — FRENTE 2 VALIDADA** (chamado 3935 abriu no IXC com contrato+endereço+tudo certo).
-  OS nasce do `su_ticket` (atendimento) → processo do assunto (O.S. OPA SUITE) abre a OS. Fixes até
-  fechar: v0.9.57 (fluxo), v0.9.58 (`titulo` obrigatório), v0.9.59 (`id_wfl_processo` do assunto).
-  Config: setor = `su_ticket_setor` (departamento); assunto = um com processo vinculado.
-- **v0.9.56 NO AR** (confirmado no teste: OS 36530 abriu com origem=Cliente, o fix da origem = v0.9.56).
-  OS abre com login/setor/status/origem corretos; **contrato e endereço da OS ainda NÃO preenchem**
-  no insert direto → é a frente 2 (OS via atendimento/protocolo). Negrito 1 asterisco OK (um login
-  escapou uma vez — regra na persona, se persistir fazer normalize `**`→`*` no envio). **v0.9.55 no ar**
-  (login pelo id — OS 36529). **v0.9.54 no ar**
-  (fix deploy worker + opções pro cliente escolher). ⚠️ **FRENTE 1 VALIDADA no WhatsApp de ponta a
-  ponta** (contrato→login→status offline→oferta de chamado). Só a abertura da OS falhava por passar
-  o NOME do login onde o IXC quer o id — corrigido na v0.9.55. **v0.9.55 já reinicia o worker sozinho**
-  (o upgrade.sh worker-first da v0.9.54 já está no servidor). O que
-  faltava era o **worker rodando código velho**: o `upgrade.sh` reiniciava só o api, não o worker
-  (19h sem restart) — a tool nova do diagnóstico não existia no worker. Corrigido no upgrade.sh
-  (worker primeiro). **Ao aplicar a v0.9.54, o upgrade.sh EM EXECUÇÃO ainda é o antigo → dar
-  `pm2 restart iastudio-worker` manual UMA vez; da próxima em diante é automático.** **v0.9.53
-  já no ar** = CONSOLIDAÇÃO do agente: fim da duplicidade de lógica + identificação
-  determinística `identificado_por` + persona.name funcional + persona padrão NETE/amigável/
-  médias + modelo padrão gpt-5.4). **v0.9.51 já no ar** (identidade doc>telefone) e **v0.9.50**
-  (frente 1 + funil). LIÇÃO (crítica do Robson, procede): eu vinha empilhando a mesma regra em
-  system_prompt + roteiro + persona (3-6 lugares) em vez de avaliar o agente inteiro — a
-  consolidação da v0.9.52 é a casa-única por assunto. Falta o teste limpo do CNPJ (contaminado
-  antes por identificação-por-telefone → Fabricia; corrigido na v0.9.51/52). ⚠️ A **v0.9.49 QUEIMOU**: a tag caiu no commit da v0.9.48 porque um
-  `.git/index.lock` órfão travou o `git commit` local — nada da frente 1 subiu (confirmado:
-  `isp-diagnosis.service.ts` não existia no servidor, `CONTENT_VERSION` em v14). **Lição:** se
-  um commit "não pega" (tag aponta pro commit velho), checar `.git/index.lock` e apagar antes.
-  Produção real segue em **v0.9.48** (com nome "v0.9.49" no painel). Confirmar sempre pelo que
-  o servidor tem, não pelo número do painel.
-- **v0.9.48** (confirmar com `git tag`): estrutural completo — aprovar-executa
-  (`ApprovalsService.executeApproved`), OS com `origem_endereco` login/cliente
-  (nunca Manual), `abrir_os` automático (seed sincroniza `requires_approval` das
-  tools builtin), anti-duplicidade de OS por setor, tick azul + "digitando",
-  agrupamento de mensagens picadas na origem (`AutomationProcessors`), GPT-5.x na
-  API OpenAI (omite temperature / usa `max_completion_tokens`).
-- **Prompt do assistente ISP: `CONTENT_VERSION v29`** (frente 5: prefere o link de pagamento na 2ª via/bloqueio; v0.9.73). Antes: v28 (não inventa "assunto em andamento"; v0.9.72), v27 (frente 4: bloqueio por inadimplência + rotina proativa; v0.9.71), v26 (avisa quando há mais boletos que o limite; v0.9.70), v25 (carrega a intenção ao trocar de CPF + boleto vencido/em atraso; v0.9.69), v24 (negrito sem e-mail/link; v0.9.62). Antes:
-  v23 (handoff fila, v0.9.60), v22 (negrito WhatsApp, v0.9.56),
-  v21 (mostrar opções, v0.9.54), v20 (abertura reconhece número, v0.9.53), v19 (consolidação, v0.9.52). Estrutura FINAL:
-  persona = tom/formato; system_prompt = 3 guardrails; roteiro = casa única do fluxo; identificação
-  determinística via `identificado_por`. Ao mexer no comportamento, editar NA CASA CERTA — não
-  reintroduzir a mesma regra em 2 lugares. Antes: v18 (identidade, v0.9.51), v17 (funil, v0.9.50). O passo "chegar até o login" usa a tool `diagnosticar_conexao`, que é a **única
-  porta** (removidos `consultar_contrato`/`status_conexao` deste assistente — funil). Exemplo
-  novo nasce com `gpt-5.5`; o campo Modelo virou dropdown curado (sem texto livre). A v0.9.46
-  já deixou a API compatível com gpt-5.x.
+> Detalhe por versão está no `CHANGELOG.md` (fonte da verdade por tag). Aqui só o ESTADO vigente.
+> Confirmar a versão real SEMPRE com `git tag | sort -V | tail`.
+
+- **v0.9.74 NO AR** (última tag). O assistente ISP (**NETE**) está completo e validado em produção
+  até a **frente 5**:
+  - Identifica (documento > telefone) → **diagnóstico determinístico** contrato→login → status online/offline.
+  - **Abre OS** via atendimento (`su_ticket` + processo do assunto) → **encaminha pra fila de Suporte**.
+  - **Bloqueado por inadimplência** → **desbloqueio de confiança AUTÔNOMO** (o ERP é o porteiro) → 2ª via → **fila Financeiro**.
+  - **Link público de pagamento** `/pagar/:token` (gerado na hora, expira, sem login) com valor/vencimento,
+    boleto **vencido marcado**, linha digitável copiável e botão "Abrir boleto ou pagar com QR Code".
+- **Prompt: `CONTENT_VERSION v29`** (`isp-example-assistant.seed.ts`). **Bump SEMPRE** que mexer no
+  roteiro/persona/system_prompt, senão não re-aplica no assistente já semeado.
+- **PIX inline DEFERIDO** (decisão do Robson: "quero trabalhar outra realidade depois; por ora está bom").
+  O `get_boleto tipo=dados` do IXC **NÃO** carrega o EMV — a op `financeiro.boleto_pix` + `findPixEmv`
+  (detecção pelo FORMATO do BR Code) está pronta mas volta vazio. Falta o endpoint certo do
+  "Copiar código PIX" do IXC (recon: F12→Network no botão, ou doc da API). Por ora o PIX vem pela
+  página da Efí (botão do boleto). **Não é bloqueio.**
+
+### 🧠 Lições que se repetem (re-ancorar antes de codar)
+- **ID de infra a IA NUNCA escolhe** (conexão/setor/assunto/fila) — vem da CONFIG curada ou auto-resolve
+  pelo escopo. Regra no CLAUDE.md (Governança). Bugs que vieram de violar isso: conexão="torre3pratinha"
+  (login), setor="suporte" (palavra), "Departamento destino".
+- **Gotcha de NULL no SQL:** `{ not: X }`/`NOT` em campo ANULÁVEL exclui os NULOS (`NULL=X`→NULL→falso).
+  Sempre OR com `null` explícito. Queimou o marcador da IA (v0.9.66→v0.9.71: conversa nova, owner nulo).
+- **IXC erra calado:** `IN` grande devolve vazio; `rp` trunca sem avisar; `online` vem "SS"; `get_boleto
+  dados` não traz PIX. Validar contra dado real; nunca presumir número plausível.
+- **Deploy worker-first:** o `upgrade.sh` reinicia `iastudio-worker` ANTES do `iastudio-api` — tool nova
+  só existe no worker após restart. `db push` destrutivo roda sozinho na fase PRISMA_PUSH.
+- **Git do sandbox às vezes STALE** (working-tree diverge dos canônicos, diff falso): confiar no
+  **Read/Edit** pro conteúdo e nos **tags/log** do git pra versão.
+- **Config de OS:** setor = `su_ticket_setor` (departamento: Financeiro=1, Suporte=2), NÃO `empresa_setor`;
+  assunto = um com processo (`id_processo`) vinculado. Recon base Newnet (cliente id 2): contrato ativo
+  `status='A'`, login ativo `radusuarios.ativo='S'`, endereço quase sempre herdado do cliente.
 
 ## 🎯 O que estamos construindo agora
 
@@ -162,12 +93,28 @@ Decisões travadas: **A** = endereço do login se houver, senão do contrato ·
    o "Departamento destino" que travou era o **worker com estado antigo** (config `setor=4` de antes do
    re-pick) — o restart do deploy resolveu. Config de OS: setor = `su_ticket_setor` (departamento), não
    `empresa_setor`; assunto = um com processo (id_processo) vinculado.
-4. Desbloqueio de confiança pela IA + oferta PIX/boleto; bloqueado → fila financeiro (a fila já existe).
-5. Página pública de 2ª via/pagamento (porte Aquapark) — junto com a frente do financeiro.
-6. Alerta de incidentes (registrar + previsão + notificar equipe via WhatsApp).
+4. **Desbloqueio de confiança + bloqueado → fila financeiro** — ✅ **FEITA E VALIDADA** (v0.9.71;
+   Carleia bloqueada → desbloqueio autônomo 5 dias → 2ª via → fila Financeiro). Rotina PROATIVA na
+   identificação (roda o diagnóstico, não menu genérico). `desbloqueio_confianca` autônomo
+   (`requires_approval:false`, ERP é o porteiro). Diagnóstico expõe `contrato.bloqueado`
+   (`status_internet`≠'A'). **PIX inline ficou deferido** (ver "Versão em produção").
+5. **Página pública de 2ª via/pagamento (porte Aquapark)** — ✅ **FEITA E VALIDADA** (v0.9.73–74;
+   `/pagar/:token` abriu com os boletos da Carleia). Modelo `IspPaymentLink` (token+snapshot+TTL, sem
+   sessão JWT), `@Public GET /isp/pagamento/:token` (410 genérico), tool `gerar_link_pagamento`, config
+   na tela ISP (`isp.pagamento.*`). Decisões: janela + TTL 24h configurável + snapshot.
+6. **Alerta de incidentes** (registrar + previsão + notificar equipe via WhatsApp) — ⏭️ **PRÓXIMA**.
+   Infra parcial já existe: `IspIncident`/`IncidentLookupService`/`IspDispatchService` +
+   `status_regiao` (reativo). Recon: ver `isp-incidents.service` + spec.
 
 ## 🧹 Pendências técnicas conhecidas (não urgentes)
 
+- **PIX inline** na página de pagamento: falta o endpoint IXC do "Copiar código PIX" (o `get_boleto
+  dados` não traz o EMV). Op `financeiro.boleto_pix` + `findPixEmv` prontas — só trocar a chamada.
+  Deferido pelo Robson ("outra realidade depois").
+- **Backlog do provider IXC** (docs que o Robson subiu, mapear em frentes futuras): viabilidade por
+  endereço + inserir LEAD (venda/cobertura); desconectar login + limpar MAC (troubleshooting técnico);
+  criar tarefa/interações/disparar-finalizar (atendimento); receber título (baixa manual — admin, não
+  é da IA); consultar dados do boleto com juro/multa (valor atualizado — refino da 2ª via).
 - Varredura de contratos front↔back: faltam MCP/Política/Memória (campo a mais no
   create/update), Incidente (`auto_detect`), Ambiente (`type`→`kind`), Workspace
   (`slug` obrigatório sem campo na UI). Todos 400 de whitelist. (Custos já corrigido.)
@@ -192,7 +139,7 @@ Estado por módulo ("o que existe e como funciona hoje"):
 - READMEs em `platform-api/src/modules/*/README.md` (ai, isp, automation, comm, integration, system).
 
 Frente em andamento (andaimes — somem quando a frente conclui + é documentada no README/CLAUDE.md):
-- `docs/spec-assistente-isp-atendimento.md` — comportamento do assistente ISP (frentes 1–5).
+- `docs/spec-assistente-isp-atendimento.md` — comportamento do assistente ISP (frentes 1–6; 1–5 feitas, falta a 6 = incidentes).
 - `docs/spec-painel-assistente-humanizado.md` — UI do editor do assistente (backlog de casca).
 
 Referência externa (porte-não-reinvente): `../aquapark/`.
