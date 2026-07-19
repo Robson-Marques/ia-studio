@@ -44,6 +44,7 @@ import Mapeamentos from './pages/Recursos/Mapeamentos';
 import Explorer from './pages/Recursos/Explorer';
 import ConsoleDev from './pages/Desenvolvedor/Console';
 import ApiKeys from './pages/Desenvolvedor/ApiKeys';
+import StudioUxDemo from './pages/StudioUxDemo';
 
 const WHATSAPP_VIEW_PERMS = [
   'comm.whatsapp.view.assigned',
@@ -107,6 +108,7 @@ export default function App() {
                 <Route path="/recursos/explorer" element={<PermissionRoute perm="resource.explore.read"><Explorer /></PermissionRoute>} />
                 <Route path="/desenvolvedor/console" element={<PermissionRoute perm="devtools.use"><ConsoleDev /></PermissionRoute>} />
                 <Route path="/desenvolvedor/api-keys" element={<PermissionRoute perm="developer.apikeys.read"><ApiKeys /></PermissionRoute>} />
+                <Route path="/studio-ux-demo" element={<StudioUxDemo />} />
               </Route>
 
               {/* Catch-all */}
