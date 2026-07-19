@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Wrench, Star, Users, Receipt, Link2 } from 'lucide-react';
+import { Loader2, Plus, Trash2, Wrench, Star, Users, Receipt, Link2, BellRing } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../../lib/toast';
-import { discoverOsResources, getOsConfig, saveOsConfig, getFilaMapping, saveFilaMapping, getBoletoMax, saveBoletoMax, getPagamentoConfig, savePagamentoConfig } from '../../services/isp';
-import { listQueues } from '../../services/whatsapp';
+import { discoverOsResources, getOsConfig, saveOsConfig, getFilaMapping, saveFilaMapping, getBoletoMax, saveBoletoMax, getPagamentoConfig, savePagamentoConfig, getPlantaoConfig, savePlantaoConfig } from '../../services/isp';
+import { listQueues, listTeams } from '../../services/whatsapp';
 
 // Configura a abertura de OS pela IA: pares setor↔assunto do ERP (descobertos),
 // com um marcado como padrão de suporte. A IA só usa o que está aqui.
@@ -26,6 +26,9 @@ export default function AberturaChamado() {
   const [pagTtl, setPagTtl] = useState(24);
   const [pagBaseUrl, setPagBaseUrl] = useState('');
   const [savingPag, setSavingPag] = useState(false);
+  const [teams, setTeams] = useState([]);
+  const [plantao, setPlantao] = useState({ team_id: '', limiar_pct: 40, template: '', cooldown_min: 60 });
+  const [savingPlantao, setSavingPlantao] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -38,13 +41,22 @@ export default function AberturaChamado() {
         const cfg = await getOsConfig(disc.connection_id);
         setPairs((cfg || []).map((c) => ({ setor_id: c.setor_id, assunto_id: c.assunto_id, is_default: !!c.is_default })));
       }
-      const [qs, map, bmax, pag] = await Promise.all([listQueues(), getFilaMapping(), getBoletoMax(), getPagamentoConfig()]);
+      const [qs, map, bmax, pag, tms, plt] = await Promise.all([
+        listQueues(), getFilaMapping(), getBoletoMax(), getPagamentoConfig(), listTeams(), getPlantaoConfig(),
+      ]);
       setQueues(qs || []);
       setFilaSuporte(map?.suporte || '');
       setFilaFinanceiro(map?.financeiro || '');
       setBoletoMax(Number.isFinite(bmax) ? bmax : 3);
       setPagTtl(pag?.ttl_horas || 24);
       setPagBaseUrl(pag?.base_url || '');
+      setTeams(tms || []);
+      setPlantao({
+        team_id: plt?.team_id || '',
+        limiar_pct: plt?.limiar_pct || 40,
+        template: plt?.template || '',
+        cooldown_min: plt?.cooldown_min ?? 60,
+      });
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -89,6 +101,31 @@ export default function AberturaChamado() {
       toast.error(err.message);
     } finally {
       setSavingPag(false);
+    }
+  }
+
+  async function handleSavePlantao() {
+    setSavingPlantao(true);
+    try {
+      const saved = await savePlantaoConfig({
+        team_id: plantao.team_id || null,
+        limiar_pct: Number(plantao.limiar_pct),
+        template: plantao.template || null,
+        cooldown_min: Number(plantao.cooldown_min),
+      });
+      if (saved) {
+        setPlantao({
+          team_id: saved.team_id || '',
+          limiar_pct: saved.limiar_pct || 40,
+          template: saved.template || '',
+          cooldown_min: saved.cooldown_min ?? 60,
+        });
+      }
+      toast.success('Equipe de plantão salva.');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingPlantao(false);
     }
   }
 
@@ -337,6 +374,72 @@ export default function AberturaChamado() {
           <div className="flex justify-end pt-1">
             <button type="button" className="btn-primary disabled:opacity-60" onClick={handleSavePag} disabled={savingPag}>
               {savingPag ? <Loader2 size={14} className="animate-spin" /> : null} Salvar
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Equipe de plantão: quem é avisado por WhatsApp quando a IA detecta uma
+          anomalia de rede sem incidente cadastrado. */}
+      <div className="rounded-lg p-4 space-y-3" style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface)' }}>
+        <div>
+          <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--ap-text-1)' }}>
+            <BellRing size={16} /> Equipe de plantão (alerta de incidente)
+          </h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
+            Quando a IA identifica uma instabilidade na região de um cliente sem incidente cadastrado, ela avisa a equipe por WhatsApp
+            e abre um rascunho de incidente para vocês tratarem. Recebem o aviso os membros desta equipe com telefone cadastrado e o
+            aviso ligado (em WhatsApp → Equipes e Filas). O modelo nunca escolhe quem recebe — vem daqui.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-xs space-y-1 block">
+            <span style={{ color: 'var(--ap-text-3)' }}>Equipe responsável</span>
+            <select className="input text-sm w-full" value={plantao.team_id} disabled={!canManage}
+              onChange={(e) => setPlantao((p) => ({ ...p, team_id: e.target.value }))}>
+              <option value="">— não avisar —</option>
+              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs space-y-1 block">
+            <span style={{ color: 'var(--ap-text-3)' }}>Considerar anomalia a partir de (% da região offline)</span>
+            <select className="input text-sm w-full" value={String(plantao.limiar_pct)} disabled={!canManage}
+              onChange={(e) => setPlantao((p) => ({ ...p, limiar_pct: Number(e.target.value) }))}>
+              <option value="20">20%</option>
+              <option value="30">30%</option>
+              <option value="40">40%</option>
+              <option value="50">50%</option>
+              <option value="60">60%</option>
+              <option value="70">70%</option>
+            </select>
+          </label>
+          <label className="text-xs space-y-1 block">
+            <span style={{ color: 'var(--ap-text-3)' }}>Modelo de mensagem aprovado (WhatsApp)</span>
+            <input className="input text-sm w-full" value={plantao.template} disabled={!canManage}
+              placeholder="nome_do_template_aprovado"
+              onChange={(e) => setPlantao((p) => ({ ...p, template: e.target.value }))} />
+          </label>
+          <label className="text-xs space-y-1 block">
+            <span style={{ color: 'var(--ap-text-3)' }}>Intervalo mínimo entre avisos (minutos)</span>
+            <select className="input text-sm w-full" value={String(plantao.cooldown_min)} disabled={!canManage}
+              onChange={(e) => setPlantao((p) => ({ ...p, cooldown_min: Number(e.target.value) }))}>
+              <option value="0">Sem intervalo</option>
+              <option value="30">30 minutos</option>
+              <option value="60">1 hora</option>
+              <option value="120">2 horas</option>
+              <option value="240">4 horas</option>
+            </select>
+          </label>
+        </div>
+        {!plantao.template && (
+          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
+            Sem um modelo aprovado, o aviso fora da janela de 24h não sai pela Meta — a equipe recebe o alerta interno no sistema como reserva.
+          </p>
+        )}
+        {canManage && (
+          <div className="flex justify-end pt-1">
+            <button type="button" className="btn-primary disabled:opacity-60" onClick={handleSavePlantao} disabled={savingPlantao}>
+              {savingPlantao ? <Loader2 size={14} className="animate-spin" /> : null} Salvar
             </button>
           </div>
         )}

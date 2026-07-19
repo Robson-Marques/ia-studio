@@ -69,14 +69,16 @@ do agente.
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| `isp.repository.ts` | Porta única ao banco (`isp_incidents`, `isp_incident_targets`, `isp_incident_dispatches`). |
+| `isp.repository.ts` | Porta única ao banco (`isp_incidents`, `isp_incident_targets`, `isp_incident_dispatches`, `isp_incident_team_alerts`) + destinatários do plantão (membros com telefone+opt-in) e dedup por `scope_hash`. |
 | `isp-connection.resolver.ts` | Resolve a Connection de ERP ACTIVE do escopo (multi-instância: matriz/filiais; multi-ERP: Altarede/IXC). Nunca expõe a conexão à IA. |
 | `isp-connectivity.service.ts` | Lê `conectividade.listar_com_status` via `ConnectionsService.execute` e agrega % offline. |
 | `isp-diagnosis.service.ts` | **Diagnóstico determinístico contrato→login** (spec §2). Compõe `cliente.dados`+`cliente.planos`+`cliente.acesso`, suprime contratos/logins inativos e devolve a próxima etapa (`escolher_contrato`/`escolher_login`/`resolvido`) — o sistema decide, o modelo só apresenta. Rótulo por plano (contrato) e login+referência (login); endereço só quando é próprio (senão herda o do cliente). |
 | `incident-lookup.service.ts` | **Modo reativo**: `activeFor(customer)` que as tools `abrir_os`/`status_regiao` consultam. |
-| `isp-dispatch.service.ts` | **Modo proativo**: disparo em massa por WhatsApp (Meta Orchestrator) com confirmação + rate limit + log. |
-| `isp-incidents.service.ts` | CRUD de incidentes, resolver afetados, ativar/encerrar, orquestra o disparo. Mutations sensíveis auditadas. |
-| `isp-outage-detection.cron.ts` | **Detecção automática de outage — OFF por default**. Só *sugere* rascunho + alerta; nunca dispara sozinho. |
+| `isp-dispatch.service.ts` | **Modo proativo**: disparo em massa por WhatsApp aos CLIENTES (Meta Orchestrator) com confirmação + rate limit + log. |
+| `isp-team-alert.service.ts` | **Alerta INTERNO à equipe de plantão** (frente 6): resolve destinatários (membros da equipe configurada com telefone + opt-in), dispara via `whatsapp-smart-send` (template HSM fora da janela, 1:1), loga em `isp_incident_team_alerts`; sem equipe/elegível/template → degrada pro aviso in-app. |
+| `isp-scope.util.ts` | Helpers puros do escopo: `scopeLabel` (rótulo humano p/ a equipe) + `scopeHash` (dedup determinístico "um escopo, um rascunho"). |
+| `isp-incidents.service.ts` | CRUD de incidentes, resolver afetados, ativar/encerrar, orquestra o disparo aos clientes. **`registerDetectedAnomaly`** (find-or-create rascunho por escopo + cooldown + aciona o plantão) e **`alertTeamForIncident`** (usado pelo cron). Mutations sensíveis auditadas. |
+| `isp-outage-detection.cron.ts` | **Detecção automática de outage — OFF por default**. Sugere rascunho + alerta in-app **e** aciona o plantão (mesmo cooldown); nunca dispara aos clientes sozinho. |
 | `isp-tools.ts` | Registra as tools do agente ISP no `ToolRegistryService` (mesmo mecanismo das builtin). |
 | `isp.controller.ts` | Endpoints `/isp/incidents/*` com `@RequirePermissions`. |
 
@@ -99,6 +101,30 @@ do agente.
   limiar, **apenas alerta** o operador (notificação in-app) — a promoção a
   incidente ativo e o disparo continuam decisões humanas.
 
+## Alerta de incidente à equipe de plantão (frente 6)
+
+Duas fontes detectam uma anomalia de rede e **acionam a equipe interna por WhatsApp**
+(sem avisar o cliente em massa — isso é o modo proativo do `IspDispatchService`):
+
+1. **Reativa (na conversa):** a tool `status_regiao` calcula o % offline do escopo.
+   Se **não** há incidente ativo cobrindo o cliente **e** o % ≥ `isp.incidente.limiar_pct`
+   (config, não o modelo), o sistema chama `registerDetectedAnomaly` e devolve ao modelo
+   uma `situacao` higienizada (`anomalia_regiao`) — **sem** percentual cru. O assistente só
+   diz que há instabilidade na região e que a equipe foi acionada; não abre chamado.
+2. **Proativa (cron):** o `isp-outage-detection.cron` (dupla-OFF) chama `alertTeamForIncident`
+   além do aviso in-app.
+
+`registerDetectedAnomaly` faz find-or-create de um rascunho DRAFT por `scope_hash` (dedup:
+um escopo, um rascunho aberto; o 2º cliente da região não cria outro) e aciona o
+`IspTeamAlertService` respeitando o **cooldown** (`isp.incidente.cooldown_min`). O rascunho
+nasce inerte — a equipe promove a ACTIVE na tela de Incidentes.
+
+**Destinatários (o modelo nunca escolhe):** membros da equipe `isp.equipe.incidente` com
+`core_users.whatsapp_phone` preenchido **e** `comm_attendance_members.receive_incident_alerts=true`.
+Envio via `whatsapp-smart-send` (template `isp.incidente.template` fora da janela de 24h; 1:1,
+nunca grupo). Sem equipe/elegível/template → **degradação graciosa**: aviso in-app (o cliente
+nunca vê erro). Config na tela **ISP → Abertura de chamado** (card "Equipe de plantão").
+
 ## Tools do agente ISP
 
 Semeadas no catálogo `ai_tools` pelo seed da Fase 5 (o `AiProvidersSeedService`
@@ -112,7 +138,7 @@ chama a API do ERP direto e nunca sabe qual ERP está do outro lado**.
 | `diagnosticar_conexao` | `cliente.dados` + `cliente.planos` + `cliente.acesso` | — |
 | `consultar_debitos` | `financeiro.boleto_aberto_todos` + `financeiro.historico` | — |
 | `status_conexao` | `cliente.acesso` | — |
-| `status_regiao` | `conectividade.listar_com_status` (+ checa incidente ativo) | — |
+| `status_regiao` | `conectividade.listar_com_status` (+ incidente ativo + **detecção de anomalia**) | — |
 | `segunda_via_boleto` | `financeiro.boleto_aberto` / `boleto_base64` / `boleto_por_email` | — |
 | `desbloqueio_confianca` | `cliente.desbloqueio` | ✅ requires_approval |
 | `abrir_os` | `os.cadastrar` (suprime OS se incidente ativo) | ✅ requires_approval |

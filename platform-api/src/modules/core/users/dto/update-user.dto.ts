@@ -25,4 +25,10 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  // Telefone (WhatsApp) para notificacoes internas. null/'' = limpar.
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null)
+  @IsString()
+  whatsapp_phone?: string | null;
 }

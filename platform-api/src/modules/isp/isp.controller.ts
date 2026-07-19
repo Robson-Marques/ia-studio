@@ -59,6 +59,16 @@ export class IspController {
     return this.incidents.findTargets(resolveOrganizationId(user, orgQuery), id);
   }
 
+  @Get(':id/team-alerts')
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
+  findTeamAlerts(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.incidents.findTeamAlerts(resolveOrganizationId(user, orgQuery), id);
+  }
+
   @Get(':id/dispatches')
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
   findDispatches(

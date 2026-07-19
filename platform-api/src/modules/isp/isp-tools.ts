@@ -22,6 +22,7 @@ import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
 import { IspDiagnosisService } from './isp-diagnosis.service';
 import { IncidentLookupService } from './incident-lookup.service';
+import { IspIncidentsService } from './isp-incidents.service';
 import { SCOPE_KEYS, ISP_QUEUE_SETTING_KEYS, IspQueueSetor } from './isp.constants';
 import { projectBoleto, projectCliente, projectConexao, projectContrato, rows, limitBoletos } from './isp-projections';
 
@@ -43,6 +44,7 @@ export class IspTools implements OnModuleInit {
     private readonly connectivity: IspConnectivityService,
     private readonly diagnosis: IspDiagnosisService,
     private readonly lookup: IncidentLookupService,
+    private readonly incidents: IspIncidentsService,
     private readonly whatsappInbox: WhatsappInboxService,
     private readonly osConfig: IspOsConfigService,
     private readonly chatAssignment: ChatAssignmentService,
@@ -258,7 +260,7 @@ export class IspTools implements OnModuleInit {
       key: 'status_regiao',
       name: 'Status da região (ISP)',
       description:
-        'Calcula o % de clientes offline por filtros de rede. Falha de rede é topologia, não geografia: prefira porta_pon > id_cto > id_olt > vlan; bairro/cidade só como último recurso. Antes de sugerir OS, verifica incidente ativo.',
+        'Verifica se há anomalia de rede na região do cliente, por filtros de topologia. Falha de rede é topologia, não geografia: prefira porta_pon > id_cto > id_olt > vlan; bairro/cidade só como último recurso. Devolve uma SITUAÇÃO (normal / anomalia_regiao / incidente_ativo) e a orientação — o sistema decide o limiar e, quando é anomalia, já aciona a equipe. Nunca informe percentuais, OLT/CTO ou nº de clientes ao cliente.',
       category: 'isp',
       input_schema: {
         type: 'object',
@@ -281,17 +283,58 @@ export class IspTools implements OnModuleInit {
       handler: async (args, ctx) => {
         if (ctx.dryRun) return { simulated: true };
         const connectionId = await this.connectionId(args, ctx);
-        const summary = await this.connectivity.query(ctx.organizationId, connectionId, this.scopeFromArgs(args));
-        // Reativo: se o cliente pertence a um incidente ativo, informa a manutencao.
-        let incident = null;
+        const scope = this.scopeFromArgs(args);
+        const summary = await this.connectivity.query(ctx.organizationId, connectionId, scope);
+
+        // Reativo: se o cliente ja pertence a um incidente ATIVO, informa a manutencao.
+        let activeIncident = null;
         if (typeof args['customer_ref'] === 'string' && args['customer_ref'].trim()) {
-          incident = await this.lookup.activeFor(ctx.organizationId, args['customer_ref']);
+          activeIncident = await this.lookup.activeFor(ctx.organizationId, args['customer_ref'].trim());
+        }
+        if (activeIncident) {
+          return {
+            situacao: 'incidente_ativo',
+            active_incident: activeIncident,
+            orientacao:
+              'Há manutenção/incidente ativo na região do cliente: informe que a equipe já está atuando e NÃO abra chamado. Não cite percentuais nem detalhes técnicos.',
+          };
+        }
+
+        // Determinismo (regra de ouro): o LIMIAR vem da config, nunca do modelo.
+        const cfg = await this.osConfig.getPlantaoConfig(ctx.organizationId);
+        const hasScope = Object.keys(scope).length > 0;
+        const anomalia = hasScope && summary.total > 0 && summary.offline_pct >= cfg.limiar_pct;
+
+        if (!anomalia) {
+          return {
+            situacao: 'normal',
+            orientacao:
+              'Sem anomalia regional detectada. Se a conexão do cliente estiver offline de forma isolada, siga o fluxo técnico normal (orientar reiniciar o modem; se persistir, oferecer abrir um chamado).',
+          };
+        }
+
+        // Anomalia sem incidente cadastrado (spec §3): o SISTEMA registra o rascunho
+        // por escopo e aciona a equipe de plantao. O modelo so apresenta.
+        let equipeAcionada = false;
+        if (ctx.workspaceId && ctx.environmentId) {
+          try {
+            const r = await this.incidents.registerDetectedAnomaly(ctx.organizationId, {
+              workspaceId: ctx.workspaceId,
+              environmentId: ctx.environmentId,
+              connectionId,
+              scope,
+              stats: { total: summary.total, offline: summary.offline, offline_pct: summary.offline_pct },
+            });
+            equipeAcionada = r.alerted || r.created;
+          } catch (e) {
+            this.logger.warn(`Falha ao acionar a equipe na anomalia de região: ${(e as Error).message}`);
+          }
         }
         return {
-          total: summary.total,
-          offline: summary.offline,
-          offline_pct: summary.offline_pct,
-          active_incident: incident,
+          situacao: 'anomalia_regiao',
+          equipe_acionada: equipeAcionada,
+          orientacao:
+            'Foi identificada uma instabilidade na região do cliente e a equipe já foi acionada. NÃO abra chamado de suporte (é rede, não instalação) e NÃO cite números, OLT/CTO nem percentuais — diga apenas que a equipe já está verificando.',
         };
       },
     });

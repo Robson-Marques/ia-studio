@@ -26,8 +26,15 @@
 > Detalhe por versão está no `CHANGELOG.md` (fonte da verdade por tag). Aqui só o ESTADO vigente.
 > Confirmar a versão real SEMPRE com `git tag | sort -V | tail`.
 
-- **v0.9.74 NO AR** (última tag). O assistente ISP (**NETE**) está completo e validado em produção
-  até a **frente 5**:
+> ⚠️ **Destravamento de release (2026-07-19):** a produção ficou presa em `c7afd43` (era v0.9.74) porque
+> a **Frente 6 nunca foi commitada** e as tags **v0.9.75/v0.9.76/v0.9.77 foram empurradas no commit errado**
+> (apontam pro `c7afd43`, sem código novo — **queimadas, não reusar**). A v0.9.77 queimou numa 2ª tentativa
+> em que o `.git/index.lock` travado bloqueou o commit mas a tag saiu mesmo assim. Destravado seguindo pra
+> frente: **v0.9.78 = Frente 6 + fundação do catálogo HSM** (com `db push`); **v0.9.79 = piloto Studio UX**
+> (isolado). Ao aplicar pelo painel, a produção sai da era v0.9.74 direto pra v0.9.79.
+
+- **v0.9.74 era a última NO AR** até o destravamento acima. O assistente ISP (**NETE**) está completo e
+  validado em produção até a **frente 5**:
   - Identifica (documento > telefone) → **diagnóstico determinístico** contrato→login → status online/offline.
   - **Abre OS** via atendimento (`su_ticket` + processo do assunto) → **encaminha pra fila de Suporte**.
   - **Bloqueado por inadimplência** → **desbloqueio de confiança AUTÔNOMO** (o ERP é o porteiro) → 2ª via → **fila Financeiro**.
@@ -102,11 +109,31 @@ Decisões travadas: **A** = endereço do login se houver, senão do contrato ·
    `/pagar/:token` abriu com os boletos da Carleia). Modelo `IspPaymentLink` (token+snapshot+TTL, sem
    sessão JWT), `@Public GET /isp/pagamento/:token` (410 genérico), tool `gerar_link_pagamento`, config
    na tela ISP (`isp.pagamento.*`). Decisões: janela + TTL 24h configurável + snapshot.
-6. **Alerta de incidentes** (registrar + previsão + notificar equipe via WhatsApp) — ⏭️ **PRÓXIMA**.
-   Infra parcial já existe: `IspIncident`/`IncidentLookupService`/`IspDispatchService` +
-   `status_regiao` (reativo). Recon: ver `isp-incidents.service` + spec.
+6. **Alerta de incidentes** (registrar + previsão + notificar equipe via WhatsApp) — ✅ **IMPLEMENTADA**
+   (aguardando `db push` + deploy + validação humana; ver CHANGELOG v0.9.75). O que faltava era a perna
+   **alerta à EQUIPE** (a infra pré-existente avisava cliente/operador in-app). Feito: `IspTeamAlertService`
+   (destinatários = membros da equipe de plantão com telefone + opt-in; envio via `whatsapp-smart-send`,
+   template fora da janela, 1:1) + `isp-scope.util` (rótulo + hash de dedup) + `registerDetectedAnomaly`/
+   `alertTeamForIncident`/`fireTeamAlert` no `isp-incidents.service`. Gatilho REATIVO na `status_regiao`
+   (agora devolve `situacao` higienizada, limiar da config; sem % cru) + o cron reusa o mesmo alerta. Config
+   `isp.equipe.incidente`/`limiar_pct`/`template`/`cooldown_min` (tela ISP → Abertura de chamado). Roteiro:
+   nova situação "anomalia_regiao" (CONTENT_VERSION **v30**). **PENDÊNCIA operacional:** criar/publicar na
+   Meta o template HSM do alerta e apontá-lo na config; cadastrar telefones dos usuários e ligar o opt-in.
+
+**Padrão de telefone (transversal, entrou junto na v0.9.75):** `components/ui/PhoneInput` (seletor de país,
+E.164 sem `+`) agora OBRIGATÓRIO em todo campo de telefone; backend com `normalizePhoneFromUser`/
+`normalizePhoneFromWhatsApp` (troca da heurística ingênua que corrompia estrangeiro). Porte do delivery-system.
+Pendência do Robson: rodar o mesmo ajuste nos outros sistemas (prompt de propagação entregue).
 
 ## 🧹 Pendências técnicas conhecidas (não urgentes)
+
+- **Catálogo de templates HSM (padrão do Aquapark) — IA Studio NÃO tem.** A regra nova no `CLAUDE.md`
+  exige um catálogo nativo de templates prontos-pra-publicar (seed no boot + `resolveButtonUrl` das ações
+  de botão/links de acesso). O IA Studio hoje só tem CRUD manual de template (`WhatsappTemplate`). **Frente
+  própria:** portar o subsistema `whatsapp-template-catalog/` do Aquapark (`catalog.seed.ts` +
+  `template-actions.ts` + mapper/service/controller + aba "Templates do Sistema"), semeando os templates do
+  ISP como padrões (inclusive o **alerta de incidente** da frente 6). Enquanto não vier, o template do alerta
+  é criado manual na Meta e apontado no card "Equipe de plantão".
 
 - **PIX inline** na página de pagamento: falta o endpoint IXC do "Copiar código PIX" (o `get_boleto
   dados` não traz o EMV). Op `financeiro.boleto_pix` + `findPixEmv` prontas — só trocar a chamada.

@@ -16,7 +16,7 @@ import {
   extractInboundMedia,
   extractMessageText,
   normalizeMessageType,
-  normalizePhone,
+  normalizePhoneFromWhatsApp,
 } from './whatsapp.helpers';
 
 export const WHATSAPP_INBOUND_EVENT = 'whatsapp.inbound.message';
@@ -82,7 +82,7 @@ export class WhatsappInboundService {
 
     for (const raw of messages) {
       const externalId = typeof raw['id'] === 'string' ? (raw['id'] as string) : null;
-      const from = normalizePhone(typeof raw['from'] === 'string' ? (raw['from'] as string) : '');
+      const from = normalizePhoneFromWhatsApp(typeof raw['from'] === 'string' ? (raw['from'] as string) : '');
       if (!externalId || !from) continue;
 
       // Idempotencia: a Meta reentrega webhooks — mesmo wamid nao duplica.

@@ -23,6 +23,9 @@ import { IspRepository } from './isp.repository';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
 import { IspDispatchService, DispatchResult } from './isp-dispatch.service';
+import { IspTeamAlertService, TeamAlertStats } from './isp-team-alert.service';
+import { IspOsConfigService } from './isp-os-config.service';
+import { scopeHash, scopeLabel } from './isp-scope.util';
 import { AuditLogService } from '../../shared/audit/audit-log.service';
 import { assertSameOrg, validateWorkspaceScope } from '../../shared/auth/tenant.util';
 import { PrismaService } from '../../shared/prisma/prisma.service';
@@ -42,6 +45,8 @@ export class IspIncidentsService {
     private readonly resolver: IspConnectionResolver,
     private readonly connectivity: IspConnectivityService,
     private readonly dispatch: IspDispatchService,
+    private readonly teamAlert: IspTeamAlertService,
+    private readonly osConfig: IspOsConfigService,
     private readonly audit: AuditLogService,
     private readonly prisma: PrismaService,
   ) {}
@@ -67,6 +72,11 @@ export class IspIncidentsService {
   async findDispatches(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
     return this.repository.findDispatches(id);
+  }
+
+  async findTeamAlerts(organizationId: string, id: string) {
+    await this.findOne(organizationId, id);
+    return this.repository.findTeamAlerts(id);
   }
 
   // ─── CRUD ───────────────────────────────────────────
@@ -248,6 +258,113 @@ export class IspIncidentsService {
       throw new ConflictException('Só é possível disparar em massa para incidentes ativos.');
     }
     return this.runDispatch(organizationId, incident, dto);
+  }
+
+  // ─── Deteccao de anomalia → alerta a equipe (frente 6) ──────────────
+  //
+  // Chamado pelo SISTEMA (tool status_regiao no modo reativo; cron de outage),
+  // NUNCA pelo modelo. Registra um rascunho por escopo (dedup deterministico) e
+  // aciona o plantao via WhatsApp — com cooldown pra nao re-spammar. O rascunho
+  // nasce DRAFT (inerte: nao dispara nada ao cliente); a equipe promove na tela.
+
+  async registerDetectedAnomaly(
+    organizationId: string,
+    params: {
+      workspaceId: string;
+      environmentId: string;
+      connectionId: string;
+      scope: Record<string, unknown>;
+      stats?: TeamAlertStats;
+      forecast?: string | null;
+    },
+  ): Promise<{ incident_id: string; created: boolean; alerted: boolean; channel?: string; reason?: string }> {
+    const hash = scopeHash(params.scope);
+    // Sem escopo nao ha dedup possivel (seria a base inteira) — nao registra.
+    if (!hash) return { incident_id: '', created: false, alerted: false, reason: 'Escopo vazio.' };
+
+    const cfg = await this.osConfig.getPlantaoConfig(organizationId);
+    let incident = await this.repository.findOpenByScopeHash(organizationId, params.connectionId, hash);
+    let created = false;
+
+    if (!incident) {
+      const label = scopeLabel(params.scope);
+      incident = await this.repository.createIncident({
+        organization_id: organizationId,
+        workspace_id: params.workspaceId,
+        environment_id: params.environmentId,
+        title: label ? `Anomalia detectada — ${label}` : 'Anomalia de rede detectada',
+        message: null,
+        forecast: params.forecast ?? null,
+        status: IspIncidentStatus.DRAFT,
+        scope: params.scope as Prisma.InputJsonValue,
+        scope_hash: hash,
+        connection_id: params.connectionId,
+        comm_mode: IspIncidentCommMode.REACTIVE,
+        // Rascunho da deteccao reativa: NAO entra no sampling do cron (ja alertou).
+        auto_detect: false,
+        created_by: null,
+      });
+      created = true;
+      await this.audit.record({
+        action: 'isp.incident.auto_detected',
+        entityType: 'IspIncident',
+        entityId: incident.id,
+        organizationId,
+        workspaceId: params.workspaceId,
+        newValue: { title: incident.title, scope_hash: hash, stats: params.stats ?? null },
+      });
+    }
+
+    const fired = await this.fireTeamAlert(organizationId, incident, cfg.cooldown_min, params.stats, created);
+    return { incident_id: incident.id, created, ...fired };
+  }
+
+  /**
+   * Aciona o plantao para um incidente JA existente (usado pelo cron de outage,
+   * que ja tem o rascunho auto_detect). Aplica o mesmo cooldown/dedup do caminho
+   * reativo — reusa o IspTeamAlertService (nao reinventa o disparo).
+   */
+  async alertTeamForIncident(
+    organizationId: string,
+    incidentId: string,
+    stats?: TeamAlertStats,
+  ): Promise<{ alerted: boolean; channel?: string; reason?: string }> {
+    const incident = await this.repository.findById(incidentId);
+    if (!incident || incident.organization_id !== organizationId) return { alerted: false, reason: 'Incidente inválido.' };
+    const cfg = await this.osConfig.getPlantaoConfig(organizationId);
+    return this.fireTeamAlert(organizationId, incident, cfg.cooldown_min, stats, false);
+  }
+
+  /** Cooldown anti-spam + disparo ao plantao + touch + auditoria. */
+  private async fireTeamAlert(
+    organizationId: string,
+    incident: IspIncident,
+    cooldownMin: number,
+    stats: TeamAlertStats | undefined,
+    created: boolean,
+  ): Promise<{ alerted: boolean; channel?: string; reason?: string }> {
+    const cooldownMs = cooldownMin * 60 * 1000;
+    const lastAt = incident.last_team_alert_at?.getTime() ?? 0;
+    // created=true (rascunho novo) sempre alerta; senao respeita a janela.
+    if (!created && cooldownMs > 0 && Date.now() - lastAt < cooldownMs) {
+      return { alerted: false, reason: 'Em cooldown.' };
+    }
+    const alertResult = await this.teamAlert.alert(incident, { stats });
+    await this.repository.touchTeamAlertAt(incident.id);
+    await this.audit.record({
+      action: 'isp.incident.team_alerted',
+      entityType: 'IspIncident',
+      entityId: incident.id,
+      organizationId,
+      workspaceId: incident.workspace_id,
+      newValue: {
+        channel: alertResult.channel,
+        recipients: alertResult.recipients,
+        sent: alertResult.sent,
+        failed: alertResult.failed,
+      },
+    });
+    return { alerted: true, channel: alertResult.channel };
   }
 
   private async runDispatch(organizationId: string, incident: IspIncident, dto: DispatchIncidentDto): Promise<DispatchResult> {

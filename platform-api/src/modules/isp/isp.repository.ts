@@ -136,4 +136,65 @@ export class IspRepository {
       orderBy: { created_at: 'desc' },
     });
   }
+
+  // ─── Deteccao/dedup por escopo (frente 6) ───────────
+
+  /**
+   * Incidente ABERTO (DRAFT ou ACTIVE) que cobre o mesmo escopo/conexao — ancora
+   * de dedup: um escopo tem um rascunho aberto (o 2o cliente da regiao nao cria
+   * outro). Match deterministico pelo hash do escopo normalizado.
+   */
+  findOpenByScopeHash(organizationId: string, connectionId: string, scopeHash: string) {
+    return this.prisma.ispIncident.findFirst({
+      where: {
+        organization_id: organizationId,
+        connection_id: connectionId,
+        scope_hash: scopeHash,
+        status: { in: [IspIncidentStatus.DRAFT, IspIncidentStatus.ACTIVE] },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  /** Marca o instante do ultimo alerta a equipe (cooldown anti-spam). */
+  touchTeamAlertAt(id: string) {
+    return this.prisma.ispIncident.update({ where: { id }, data: { last_team_alert_at: new Date() } });
+  }
+
+  // ─── Alerta a equipe de plantao (frente 6) ──────────
+
+  /**
+   * Destinatarios do plantao: membros da equipe com opt-in ligado, cujo usuario
+   * esta ativo e tem telefone cadastrado. Dois passos (AttendanceTeamMember nao
+   * tem relation com User no schema) — resolve os user_ids, depois os usuarios.
+   */
+  async findPlantaoRecipients(
+    organizationId: string,
+    teamId: string,
+  ): Promise<{ user_id: string; name: string; phone: string }[]> {
+    const members = await this.prisma.attendanceTeamMember.findMany({
+      where: { organization_id: organizationId, team_id: teamId, receive_incident_alerts: true },
+      select: { user_id: true },
+    });
+    const ids = members.map((m) => m.user_id);
+    if (ids.length === 0) return [];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: ids }, is_active: true, deleted_at: null, whatsapp_phone: { not: null } },
+      select: { id: true, name: true, whatsapp_phone: true },
+    });
+    return users
+      .filter((u) => (u.whatsapp_phone ?? '').trim())
+      .map((u) => ({ user_id: u.id, name: u.name, phone: (u.whatsapp_phone as string).trim() }));
+  }
+
+  createTeamAlert(data: Prisma.IspIncidentTeamAlertUncheckedCreateInput) {
+    return this.prisma.ispIncidentTeamAlert.create({ data });
+  }
+
+  findTeamAlerts(incidentId: string) {
+    return this.prisma.ispIncidentTeamAlert.findMany({
+      where: { incident_id: incidentId },
+      orderBy: { created_at: 'desc' },
+    });
+  }
 }

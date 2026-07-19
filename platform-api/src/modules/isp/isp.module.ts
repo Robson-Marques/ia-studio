@@ -20,6 +20,7 @@ import { IspConnectivityService } from './isp-connectivity.service';
 import { IspDiagnosisService } from './isp-diagnosis.service';
 import { IncidentLookupService } from './incident-lookup.service';
 import { IspDispatchService } from './isp-dispatch.service';
+import { IspTeamAlertService } from './isp-team-alert.service';
 import { IspIncidentsService } from './isp-incidents.service';
 import { IspOutageDetectionCron } from './isp-outage-detection.cron';
 import { IspTools } from './isp-tools';
@@ -43,6 +44,7 @@ import { IspPaymentLinkController } from './isp-payment-link.controller';
     IspDiagnosisService,
     IncidentLookupService,
     IspDispatchService,
+    IspTeamAlertService,
     IspIncidentsService,
     IspOutageDetectionCron,
     IspTools,

@@ -118,4 +118,24 @@ export class IspOsConfigController {
   ) {
     return this.service.setPagamentoConfig(resolveOrganizationId(user, orgQuery), body ?? {});
   }
+
+  /** Config do alerta de incidente à equipe de plantão (equipe + limiar + template). */
+  @Get('plantao')
+  @ApiOperation({ summary: 'Config do alerta de incidente à equipe de plantão' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
+  getPlantao(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
+    return this.service.getPlantaoConfig(resolveOrganizationId(user, orgQuery));
+  }
+
+  /** Salva a config do plantão. `team_id` é o id de uma AttendanceTeam (ou vazio). */
+  @Put('plantao')
+  @ApiOperation({ summary: 'Salva a config do alerta de incidente à equipe' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
+  setPlantao(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { team_id?: string | null; limiar_pct?: number; template?: string | null; cooldown_min?: number },
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.service.setPlantaoConfig(resolveOrganizationId(user, orgQuery), body ?? {});
+  }
 }

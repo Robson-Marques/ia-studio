@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Pencil, Plus, Users, ListOrdered, Trash2, UserPlus } from 'lucide-react';
+import { Loader2, Pencil, Plus, Users, ListOrdered, Trash2, UserPlus, Bell, BellOff } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Tabs from '../../components/ui/Tabs';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -139,6 +139,25 @@ export default function EquipesFilas() {
       await addTeamMember(membersFor.id, memberForm);
       toast.success('Membro adicionado.');
       setMemberForm({ user_id: '', role: 'MEMBER' });
+      const fresh = await listTeams(true);
+      setTeams(fresh);
+      setMembersFor(fresh.find((t) => t.id === membersFor.id) || null);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleIncidentAlert(m) {
+    setSaving(true);
+    try {
+      // addTeamMember faz upsert (team+user): preserva o papel e alterna o opt-in.
+      await addTeamMember(membersFor.id, {
+        user_id: m.user_id,
+        role: m.role,
+        receive_incident_alerts: !m.receive_incident_alerts,
+      });
       const fresh = await listTeams(true);
       setTeams(fresh);
       setMembersFor(fresh.find((t) => t.id === membersFor.id) || null);
@@ -349,9 +368,24 @@ export default function EquipesFilas() {
                     <p className="text-sm" style={{ color: 'var(--ap-text-1)' }}>{userName(m.user_id)}</p>
                     <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>{m.role === 'SUPERVISOR' ? 'Supervisor' : 'Membro'}</p>
                   </div>
-                  <button title="Remover da equipe" className="text-red-500" disabled={saving} onClick={() => handleRemoveMember(m.user_id)}>
-                    <Trash2 size={15} />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => handleToggleIncidentAlert(m)}
+                      title={m.receive_incident_alerts
+                        ? 'Recebe alerta de incidente por WhatsApp — clique para desligar'
+                        : 'Não recebe alerta de incidente — clique para ligar'}
+                      className="flex items-center gap-1 text-[11px] disabled:opacity-50"
+                      style={{ color: m.receive_incident_alerts ? 'var(--ap-brand, #2563eb)' : 'var(--ap-text-4)' }}
+                    >
+                      {m.receive_incident_alerts ? <Bell size={14} /> : <BellOff size={14} />}
+                      <span className="hidden sm:inline">Alerta de incidente</span>
+                    </button>
+                    <button title="Remover da equipe" className="text-red-500" disabled={saving} onClick={() => handleRemoveMember(m.user_id)}>
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
               ))}
               {(membersFor.members || []).length === 0 && (

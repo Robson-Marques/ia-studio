@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = [
 // Bump este marcador quando quiser que o conteúdo do exemplo (roteiro/persona/
 // system_prompt) seja RE-aplicado no assistente já semeado (é um exemplo, pode
 // atualizar). Ver refreshContent no repositório.
-const CONTENT_VERSION = 'v29-link-pagamento-2via';
+const CONTENT_VERSION = 'v30-alerta-incidente-equipe';
 
 // Ferramentas do assistente ISP: consulta (diagnóstico, débitos, 2ª via, região)
 // + ações controladas — abrir OS (config curada + guards), desbloqueio de
@@ -104,8 +104,12 @@ const ROTEIRO = {
       faca: 'Não é problema técnico e NÃO abre chamado de suporte. Informe com clareza que a conexão está bloqueada por falta de pagamento. Tente o desbloqueio de confiança — a ferramenta executa e o PRÓPRIO provedor decide: se liberar, avise que é um acesso TEMPORÁRIO até o pagamento; se o provedor não permitir (a ferramenta volta sem liberar), não prometa o desbloqueio. Em qualquer caso, ofereça o pagamento para regularizar: gere o LINK DE PAGAMENTO (página pública com a 2ª via, que expira sozinha) e mande a URL que a ferramenta devolver; se ela devolver "error" (ex.: URL pública não configurada), passe então a linha digitável e o link do boleto direto, sem inventar link. Ao final, encaminhe a conversa para a fila do FINANCEIRO para um atendente acompanhar.',
     },
     {
-      quando: 'houver manutenção ou incidente na região do cliente',
-      faca: 'Informe que a equipe já está atuando e NÃO abra chamado (evita chamado duplicado).',
+      quando: 'a verificação da região indicar manutenção/incidente já em andamento (situação "incidente_ativo")',
+      faca: 'Informe que a equipe já está atuando na região e NÃO abra chamado (evita chamado duplicado). Se houver previsão, pode passá-la; nunca cite detalhes técnicos, quantidade de clientes nem percentuais.',
+    },
+    {
+      quando: 'a verificação da região indicar uma anomalia ainda não cadastrada (situação "anomalia_regiao")',
+      faca: 'Diga apenas que você identificou uma possível instabilidade na REGIÃO do cliente e que a equipe já foi acionada para verificar. NÃO abra chamado de suporte (é rede, não instalação individual) e NÃO cite números, percentuais, OLT/CTO nem qualquer detalhe técnico — o sistema já avisou a equipe automaticamente. Se o cliente quiser, ofereça registrar o contato para retorno, mas não prometa prazo.',
     },
     {
       quando: 'o cliente aceitar abrir o chamado (um "sim", "pode", "abre")',

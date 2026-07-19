@@ -55,6 +55,7 @@ export class UsersService {
       email: dto.email,
       password_hash: await hashPassword(dto.password),
       ...(dto.profile_id ? { profile: { connect: { id: dto.profile_id } } } : {}),
+      ...(dto.whatsapp_phone ? { whatsapp_phone: dto.whatsapp_phone.trim() } : {}),
       created_by: createdBy ?? null,
     });
     await this.audit.record({
@@ -92,6 +93,9 @@ export class UsersService {
           : { profile: { connect: { id: dto.profile_id } } }
         : {}),
       ...(dto.is_active !== undefined ? { is_active: dto.is_active } : {}),
+      ...(dto.whatsapp_phone !== undefined
+        ? { whatsapp_phone: dto.whatsapp_phone ? dto.whatsapp_phone.trim() : null }
+        : {}),
       updated_by: updatedBy ?? null,
     });
     if (dto.password !== undefined || dto.is_active === false) {

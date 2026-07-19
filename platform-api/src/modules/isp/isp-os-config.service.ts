@@ -12,7 +12,20 @@ import {
   ISP_PAGAMENTO_TTL_SETTING_KEY,
   ISP_PAGAMENTO_TTL_DEFAULT,
   ISP_PAGAMENTO_BASE_URL_SETTING_KEY,
+  ISP_PLANTAO_TEAM_SETTING_KEY,
+  ISP_PLANTAO_LIMIAR_SETTING_KEY,
+  ISP_PLANTAO_LIMIAR_DEFAULT,
+  ISP_PLANTAO_TEMPLATE_SETTING_KEY,
+  ISP_PLANTAO_COOLDOWN_SETTING_KEY,
+  ISP_PLANTAO_COOLDOWN_DEFAULT,
 } from './isp.constants';
+
+export interface PlantaoConfig {
+  team_id: string | null;
+  limiar_pct: number;
+  template: string | null;
+  cooldown_min: number;
+}
 
 export interface DiscoveredOption {
   id: string;
@@ -97,6 +110,46 @@ export class IspOsConfigService {
       await this.settings.set(organizationId, ISP_PAGAMENTO_BASE_URL_SETTING_KEY, url.replace(/\/$/, ''));
     }
     return this.getPagamentoConfig(organizationId);
+  }
+
+  /** Config do alerta de incidente à equipe de plantão. */
+  async getPlantaoConfig(organizationId: string): Promise<PlantaoConfig> {
+    const team = await this.settings.getValue(organizationId, ISP_PLANTAO_TEAM_SETTING_KEY);
+    const limiar = await this.settings.getValue(organizationId, ISP_PLANTAO_LIMIAR_SETTING_KEY);
+    const template = await this.settings.getValue(organizationId, ISP_PLANTAO_TEMPLATE_SETTING_KEY);
+    const cooldown = await this.settings.getValue(organizationId, ISP_PLANTAO_COOLDOWN_SETTING_KEY);
+    const limiarN = typeof limiar === 'string' ? Number.parseInt(limiar, 10) : NaN;
+    const cooldownN = typeof cooldown === 'string' ? Number.parseInt(cooldown, 10) : NaN;
+    return {
+      team_id: typeof team === 'string' && team ? team : null,
+      limiar_pct: Number.isFinite(limiarN) && limiarN >= 1 && limiarN <= 100 ? limiarN : ISP_PLANTAO_LIMIAR_DEFAULT,
+      template: typeof template === 'string' && template ? template : null,
+      cooldown_min: Number.isFinite(cooldownN) && cooldownN >= 0 ? cooldownN : ISP_PLANTAO_COOLDOWN_DEFAULT,
+    };
+  }
+
+  /** Grava a config do plantão. Valores vazios = limpar (equipe/template). */
+  async setPlantaoConfig(
+    organizationId: string,
+    cfg: { team_id?: string | null; limiar_pct?: number; template?: string | null; cooldown_min?: number },
+  ): Promise<PlantaoConfig> {
+    if (cfg.team_id !== undefined) {
+      await this.settings.set(organizationId, ISP_PLANTAO_TEAM_SETTING_KEY, cfg.team_id ?? '');
+    }
+    if (cfg.limiar_pct !== undefined) {
+      const n = Math.trunc(Number(cfg.limiar_pct));
+      if (!Number.isFinite(n) || n < 1 || n > 100) throw new BadRequestException('Limiar inválido (1 a 100%).');
+      await this.settings.set(organizationId, ISP_PLANTAO_LIMIAR_SETTING_KEY, String(n));
+    }
+    if (cfg.template !== undefined) {
+      await this.settings.set(organizationId, ISP_PLANTAO_TEMPLATE_SETTING_KEY, (cfg.template ?? '').trim());
+    }
+    if (cfg.cooldown_min !== undefined) {
+      const n = Math.trunc(Number(cfg.cooldown_min));
+      if (!Number.isFinite(n) || n < 0 || n > 1440) throw new BadRequestException('Cooldown inválido (0 a 1440 minutos).');
+      await this.settings.set(organizationId, ISP_PLANTAO_COOLDOWN_SETTING_KEY, String(n));
+    }
+    return this.getPlantaoConfig(organizationId);
   }
 
   private async resolveConnectionId(organizationId: string, connectionId?: string): Promise<string> {

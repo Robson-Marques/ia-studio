@@ -37,6 +37,25 @@ export const ISP_PAGAMENTO_TTL_DEFAULT = 24;
 export const ISP_PAGAMENTO_BASE_URL_SETTING_KEY = 'isp.pagamento.base_url';
 
 /**
+ * Alerta de incidente à equipe de plantão (frente 6), em `system_settings` por
+ * organização. A detecção de anomalia (reativa na conversa ou pelo cron) aciona
+ * o plantão via WhatsApp. Config curada — a IA nunca escolhe destinatário nem
+ * limiar; ambos vêm daqui, lidos do banco (determinístico).
+ *   * `team_id`      = equipe responsável (AttendanceTeam). Vazio = não configurado
+ *                     → cai no alerta in-app (degradação graciosa).
+ *   * `limiar_pct`   = % de offline no escopo a partir do qual conta como anomalia.
+ *   * `template`     = template HSM aprovado usado fora da janela de 24h (business-
+ *                     initiated; a Meta oficial exige template — nunca grupo, só 1:1).
+ *   * `cooldown_min` = janela mínima entre dois alertas do MESMO incidente (anti-spam).
+ */
+export const ISP_PLANTAO_TEAM_SETTING_KEY = 'isp.equipe.incidente';
+export const ISP_PLANTAO_LIMIAR_SETTING_KEY = 'isp.incidente.limiar_pct';
+export const ISP_PLANTAO_LIMIAR_DEFAULT = 40;
+export const ISP_PLANTAO_TEMPLATE_SETTING_KEY = 'isp.incidente.template';
+export const ISP_PLANTAO_COOLDOWN_SETTING_KEY = 'isp.incidente.cooldown_min';
+export const ISP_PLANTAO_COOLDOWN_DEFAULT = 60;
+
+/**
  * ERPs de provedor suportados. Todos implementam o MESMO contrato canonico de
  * operacoes (`cliente.dados`, `financeiro.*`, `os.cadastrar`,
  * `conectividade.listar_com_status`...), traduzido internamente por cada

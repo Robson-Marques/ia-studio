@@ -76,6 +76,20 @@ export async function savePagamentoConfig(cfg) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar a config de pagamento')); }
 }
 
+export async function getPlantaoConfig() {
+  try {
+    const { data } = await api.get('/isp/os-config/plantao');
+    return data || { team_id: null, limiar_pct: 40, template: null, cooldown_min: 60 };
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar a config do plantão')); }
+}
+
+export async function savePlantaoConfig(cfg) {
+  try {
+    const { data } = await api.put('/isp/os-config/plantao', cfg);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar a config do plantão')); }
+}
+
 // Público (sem auth): dados da página /pagar/:token.
 export async function getPublicPayment(token) {
   try {

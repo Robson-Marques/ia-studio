@@ -70,11 +70,26 @@ export class AttendanceRepository {
     return this.prisma.attendanceTeamMember.findMany({ where: { user_id: userId } });
   }
 
-  addMember(organizationId: string, teamId: string, userId: string, role: CommTeamRole) {
+  addMember(
+    organizationId: string,
+    teamId: string,
+    userId: string,
+    role: CommTeamRole,
+    receiveIncidentAlerts?: boolean,
+  ) {
     return this.prisma.attendanceTeamMember.upsert({
       where: { team_id_user_id: { team_id: teamId, user_id: userId } },
-      create: { organization_id: organizationId, team_id: teamId, user_id: userId, role },
-      update: { role },
+      create: {
+        organization_id: organizationId,
+        team_id: teamId,
+        user_id: userId,
+        role,
+        ...(receiveIncidentAlerts !== undefined ? { receive_incident_alerts: receiveIncidentAlerts } : {}),
+      },
+      update: {
+        role,
+        ...(receiveIncidentAlerts !== undefined ? { receive_incident_alerts: receiveIncidentAlerts } : {}),
+      },
     });
   }
 

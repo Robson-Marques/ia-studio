@@ -88,4 +88,9 @@ export class AddMemberDto {
 
   @IsIn(['MEMBER', 'SUPERVISOR'])
   role!: 'MEMBER' | 'SUPERVISOR';
+
+  // Opt-in: recebe alerta de incidente ISP via WhatsApp (nasce OFF).
+  @IsOptional()
+  @IsBoolean()
+  receive_incident_alerts?: boolean;
 }

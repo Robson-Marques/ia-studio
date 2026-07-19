@@ -8,6 +8,7 @@ const USER_SAFE_SELECT = {
   organization_id: true,
   name: true,
   email: true,
+  whatsapp_phone: true,
   is_platform_admin: true,
   profile_id: true,
   is_active: true,

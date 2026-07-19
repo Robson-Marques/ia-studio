@@ -9,6 +9,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { IspRepository } from './isp.repository';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspConnectivityService } from './isp-connectivity.service';
+import { IspIncidentsService } from './isp-incidents.service';
 import { NotificationCenterService } from '../automation/notifications/notification-center.service';
 import { processorsEnabled } from '../automation/worker/processors.gate';
 
@@ -21,6 +22,7 @@ export class IspOutageDetectionCron {
     private readonly repository: IspRepository,
     private readonly resolver: IspConnectionResolver,
     private readonly connectivity: IspConnectivityService,
+    private readonly incidents: IspIncidentsService,
     private readonly notifications: NotificationCenterService,
   ) {}
 
@@ -57,6 +59,7 @@ export class IspOutageDetectionCron {
             (incident.scope ?? {}) as Record<string, unknown>,
           );
           if (summary.total > 0 && summary.offline_pct >= limit) {
+            // (1) Aviso in-app: sugere ao operador promover o rascunho a ativo.
             await this.notifications.notify({
               organizationId: incident.organization_id,
               workspaceId: incident.workspace_id,
@@ -64,6 +67,13 @@ export class IspOutageDetectionCron {
               recipient: { user_id: '' }, // broadcast in-app pra org
               title: 'Possível outage detectado',
               body: `O escopo do rascunho "${incident.title}" está com ${summary.offline_pct}% offline (${summary.offline}/${summary.total}). Revise e, se confirmado, ative o incidente.`,
+            });
+            // (2) Alerta a equipe de plantao via WhatsApp — mesmo serviço/cooldown
+            // do caminho reativo (não re-spamma a cada tick de 10 min).
+            await this.incidents.alertTeamForIncident(incident.organization_id, incident.id, {
+              total: summary.total,
+              offline: summary.offline,
+              offline_pct: summary.offline_pct,
             });
             this.logger.warn(
               `Outage sugerido: incidente ${incident.id} — ${summary.offline_pct}% offline (limiar ${limit}%).`,

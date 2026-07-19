@@ -212,6 +212,9 @@ model User {
   organization_id   String?
   name              String
   email             String    @unique
+  // Telefone (E.164) para notificacoes internas via WhatsApp (ex.: alerta de
+  // incidente ISP ao plantao). null = usuario nao recebe WhatsApp.
+  whatsapp_phone    String?
   password_hash     String
   is_platform_admin Boolean   @default(false)
   profile_id        String?
@@ -731,12 +734,23 @@ model WhatsappTemplate {
   meta_template_id String?
   rejection_reason String?
   synced_at        DateTime?
+  // ─── Catálogo de padrões prontos-pra-publicar (docs-as-code) ─────────
+  // is_system_template = veio do SEED_CATALOG (não do CRUD do usuário). event =
+  // gatilho de negócio ao qual o template atende. buttons_json guarda a AÇÃO
+  // simbólica do botão ({type,text,action}) — a URL é resolvida no publish/envio
+  // por resolveButtonUrl. variable_map_json = posição→nome-da-variável por
+  // componente (header/body/footer/buttons).
+  is_system_template Boolean          @default(false)
+  event              String?
+  buttons_json       Json?
+  variable_map_json  Json?
   created_by       String?
   created_at       DateTime           @default(now())
   updated_at       DateTime           @updatedAt
 
   @@unique([connection_id, name, language])
   @@index([organization_id, connection_id])
+  @@index([organization_id, is_system_template])
   @@map("comm_whatsapp_templates")
 }
 
@@ -810,6 +824,9 @@ model AttendanceTeamMember {
   team_id         String
   user_id         String
   role            CommTeamRole @default(MEMBER)
+  // Opt-in por membro: recebe alerta de incidente ISP via WhatsApp. Nasce OFF
+  // (automatismo nasce OFF); o operador liga por pessoa na tela de Equipes.
+  receive_incident_alerts Boolean @default(false)
   created_at      DateTime     @default(now())
 
   team AttendanceTeam @relation(fields: [team_id], references: [id])
@@ -1636,17 +1653,25 @@ model IspIncident {
   template_active_id    String?
   template_normalized_id String?
   auto_detect           Boolean             @default(false)
+  // Hash deterministico do escopo normalizado — dedup do rascunho auto-criado
+  // pela deteccao (reativa/cron): um escopo, um rascunho aberto. null = manual.
+  scope_hash            String?
+  // Cooldown do alerta a equipe: ultimo disparo interno deste incidente, para o
+  // 2o cliente da mesma regiao (ou o tick do cron) nao re-spammar o plantao.
+  last_team_alert_at    DateTime?
   activated_at          DateTime?
   resolved_at           DateTime?
   created_by            String?
   created_at            DateTime            @default(now())
   updated_at            DateTime            @updatedAt
 
-  targets    IspIncidentTarget[]
-  dispatches IspIncidentDispatch[]
+  targets     IspIncidentTarget[]
+  dispatches  IspIncidentDispatch[]
+  team_alerts IspIncidentTeamAlert[]
 
   @@index([organization_id, workspace_id, environment_id])
   @@index([organization_id, status])
+  @@index([organization_id, scope_hash])
   @@map("isp_incidents")
 }
 
@@ -1690,6 +1715,29 @@ model IspIncidentDispatch {
   @@index([incident_id])
   @@index([organization_id, status])
   @@map("isp_incident_dispatches")
+}
+
+// Log por destinatario do ALERTA INTERNO a equipe de plantao (WhatsApp). Difere
+// do IspIncidentDispatch (que avisa o CLIENTE): aqui o alvo e um usuario da org
+// (membro da equipe configurada, com telefone e opt-in). via = caminho do envio
+// inteligente (texto dentro da janela / template fora / skipped).
+model IspIncidentTeamAlert {
+  id              String                    @id @default(uuid())
+  organization_id String
+  incident_id     String
+  user_id         String
+  phone           String
+  via             String?
+  status          IspIncidentDispatchStatus @default(PENDING)
+  error           String?
+  sent_at         DateTime?
+  created_at      DateTime                  @default(now())
+
+  incident IspIncident @relation(fields: [incident_id], references: [id], onDelete: Cascade)
+
+  @@index([incident_id])
+  @@index([organization_id, status])
+  @@map("isp_incident_team_alerts")
 }
 
 // Config de abertura de OS pela IA: pares setor↔assunto VÁLIDOS (curados do

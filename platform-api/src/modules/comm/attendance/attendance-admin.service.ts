@@ -141,13 +141,24 @@ export class AttendanceAdminService {
     if (!user || user.organization_id !== organizationId) {
       throw new BadRequestException('Usuário inexistente ou inativo nesta organização.');
     }
-    const member = await this.repository.addMember(organizationId, teamId, dto.user_id, dto.role as CommTeamRole);
+    const member = await this.repository.addMember(
+      organizationId,
+      teamId,
+      dto.user_id,
+      dto.role as CommTeamRole,
+      dto.receive_incident_alerts,
+    );
     await this.audit.record({
       action: 'comm.whatsapp.team.member.add',
       entityType: 'AttendanceTeamMember',
       entityId: member.id,
       organizationId,
-      newValue: { team_id: teamId, user_id: dto.user_id, role: dto.role },
+      newValue: {
+        team_id: teamId,
+        user_id: dto.user_id,
+        role: dto.role,
+        receive_incident_alerts: member.receive_incident_alerts,
+      },
     });
     return member;
   }

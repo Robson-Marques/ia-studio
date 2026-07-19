@@ -8,6 +8,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import EmptyState from '../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Tr, Td, Badge, Pagination } from '../components/ui/Table';
 import { FormField, TextInput, Select } from '../components/ui/FormField';
+import PhoneInput from '../components/ui/PhoneInput';
 import { listUsers, createUser, updateUser, inactivateUser, activateUser } from '../services/users';
 import { listInvites, createInvite, revokeInvite } from '../services/invites';
 import { listProfiles } from '../services/profiles';
@@ -244,14 +245,14 @@ function UsersTab({ profiles }) {
 }
 
 function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
-  const [form, setForm] = useState({ name: '', email: '', profile_id: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', profile_id: '', password: '', whatsapp_phone: '' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setForm(editing
-      ? { name: editing.name || '', email: editing.email || '', profile_id: editing.profile_id || editing.profile?.id || '', password: '' }
-      : { name: '', email: '', profile_id: '', password: '' });
+      ? { name: editing.name || '', email: editing.email || '', profile_id: editing.profile_id || editing.profile?.id || '', password: '', whatsapp_phone: editing.whatsapp_phone || '' }
+      : { name: '', email: '', profile_id: '', password: '', whatsapp_phone: '' });
   }, [open, editing]);
 
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
@@ -267,7 +268,7 @@ function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
     setSaving(true);
     try {
       if (editing) {
-        await updateUser(editing.id, { name: form.name.trim(), profile_id: form.profile_id });
+        await updateUser(editing.id, { name: form.name.trim(), profile_id: form.profile_id, whatsapp_phone: form.whatsapp_phone || null });
         toast.success('Usuário atualizado.');
       } else {
         await createUser({
@@ -275,6 +276,7 @@ function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
           email: form.email.trim(),
           profile_id: form.profile_id,
           password: form.password,
+          ...(form.whatsapp_phone ? { whatsapp_phone: form.whatsapp_phone } : {}),
         });
         toast.success('Usuário criado.');
       }
@@ -325,6 +327,9 @@ function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
             <option value="">Selecione…</option>
             {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
+        </FormField>
+        <FormField label="WhatsApp para notificações" hint="Usado para alertas internos (ex.: incidente de rede). Deixe vazio se não recebe.">
+          <PhoneInput value={form.whatsapp_phone} onChange={(v) => set('whatsapp_phone', v)} />
         </FormField>
         {!editing && (
           <FormField label="Senha inicial" required hint="Mínimo de 8 caracteres. O usuário pode trocar depois.">

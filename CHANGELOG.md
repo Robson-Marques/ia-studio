@@ -1,5 +1,23 @@
 # Changelog — IA Studio
 
+## v0.9.79 - 2026-07-19 (Piloto de adoção do Studio UX — rota isolada /studio-ux-demo)
+Sem `db push`. Só frontend (`platform-admin`). Consome os pacotes publicados `@studio-ux-ds/{tokens,components,react}` (GitHub Packages, org `studio-ux-ds`) numa rota isolada `/studio-ux-demo` — nenhuma tela existente foi tocada. Os CSS do Studio UX (`--su-*`/`.su*`) coexistem com os `--ap-*` sem colisão; o tema segue o toggle do painel. **Pré-requisito de build:** o servidor precisa de `platform-admin/.npmrc` com token `read:packages` (ver `docs/adocao-studio-ux.md`) — sem ele o `npm install` dos pacotes privados falha. Novos arquivos: `src/pages/StudioUxDemo.jsx`, `docs/adocao-studio-ux.md`; ajustes em `App.jsx` (rota), `main.jsx` (imports CSS), `package.json` (deps).
+
+## v0.9.78 - 2026-07-19 (Frente 6: alerta de incidente à equipe + padrão de telefone + fundação do catálogo HSM)
+
+> Destrava a Frente 6, que estava escrita mas nunca commitada desde a era v0.9.74 (as tags v0.9.75/v0.9.76/v0.9.77 foram empurradas no commit errado — apontam pro `c7afd43`, queimadas; seguimos em v0.9.78).
+
+⚠️ **`db push` (destrutivo, mas só adição)** — colunas novas (`core_users.whatsapp_phone`, `comm_attendance_members.receive_incident_alerts`, `isp_incidents.scope_hash`/`last_team_alert_at`, `comm_whatsapp_templates.is_system_template`/`event`/`buttons_json`/`variable_map_json`) + tabela `isp_incident_team_alerts`. Backend + frontend + `CONTENT_VERSION` v30.
+
+- **Alerta de incidente à equipe (frente 6).** Quando a IA identifica, na conversa, uma anomalia de rede na região de um cliente **sem incidente cadastrado**, o **sistema** (não o modelo) registra um rascunho de incidente por escopo e **aciona a equipe de plantão por WhatsApp**. O assistente só diz "identifiquei uma instabilidade na sua região, a equipe já foi acionada", não abre chamado e não vaza %/OLT/CTO.
+  - **`status_regiao` virou determinístico e higienizado:** devolve uma `situacao` (`normal` / `anomalia_regiao` / `incidente_ativo`) + orientação — o **limiar vem da config**, não do modelo; não devolve mais percentual cru. Quando é anomalia, o sistema já aciona a equipe.
+  - **Destinatário = usuário→equipe→opt-in:** os alvos são os membros da **equipe de plantão configurada** (`isp.equipe.incidente`) com **telefone cadastrado** e o **opt-in "recebe alerta de incidente" ligado** no vínculo com a equipe. Resolvido no banco (determinístico); envio via `whatsapp-smart-send` (template HSM fora da janela, 1:1, nunca grupo — limite da Meta). Sem equipe/elegível/template → degradação graciosa (alerta in-app).
+  - **Cron de outage** passou a reusar o mesmo alerta à equipe (além do in-app), com a mesma dedup/cooldown e as duas travas OFF.
+  - Config nova na tela **ISP → Abertura de chamado**: card "Equipe de plantão" (equipe + limiar % + template + cooldown). Campos novos: telefone no cadastro de Usuários e toggle "recebe alerta" por membro em WhatsApp → Equipes e Filas. Log por destinatário em `isp_incident_team_alerts`; auditoria `isp.incident.auto_detected`/`team_alerted`.
+- **Padrão de telefone (porte do delivery-system).** Novo `components/ui/PhoneInput` (seletor de país + busca, guarda E.164 sem `+`), agora **obrigatório** para todo campo de telefone (CLAUDE.md). Backend ganhou `normalizePhoneFromUser`/`normalizePhoneFromWhatsApp`/`isValidPhone`/`phoneVariants` — o `normalizePhone` ingênuo (que corrompia número estrangeiro de 11 dígitos) foi trocado pela heurística madura; inbound do WhatsApp passou a usar `normalizePhoneFromWhatsApp`.
+- **Fundação do catálogo de templates HSM (Fase A, inerte).** Porte do padrão do Aquapark (adaptado ao multi-tenant): `WhatsappTemplate` ganhou `is_system_template`/`event`/`buttons_json`/`variable_map_json`; `comm/whatsapp/template-catalog/` com `catalog.seed.ts` (só o template do **alerta de incidente**) e `template-actions.ts` (`resolveButtonUrl` ação→link + `system.public_url`). Ainda **não fiado** (sem mapper/service/boot-seeder) — arquivos puros, não referenciados, sem efeito em runtime. A fiação (seed por org + publish na Meta) é a próxima frente.
+- **Regras novas no CLAUDE.md.** (1) **Templates HSM**: o sistema tem que ter um catálogo nativo de padrões prontos-pra-publicar, com botões/links de acesso via `action`→`resolveButtonUrl`; todo novo emissor fora da janela de 24h nasce com sua linha no catálogo. (2) **Rodapé da sidebar**: aviso passivo de "nova versão disponível" (via `GET /system/version`), padrão portado do delivery-system.
+
 ## v0.9.74 - 2026-07-13 (PIX copia-e-cola na página de pagamento)
 
 Sem `db push`. Backend (provider IXC + tool) + frontend (página pública).

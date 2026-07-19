@@ -15,4 +15,9 @@ export class CreateUserDto {
   @IsOptional()
   @IsUUID()
   profile_id?: string;
+
+  // Telefone (WhatsApp) para notificacoes internas (ex.: alerta de incidente ISP).
+  @IsOptional()
+  @IsString()
+  whatsapp_phone?: string;
 }
