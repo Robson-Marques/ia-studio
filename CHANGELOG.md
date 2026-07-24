@@ -1,5 +1,44 @@
 # Changelog — IA Studio
 
+## v0.9.82 - 2026-07-24 (Fix build — bump @studio-ux-ds/* de ^1.0.15 para ^1.2.9)
+
+Sem `db push`. Só `platform-admin/package.json`. Nasce depois que a aplicação de **v0.9.81** falhou em `ADMIN_BUILD` com:
+
+```
+src/context/ThemeContext.jsx (2:9): "isDark" is not exported by
+"node_modules/@studio-ux-ds/react/index.js"
+```
+
+Causa: a v0.9.80 do IA Studio (adoção do Studio UX) usou `isDark`/`setTheme` do `@studio-ux-ds/react` no `ThemeContext.jsx` — mas esses símbolos só passaram a ser exportados pelo barrel `index.js` em versão posterior a 1.0.15. O `package.json` estava pinado em `^1.0.15` desde a fase 1 do piloto (v0.9.79); o `npm install` do upgrade continuava resolvendo 1.0.15, que não tinha `isDark`/`setTheme`. Erro meu (Claude) por não ter conferido a versão instalada antes de importar.
+
+### Alterado
+
+- `platform-admin/package.json` — bump das 3 deps do DS de `^1.0.15` para `^1.2.9`:
+  - `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` sobem em lockstep.
+- Impacto: com o `^1.2.9` (que permite qualquer 1.x.y), o `npm install` resolve para a versão mais recente compatível — que exporta `isDark`, `setTheme`, `AppShell`, `PageHeader`, `Customize`, `ToastProvider`, `useToast` e tudo o mais que a fase 2 depende.
+
+### Como aplicar no servidor
+
+Este commit também precisa do `upgrade.sh` v0.9.81+ (que faz `source .env`) já no disco. Se ainda não trouxe:
+
+```bash
+cd /opt/iastudio
+git fetch --tags origin
+# Trazer upgrade.sh v0.9.82 + package.json v0.9.82 pro disco (sem mexer no HEAD):
+git checkout v0.9.82 -- scripts/upgrade.sh platform-admin/package.json
+
+# Forçar reinstall do platform-admin (o package-lock antigo travava em 1.0.15):
+rm -rf /opt/iastudio/platform-admin/node_modules /opt/iastudio/platform-admin/package-lock.json
+
+# Aplicar v0.9.82 no painel: Configurações > Atualização > Atualizar
+```
+
+O upgrade.sh vai fazer `npm install` limpo (agora resolvendo 1.2.9), depois `vite build` — dessa vez o build **vai gerar dist novo** com `AppShell`, `PageHeader`, `StatCard` etc. do DS. Data do `/opt/iastudio/platform-admin/dist/assets/*.js` vai passar a ser 24/jul.
+
+### Nota sobre v0.9.81
+
+O painel mostra "v0.9.81" e "Instância atualizada" — é bug de UI do painel. A tabela `system_upgrades` confirma: `v0.9.81 status=FAILED error_step=ADMIN_BUILD`. Nenhum dist novo foi gerado. O que roda em produção é ainda o dist da v0.9.79 (19/jul). v0.9.82 é a primeira aplicação que realmente vai substituir o dist.
+
 ## v0.9.81 - 2026-07-24 (Fix deploy — upgrade.sh carrega .env antes do npm install; install.sh pergunta NODE_AUTH_TOKEN)
 
 Sem `db push`. Só scripts + docs. Nasce depois que a aplicação de **v0.9.80** falhou em `ADMIN_BUILD` no painel com **npm E401** — o `.npmrc` versionado referencia `${NODE_AUTH_TOKEN}`, mas o `upgrade.sh` é spawnado detached pelo backend PM2 e não herdava `.bashrc` do root nem tinha a var no ambiente. Correção estrutural: **fonte única de segredos = `.env` do platform-api**, o `upgrade.sh` faz `source .env` antes de qualquer build, e o `install.sh` pergunta o token durante instalação (ou aceita `--npm-token=...` em modo headless).
