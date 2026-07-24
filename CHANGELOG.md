@@ -1,5 +1,38 @@
 # Changelog — IA Studio
 
+## v0.9.86 - 2026-07-24 (Migração visual — IA/Aprovacoes pro Studio UX; 3/6 da família IA Studio)
+
+Sem `db push`. Só frontend. Terceira tela da família IA Studio migrada.
+
+### Alterado
+
+- `pages/IA/Aprovacoes.jsx` — reescrito com componentes do DS: `PageHeader`, `Tabs`, `Card`, `DataTable`, `EmptyState`, `Badge` (tone), `Modal` (maxWidth), `ConfirmDialog`, `Field`, `Input`, `Select`, `TextArea`, `Button` (variant), `Checkbox`. `useToast` já vinha do sweep.
+- **Fix registrado na dívida técnica do IA Studio**: os 2 botões inline com Tailwind hardcoded (`bg-emerald-600` no "Aprovar" e `bg-red-600` no "Rejeitar" nas linhas 111-124 do legado + `bg-red-600` no footer do `RejectModal` linha 196) — que fugiam do sistema de `.su-btn` — foram substituídos por `<Button variant="primary">` (Aprovar, ação primária positiva) e `<Button variant="danger">` (Rejeitar, ação destrutiva). Alinhado ao padrão do DS.
+- Botões na linha do DataTable renderizados via `renderRowMenu` do DS (o "…" contextual). "Aprovar" e "Rejeitar" com `title` (tooltip) preservado do legado.
+- `PolicyModal`: `Textarea` com estilo mono para JSON via `style` inline (o DS não tem prop `variant="mono"` no TextArea — se surgir necessidade recorrente, sub-frente própria pra evoluir DS). `<input type="checkbox">` inline substituído por `<Checkbox>` do DS.
+- Helper `statusToTone` mapeia variantes do legado (`green`/`red`/`yellow`/`blue`/`purple`/`gray`) pros tones do DS (`success`/`danger`/`warning`/`info`/`info`/`neutral`) sem alterar `APPROVAL_STATUS` (fonte compartilhada em `ia.constants`).
+- Comportamento e API preservados 1:1: mesmos endpoints, mesmos payloads, mesmo fluxo de 5 patrasques (ConfirmDialog para aprovar; Modal com motivo para rejeitar), mesmas permissões (`ai.approvals.decide`).
+
+### Adicionado
+
+- `pages/IA/Aprovacoes.legacy.jsx` — backup literal para rollback.
+
+### Modais siblings — nota
+
+`Aprovacoes` está na lista das 9 páginas com modais siblings (ConfirmDialog approve + RejectModal + PolicyModal, 3 states independentes). Como todos os 3 são excludentes na prática (só um se abre por vez) e não empilham, migrei tal como estão — dívida técnica de refactor arquitetural (rotas dedicadas ou máquina de estado explícita) segue registrada em `docs/adocao-studio-ux.md` como sub-frente futura.
+
+### Testar após aplicar
+
+1. **IA Studio → Pendências**, aba **Fila**: se vazio, `EmptyState` "Nada pendente". Se com dados, `DataTable` com colunas Alvo/Status/Solicitada + botões Aprovar (primário roxo) / Rejeitar (vermelho) por linha.
+2. Clicar em **Aprovar** → abre `ConfirmDialog` com título "Aprovar ação" + mensagem explicativa + botão vermelho "Aprovar e executar". Confirmar chama backend, toast, recarrega.
+3. Clicar em **Rejeitar** → abre `Modal` com mensagem explicativa + `TextArea` de motivo opcional + botão vermelho "Rejeitar". Confirmar chama backend, toast, recarrega.
+4. Aba **Políticas**: header com botão "Nova política" à direita; `DataTable` com colunas Nome/Alvo/Condição/Status; ou `EmptyState` se vazio.
+5. **Nova política** → Modal com Nome/Descrição/Alvo/Condição JSON (TextArea mono) + Checkbox "Ativar imediatamente". Validar JSON errado → toast "Condição: JSON inválido.". Salvar → toast + recarrega.
+
+### Restantes na família (3 telas)
+
+`v0.9.87 Ferramentas` → `v0.9.88 BasesConhecimento` → `v0.9.89 Agentes + 3 editors`.
+
 ## v0.9.85 - 2026-07-24 (Bump DS ^1.2.10 + Custos.fullWidth + Memoria migrada; 2/6 da família IA Studio)
 
 Sem `db push`. Só frontend. Release combinado com 3 mudanças acopladas:
