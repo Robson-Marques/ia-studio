@@ -3,7 +3,7 @@ import { Bell, Loader2, RefreshCcw } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Tr, Td, Badge, Pagination } from '../../components/ui/Table';
 import { getNotificationsLog } from '../../services/automation';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { NOTIFICATION_STATUS, formatDateTime } from './automation.constants';
 
 const PER_PAGE = 50;
@@ -11,6 +11,7 @@ const CHANNEL = { whatsapp: 'WhatsApp', email: 'E-mail', in_app: 'Sino', none: '
 
 // Log de entrega do Notification Center (diretriz 22). O sino fica no Header.
 export default function Notificacoes() {
+  const toast = useToast();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);

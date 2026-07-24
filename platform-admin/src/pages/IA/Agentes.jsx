@@ -9,7 +9,7 @@ import {
 } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { formatDateTime } from './ia.constants';
 import AgentEditorModal from './editor/AgentEditorModal';
 import AgentVersionsModal from './editor/AgentVersionsModal';
@@ -19,6 +19,7 @@ import AgentExecuteModal from './editor/AgentExecuteModal';
 // Conhecimento/Memória/Aprovações/Custos). Ações: Publicar/Rollback (versões),
 // Testar (execução com transcript+tokens+custo), Exportar/Importar (sem secrets).
 export default function Agentes() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -224,6 +225,7 @@ export default function Agentes() {
 }
 
 function ImportAgentModal({ open, onClose, onImported, workspaceId, environmentId }) {
+  const toast = useToast();
   const [json, setJson] = useState('');
   const [saving, setSaving] = useState(false);
 

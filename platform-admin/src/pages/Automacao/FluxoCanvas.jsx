@@ -29,7 +29,7 @@ import {
 import { listConnections } from '../../services/integrations';
 import { listAgents } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { NODE_CATEGORY_ORDER } from './automation.constants';
 import { StatusBadge } from './Fluxos';
 import TriggerEditor from './editor/TriggerEditor';
@@ -240,6 +240,7 @@ function InspectorField({ field, value, jsonDraft, refs, disabled, onChange, onJ
 
 // ─── Canvas interno (dentro do ReactFlowProvider) ────────────
 function FluxoCanvasInner() {
+  const toast = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const { can } = usePermissions();

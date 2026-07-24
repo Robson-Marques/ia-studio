@@ -1,19 +1,4 @@
-// Bus de eventos simples para toasts de UI (erros/sucessos de formularios).
-// O UIToastContainer escuta estes eventos e renderiza.
-
-const EVENT = 'iastudio:ui-toast';
-
-export function emitToast(type, message, opts = {}) {
-  window.dispatchEvent(new CustomEvent(EVENT, {
-    detail: { type, message, ...opts },
-  }));
-}
-
-export const toast = {
-  success: (msg, opts) => emitToast('success', msg, opts),
-  error:   (msg, opts) => emitToast('error',   msg, opts),
-  info:    (msg, opts) => emitToast('info',    msg, opts),
-  warn:    (msg, opts) => emitToast('warn',    msg, opts),
-};
-
-export const TOAST_EVENT = EVENT;
+// APAGADO 2026-07-24 — sweep de Toast concluído.
+// Este arquivo era o bus de eventos legado (`iastudio:ui-toast` → UIToastContainer).
+// Todos os callsites migraram para `useToast()` do @studio-ux-ds/react.
+// Nenhum código do painel importa daqui. Pode ser removido do disco a qualquer momento.

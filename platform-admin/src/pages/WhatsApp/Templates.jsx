@@ -4,8 +4,8 @@ import Modal from '../../components/ui/Modal';
 import EmptyState from '../../components/ui/EmptyState';
 import { Badge, Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui/Table';
 import { FormField, Select, TextInput, Textarea } from '../../components/ui/FormField';
+import { useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
 import { formatDateTime } from '../../lib/format';
 import { createTemplate, listNumbers, listTemplates, syncTemplates } from '../../services/whatsapp';
 import { TEMPLATE_STATUS } from './whatsapp.constants';
@@ -18,6 +18,7 @@ const EMPTY_FORM = {
 // Templates HSM por conexão: lista com status Meta, criação com componentes
 // básicos (header/body/footer/buttons) e sincronização bidirecional.
 export default function Templates() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [numbers, setNumbers] = useState([]);
   const [connectionId, setConnectionId] = useState('');

@@ -7,8 +7,8 @@ import EmptyState from '../../components/ui/EmptyState';
 import { Badge, Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui/Table';
 import { FormField, Select, TextInput } from '../../components/ui/FormField';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useToast } from '@studio-ux-ds/react';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
 import {
   addTeamMember, createQueue, createTeam, listAttendanceUsers,
   listQueues, listTeams, removeTeamMember, updateQueue, updateTeam,
@@ -22,6 +22,7 @@ const TABS = [
 // Equipes e Filas da Central de Atendimento — CRUD + membros. Exclusão é
 // SOFT-DELETE (desativar) com checagem de conversas abertas no backend.
 export default function EquipesFilas() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [tab, setTab] = useState('teams');

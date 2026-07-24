@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck } from 'lucide-react';
+import { useToast } from '@studio-ux-ds/react';
 import { getNotificationsInbox, markNotificationRead, markAllNotificationsRead } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
 import { formatDateTime } from '../../pages/Automacao/automation.constants';
 
 // Sino do Header (Notification Center — diretriz 22): polling 30s de não
 // lidas + dropdown com as últimas notificações in-app do usuário.
 export default function NotificationsBell() {
+  const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
   const [open, setOpen] = useState(false);

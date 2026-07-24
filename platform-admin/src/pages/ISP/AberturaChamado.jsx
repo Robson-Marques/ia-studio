@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Plus, Trash2, Wrench, Star, Users, Receipt, Link2, BellRing } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
+import { useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
 import { discoverOsResources, getOsConfig, saveOsConfig, getFilaMapping, saveFilaMapping, getBoletoMax, saveBoletoMax, getPagamentoConfig, savePagamentoConfig, getPlantaoConfig, savePlantaoConfig } from '../../services/isp';
 import { listQueues, listTeams } from '../../services/whatsapp';
 
 // Configura a abertura de OS pela IA: pares setor↔assunto do ERP (descobertos),
 // com um marcado como padrão de suporte. A IA só usa o que está aqui.
 export default function AberturaChamado() {
+  const toast = useToast();
   const { can } = usePermissions();
   const canManage = can('isp.incidents.write');
   const [loading, setLoading] = useState(true);

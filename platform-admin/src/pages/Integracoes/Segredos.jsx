@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { KeyRound, Loader2, RefreshCcw } from 'lucide-react';
+import { useToast } from '@studio-ux-ds/react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
@@ -8,12 +9,12 @@ import { FormField, TextInput } from '../../components/ui/FormField';
 import { listSecrets, rotateSecret } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
-import { toast } from '../../lib/toast';
 import { SECRET_KIND_LABELS } from './integration.constants';
 
 // Cofre de Segredos (diretriz 5): lista SOMENTE metadados — o valor cifrado
 // nunca sai por HTTP. Ação disponível: rotacionar (novos valores).
 export default function Segredos() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);

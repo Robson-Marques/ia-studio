@@ -1,22 +1,33 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Boxes, PlayCircle, Cpu, Loader2, CreditCard } from 'lucide-react';
-import StatCard from '../components/ui/StatCard';
-import { Badge } from '../components/ui/Table';
+import { Loader2 } from 'lucide-react';
+import { PageHeader, StatCard, Card, Badge, useToast } from '@studio-ux-ds/react';
 import { getLicense } from '../services/account';
 import { useAuth } from '../context/AuthContext';
 import { formatNumber, formatLimit, formatDate } from '../lib/format';
-import { toast } from '../lib/toast';
 
-const STATUS_BADGE = {
-  TRIAL:      { label: 'Trial',      variant: 'blue' },
-  ACTIVE:     { label: 'Ativa',      variant: 'green' },
-  RESTRICTED: { label: 'Restrita',   variant: 'yellow' },
-  SUSPENDED:  { label: 'Suspensa',   variant: 'red' },
-  EXPIRED:    { label: 'Expirada',   variant: 'red' },
-  CANCELLED:  { label: 'Cancelada',  variant: 'gray' },
+// Dashboard — primeira tela após login. Migrado para o padrão visual do
+// Studio UX (passo 3 da expansão de adoção, 2026-07-24): PageHeader + StatCard
+// + Card do DS. Dados/lógica idênticos ao Dashboard.legacy — apenas a casca da
+// tela mudou. `toast` segue apontando pro `lib/toast` do IA Studio (o sweep pra
+// useToast() do DS é o próximo passo).
+
+// StatCard do DS aceita `tone` = neutral | info | success | warning | danger.
+// Mapeamento das 4 métricas do legado (que usavam `color` = brand/blue/green/purple):
+//   Usuários      → info      (era brand/indigo)
+//   Workspaces    → info      (era blue)
+//   Execuções     → success   (era green)
+//   Consumo de IA → neutral   (era purple — sem equivalente exato; neutro é sóbrio)
+const STATUS_TO_DS = {
+  TRIAL:      { label: 'Trial',      status: 'info' },
+  ACTIVE:     { label: 'Ativa',      status: 'success' },
+  RESTRICTED: { label: 'Restrita',   status: 'warning' },
+  SUSPENDED:  { label: 'Suspensa',   status: 'danger' },
+  EXPIRED:    { label: 'Expirada',   status: 'danger' },
+  CANCELLED:  { label: 'Cancelada',  status: 'default' },
 };
 
 export default function Dashboard() {
+  const toast = useToast();
   const { me } = useAuth();
   const [license, setLicense] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -47,75 +58,65 @@ export default function Dashboard() {
   const usage  = license?.usage  || {};
   const limits = license?.limits || {};
   const planName = license?.plan?.name || license?.plan_name || license?.plan || '—';
-  const statusInfo = STATUS_BADGE[license?.status] || { label: license?.status || '—', variant: 'gray' };
+  const statusInfo = STATUS_TO_DS[license?.status] || { label: license?.status || '—', status: 'default' };
   const workspacesCount = usage.workspaces ?? (me?.workspaces?.length || 0);
+
+  const trialOrExpiryText = license?.status === 'TRIAL' && license?.trial_ends_at
+    ? `Trial termina em ${formatDate(license.trial_ends_at)}.`
+    : license?.expires_at
+      ? `Válida até ${formatDate(license.expires_at)}.`
+      : null;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>
-          {me?.organization?.name || 'Dashboard'}
-        </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Visão geral da sua conta no mês corrente.
-        </p>
-      </div>
+      <PageHeader
+        title={me?.organization?.name || 'Dashboard'}
+        subtitle="Visão geral da sua conta no mês corrente."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Usuários"
           value={formatNumber(usage.users ?? 0)}
-          sub={`Limite: ${formatLimit(limits.users)}`}
-          icon={Users}
-          color="brand"
+          delta={`Limite: ${formatLimit(limits.users)}`}
+          tone="info"
         />
         <StatCard
           label="Workspaces"
           value={formatNumber(workspacesCount)}
-          sub={`Limite: ${formatLimit(limits.workspaces)}`}
-          icon={Boxes}
-          color="blue"
+          delta={`Limite: ${formatLimit(limits.workspaces)}`}
+          tone="info"
         />
         <StatCard
           label="Execuções no mês"
           value={formatNumber(usage.executions ?? 0)}
-          sub={`Limite: ${formatLimit(limits.executions)}`}
-          icon={PlayCircle}
-          color="green"
+          delta={`Limite: ${formatLimit(limits.executions)}`}
+          tone="success"
         />
         <StatCard
           label="Consumo de IA no mês"
           value={formatNumber(usage.tokens ?? 0)}
-          sub={`Limite: ${formatLimit(limits.tokens)}`}
-          icon={Cpu}
-          color="purple"
+          delta={`Limite: ${formatLimit(limits.tokens)}`}
+          tone="neutral"
         />
       </div>
 
-      {/* Card do plano */}
-      <div className="card p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-brand/10 text-brand">
-            <CreditCard size={20} />
+      <Card>
+        <div style={{ padding: 20 }}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ap-text-4)' }}>
+                Plano atual
+              </p>
+              <p className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>{planName}</p>
+            </div>
+            <Badge status={statusInfo.status}>{statusInfo.label}</Badge>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ap-text-4)' }}>
-              Plano atual
-            </p>
-            <p className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>{planName}</p>
-          </div>
-          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+          {trialOrExpiryText && (
+            <p className="text-xs mt-3" style={{ color: 'var(--ap-text-4)' }}>{trialOrExpiryText}</p>
+          )}
         </div>
-        {(license?.trial_ends_at || license?.expires_at) && (
-          <p className="text-xs mt-3" style={{ color: 'var(--ap-text-4)' }}>
-            {license?.status === 'TRIAL' && license?.trial_ends_at
-              ? `Trial termina em ${formatDate(license.trial_ends_at)}.`
-              : license?.expires_at
-                ? `Válida até ${formatDate(license.expires_at)}.`
-                : null}
-          </p>
-        )}
-      </div>
+      </Card>
     </div>
   );
 }

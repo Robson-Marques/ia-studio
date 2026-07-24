@@ -9,7 +9,7 @@ import {
 } from '../services/workspaces';
 import { usePermissions } from '../hooks/usePermissions';
 import { useAuth } from '../context/AuthContext';
-import { toast } from '../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 
 const ENV_TYPES = [
   { value: 'PRODUCTION',  label: 'Produção',        variant: 'green' },
@@ -20,6 +20,7 @@ const ENV_TYPES = [
 const envInfo = (type) => ENV_TYPES.find((e) => e.value === type) || { label: type, variant: 'gray' };
 
 export default function Workspaces() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { refreshMe } = useAuth();
   const [items, setItems] = useState([]);
@@ -153,6 +154,7 @@ export default function Workspaces() {
 }
 
 function WorkspaceFormModal({ open, editing, onClose, onSaved }) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -203,6 +205,7 @@ function WorkspaceFormModal({ open, editing, onClose, onSaved }) {
 }
 
 function EnvironmentFormModal({ open, workspace, editing, onClose, onSaved }) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [type, setType] = useState('DEVELOPMENT');
   const [saving, setSaving] = useState(false);

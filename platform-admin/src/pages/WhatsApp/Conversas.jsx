@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
+import { useToast } from '@studio-ux-ds/react';
 import { useAuth } from '../../context/AuthContext';
-import { toast } from '../../lib/toast';
 import {
   getChat, getChatCounts, getChatWindow, getWhatsappScope, listChats, listMessages,
   listTemplates, markChatRead,
@@ -17,6 +17,7 @@ const POLL_MS = 5000; // realtime desta fase = polling 5s (sem WebSocket — ver
 // Conversas WhatsApp — contact center: lista (abas por escopo) + janela da
 // conversa + composer com janela de 24h + ações de atendimento.
 export default function Conversas() {
+  const toast = useToast();
   const { user, me } = useAuth();
   const meId = me?.user?.id || user?.id || user?.sub || null;
 

@@ -6,7 +6,7 @@ import { Badge } from '../../components/ui/Table';
 import { Select } from '../../components/ui/FormField';
 import { getMarketplace, installProvider, uninstallProvider } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { CATEGORY_LABELS, categoryLabel } from './integration.constants';
 import ConnectionWizard from './ConnectionWizard';
 

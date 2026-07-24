@@ -5,8 +5,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Table';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
 import {
   claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia, unlinkCustomer,
 } from '../../services/whatsapp';
@@ -28,6 +28,7 @@ function StatusTicks({ status }) {
 // backend). Serve tanto pra mídia recebida quanto pra mídia enviada por upload
 // do aparelho (persistida com media_id) — o download por media_id é direção-agnóstico.
 function ChatMedia({ chatId, message }) {
+  const toast = useToast();
   const media = message.media || {};
   const outgoing = message.direction === 'OUTGOING';
   const [data, setData] = useState(media.url ? { src: media.url, mime: media.mime_type } : null);
@@ -123,6 +124,7 @@ export default function ChatWindow({
   chat, messages, windowInfo, templates, scope, meId,
   onRefresh, onOpenTransfer, onOpenTimeline, onSent,
 }) {
+  const toast = useToast();
   const { can } = usePermissions();
   const scrollRef = useRef(null);
   const [acting, setActing] = useState(false);

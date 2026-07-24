@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Sparkles, Loader2 } from 'lucide-react';
+import { useToast } from '@studio-ux-ds/react';
 import { useAuth } from '../context/AuthContext';
-import { toast } from '../lib/toast';
 
 export default function Login() {
+  const toast = useToast();
   const { login, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');

@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollText, Loader2, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { useToast } from '@studio-ux-ds/react';
 import EmptyState from '../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Td, Badge, Pagination } from '../components/ui/Table';
 import { TextInput } from '../components/ui/FormField';
 import { listAudit } from '../services/audit';
 import { formatDateTime } from '../lib/format';
-import { toast } from '../lib/toast';
 
 const PER_PAGE = 20;
 
 // Tela de auditoria da organização. Filtros: ação, entidade, período.
 // Expandir a linha mostra old/new value em JSON formatado.
 export default function Auditoria({ fetcher = listAudit, title = 'Auditoria', subtitle = 'Trilha de ações administrativas da organização.' }) {
+  const toast = useToast();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

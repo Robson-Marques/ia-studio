@@ -1,7 +1,7 @@
 import React from 'react';
 import { Copy, Sparkles } from 'lucide-react';
+import { useToast } from '@studio-ux-ds/react';
 import { FormField, TextInput, Select } from '../../components/ui/FormField';
-import { toast } from '../../lib/toast';
 
 // Renderizador declarativo dos campos do wizard_schema — COMPARTILHADO entre o
 // ConnectionWizard (criação) e o EditConnectionModal (edição). Nenhum código
@@ -20,6 +20,10 @@ export function generateToken() {
   return `ias_${hex}`;
 }
 
+// Puro: escreve no clipboard e retorna true/false. Toast é responsabilidade
+// do caller (componente React usa useToast) — assim `copyToClipboard` não é
+// mais função exportada com toast embutido (que impedia migração pro useToast
+// do DS, que é hook e só funciona em componente).
 export async function copyToClipboard(text) {
   try {
     if (navigator.clipboard?.writeText) {
@@ -35,16 +39,22 @@ export async function copyToClipboard(text) {
       document.execCommand('copy');
       document.body.removeChild(el);
     }
-    toast.success('Copiado');
+    return true;
   } catch {
-    toast.error('Não foi possível copiar. Copie manualmente.');
+    return false;
   }
 }
 
 // Caixa com a URL do webhook (origin + schema.webhookPath) pronta pra colar na Meta.
 export function WebhookUrlBox({ webhookPath }) {
+  const toast = useToast();
   if (!webhookPath) return null;
   const url = `${window.location.origin}${webhookPath}`;
+  async function handleCopy() {
+    const ok = await copyToClipboard(url);
+    if (ok) toast.success('Copiado');
+    else toast.error('Não foi possível copiar. Copie manualmente.');
+  }
   return (
     <div
       className="rounded-lg px-3 py-2.5 space-y-1.5"
@@ -55,7 +65,7 @@ export function WebhookUrlBox({ webhookPath }) {
       </p>
       <div className="flex items-center gap-1.5">
         <TextInput value={url} readOnly onFocus={(e) => e.target.select()} className="flex-1 text-xs" />
-        <button type="button" className="btn-ghost p-2 shrink-0" title="Copiar URL" onClick={() => copyToClipboard(url)}>
+        <button type="button" className="btn-ghost p-2 shrink-0" title="Copiar URL" onClick={handleCopy}>
           <Copy size={14} className="text-brand" />
         </button>
       </div>
@@ -68,11 +78,18 @@ export function WebhookUrlBox({ webhookPath }) {
 
 // Renderiza UM campo do schema. `editing` muda o comportamento dos secretos.
 export function ConnectionField({ field, value, onChange, namePrefix, editing = false }) {
+  const toast = useToast();
   const isSecret = field.secret || field.type === 'password';
   // Campo generatable (ex.: verify_token) fica VISÍVEL — o usuário precisa
   // enxergar e copiar o valor pra colar no painel da Meta.
   const masked = isSecret && !field.generatable;
   const placeholder = editing && isSecret ? 'Deixe em branco para manter o atual' : field.placeholder;
+
+  async function handleCopyValue() {
+    const ok = await copyToClipboard(String(value ?? ''));
+    if (ok) toast.success('Copiado');
+    else toast.error('Não foi possível copiar. Copie manualmente.');
+  }
 
   if (field.type === 'select') {
     return (
@@ -117,7 +134,7 @@ export function ConnectionField({ field, value, onChange, namePrefix, editing = 
               type="button"
               className="btn-ghost p-2 shrink-0"
               title="Copiar valor"
-              onClick={() => copyToClipboard(String(value ?? ''))}
+              onClick={handleCopyValue}
             >
               <Copy size={14} className="text-brand" />
             </button>

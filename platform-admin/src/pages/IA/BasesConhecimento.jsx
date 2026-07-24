@@ -14,12 +14,13 @@ import {
 import { listConnections } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { DOC_STATUS, formatDateTime } from './ia.constants';
 
 // Bases de conhecimento (RAG): lista + detalhe com documentos (upload texto/URL),
 // status de ingestão e "Testar consulta" (query → chunks + score).
 export default function BasesConhecimento() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -152,6 +153,7 @@ export default function BasesConhecimento() {
 }
 
 function BaseDetail({ baseId, onBack, canWrite }) {
+  const toast = useToast();
   const [base, setBase] = useState(null);
   const [loading, setLoading] = useState(true);
   const [docOpen, setDocOpen] = useState(false);
@@ -228,6 +230,7 @@ function BaseDetail({ baseId, onBack, canWrite }) {
 }
 
 function CreateBaseModal({ open, onClose, onCreated, workspaceId, environmentId }) {
+  const toast = useToast();
   const [form, setForm] = useState({ name: '', description: '', embedding_connection_id: '', embedding_model: 'text-embedding-3-small', chunk_size: 800, chunk_overlap: 120 });
   const [connections, setConnections] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -310,6 +313,7 @@ function CreateBaseModal({ open, onClose, onCreated, workspaceId, environmentId 
 }
 
 function AddDocumentModal({ open, onClose, baseId, onAdded }) {
+  const toast = useToast();
   const [mode, setMode] = useState('TXT'); // TXT | MARKDOWN | URL
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
@@ -386,6 +390,7 @@ function AddDocumentModal({ open, onClose, baseId, onAdded }) {
 }
 
 function QueryModal({ open, onClose, baseId }) {
+  const toast = useToast();
   const [query, setQuery] = useState('');
   const [topK, setTopK] = useState(4);
   const [running, setRunning] = useState(false);

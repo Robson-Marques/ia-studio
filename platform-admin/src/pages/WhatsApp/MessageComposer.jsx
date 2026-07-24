@@ -14,7 +14,7 @@ import {
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { FormField, TextInput, Select } from '../../components/ui/FormField';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { sendChatMessage, uploadChatMedia, sendTyping } from '../../services/whatsapp';
 import AudioPlayer from './AudioPlayer';
 
@@ -75,6 +75,7 @@ const fmtTime = (s) =>
 
 // Estados de gravação: idle -> recording -> paused/recording -> preview -> idle
 export default function MessageComposer({ chat, windowInfo, templates, scope, onSent }) {
+  const toast = useToast();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [file, setFile] = useState(null);

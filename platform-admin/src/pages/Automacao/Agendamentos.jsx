@@ -9,7 +9,7 @@ import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Tabl
 import { FormField, TextInput, Textarea } from '../../components/ui/FormField';
 import { listSchedules, listCalendars, createCalendar, updateCalendar, deleteCalendar } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { formatDateTime, WEEKDAYS } from './automation.constants';
 
 const TABS = [
@@ -37,6 +37,7 @@ export default function Agendamentos() {
 }
 
 function SchedulesTab() {
+  const toast = useToast();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +83,7 @@ function SchedulesTab() {
 }
 
 function CalendarsTab() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -181,6 +183,7 @@ function CalendarsTab() {
 }
 
 function CalendarModal({ calendar, onClose, onSaved }) {
+  const toast = useToast();
   const isEdit = Boolean(calendar?.id);
   const [name, setName] = useState('');
   const [holidays, setHolidays] = useState('');

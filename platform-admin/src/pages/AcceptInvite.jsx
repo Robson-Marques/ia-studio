@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Sparkles, Loader2 } from 'lucide-react';
+import { useToast } from '@studio-ux-ds/react';
 import { acceptInvite } from '../services/invites';
-import { toast } from '../lib/toast';
 
 // Rota PUBLICA /convite/:token — aceite do convite (nome + senha).
 export default function AcceptInvite() {
+  const toast = useToast();
   const { token } = useParams();
   const navigate = useNavigate();
   const [name, setName] = useState('');

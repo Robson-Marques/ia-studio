@@ -13,10 +13,10 @@ import {
   listConnections, changeConnectionState, testConnection, listConnectionLogs, getMarketplace,
   updateConnection, discoverConnection,
 } from '../../services/integrations';
+import { useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { formatDateTime } from '../../lib/format';
-import { toast } from '../../lib/toast';
 import { statusMeta } from './integration.constants';
 import ConnectionWizard from './ConnectionWizard';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
@@ -25,6 +25,7 @@ import GoogleOAuthButton from './GoogleOAuthButton';
 // Conexões (Instances — diretriz 52): tabela + testar + ativar/desativar/
 // manutenção com ConfirmDialog. SEM excluir — conexão só muda de estado.
 export default function Conexoes() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaces } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -325,6 +326,7 @@ const KIND_LABELS = {
 // Resultado do "Descobrir recursos": read-only, agrupado por tipo. O id é o que
 // interessa (ex.: `id_assunto` da OS no IXC), então dá pra copiar com um clique.
 function DiscoveryModal({ discovery, onClose }) {
+  const toast = useToast();
   if (!discovery) return null;
   const { connection, resources } = discovery;
 
@@ -389,6 +391,7 @@ function DiscoveryModal({ discovery, onClose }) {
 
 // Detalhe da conexão — abas Dados / Logs (padrão único components/ui/Tabs).
 function ConnectionDetailModal({ connection, scopeName, onClose }) {
+  const toast = useToast();
   const { can } = usePermissions();
   const [tab, setTab] = useState('dados');
   const [logs, setLogs] = useState([]);
@@ -512,6 +515,7 @@ function ConnectionDetailModal({ connection, scopeName, onClose }) {
 // pré-preenchido; secretos em branco = mantém o atual). Reaproveita o
 // renderizador de campos do wizard (ConnectionField/WebhookUrlBox).
 function EditConnectionModal({ connection, onClose, onSaved }) {
+  const toast = useToast();
   const [schema, setSchema] = useState(null);
   const [loadingSchema, setLoadingSchema] = useState(false);
   const [name, setName] = useState('');
@@ -645,6 +649,7 @@ function InfoRow({ label, value }) {
 
 // Escolha do conector instalado antes de abrir o wizard.
 function NewConnectionPicker({ open, onClose, onPick }) {
+  const toast = useToast();
   const [providers, setProviders] = useState([]);
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(false);

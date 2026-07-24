@@ -6,12 +6,13 @@ import { Badge } from '../../../components/ui/Table';
 import { Select } from '../../../components/ui/FormField';
 import { publishWorkflow } from '../../../services/automation';
 import { usePermissions } from '../../../hooks/usePermissions';
-import { toast } from '../../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { formatDateTime, TRIGGER_LABEL } from '../automation.constants';
 
 // Histórico de versões (imutáveis — diretriz 3): publicar, rollback e diff
 // textual entre duas versões (linhas +/- do JSON do grafo).
 export default function VersionsModal({ open, onClose, workflow, versions, onPublished }) {
+  const toast = useToast();
   const { can } = usePermissions();
   const [confirming, setConfirming] = useState(null); // { version, isRollback }
   const [publishing, setPublishing] = useState(false);

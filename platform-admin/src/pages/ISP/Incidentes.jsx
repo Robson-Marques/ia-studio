@@ -15,7 +15,7 @@ import {
 import { listConnections } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 
 const STATUS_BADGE = {
   DRAFT: { variant: 'gray', label: 'Rascunho' },
@@ -37,6 +37,7 @@ const SCOPE_FIELDS = [
 // toggles), resolver afetados (checkbox include/exclude + manual), ativar/
 // encerrar (5 patrasques) e disparo proativo (ConfirmDialog + rate limit).
 export default function Incidentes() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -197,6 +198,7 @@ export default function Incidentes() {
 // ─── Editor de incidente ───────────────────────────────────────
 
 function IncidentModal({ open, incident, workspaceId, environmentId, onClose, onSaved }) {
+  const toast = useToast();
   const isEdit = !!incident?.id;
   const [connections, setConnections] = useState([]);
   const [form, setForm] = useState(blankForm());
@@ -351,6 +353,7 @@ function Toggle({ label, checked, onChange }) {
 // ─── Afetados + disparo ────────────────────────────────────────
 
 function TargetsModal({ incident, canDispatch, onClose }) {
+  const toast = useToast();
   const open = !!incident;
   const [targets, setTargets] = useState([]);
   const [loading, setLoading] = useState(false);

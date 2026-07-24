@@ -10,7 +10,7 @@ import Modal from '../ui/Modal';
 import { FormField, TextInput } from '../ui/FormField';
 import { Badge } from '../ui/Table';
 import NotificationsBell from './NotificationsBell';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 
 // Mapa estatico de breadcrumbs — toda rota nova adiciona entrada aqui.
 const BREADCRUMBS = {
@@ -230,6 +230,7 @@ export default function Header({ onToggleSidebar }) {
 }
 
 function ChangePasswordModal({ open, onClose, changePassword }) {
+  const toast = useToast();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');

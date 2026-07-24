@@ -3,9 +3,9 @@ import { CheckCircle2, ChevronLeft, ChevronRight, Loader2, PlugZap, XCircle } fr
 import Modal from '../../components/ui/Modal';
 import { FormField, TextInput } from '../../components/ui/FormField';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
+import { useToast } from '@studio-ux-ds/react';
 import { createConnection } from '../../services/integrations';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
 import { statusMeta } from './integration.constants';
 import GoogleOAuthButton from './GoogleOAuthButton';
 
@@ -13,6 +13,7 @@ import GoogleOAuthButton from './GoogleOAuthButton';
 // nenhum código por tipo de conector). Passos: dados do wizard → passo final
 // "Testar e salvar" (o backend cria PENDING_AUTH, testa e devolve o estado).
 export default function ConnectionWizard({ open, provider, onClose, onCreated }) {
+  const toast = useToast();
   const { workspace, environment, workspaceId, environmentId } = useWorkspace();
   const [stepIndex, setStepIndex] = useState(0);
   const [name, setName] = useState('');

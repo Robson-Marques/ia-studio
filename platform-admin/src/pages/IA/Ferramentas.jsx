@@ -13,7 +13,7 @@ import {
 } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { MCP_TRANSPORTS, formatDateTime } from './ia.constants';
 
 const PAGE_TABS = [
@@ -40,6 +40,7 @@ export default function Ferramentas() {
 }
 
 function CatalogTab() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -122,6 +123,7 @@ function CatalogTab() {
 // builtin). Governança (is_active/timeout_ms/requires_approval) porta a UX do
 // Aquapark; nome/chave/schema seguem o padrão do IA Studio.
 function ToolModal({ open, tool, onClose, onSaved }) {
+  const toast = useToast();
   const isEdit = !!tool?.id;
   const isBuiltin = !!tool?.builtin;
   const EMPTY_TOOL = { key: '', name: '', description: '', category: '', input_schema: '{\n  "type": "object",\n  "properties": {}\n}', requires_approval: false, is_active: true, timeout_ms: '' };
@@ -257,6 +259,7 @@ function ToolModal({ open, tool, onClose, onSaved }) {
 }
 
 function McpTab() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -380,6 +383,7 @@ function McpTab() {
 }
 
 function McpServerModal({ open, onClose, onSaved, workspaceId, environmentId }) {
+  const toast = useToast();
   const [form, setForm] = useState({ name: '', transport: 'HTTP', endpoint: '', is_active: false });
   const [saving, setSaving] = useState(false);
 

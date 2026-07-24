@@ -9,12 +9,13 @@ import {
 } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { MEMORY_SCOPES, formatDateTime } from './ia.constants';
 
 // Perfis de memória (scope/TTL/max_items) + navegação de entries por scope_key
 // (read-only). Escrita de entries acontece pelos agentes/tools, não pela UI.
 export default function Memoria() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -123,6 +124,7 @@ export default function Memoria() {
 }
 
 function EntriesView({ profile, onBack }) {
+  const toast = useToast();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [scopeKey, setScopeKey] = useState('');
@@ -190,6 +192,7 @@ function EntriesView({ profile, onBack }) {
 }
 
 function ProfileModal({ open, profile, onClose, onSaved, workspaceId, environmentId }) {
+  const toast = useToast();
   const isEdit = !!profile?.id;
   const [form, setForm] = useState({ name: '', scope: 'SESSION', description: '', default_ttl_seconds: null, max_items: null });
   const [saving, setSaving] = useState(false);

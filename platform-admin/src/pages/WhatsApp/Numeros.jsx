@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { Loader2, Phone, RefreshCw, Signal, Star } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
 import { Badge } from '../../components/ui/Table';
+import { useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
 import { formatDateTime } from '../../lib/format';
 import { listNumbers, syncNumber } from '../../services/whatsapp';
 import { MESSAGING_LIMIT_LABEL, QUALITY, formatPhone } from './whatsapp.constants';
@@ -23,6 +23,7 @@ const STATUS_LABEL = {
 // Números WhatsApp — painel das conexões whatsapp-meta: qualidade, limite,
 // status, health e sync. Nova conexão = Connection Wizard (Integrações).
 export default function Numeros() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);

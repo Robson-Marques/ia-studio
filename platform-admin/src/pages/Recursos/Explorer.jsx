@@ -4,13 +4,14 @@ import Modal from '../../components/ui/Modal';
 import EmptyState from '../../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
 import { FormField, TextInput, Select } from '../../components/ui/FormField';
+import { useToast } from '@studio-ux-ds/react';
 import { getResourceCatalog, exploreResource } from '../../services/resource';
 import { listConnections } from '../../services/integrations';
-import { toast } from '../../lib/toast';
 
 // Recursos → Explorer (read-only): seleciona conexão + tipo canônico + busca →
 // tabela de registros canônicos + detalhe em Modal. Não persiste nada.
 export default function Explorer() {
+  const toast = useToast();
   const [catalog, setCatalog] = useState([]);
   const [connections, setConnections] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(true);

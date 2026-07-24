@@ -9,12 +9,13 @@ import { FormField, TextInput, Textarea } from '../../components/ui/FormField';
 import { listWorkflows, createWorkflow, importWorkflow, archiveWorkflow, deleteWorkflow } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { WORKFLOW_STATUS, EXECUTION_STATUS, formatDateTime } from './automation.constants';
 
 // Fluxos de automação: lista (nome, status, versão, tags, últimas execuções)
 // + criar + importar (JSON diretriz 29) + arquivar. Editor em rota própria.
 export default function Fluxos() {
+  const toast = useToast();
   const { can } = usePermissions();
   const navigate = useNavigate();
   const { workspaceId, environmentId } = useWorkspace();
@@ -231,6 +232,7 @@ export function StatusBadge({ status }) {
 }
 
 function CreateWorkflowModal({ open, onClose, onCreated, workspaceId, environmentId }) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
@@ -291,6 +293,7 @@ function CreateWorkflowModal({ open, onClose, onCreated, workspaceId, environmen
 }
 
 function ImportWorkflowModal({ open, onClose, onImported, workspaceId, environmentId }) {
+  const toast = useToast();
   const [json, setJson] = useState('');
   const [saving, setSaving] = useState(false);
 

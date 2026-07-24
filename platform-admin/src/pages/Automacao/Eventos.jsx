@@ -7,13 +7,14 @@ import { Table, Thead, Th, Tbody, Tr, Td, Badge, Pagination } from '../../compon
 import { TextInput } from '../../components/ui/FormField';
 import { listEvents, replayEvent } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { formatDateTime } from './automation.constants';
 
 const PER_PAGE = 25;
 
 // Event Bus (diretriz 7): log persistido de TODO evento publicado + replay.
 export default function Eventos() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);

@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { Bot, Loader2, MessageCircle, ExternalLink, ShieldCheck } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
 import { listWorkflows, publishWorkflow, unpublishWorkflow } from '../../services/automation';
 
 // Tag estável que o seed coloca no fluxo de exemplo (isp-example.repository.ts).
@@ -14,6 +14,7 @@ const AUTOREPLY_TAG = 'ia-whatsapp';
 // WhatsApp". Ligar = publicar o fluxo; desligar = despublicar (volta a DRAFT).
 // O fluxo em si (gatilho → condição → assistente → enviar) fica no canvas.
 export default function AtendimentoIA() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [workflow, setWorkflow] = useState(null);
   const [loading, setLoading] = useState(true);

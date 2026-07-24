@@ -4,12 +4,13 @@ import Modal from '../../../components/ui/Modal';
 import { FormField, TextInput, Textarea, Select, NumberInput } from '../../../components/ui/FormField';
 import { listConnections } from '../../../services/integrations';
 import { listAutomationTemplates } from '../../../services/automation';
-import { toast } from '../../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 
 // Modal DECLARATIVO de configuração de nó: renderiza os campos da definition
 // vinda do catálogo (text/textarea/number/select/json/connection/template) —
 // nenhum código por tipo de nó. Aceita {{variáveis}} nos campos de texto.
 export default function NodeConfigModal({ open, node, definition, onClose, onSave }) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [config, setConfig] = useState({});
   const [jsonDrafts, setJsonDrafts] = useState({});

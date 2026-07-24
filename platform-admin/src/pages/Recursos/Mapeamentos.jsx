@@ -10,15 +10,16 @@ import { FormField, TextInput, Textarea, Select } from '../../components/ui/Form
 import {
   getResourceCatalog, listMappings, createMapping, updateMapping, deleteMapping, suggestMapping,
 } from '../../services/resource';
+import { useToast } from '@studio-ux-ds/react';
 import { listConnections } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
 
 // Recursos → Mapeamentos: CRUD de ResourceMapping. Seleciona conexão (provider) +
 // tipo canônico do catálogo; editor de field_map (canonicalField → sourcePath);
 // "Sugerir com IA" preenche o field_map para REVISÃO (nunca aplica sozinho);
 // ativar/desativar (mapping nasce OFF). Exclusão com ConfirmDialog.
 export default function Mapeamentos() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [catalog, setCatalog] = useState([]);
@@ -230,6 +231,7 @@ export default function Mapeamentos() {
 
 // Editor de mapeamento — provider/conexão + tipo canônico + field_map + IA.
 function MappingModal({ open, mapping, catalog, connections, onClose, onSaved }) {
+  const toast = useToast();
   const isEdit = !!mapping?.id;
   const [form, setForm] = useState(emptyForm());
   const [rows, setRows] = useState([]); // [{ canonical, path }]

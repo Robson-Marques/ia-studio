@@ -9,9 +9,10 @@ import {
   listProfiles, createProfile, updateProfile, deleteProfile, getPermissionsCatalog,
 } from '../services/profiles';
 import { usePermissions } from '../hooks/usePermissions';
-import { toast } from '../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 
 export default function PerfisAcesso() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [catalog, setCatalog] = useState([]);
@@ -174,6 +175,7 @@ export default function PerfisAcesso() {
 }
 
 function ProfileFormModal({ open, editing, catalog, readOnly, onClose, onSaved }) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selected, setSelected] = useState(() => new Set());

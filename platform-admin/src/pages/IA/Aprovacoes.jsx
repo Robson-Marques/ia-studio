@@ -13,7 +13,7 @@ import {
 } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { APPROVAL_STATUS, APPROVAL_TARGET_TYPES, formatDateTime } from './ia.constants';
 
 const PAGE_TABS = [
@@ -40,6 +40,7 @@ export default function Aprovacoes() {
 }
 
 function QueueTab() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -163,6 +164,7 @@ function friendlyTarget(key) {
 }
 
 function RejectModal({ approval, onClose, onRejected }) {
+  const toast = useToast();
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -214,6 +216,7 @@ function RejectModal({ approval, onClose, onRejected }) {
 }
 
 function PoliciesTab() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -286,6 +289,7 @@ function PoliciesTab() {
 }
 
 function PolicyModal({ open, onClose, onSaved, workspaceId, environmentId }) {
+  const toast = useToast();
   const [form, setForm] = useState({ name: '', description: '', target_type: 'TOOL', condition: '{}', is_active: false });
   const [saving, setSaving] = useState(false);
 

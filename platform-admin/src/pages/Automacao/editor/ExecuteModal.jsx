@@ -4,11 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../../../components/ui/Modal';
 import { FormField, Textarea } from '../../../components/ui/FormField';
 import { executeWorkflow } from '../../../services/automation';
-import { toast } from '../../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 
 // Execução manual: input JSON + toggle dry-run (diretriz 27 — nós side-effect
 // só simulam). A API enfileira; acompanhar em Execuções.
 export default function ExecuteModal({ open, onClose, workflow }) {
+  const toast = useToast();
   const navigate = useNavigate();
   const [input, setInput] = useState('{}');
   const [dryRun, setDryRun] = useState(true);

@@ -1,5 +1,72 @@
 # Changelog — IA Studio
 
+## v0.9.80 - 2026-07-24 (Adoção do Studio UX no platform-admin — casca AppShell + Dashboard + rota /conta/senha + sweep de Toast)
+
+Sem `db push`. Só frontend (`platform-admin`). Primeira aplicação prática da `ia-studio.studio-ux-adoption@1.0.0` (task criada em 2026-07-23). Casca do painel migrada para o `AppShell` do `@studio-ux-ds/react`, Dashboard (primeira tela após login) reescrito com `PageHeader` + `StatCard` + `Card` do DS, rota nova `/conta/senha` substituindo o modal cross-tree do Header, e **sweep total de 55 arquivos** migrando do bus de toast local (`lib/toast`) para o `useToast()` do DS. Piloto isolado v0.9.79 (`/studio-ux-demo`) preservado. Coexistência intencional das demais telas (Automação, WhatsApp, ISP, IA, Integrações, Configurações etc.) com o padrão `--ap-*` + Tailwind dentro da nova casca.
+
+### Alterado (infra/casca)
+
+- `platform-admin/src/main.jsx` — importa `configureTheme`/`applyTheme`/`ToastProvider` do DS. `configureTheme({ namespace: 'ia-studio' })` + `applyTheme()` chamados **antes** do 1º render (evita flash). `<ToastProvider>` envolve o app.
+- `platform-admin/src/context/ThemeContext.jsx` — reescrito como wrapper fino do mecanismo de tema do DS. Fonte única = DS; API pública (`useTheme` → `{ theme, toggle, isDark }`) preservada. Espelha `.dark` no `<html>` para compatibilidade com telas Tailwind. `MutationObserver` sincroniza tudo quando o AppShell/Customize trocam o tema.
+- `platform-admin/src/components/Layout/Layout.jsx` — reescrito com `AppShell`. Slots: brand, nav (grupos com filtro por permissão), version, breadcrumb, topbarContext (seletor de workspace + badge de ambiente), user, userMenuItems (Minha conta + Trocar senha), `onNotifications` (redireciona para `/automacao/notificacoes`), `notifications` (polling 30s via `useNotificationsUnread`), `customize=true` (painel embutido), `onLogout`.
+- `platform-admin/src/pages/Dashboard.jsx` — reescrito com `PageHeader` + 4 `StatCard` (tones info/success/neutral) + `Card` do DS. Dados/lógica idênticos.
+- `platform-admin/src/App.jsx` — nova rota `/conta/senha`, remoção do `<UIToastContainer />` (substituído pelo `<ToastProvider>` do DS no `main.jsx`).
+
+### Adicionado
+
+- `platform-admin/src/pages/ContaSenha.jsx` — rota `/conta/senha`. Substitui o modal de troca de senha que vivia no `Header` legado (elimina empilhamento cross-tree — o modal ficava fora do `<Outlet/>`). Usa `PageHeader` + `Card` + `Field` + `Input` + `Button` do DS.
+- Backups para rollback rápido: `Layout.legacy.jsx`, `Sidebar.legacy.jsx`, `Header.legacy.jsx`, `Dashboard.legacy.jsx` (troca o import em `App.jsx` para reverter).
+
+### Sweep de Toast (55 arquivos)
+
+Cada `import { toast } from '<caminho>/lib/toast'` foi substituído por `import { useToast } from '@studio-ux-ds/react'` + `const toast = useToast()` como primeira linha do componente. Subcomponentes no mesmo arquivo que chamam `toast.*` receberam cada um seu próprio `useToast()`. Nenhuma chamada `toast.error/success/warn/info` teve texto ou semântica alterados. Distribuição:
+
+- `pages/`: `Dashboard.jsx`, `Dashboard.legacy.jsx`, `ContaSenha.jsx`, `Login.jsx`, `AcceptInvite.jsx`, `MinhaConta.jsx`, `Auditoria.jsx`, `Usuarios.jsx`, `PerfisAcesso.jsx`, `Workspaces.jsx`
+- `pages/Automacao/`: `Fluxos.jsx`, `FluxoEditor.jsx`, `FluxoCanvas.jsx`, `Agendamentos.jsx`, `Execucoes.jsx`, `TemplatesAutomacao.jsx`, `Eventos.jsx`, `Notificacoes.jsx`, `editor/VersionsModal.jsx`, `editor/NodeConfigModal.jsx`, `editor/ExecuteModal.jsx`, `editor/TriggerEditor.jsx`
+- `pages/WhatsApp/`: `Conversas.jsx`, `Templates.jsx`, `EquipesFilas.jsx`, `Numeros.jsx`, `AtendimentoIA.jsx`, `MessageComposer.jsx`, `ChatWindow.jsx`, `TimelineModal.jsx`, `TransferModal.jsx`
+- `pages/ISP/`: `Incidentes.jsx`, `AberturaChamado.jsx`
+- `pages/IA/`: `Agentes.jsx`, `BasesConhecimento.jsx`, `Memoria.jsx`, `Ferramentas.jsx`, `Aprovacoes.jsx`, `Custos.jsx`, `editor/AgentEditorModal.jsx`, `editor/AgentVersionsModal.jsx`, `editor/AgentExecuteModal.jsx`
+- `pages/Integracoes/`: `Marketplace.jsx`, `Conexoes.jsx`, `Segredos.jsx`, `ConnectionWizard.jsx`, `ConnectionFields.jsx`, `GoogleOAuthButton.jsx`
+- `pages/Recursos/`: `Mapeamentos.jsx`, `Explorer.jsx`
+- `pages/Desenvolvedor/`: `Console.jsx`, `ApiKeys.jsx`
+- `components/Layout/`: `Header.legacy.jsx`, `NotificationsBell.jsx`
+
+Total: 55.
+
+### Refactor pontual (1 arquivo)
+
+- `pages/Integracoes/ConnectionFields.jsx` — a função exportada `copyToClipboard(text)` chamava `toast.success/error` fora de contexto de componente (impossível com hook). Refatorada para retornar `Promise<boolean>` sem toast interno; os 2 callsites (`WebhookUrlBox`, `ConnectionField`) chamam `useToast()` e exibem o toast eles mesmos após o `await`. Sem mudança de UX.
+
+### Removido do runtime
+
+- `<UIToastContainer />` do `App.jsx` (import + JSX).
+- `lib/toast.js` esvaziado (comentário-marcador). Nenhum arquivo importa mais.
+- `components/ui/UIToastContainer.jsx` esvaziado. Nenhum arquivo importa mais.
+- `components/Layout/Header.jsx` — órfão desde a substituição da casca (o `Layout` novo não o importa; apenas `Header.legacy.jsx` é importado via `Layout.legacy.jsx`).
+
+### Governança
+
+- Sweep de Toast executado como **exceção deliberada** à `workflow.consuming-system-adoption@1.0.0` — registrada no ADR `docs/adocao-studio-ux.md` §5. Custo real (56 arquivos, 399 chamadas) confirmado com o dono antes da execução; alternativa (bridge module-level de 3 arquivos, risco zero) foi apresentada e rejeitada em favor do sweep.
+- 9 páginas com múltiplos `<Modal>` siblings + states independentes ficam registradas como dívida técnica antes de qualquer migração visual dessas telas: `WhatsApp/EquipesFilas`, `Automacao/FluxoCanvas`, `Automacao/FluxoEditor`, `Integracoes/Conexoes`, `IA/Ferramentas`, `IA/BasesConhecimento`, `Automacao/Fluxos`, `IA/Aprovacoes`, `ISP/Incidentes` (este último se defende manualmente).
+
+### Pendências operacionais
+
+- **`.npmrc`** no `platform-admin/` — a sandbox de execução recusou o `Write`. Robson precisa criar manualmente antes do próximo `npm install` limpo. Conteúdo (referenciando `NODE_AUTH_TOKEN` do ambiente): ver `docs/adocao-studio-ux.md`.
+- **Arquivos mortos a remover do disco** quando a casca+Dashboard novos estiverem validados: `Header.jsx`, `NotificationsBell.jsx`, `Sidebar.legacy.jsx`, `Header.legacy.jsx`, `Layout.legacy.jsx`, `Dashboard.legacy.jsx`, `lib/toast.js`, `components/ui/UIToastContainer.jsx`. Sub-frente própria — pode ser um `rm` só.
+- **Multi-tenant branding** (accent/tema por organização via Customize) — quando o backend expuser preferências por org.
+
+### Piloto preservado
+
+- `/studio-ux-demo` (v0.9.79) — renderiza dentro do AppShell novo sem alteração.
+
+## docs - 2026-07-23 (Novo catálogo local + `ia-studio.studio-ux-adoption@1.0.0`)
+
+Sem `db push`. Só documentação (`docs/prompt-framework/`). O projeto ganha **catálogo local próprio** — `ia-studio.specialty-catalog@1.0.0` (`kind: shared`) — até agora inexistente (só o stub `README.md` apontava pro STUDIO-WORKFLOW). Nasce já com a primeira task: `ia-studio.studio-ux-adoption@1.0.0` (`kind: task`, `extends: workflow.consuming-system-adoption@1.0.0` do STUDIO-WORKFLOW v3.1.0). A task governa a adoção do Studio UX no `platform-admin` **contextualizando o piloto v0.9.79** (rota `/studio-ux-demo` + `docs/adocao-studio-ux.md`) — não é adoção do zero, é expansão controlada por famílias de tela, respeitando as regras do próprio DS e o contexto multi-tenant.
+
+Criação executada pela primeira aplicação real da `workflow.specialty-creation@1.0.0` (task nova do STUDIO-WORKFLOW v3.1.0 que fecha o loop deixado aberto pelo alinhador). Nenhuma linha de código no `platform-admin` foi tocada — a task é o método; a execução em qualquer tela precisa de novo alinhamento.
+
+- Sem release taggeada. Puramente documental.
+
 ## docs - 2026-07-23 (Adota STUDIO-WORKFLOW v3.0.0)
 
 Sem `db push`. Só documentação. O `COMO-INTERAGIR-COM-ROBSON.md` (raiz) virou stub apontando pro SSOT agnóstico em `C:\Users\Flowspec\Documents\STUDIO-WORKFLOW\`; criado `docs/prompt-framework/README.md` como stub explicando o consumo do método (paradigma `prompt-framework/v1`, v3.0.0). O projeto ainda não tem catálogo local — quando fizer sentido, cria como `ia-studio.*` no schema formal.

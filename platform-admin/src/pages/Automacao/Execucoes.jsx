@@ -8,7 +8,7 @@ import { Table, Thead, Th, Tbody, Tr, Td, Badge, Pagination } from '../../compon
 import { Select, TextInput } from '../../components/ui/FormField';
 import { listExecutions, getExecution, retryExecution, cancelExecution, listWorkflows } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { EXECUTION_STATUS, TRIGGER_TYPE_LABEL, formatDateTime } from './automation.constants';
 
 const PER_PAGE = 25;
@@ -16,6 +16,7 @@ const PER_PAGE = 25;
 // Execution Monitor (diretriz 13): filtros status/fluxo/trace_id + detalhe
 // com timeline por nó + retry/cancel. Aceita ?open=<id> (deep-link).
 export default function Execucoes() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
@@ -154,6 +155,7 @@ function ExecStatusBadge({ status }) {
 }
 
 function ExecutionDetailModal({ id, onClose, canRetry, onChanged }) {
+  const toast = useToast();
   const [execution, setExecution] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState(null); // 'retry' | 'cancel'

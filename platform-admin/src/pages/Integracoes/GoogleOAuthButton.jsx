@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, LogIn } from 'lucide-react';
+import { useToast } from '@studio-ux-ds/react';
 import { startGoogleOAuth, getConnection } from '../../services/integrations';
-import { toast } from '../../lib/toast';
 
 // Botão "Entrar com Google" (Email Platform — Fase 7). Abre a URL de
 // consentimento (retornada pelo start do OAuth) numa janela popup e faz
 // polling do status da conexão até virar ACTIVE (ou o popup fechar). Reusado
 // no Wizard (passo final) e na tela de Conexões (linha PENDING_AUTH/TOKEN_EXPIRED).
 export default function GoogleOAuthButton({ connectionId, onActivated, size = 'md' }) {
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
   const timerRef = useRef(null);

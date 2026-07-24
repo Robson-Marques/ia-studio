@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { CalendarClock, Loader2, Webhook, Zap, Hand } from 'lucide-react';
 import { FormField, TextInput, Select, NumberInput } from '../../../components/ui/FormField';
 import { previewSchedule, listCalendars } from '../../../services/automation';
-import { toast } from '../../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { SCHEDULE_KINDS, WEEKDAYS, formatDateTime } from '../automation.constants';
 
 // Editor do gatilho do fluxo: manual/evento/webhook/agendado.
 // Agendado = UI amigável (diretriz 12) com preview das próximas 5 execuções.
 export default function TriggerEditor({ trigger, onChange, webhookToken }) {
+  const toast = useToast();
   const t = trigger || { type: 'manual' };
   const schedule = t.schedule || { kind: 'daily', time: '08:00' };
   const [calendars, setCalendars] = useState([]);

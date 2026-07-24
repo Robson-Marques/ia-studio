@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import EmptyState from '../../components/ui/EmptyState';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { getChatTimeline } from '../../services/whatsapp';
 import { formatDateTime } from '../../lib/format';
 
@@ -19,6 +19,7 @@ const ACTOR_LABEL = { USER: 'Atendente', SYSTEM: 'Sistema', BOT: 'IA' };
 
 // Trilha de atendimento da conversa (comm_whatsapp_chat_events).
 export default function TimelineModal({ open, chat, onClose }) {
+  const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 

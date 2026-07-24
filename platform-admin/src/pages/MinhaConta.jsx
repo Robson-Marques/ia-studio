@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { CreditCard, KeyRound, Copy, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { useToast } from '@studio-ux-ds/react';
 import { Badge } from '../components/ui/Table';
 import { getLicense } from '../services/account';
 import { formatNumber, formatLimit, formatDate } from '../lib/format';
-import { toast } from '../lib/toast';
 
 const STATUS_BADGE = {
   TRIAL:      { label: 'Trial',     variant: 'blue' },
@@ -41,6 +41,7 @@ const FEATURE_LABELS = {
 };
 
 export default function MinhaConta() {
+  const toast = useToast();
   const [license, setLicense] = useState(null);
   const [loading, setLoading] = useState(true);
 

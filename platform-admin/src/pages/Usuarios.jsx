@@ -9,12 +9,12 @@ import EmptyState from '../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Tr, Td, Badge, Pagination } from '../components/ui/Table';
 import { FormField, TextInput, Select } from '../components/ui/FormField';
 import PhoneInput from '../components/ui/PhoneInput';
+import { useToast } from '@studio-ux-ds/react';
 import { listUsers, createUser, updateUser, inactivateUser, activateUser } from '../services/users';
 import { listInvites, createInvite, revokeInvite } from '../services/invites';
 import { listProfiles } from '../services/profiles';
 import { usePermissions } from '../hooks/usePermissions';
 import { formatDateTime } from '../lib/format';
-import { toast } from '../lib/toast';
 
 const TABS = [
   { id: 'usuarios', label: 'Usuários', Icon: UsersIcon },
@@ -54,6 +54,7 @@ export default function Usuarios() {
 /* ───────────────────────── Usuários ───────────────────────── */
 
 function UsersTab({ profiles }) {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -245,6 +246,7 @@ function UsersTab({ profiles }) {
 }
 
 function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
+  const toast = useToast();
   const [form, setForm] = useState({ name: '', email: '', profile_id: '', password: '', whatsapp_phone: '' });
   const [saving, setSaving] = useState(false);
 
@@ -344,6 +346,7 @@ function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
 /* ───────────────────────── Convites ───────────────────────── */
 
 function InvitesTab({ profiles }) {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -519,6 +522,7 @@ function InvitesTab({ profiles }) {
 }
 
 function InviteFormModal({ open, profiles, onClose, onSaved }) {
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [profileId, setProfileId] = useState('');
   const [saving, setSaving] = useState(false);

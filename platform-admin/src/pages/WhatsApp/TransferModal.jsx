@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import Tabs from '../../components/ui/Tabs';
 import { FormField, Select, TextInput } from '../../components/ui/FormField';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { listAttendanceUsers, listQueues, listTeams, transferChat } from '../../services/whatsapp';
 
 const TARGET_TABS = [
@@ -14,6 +14,7 @@ const TARGET_TABS = [
 // Transferência de conversa: pra atendente (IN_PROGRESS), fila ou equipe
 // (volta pro pool OPEN da fila). Lock otimista no backend → 409 vira toast.
 export default function TransferModal({ open, chat, onClose, onDone }) {
+  const toast = useToast();
   const [tab, setTab] = useState('user');
   const [users, setUsers] = useState([]);
   const [queues, setQueues] = useState([]);

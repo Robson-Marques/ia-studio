@@ -10,12 +10,13 @@ import {
 } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { CHANNEL_LABEL, formatDateTime } from './automation.constants';
 
 // Catálogo de Templates (diretriz 11): conteúdo + {{variáveis}} por canal.
 // A automação referencia o template e troca só o canal.
 export default function TemplatesAutomacao() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -172,6 +173,7 @@ function extractVars(t) {
 }
 
 function TemplateModal({ template, canWrite, workspaceId, environmentId, onClose, onSaved }) {
+  const toast = useToast();
   const isEdit = Boolean(template?.id);
   const [name, setName] = useState('');
   const [channel, setChannel] = useState('WHATSAPP');

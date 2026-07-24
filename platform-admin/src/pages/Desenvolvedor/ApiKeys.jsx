@@ -5,14 +5,15 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
 import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
 import { FormField, TextInput } from '../../components/ui/FormField';
+import { useToast } from '@studio-ux-ds/react';
 import { listApiKeys, createApiKey, revokeApiKey } from '../../services/developer';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
-import { toast } from '../../lib/toast';
 
 // Desenvolvedor → API Keys: lista metadados (nunca a chave), criação exibe a
 // chave em claro UMA vez (com aviso + copiar) e revogação com os 5 patrasques.
 export default function ApiKeys() {
+  const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);

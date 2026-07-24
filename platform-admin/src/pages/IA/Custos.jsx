@@ -13,7 +13,7 @@ import {
 } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { PROVIDER_KINDS, formatUsd, formatTokens } from './ia.constants';
 
 const PAGE_TABS = [
@@ -48,6 +48,7 @@ function currentPeriod() {
 }
 
 function SummaryTab() {
+  const toast = useToast();
   const { environmentId } = useWorkspace();
   const [period, setPeriod] = useState(currentPeriod());
   const [summary, setSummary] = useState(null);
@@ -123,6 +124,7 @@ function SummaryTab() {
 }
 
 function BudgetsTab() {
+  const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
@@ -199,6 +201,7 @@ function BudgetsTab() {
 }
 
 function BudgetModal({ open, budget, onClose, onSaved, workspaceId, environmentId }) {
+  const toast = useToast();
   const isEdit = !!budget?.id;
   const [form, setForm] = useState({ limit_usd: 100, alert_threshold_pct: 80, block_on_exceed: false, is_active: false });
   const [saving, setSaving] = useState(false);
@@ -274,6 +277,7 @@ function BudgetModal({ open, budget, onClose, onSaved, workspaceId, environmentI
 }
 
 function SimulatorTab() {
+  const toast = useToast();
   const [form, setForm] = useState({ provider_kind: 'OPENAI', model: 'gpt-4o-mini', prompt_tokens: 1000, completion_tokens: 500, runs: 1 });
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);

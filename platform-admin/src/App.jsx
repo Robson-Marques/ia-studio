@@ -5,12 +5,12 @@ import { ThemeProvider } from './context/ThemeContext';
 import { WorkspaceProvider } from './context/WorkspaceContext';
 import ProtectedRoute, { PermissionRoute } from './components/ProtectedRoute';
 import Layout from './components/Layout/Layout';
-import UIToastContainer from './components/ui/UIToastContainer';
 
 import Login from './pages/Login';
 import AcceptInvite from './pages/AcceptInvite';
 import PaginaPagamento from './pages/PaginaPagamento';
 import Dashboard from './pages/Dashboard';
+import ContaSenha from './pages/ContaSenha';
 import Usuarios from './pages/Usuarios';
 import PerfisAcesso from './pages/PerfisAcesso';
 import Workspaces from './pages/Workspaces';
@@ -59,7 +59,6 @@ export default function App() {
       <AuthProvider>
         <WorkspaceProvider>
           <BrowserRouter>
-            <UIToastContainer />
             <Routes>
               {/* Publicas */}
               <Route path="/login" element={<Login />} />
@@ -80,6 +79,7 @@ export default function App() {
                 <Route path="/workspaces" element={<PermissionRoute perm="core.workspaces.read"><Workspaces /></PermissionRoute>} />
                 <Route path="/auditoria" element={<PermissionRoute perm="core.audit.read"><Auditoria /></PermissionRoute>} />
                 <Route path="/minha-conta" element={<MinhaConta />} />
+                <Route path="/conta/senha" element={<ContaSenha />} />
                 <Route path="/integracoes/marketplace" element={<PermissionRoute perm="integrations.marketplace.read"><Marketplace /></PermissionRoute>} />
                 <Route path="/integracoes/conexoes" element={<PermissionRoute perm="integrations.connections.read"><Conexoes /></PermissionRoute>} />
                 <Route path="/integracoes/segredos" element={<PermissionRoute perm="integrations.secrets.read"><Segredos /></PermissionRoute>} />

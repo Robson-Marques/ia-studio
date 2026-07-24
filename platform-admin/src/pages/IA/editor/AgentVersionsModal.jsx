@@ -5,13 +5,14 @@ import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { Badge } from '../../../components/ui/Table';
 import { publishAgent } from '../../../services/ai';
 import { usePermissions } from '../../../hooks/usePermissions';
-import { toast } from '../../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { formatDateTime } from '../ia.constants';
 
 // Histórico de versões do agente (imutáveis — diretriz 3): publicar aponta a
 // current_version; rollback repontar para versão anterior. Mesmo padrão do
 // VersionsModal de Automação (Fase 4).
 export default function AgentVersionsModal({ open, onClose, agent, versions, onPublished }) {
+  const toast = useToast();
   const { can } = usePermissions();
   const [confirming, setConfirming] = useState(null); // { version, isRollback }
   const [publishing, setPublishing] = useState(false);

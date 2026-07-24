@@ -4,8 +4,8 @@ import Tabs from '../../components/ui/Tabs';
 import { FormField, TextInput, Textarea, Select, NumberInput } from '../../components/ui/FormField';
 import { listConnections } from '../../services/integrations';
 import { listTools } from '../../services/ai';
+import { useToast } from '@studio-ux-ds/react';
 import { runExecute, runSql, runHttp, runAi, runTool } from '../../services/devtools';
-import { toast } from '../../lib/toast';
 
 const PAGE_TABS = [
   { id: 'execute', label: 'Execute', Icon: Play },
@@ -18,6 +18,7 @@ const PAGE_TABS = [
 // Desenvolvedor → Console (Postman interno): abas Execute / SQL / HTTP / IA / Tool.
 // Cada aba tem um form + área de resposta JSON + loading. SQL avisa read-only.
 export default function Console() {
+  const toast = useToast();
   const [tab, setTab] = useState('execute');
   const [connections, setConnections] = useState([]);
   const [tools, setTools] = useState([]);
@@ -105,6 +106,7 @@ function RunButton({ loading, onClick, label = 'Executar' }) {
 
 // Hook local minimalista para o estado de execução de cada aba.
 function useRun() {
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(undefined);
   const [error, setError] = useState('');
@@ -126,6 +128,7 @@ function useRun() {
 // ─── Execute ─────────────────────────────────────────────────
 
 function ExecuteTab({ connections }) {
+  const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ connection_id: '', operation: '', params: '' });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
@@ -160,6 +163,7 @@ function ExecuteTab({ connections }) {
 // ─── SQL ─────────────────────────────────────────────────────
 
 function SqlTab({ connections }) {
+  const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ connection_id: '', sql: '' });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
@@ -196,6 +200,7 @@ function SqlTab({ connections }) {
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 function HttpTab({ connections }) {
+  const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ method: 'GET', url: '', connection_id: '', headers: '', body: '' });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
@@ -253,6 +258,7 @@ function HttpTab({ connections }) {
 // ─── IA ──────────────────────────────────────────────────────
 
 function AiTab({ connections }) {
+  const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ connection_id: '', model: '', prompt: '', system: '', temperature: null, max_tokens: null });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
@@ -304,6 +310,7 @@ function AiTab({ connections }) {
 // ─── Tool ────────────────────────────────────────────────────
 
 function ToolTab({ connections, tools }) {
+  const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ tool_key: '', input: '{\n  \n}', connection_id: '' });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));

@@ -4,12 +4,13 @@ import Modal from '../../../components/ui/Modal';
 import { FormField, Textarea } from '../../../components/ui/FormField';
 import { Badge } from '../../../components/ui/Table';
 import { executeAgent } from '../../../services/ai';
-import { toast } from '../../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { formatUsd, formatTokens, RUN_STATUS } from '../ia.constants';
 
 // Teste do agente: input → run síncrona → transcript + tokens + custo.
 // O transcript vem em run.messages[] ({role, content, tool_calls?, tool_call_id?}).
 export default function AgentExecuteModal({ open, onClose, agent }) {
+  const toast = useToast();
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
   const [run, setRun] = useState(null);

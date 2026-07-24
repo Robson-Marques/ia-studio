@@ -13,7 +13,7 @@ import {
 } from '../../../services/ai';
 import { listConnections } from '../../../services/integrations';
 import { usePermissions } from '../../../hooks/usePermissions';
-import { toast } from '../../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import {
   AGENT_MODELS, PERSONA_TONES, PERSONA_EMOJIS, PERSONA_BREVITY, RUN_STATUS,
 } from '../ia.constants';
@@ -44,6 +44,7 @@ const EMPTY = {
 };
 
 export default function AgentEditorModal({ open, onClose, agent, onSaved, canWrite, workspaceId, environmentId }) {
+  const toast = useToast();
   const { can } = usePermissions();
   const canExecute = can('ai.agents.execute');
   // Conceder ferramentas que gravam dados exige permissão (anti-escalada).
@@ -494,6 +495,7 @@ export default function AgentEditorModal({ open, onClose, agent, onSaved, canWri
 }
 
 function TestTab({ agentId, canExecute }) {
+  const toast = useToast();
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
   const [run, setRun] = useState(null);

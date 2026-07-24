@@ -13,7 +13,7 @@ import {
   exportWorkflow,
 } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { toast } from '../../lib/toast';
+import { useToast } from '@studio-ux-ds/react';
 import { NODE_CATEGORY_ORDER } from './automation.constants';
 import { StatusBadge } from './Fluxos';
 import NodeConfigModal from './editor/NodeConfigModal';
@@ -25,6 +25,7 @@ import ExecuteModal from './editor/ExecuteModal';
 // chega na Fase 5 e consome o MESMO grafo {nodes, edges}). Salvar = sempre
 // nova versão imutável; publicar/rollback no modal de versões (diretriz 3).
 export default function FluxoEditor() {
+  const toast = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const { can } = usePermissions();
