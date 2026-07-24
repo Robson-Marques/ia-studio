@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## docs - 2026-07-23 (Adota STUDIO-WORKFLOW v3.0.0)
+
+Sem `db push`. Só documentação. O `COMO-INTERAGIR-COM-ROBSON.md` (raiz) virou stub apontando pro SSOT agnóstico em `C:\Users\Flowspec\Documents\STUDIO-WORKFLOW\`; criado `docs/prompt-framework/README.md` como stub explicando o consumo do método (paradigma `prompt-framework/v1`, v3.0.0). O projeto ainda não tem catálogo local — quando fizer sentido, cria como `ia-studio.*` no schema formal.
+
+**Não confundir com o piloto de adoção visual do Studio UX (v0.9.79):** aquele é sobre consumir o **design system** (`@studio-ux-ds/*`); este é sobre consumir o **método de intake** (`STUDIO-WORKFLOW`). Dois trilhos distintos.
+
 ## v0.9.79 - 2026-07-19 (Piloto de adoção do Studio UX — rota isolada /studio-ux-demo)
 Sem `db push`. Só frontend (`platform-admin`). Consome os pacotes publicados `@studio-ux-ds/{tokens,components,react}` (GitHub Packages, org `studio-ux-ds`) numa rota isolada `/studio-ux-demo` — nenhuma tela existente foi tocada. Os CSS do Studio UX (`--su-*`/`.su*`) coexistem com os `--ap-*` sem colisão; o tema segue o toggle do painel. **Pré-requisito de build:** o servidor precisa de `platform-admin/.npmrc` com token `read:packages` (ver `docs/adocao-studio-ux.md`) — sem ele o `npm install` dos pacotes privados falha. Novos arquivos: `src/pages/StudioUxDemo.jsx`, `docs/adocao-studio-ux.md`; ajustes em `App.jsx` (rota), `main.jsx` (imports CSS), `package.json` (deps).
 
