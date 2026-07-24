@@ -1,5 +1,36 @@
 # Changelog — IA Studio
 
+## v0.9.85 - 2026-07-24 (Bump DS ^1.2.10 + Custos.fullWidth + Memoria migrada; 2/6 da família IA Studio)
+
+Sem `db push`. Só frontend. Release combinado com 3 mudanças acopladas:
+
+### 1. Bump `@studio-ux-ds/*` para `^1.2.10`
+
+- `platform-admin/package.json` — 3 deps do DS de `^1.2.9` para `^1.2.10`. A v1.2.10 do Studio UX (2026-07-24) adicionou a prop `fullWidth` no `NumericInput`, que esta release aproveita.
+
+### 2. Custos.jsx — `fullWidth` nos 5 NumericInputs (fix visual v0.9.84)
+
+- `pages/IA/Custos.jsx` — os 5 `<NumericInput>` (2 em `BudgetModal`, 3 em `SimulatorTab`) passaram a receber `fullWidth`. Elimina o espaço vazio à direita reportado na aplicação de v0.9.84 (o `NumericInput` default é `inline-flex` com input de 72px fixo; nas células de `grid-cols-2`/`grid-cols-3` sobrava vazio à direita).
+
+### 3. Migração visual — Memoria (2ª tela da família IA Studio)
+
+- `pages/IA/Memoria.jsx` — reescrito com componentes do DS: `PageHeader` (com `actions={newProfileBtn}`), `Card`, `DataTable` (colunas declarativas + `onRowClick`+`getRowLabel` + `renderRowMenu` para editar), `EmptyState` (icon string DSIcon), `Badge` (tone `info`), `Modal` (usa `maxWidth={520}`, sem `size` nem `dismissable`), `Field`+`Input`+`Select`+`NumericInput`+`TextArea`+`Button`. `useToast` já vinha do sweep.
+  - **Comportamento preservado 1:1** — mesmos endpoints, mesmo master-detail via state `selected` (a migração pra rota `?open=<id>` é sub-frente arquitetural futura, registrada em `docs/adocao-studio-ux.md`), mesmo filtro de `scope_key` na EntriesView, mesma semântica de campos opcionais (TTL/max_items vazio = `null`).
+  - **Ajuste técnico do NumericInput**: o legado usava prop `allowEmpty` do `NumberInput` local (que aceitava `null`). O `NumericInput` do DS não tem essa prop, mas aceita string vazia (`""`) como valor intermediário no `value`/`onChange`. Adaptação: `form.default_ttl_seconds` e `form.max_items` inicializam com `''` em vez de `null`; helper `toNullable(v)` converte `""` para `null` antes de mandar pro backend. Semântica exposta ao usuário (vazio = sem limite) preservada.
+  - **`fullWidth`** nos 2 NumericInputs do modal desde já — sem regressão desde o começo.
+- `pages/IA/Memoria.legacy.jsx` — backup literal para rollback (trocar 1 import em `App.jsx`).
+
+### Testar após aplicar
+
+1. **IA Studio → Custos**, aba **Orçamentos** e **Simulador**: os NumericInputs agora ocupam toda a largura da célula da grid (input + botões +/− esticados). Sem espaço vazio à direita.
+2. **IA Studio → Memória** (lista): `PageHeader` com botão "Novo perfil" à direita. Se vazio: `EmptyState` dentro de `Card`. Se com dados: `DataTable` do DS (clique numa linha abre entries; botão "..." de editar por linha).
+3. **Memória → clicar em um perfil**: master-detail abre com botão voltar + PageHeader + filtro de scope_key + botão "Filtrar". Se sem entradas: EmptyState. Se com entradas: DataTable com 5 colunas.
+4. **Memória → Novo perfil**: modal com Nome + Escopo (Select, desabilitado em edit) + Descrição (TextArea) + TTL + Máx.itens (ambos NumericInput com `fullWidth`, vazios significam null).
+
+### Restantes na família (4 telas)
+
+`v0.9.86 Aprovacoes` → `v0.9.87 Ferramentas` → `v0.9.88 BasesConhecimento` → `v0.9.89 Agentes + 3 editors`.
+
 ## v0.9.84 - 2026-07-24 (Migração visual — IA/Custos pro Studio UX; 1/6 da família IA Studio)
 
 Sem `db push`. Só frontend. Primeira tela migrada visualmente na nova frente (família IA Studio). Escopo: `pages/IA/Custos.jsx` — casca `<h1>`+subtitle+Tabs+StatCards+Tabelas+Modal reescrita usando componentes do `@studio-ux-ds/react`.

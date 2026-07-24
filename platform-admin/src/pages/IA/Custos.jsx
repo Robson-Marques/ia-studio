@@ -250,10 +250,10 @@ function BudgetModal({ open, budget, onClose, onSaved, workspaceId, environmentI
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Limite mensal (US$)">
-            <NumericInput value={form.limit_usd} onChange={(v) => patch({ limit_usd: v })} min={0} step={1} />
+            <NumericInput value={form.limit_usd} onChange={(v) => patch({ limit_usd: v })} min={0} step={1} fullWidth />
           </Field>
           <Field label="Alerta em (%)">
-            <NumericInput value={form.alert_threshold_pct} onChange={(v) => patch({ alert_threshold_pct: v })} min={1} max={100} step={5} />
+            <NumericInput value={form.alert_threshold_pct} onChange={(v) => patch({ alert_threshold_pct: v })} min={1} max={100} step={5} fullWidth />
           </Field>
         </div>
         <Checkbox
@@ -316,13 +316,13 @@ function SimulatorTab() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Field label="Tokens de prompt">
-              <NumericInput value={form.prompt_tokens} onChange={(v) => patch({ prompt_tokens: v })} min={0} step={100} />
+              <NumericInput value={form.prompt_tokens} onChange={(v) => patch({ prompt_tokens: v })} min={0} step={100} fullWidth />
             </Field>
             <Field label="Tokens de resposta">
-              <NumericInput value={form.completion_tokens} onChange={(v) => patch({ completion_tokens: v })} min={0} step={100} />
+              <NumericInput value={form.completion_tokens} onChange={(v) => patch({ completion_tokens: v })} min={0} step={100} fullWidth />
             </Field>
             <Field label="Nº de execuções">
-              <NumericInput value={form.runs} onChange={(v) => patch({ runs: v })} min={1} step={1} />
+              <NumericInput value={form.runs} onChange={(v) => patch({ runs: v })} min={1} step={1} fullWidth />
             </Field>
           </div>
           <div className="flex justify-end">
