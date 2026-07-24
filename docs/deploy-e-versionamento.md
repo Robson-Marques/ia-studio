@@ -55,3 +55,19 @@ Aba **Backup e Restauração**:
 ## Regra permanente (desde já)
 
 Ao concluir qualquer mudança de código em produção futura, entregar ao Robson os comandos de release (PowerShell acima) e o aviso de `db push` destrutivo quando o schema mudar. Feature flags: valor de produção mora no **default do código**; env só para override. Toggles de usuário moram no **banco** (`system_settings`), configuráveis pela UI, e viajam no backup.
+
+## Segredos e credenciais de build — fonte única no `.env`
+
+**Todo segredo consumido durante o `upgrade.sh` (npm install, prisma, builds) mora em `${API_DIR}/.env` — nunca no `.bashrc` do root, nem no `ecosystem.config.js` do PM2.** A partir da v0.9.81 o `upgrade.sh` faz `set -a; source "$ENV_FILE"; set +a` antes das fases de build, então qualquer var no `.env` fica visível para os processos filhos sem depender de herança do PM2.
+
+Exemplos:
+- **`NODE_AUTH_TOKEN`** — PAT do GitHub com escopo `read:packages`, usado pelo `.npmrc` do `platform-admin` para autenticar em `@studio-ux-ds/*` (GitHub Packages). O `install.sh` a partir de v0.9.81 pergunta durante instalação (`--npm-token=...` em modo headless). Adicionar em servidor existente: `echo "NODE_AUTH_TOKEN=ghp_..." >> /opt/iastudio/platform-api/.env`.
+- `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET` — mesmo padrão. Já estão no `.env` gerado pelo `install.sh`.
+
+**Armadilha comum:** um arquivo antes criado manualmente no servidor (como `platform-admin/.npmrc`) que depois passa a ser **versionado** por um commit — o `git checkout <tag_nova>` recusa com `error: The following untracked working tree files would be overwritten by checkout`. Antes de aplicar a tag que introduz o versionamento, apagar/mover o arquivo untracked do servidor:
+
+```bash
+mv /opt/iastudio/platform-admin/.npmrc /opt/iastudio/platform-admin/.npmrc.pre-tag
+```
+
+Depois de aplicar, comparar (`diff`) e apagar o backup se idênticos.

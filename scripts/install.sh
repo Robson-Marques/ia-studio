@@ -26,6 +26,12 @@ set -euo pipefail
 MODE=""; DOMAIN=""; DOMAIN_ADMIN=""; DOMAIN_CONSOLE=""; DOMAIN_API=""
 CERT_EMAIL=""; ADMIN_NAME="Administrador"; ADMIN_EMAIL=""; ADMIN_PASSWORD=""
 SEED_DEMO="1"; KEEP_DEPS=0; KEEP_DB=0; NO_SSL=0
+# NODE_AUTH_TOKEN — PAT do GitHub com escopo `read:packages`. Usado pelo .npmrc
+# do platform-admin para autenticar em `npm install @studio-ux-ds/*` (pacotes
+# privados). Vai gravado no .env do platform-api; o upgrade.sh faz `source .env`
+# antes dos npm install, entao a var fica visivel para o build. Pode ser vazio
+# na primeira instalacao (usuario adiciona depois com `echo ... >> .env`).
+NODE_AUTH_TOKEN=""
 
 usage() {
   cat <<EOF
@@ -50,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     --admin-name=*)      ADMIN_NAME="${1#*=}" ;;
     --admin-email=*)     ADMIN_EMAIL="${1#*=}" ;;
     --admin-password=*)  ADMIN_PASSWORD="${1#*=}" ;;
+    --npm-token=*)       NODE_AUTH_TOKEN="${1#*=}" ;;
     --no-demo)           SEED_DEMO="0" ;;
     --keep-deps)         KEEP_DEPS=1 ;;
     --keep-db)           KEEP_DB=1 ;;
@@ -143,6 +150,13 @@ if [ "${INTERACTIVE}" = "1" ]; then
   ask "Nome do admin" "Administrador"; ADMIN_NAME="${ASK_REPLY}"
   ask_required "E-mail do admin"; ADMIN_EMAIL="${ASK_REPLY}"
   ask_password "Senha do admin (min 8 chars)"; ADMIN_PASSWORD="${ASK_REPLY}"
+  echo
+  echo "  --- Design System (GitHub Packages) ---"
+  echo "  O painel importa @studio-ux-ds/{tokens,components,react} do GitHub"
+  echo "  Packages (pacotes privados). O build precisa de um PAT com escopo"
+  echo "  read:packages. Pode deixar em branco agora e adicionar depois em"
+  echo "  ${API_DIR}/.env (variavel NODE_AUTH_TOKEN)."
+  ask "Token do GitHub (read:packages)" ""; NODE_AUTH_TOKEN="${ASK_REPLY}"
   echo
   if ask_yesno "Criar organizacao 'Demo' de avaliacao (admin@demo.local/demo123)?" "n"; then
     SEED_DEMO="1"
@@ -354,6 +368,10 @@ SEED_DEMO=${SEED_DEMO}
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_OAUTH_REDIRECT=${GOOGLE_REDIRECT}
+# GitHub Packages: PAT com escopo read:packages, usado pelo .npmrc do
+# platform-admin durante `npm install @studio-ux-ds/*`. O upgrade.sh faz
+# `source .env` antes do build, entao esta var fica visivel automaticamente.
+NODE_AUTH_TOKEN=${NODE_AUTH_TOKEN}
 ENVEOF
 chmod 600 "${API_DIR}/.env"
 log_ok ".env criado"

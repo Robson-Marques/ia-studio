@@ -116,18 +116,28 @@ trocar o import correspondente em `App.jsx`:
 
 Os pacotes são **privados** (org `studio-ux-ds`). Para o `npm install` baixá-los, o ambiente precisa de um token do GitHub com escopo **`read:packages`**.
 
-1. Gere um token clássico no GitHub (Settings → Developer settings → Tokens) com `read:packages`.
-2. O `.npmrc` do `platform-admin` referencia esse token por variável de ambiente (não guarda segredo):
+**Fonte única do token:** `${API_DIR}/.env` (`/opt/iastudio/platform-api/.env`), variável `NODE_AUTH_TOKEN`. Nada de `.bashrc`, nada de `ecosystem.config.js`, nada de export manual — o `upgrade.sh` (a partir de v0.9.81) faz `source .env` antes de qualquer `npm install`, então o valor fica visível para os builds do platform-api, platform-admin e platform-console.
+
+1. Gere um token clássico no GitHub (Settings → Developer settings → Personal access tokens → Classic) com o escopo **`read:packages`**. Copie o `ghp_...` (só aparece uma vez).
+
+2. O `.npmrc` do `platform-admin` (versionado) referencia esse token por variável de ambiente (não guarda segredo):
 
    ```
    @studio-ux-ds:registry=https://npm.pkg.github.com
    //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
    ```
 
-3. **No servidor de build** (onde o `upgrade.sh`/`install.sh` roda o `npm install`), exporte a variável antes do install — por exemplo no `.bashrc` do root, ou no próprio script de deploy:
+3. **Adicionar o token no `.env` do platform-api** — o `install.sh` (a partir de v0.9.81) pergunta durante instalação limpa (`--npm-token=...` também aceito em modo headless). Em instalação já existente, adicionar manualmente:
 
    ```bash
-   export NODE_AUTH_TOKEN=ghp_seu_token_read_packages
+   echo "NODE_AUTH_TOKEN=ghp_seu_token_read_packages" >> /opt/iastudio/platform-api/.env
+   ```
+
+   Reiniciar o backend para o Nest recarregar `.env` (o painel de Atualização lê a var via `source .env` do upgrade.sh — mas se você aplicar antes do reload, o backend passa env do PM2 já herdada; garante-se com `pm2 delete + pm2 start ecosystem.config.js`):
+
+   ```bash
+   cd /opt/iastudio/platform-api
+   pm2 delete iastudio-api iastudio-worker && pm2 start ecosystem.config.js && pm2 save
    ```
 
    Sem essa variável, o `npm install` dos `@studio-ux-ds/*` retorna **401** e o build aborta (fail-safe — a produção fica na versão anterior).

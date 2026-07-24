@@ -48,6 +48,17 @@ mkdir -p "$BACKUP_DIR"
 DATABASE_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//;s/^'\''//;s/'\''$//')
 [ -z "$DATABASE_URL" ] && echo "ERRO: DATABASE_URL ausente em $ENV_FILE" && exit 1
 
+# Exporta o .env inteiro para o ambiente do bash — assim NODE_AUTH_TOKEN (usado
+# pelo .npmrc do platform-admin para autenticar em GitHub Packages @studio-ux-ds/*)
+# e quaisquer outras vars secretas ficam visiveis para os `npm install`/`prisma`/
+# builds das fases seguintes, sem depender de env passada pelo PM2 nem do .bashrc
+# do root (que nao e carregado em spawn detached). Fonte unica de segredos = .env.
+# `set -a` marca toda variavel atribuida a partir daqui como export automatico.
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
 # Modo/dominios pra rebuildar os fronts com a mesma URL da API/base do install.
 MODE="single"; DOMAIN=""; DOMAIN_API=""
 # shellcheck disable=SC1090

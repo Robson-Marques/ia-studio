@@ -1,5 +1,29 @@
 # Changelog — IA Studio
 
+## v0.9.81 - 2026-07-24 (Fix deploy — upgrade.sh carrega .env antes do npm install; install.sh pergunta NODE_AUTH_TOKEN)
+
+Sem `db push`. Só scripts + docs. Nasce depois que a aplicação de **v0.9.80** falhou em `ADMIN_BUILD` no painel com **npm E401** — o `.npmrc` versionado referencia `${NODE_AUTH_TOKEN}`, mas o `upgrade.sh` é spawnado detached pelo backend PM2 e não herdava `.bashrc` do root nem tinha a var no ambiente. Correção estrutural: **fonte única de segredos = `.env` do platform-api**, o `upgrade.sh` faz `source .env` antes de qualquer build, e o `install.sh` pergunta o token durante instalação (ou aceita `--npm-token=...` em modo headless).
+
+### Alterado
+
+- `scripts/upgrade.sh` — 4 linhas novas após a leitura de `DATABASE_URL`: `set -a; source "$ENV_FILE"; set +a`. Exporta o `.env` inteiro pro ambiente do bash — qualquer var (NODE_AUTH_TOKEN, GOOGLE_*, futuras) fica visível para os npm install/prisma/builds das fases seguintes sem depender de herança do PM2.
+- `scripts/install.sh` — 4 mudanças acopladas:
+  - Nova variável `NODE_AUTH_TOKEN=""` no bloco inicial de defaults.
+  - Novo arg CLI `--npm-token=...` (modo headless).
+  - Novo prompt no wizard interativo (após o admin, antes da opção de Demo) — pode ser vazio; usuário adiciona depois no `.env`.
+  - Nova linha no heredoc que gera `${API_DIR}/.env`: `NODE_AUTH_TOKEN=${NODE_AUTH_TOKEN}`.
+- `docs/adocao-studio-ux.md` — reescrita a seção "Pré-requisito operacional — autenticar no GitHub Packages": fonte única = `.env` do platform-api (não `.bashrc`, não `ecosystem.config.js`). Comando para adicionar em servidor existente + como reiniciar PM2 corretamente.
+- `docs/deploy-e-versionamento.md` — nova seção "Segredos e credenciais de build — fonte única no `.env`" documenta a garantia dada pelo `source .env` do upgrade.sh + armadilha de untracked file vs. tag (a que causou a falha do `GIT_CHECKOUT` da v0.9.80).
+
+### Como aplicar no servidor existente (pré-requisitos operacionais)
+
+1. Se ainda tem o `.npmrc.pre-v0.9.80` como fallback: apagar (não faz mais sentido) — `rm /opt/iastudio/platform-admin/.npmrc.pre-v0.9.80`.
+2. Adicionar o token no `.env`: `echo "NODE_AUTH_TOKEN=ghp_SEU_TOKEN" >> /opt/iastudio/platform-api/.env`.
+3. Reiniciar PM2 relendo o `.env` (o `pm2 restart --update-env` não relê arquivo): `cd /opt/iastudio/platform-api && pm2 delete iastudio-api iastudio-worker && pm2 start ecosystem.config.js && pm2 save`.
+4. Aplicar v0.9.81 no painel: **Configurações → Atualização → Atualizar na v0.9.81**. O upgrade que roda ainda é o `upgrade.sh` v0.9.79 do disco atual, mas com `NODE_AUTH_TOKEN` no env herdado do backend PM2 (que agora relê o `.env`), o `npm install` do platform-admin passa. Depois de v0.9.81 aplicada, o `upgrade.sh` novo (com `source .env`) fica versionado para todas as versões futuras — independente de PM2/ecosystem.
+
+Nota: aplicar v0.9.80 diretamente também funciona com o mesmo pré-requisito (env no PM2), mas v0.9.81 já traz a correção estrutural — recomendado aplicar v0.9.81 direto (o painel lista as duas tags; pode pular v0.9.80).
+
 ## v0.9.80 - 2026-07-24 (Adoção do Studio UX no platform-admin — casca AppShell + Dashboard + rota /conta/senha + sweep de Toast)
 
 Sem `db push`. Só frontend (`platform-admin`). Primeira aplicação prática da `ia-studio.studio-ux-adoption@1.0.0` (task criada em 2026-07-23). Casca do painel migrada para o `AppShell` do `@studio-ux-ds/react`, Dashboard (primeira tela após login) reescrito com `PageHeader` + `StatCard` + `Card` do DS, rota nova `/conta/senha` substituindo o modal cross-tree do Header, e **sweep total de 55 arquivos** migrando do bus de toast local (`lib/toast`) para o `useToast()` do DS. Piloto isolado v0.9.79 (`/studio-ux-demo`) preservado. Coexistência intencional das demais telas (Automação, WhatsApp, ISP, IA, Integrações, Configurações etc.) com o padrão `--ap-*` + Tailwind dentro da nova casca.
