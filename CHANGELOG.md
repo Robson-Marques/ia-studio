@@ -1,5 +1,40 @@
 # Changelog — IA Studio
 
+## v0.9.84 - 2026-07-24 (Migração visual — IA/Custos pro Studio UX; 1/6 da família IA Studio)
+
+Sem `db push`. Só frontend. Primeira tela migrada visualmente na nova frente (família IA Studio). Escopo: `pages/IA/Custos.jsx` — casca `<h1>`+subtitle+Tabs+StatCards+Tabelas+Modal reescrita usando componentes do `@studio-ux-ds/react`.
+
+### Alterado
+
+- `pages/IA/Custos.jsx` — reescrito com:
+  - `PageHeader` (título + subtitle) em vez de `<h1>` + `<p>` do legado.
+  - `Tabs` do DS (`value`/`onChange` em vez de `active`; removidos os `Icon` das tabs — o DS aceita `icon` como string DSIcon mas removi por sobriedade nesta tela).
+  - `StatCard` do DS com `tone` (`success`, `info`, `neutral`) substituindo as 4 chamadas do legado com `icon={Users}` + `color="brand/blue/green/purple"`. Removida a prop `icon` — o `StatCard` do DS coloca o ícone à direita do label, decisão foi manter mais sóbrio sem ícone (padrão Dashboard v0.9.80).
+  - `DataTable` do DS substituindo `Table/Thead/Th/Tbody/Tr/Td` — colunas declaradas via `columns=[{key, header, align?, render?}]`. Botão "Editar" da tabela de orçamentos virou `renderRowMenu` (o "…" contextual do DS).
+  - `Card` do DS envolvendo o `EmptyState` (quando não há dados) e o form do Simulador.
+  - `EmptyState` do DS (`icon` como string DSIcon: `chart-bar`, `file`).
+  - `Badge` do DS com `tone` (`info`, `success`, `danger`, `neutral`) substituindo `variant="blue|green|red|gray"` do legado.
+  - `Modal` do DS (usa `maxWidth={520}` — não `size="md"` como o legado). Sem `dismissable`.
+  - `Field` + `Input` + `Select` + `NumericInput` do DS substituindo `FormField/TextInput/Select/NumberInput` locais. `NumericInput` do DS recebe number direto no `onChange` (não `event.target.value`).
+  - `Button` do DS com `variant="primary|secondary|ghost"`, `icon` string. Substituiu `<button className="btn-primary/secondary/ghost">` do legado.
+  - `Checkbox` do DS substituindo os `<label><input type="checkbox">` inline do legado.
+  - `useToast` do DS já estava (do sweep anterior).
+- Comportamento e API preservados: mesmos handlers, mesmos endpoints, mesmos corpos de request (create vs update com whitelist do backend). Único ganho funcional: `DataTable` cuida do responsivo (cards mobile) sem código duplicado.
+
+### Adicionado
+
+- `pages/IA/Custos.legacy.jsx` — backup literal do arquivo anterior. Não é importado enquanto o novo estiver ativo. Rollback: trocar `import Custos from './pages/IA/Custos'` por `Custos.legacy` em `App.jsx`.
+
+### Testar após aplicar
+
+1. Aba **Consumo**: filtro de mês (`Input type="month"`); 3 `StatCard` mostrando total/tokens/assistentes; tabela quando há dados ou EmptyState "Sem consumo no período".
+2. Aba **Orçamentos**: botão "Novo orçamento" abre modal; DataTable com botão "…" de editar por linha; EmptyState quando vazio; criar/editar salva e recarrega.
+3. Aba **Simulador**: form com 5 campos, botão "Simular custo", ao clicar chama backend e mostra 2 StatCards com resultado.
+
+### Restantes na família (5 telas)
+
+`v0.9.85 Memoria` → `v0.9.86 Aprovacoes` → `v0.9.87 Ferramentas` → `v0.9.88 BasesConhecimento` → `v0.9.89 Agentes + 3 editors`.
+
 ## v0.9.83 - 2026-07-24 (Fix workspace picker — Portal + position fixed)
 
 Sem `db push`. Só `platform-admin/src/components/Layout/Layout.jsx`. Nasce depois que Robson viu no painel v0.9.82 que o botão "Selecionar workspace" no topbar (com title tooltip funcionando) **não abria o dropdown quando clicado**.
