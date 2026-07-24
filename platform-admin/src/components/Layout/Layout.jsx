@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '@studio-ux-ds/react';
 import { useAuth } from '../../context/AuthContext';
@@ -232,6 +233,19 @@ export default function Layout() {
   const { workspaces, workspace, environment, selectWorkspace, selectEnvironment } = useWorkspace();
   const unread = useNotificationsUnread();
   const [wsOpen, setWsOpen] = useState(false);
+  // Ref no botão do picker + posição fixa do dropdown. O AppShell tem
+  // `overflow: hidden` nos ancestrais (.su-appshell, .su-appshell__main),
+  // o que corta qualquer dropdown `position: absolute`. Solução: renderizar
+  // o menu via createPortal no <body>, com posição fixed calculada a partir
+  // do getBoundingClientRect do botão.
+  const wsButtonRef = useRef(null);
+  const [wsMenuPos, setWsMenuPos] = useState(null);
+  function toggleWsMenu() {
+    if (wsOpen) { setWsOpen(false); return; }
+    const rect = wsButtonRef.current?.getBoundingClientRect();
+    if (rect) setWsMenuPos({ top: rect.bottom + 6, left: rect.left });
+    setWsOpen(true);
+  }
 
   // Constrói `nav` no formato do AppShell (sections + items; grupo colapsável).
   // Filtragem por permissão: item sem perm sempre aparece; item com perm só se
@@ -270,15 +284,28 @@ export default function Layout() {
     return items;
   }, [location.pathname, can, navigate]);
 
-  // Fecha o dropdown de workspace ao clicar fora.
+  // Fecha o dropdown de workspace ao clicar fora. Como o menu agora vive num
+  // portal (fora do container do botão), o teste "clicou fora" precisa
+  // verificar TANTO o botão QUANTO o próprio menu — se o target não estiver
+  // dentro de nenhum dos dois, fecha.
   useEffect(() => {
     if (!wsOpen) return;
     function onDoc(e) {
-      const el = document.getElementById('ws-picker-root');
-      if (el && !el.contains(e.target)) setWsOpen(false);
+      const btn = wsButtonRef.current;
+      const menu = document.getElementById('ws-picker-menu');
+      const inside = (btn && btn.contains(e.target)) || (menu && menu.contains(e.target));
+      if (!inside) setWsOpen(false);
     }
+    // Fecha também em scroll/resize (posição do fixed pode ficar deslocada).
+    function onWinChange() { setWsOpen(false); }
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    window.addEventListener('scroll', onWinChange, true);
+    window.addEventListener('resize', onWinChange);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      window.removeEventListener('scroll', onWinChange, true);
+      window.removeEventListener('resize', onWinChange);
+    };
   }, [wsOpen]);
 
   const crumb = BREADCRUMBS[location.pathname]
@@ -290,69 +317,81 @@ export default function Layout() {
     : null;
 
   // Workspace picker + badge de ambiente — vive no topbarContext do AppShell.
+  // O menu abre via Portal (fora do container com overflow: hidden do AppShell).
   const topbarContext = workspaces.length > 0 ? (
-    <div id="ws-picker-root" className="relative">
-      <button
-        onClick={() => setWsOpen((o) => !o)}
-        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors min-h-[36px]"
-        style={{ border: '1px solid var(--ap-border)', color: 'var(--ap-text-2)', backgroundColor: 'var(--ap-surface-2)' }}
-        title="Selecionar workspace"
-      >
-        <span className="max-w-[140px] md:max-w-[200px] truncate font-medium">
-          {workspace?.name || 'Workspace'}
-        </span>
-        {envInfo && <Badge variant={envInfo.variant}>{envInfo.label}</Badge>}
-      </button>
-      {wsOpen && (
-        <div
-          className="absolute left-0 mt-1.5 w-72 rounded-xl shadow-xl z-50 overflow-hidden"
-          style={{ backgroundColor: 'var(--ap-surface)', border: '1px solid var(--ap-border)' }}
-        >
-          <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-5)' }}>
-            Workspaces
-          </p>
-          <div className="max-h-72 overflow-y-auto pb-2">
-            {workspaces.map((w) => (
-              <div key={w.id}>
-                <button
-                  onClick={() => { selectWorkspace(w.id); setWsOpen(false); }}
-                  className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2"
-                  style={{
-                    color: w.id === workspace?.id ? 'var(--ap-accent)' : 'var(--ap-text-2)',
-                    backgroundColor: w.id === workspace?.id ? 'var(--ap-surface-3)' : 'transparent',
-                  }}
-                >
-                  <span className="flex-1 truncate font-medium">{w.name}</span>
-                </button>
-                {w.id === workspace?.id && (w.environments || []).length > 0 && (
-                  <div className="pl-4 pr-3 pb-1 flex flex-wrap gap-1">
-                    {w.environments.map((e) => {
-                      const info = ENV_BADGE[e.kind] || { label: e.name || e.kind, variant: 'gray' };
-                      const on = e.id === environment?.id;
-                      return (
-                        <button
-                          key={e.id}
-                          onClick={() => { selectEnvironment(e.id); setWsOpen(false); }}
-                          className="text-[11px] px-2 py-1 rounded-md transition-colors"
-                          style={{
-                            border: '1px solid var(--ap-border)',
-                            backgroundColor: on ? 'var(--ap-surface-3)' : 'transparent',
-                            color: on ? 'var(--ap-text-1)' : 'var(--ap-text-4)',
-                            fontWeight: on ? 600 : 400,
-                          }}
-                        >
-                          {info.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+    <button
+      ref={wsButtonRef}
+      onClick={toggleWsMenu}
+      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors min-h-[36px]"
+      style={{ border: '1px solid var(--ap-border)', color: 'var(--ap-text-2)', backgroundColor: 'var(--ap-surface-2)' }}
+      title="Selecionar workspace"
+    >
+      <span className="max-w-[140px] md:max-w-[200px] truncate font-medium">
+        {workspace?.name || 'Workspace'}
+      </span>
+      {envInfo && <Badge variant={envInfo.variant}>{envInfo.label}</Badge>}
+    </button>
+  ) : null;
+
+  // Menu do picker — renderizado via Portal para escapar do overflow: hidden
+  // do AppShell. Posição fixed calculada em toggleWsMenu().
+  const workspaceMenu = wsOpen && wsMenuPos && workspaces.length > 0 ? createPortal(
+    <div
+      id="ws-picker-menu"
+      className="w-72 rounded-xl shadow-xl overflow-hidden"
+      style={{
+        position: 'fixed',
+        top: wsMenuPos.top,
+        left: wsMenuPos.left,
+        zIndex: 1000,
+        backgroundColor: 'var(--ap-surface)',
+        border: '1px solid var(--ap-border)',
+      }}
+    >
+      <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-5)' }}>
+        Workspaces
+      </p>
+      <div className="max-h-72 overflow-y-auto pb-2">
+        {workspaces.map((w) => (
+          <div key={w.id}>
+            <button
+              onClick={() => { selectWorkspace(w.id); setWsOpen(false); }}
+              className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2"
+              style={{
+                color: w.id === workspace?.id ? 'var(--ap-accent)' : 'var(--ap-text-2)',
+                backgroundColor: w.id === workspace?.id ? 'var(--ap-surface-3)' : 'transparent',
+              }}
+            >
+              <span className="flex-1 truncate font-medium">{w.name}</span>
+            </button>
+            {w.id === workspace?.id && (w.environments || []).length > 0 && (
+              <div className="pl-4 pr-3 pb-1 flex flex-wrap gap-1">
+                {w.environments.map((e) => {
+                  const info = ENV_BADGE[e.kind] || { label: e.name || e.kind, variant: 'gray' };
+                  const on = e.id === environment?.id;
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => { selectEnvironment(e.id); setWsOpen(false); }}
+                      className="text-[11px] px-2 py-1 rounded-md transition-colors"
+                      style={{
+                        border: '1px solid var(--ap-border)',
+                        backgroundColor: on ? 'var(--ap-surface-3)' : 'transparent',
+                        color: on ? 'var(--ap-text-1)' : 'var(--ap-text-4)',
+                        fontWeight: on ? 600 : 400,
+                      }}
+                    >
+                      {info.label}
+                    </button>
+                  );
+                })}
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
-    </div>
+        ))}
+      </div>
+    </div>,
+    document.body,
   ) : null;
 
   const userForShell = {
@@ -379,20 +418,23 @@ export default function Layout() {
   );
 
   return (
-    <AppShell
-      brand={brand}
-      nav={nav}
-      version={`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}`}
-      breadcrumb={breadcrumb}
-      topbarContext={topbarContext}
-      user={userForShell}
-      userMenuItems={userMenuItems}
-      onNotifications={() => navigate('/automacao/notificacoes')}
-      notifications={unread}
-      customize
-      onLogout={logout}
-    >
-      <Outlet />
-    </AppShell>
+    <>
+      <AppShell
+        brand={brand}
+        nav={nav}
+        version={`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}`}
+        breadcrumb={breadcrumb}
+        topbarContext={topbarContext}
+        user={userForShell}
+        userMenuItems={userMenuItems}
+        onNotifications={() => navigate('/automacao/notificacoes')}
+        notifications={unread}
+        customize
+        onLogout={logout}
+      >
+        <Outlet />
+      </AppShell>
+      {workspaceMenu}
+    </>
   );
 }

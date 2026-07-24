@@ -1,5 +1,34 @@
 # Changelog — IA Studio
 
+## v0.9.83 - 2026-07-24 (Fix workspace picker — Portal + position fixed)
+
+Sem `db push`. Só `platform-admin/src/components/Layout/Layout.jsx`. Nasce depois que Robson viu no painel v0.9.82 que o botão "Selecionar workspace" no topbar (com title tooltip funcionando) **não abria o dropdown quando clicado**.
+
+Causa raiz: o `AppShell` do `@studio-ux-ds/react` tem `overflow: hidden` nos ancestrais (`.su-appshell` e `.su-appshell__main`, conforme `components.css`). O dropdown do picker era renderizado como `<div className="absolute ...">` dentro do `topbarContext` — o `overflow: hidden` dos pais recortava-o e ele nunca aparecia. O botão funcionava (`onClick` disparava, `setWsOpen(true)` mudava estado), mas o DOM do menu ficava invisível.
+
+### Alterado
+
+- `Layout.jsx` — 4 mudanças acopladas:
+  - Novo import: `import { createPortal } from 'react-dom';` + `useRef`.
+  - `wsButtonRef` (ref no botão do picker) + `wsMenuPos` (state com `{top, left}` calculados via `getBoundingClientRect` do botão no momento do toggle).
+  - `toggleWsMenu()` — handler que calcula posição fixa antes de abrir; fecha se já aberto.
+  - Menu extraído do `topbarContext` e renderizado via `createPortal(..., document.body)` como `position: fixed`. Ignora todos os `overflow: hidden` dos ancestrais.
+  - `useEffect` de "clicar fora" reescrito: como o menu vive num portal fora do container do botão, o teste passou a verificar `btnRef.contains(target) || menu.contains(target)`. Também adiciona listeners de `scroll` (capturado) e `resize` que fecham o menu — a posição `fixed` calculada perde sinc se a janela mexer.
+  - `return` do componente virou Fragment (`<>`) para renderizar `{workspaceMenu}` ao lado do `<AppShell>`.
+
+### Impacto
+
+Zero regressão de comportamento — apenas o dropdown agora aparece. Menu do usuário (Minha conta / Trocar senha / Sair / Personalizar / Claro/Escuro) continua funcionando porque é gerenciado internamente pelo AppShell (que já usa o padrão correto). Se aparecerem outros dropdowns/menus do IA Studio dentro do AppShell sofrendo o mesmo corte (ex.: hoje o `NotificationsBell` NÃO está mais no shell — o AppShell tem seu próprio sino), a solução é a mesma: Portal + fixed calculado.
+
+### Como aplicar
+
+Sequência normal (o upgrade.sh v0.9.82 já está no disco fazendo `source .env`; nenhuma alteração adicional no servidor):
+
+1. Commit + tag + push v0.9.83.
+2. **Configurações → Atualização → Atualizar na v0.9.83.** Vai passar direto (só toca 1 arquivo do frontend; nem `.env` nem package.json nem schema mudaram).
+3. Hard reload no navegador (Ctrl+Shift+R).
+4. Clicar no botão "Principal — Produção" no topbar. O dropdown deve aparecer logo abaixo com a lista de workspaces + badges de ambiente.
+
 ## v0.9.82 - 2026-07-24 (Fix build — bump @studio-ux-ds/* de ^1.0.15 para ^1.2.9)
 
 Sem `db push`. Só `platform-admin/package.json`. Nasce depois que a aplicação de **v0.9.81** falhou em `ADMIN_BUILD` com:
