@@ -1,21 +1,33 @@
 # Changelog — IA Studio
 
-## v0.9.93 - 2026-07-25 (Correções da revisão visual do ISP + grupos de opções em colunas)
+## v0.9.94 - 2026-07-25 (Grupos de opções em colunas — `CheckGroup` do DS)
 
-Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.17`**. Quatro achados do Robson revisando a v0.9.92 no ar — três eram do DS e geraram duas releases dele: **v1.2.16** (rótulo de opção deixa de ser inline; ✓ centralizado) e **v1.2.17** (o `CheckGroup`).
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.17`**, que trouxe o `CheckGroup`.
+
+### Alterado
+
+Empilhar uma opção por linha desperdiçava a tela larga — as 4 opções de comportamento do incidente ocupavam ~40% do card, o resto vazio. O DS ganhou o **`CheckGroup`** (v1.2.17), que distribui a lista em colunas por `auto-fill` + `minmax` (sem media query, cai pra uma coluna sozinho em tela estreita), e as duas telas passaram a usá-lo:
+
+- **Incidente → "Comportamento do assistente"**: `columns={2}`. Escolhi 2 e não 3 porque os rótulos são frases inteiras ("Detectar instabilidade automaticamente — só sugere um rascunho, nunca ativa sozinho") — em 3 colunas cada uma quebraria em três linhas e ficaria pior que o vazio.
+- **Editor de assistente → listas de habilidades / bases / memória**: `columns={3}`, e a **grade `auto-fill` que eu tinha montado à mão** na v0.9.91 foi **deletada**. O responsivo virou responsabilidade do componente, não da tela: se o comportamento de coluna mudar, muda no DS e chega em todo mundo.
+
+O grupo também recebe `role="group"` + `aria-labelledby` apontando pro título visível da seção, então o leitor de tela anuncia "Comportamento do assistente, grupo" antes das opções.
+
+### Testar após aplicar
+
+1. **Incidente → aba Informativo → "Comportamento do assistente"**: as 4 opções em **2 colunas**, preenchendo o card. Estreitando a janela, caem pra 1 sozinhas.
+2. **Editor de assistente → "O que pode fazer"**: habilidades em **3 colunas** (visualmente igual à v0.9.91 — a diferença é que agora quem faz é o DS).
+3. Em ambas: nenhuma opção deve encostar na vizinha, e rótulo que quebra em duas linhas alinha a caixa com a **primeira** linha.
+
+## v0.9.93 - 2026-07-25 (Correções da revisão visual do ISP)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.16`**. Três achados do Robson revisando a v0.9.92 no ar — todos do DS, e viraram a release **v1.2.16** dele (rótulo de opção deixa de ser inline; ✓ centralizado nas duas formas).
 
 ### Corrigido
 
 - **As 4 opções de "Comportamento do assistente" (incidente) apareciam em duas linhas corridas**, com o rótulo de uma encostando no controle da próxima: *"…por este incidente✓ Informar a previsão…"*. Era do DS — o rótulo de `Checkbox`/`Radio` era `display: inline-flex`, e elemento inline **não quebra linha**, então nem o `space-y-3` que eu pus no container tinha efeito. Corrigido no DS v1.2.16: o default virou `flex` (empilha), com a prop `inline` para o caso raro de opções lado a lado. Ganhou também `align-items: flex-start`, então rótulo longo que quebra em duas linhas alinha o controle com a **primeira** linha.
 - **O "Padrão do suporte" (abertura de chamado) ficava estranho de ler.** Estava encaixado no fim da linha dos dois selects: sem rótulo de cabeçalho como os vizinhos, num baseline diferente e disputando espaço com a lixeira. Ganhou **linha própria** dentro do card do par, com rótulo explícito *"Usar este par como padrão do suporte"* — é uma decisão **sobre o par inteiro**, não um terceiro campo dele. Passou a usar o componente `Radio` do DS em vez do `<input>` montado à mão. **Funcionava** desde a v0.9.92 (marcar um desmarcava o outro); o problema era só visual.
 - **O ✓ do círculo estava desalinhado** — a posição era um offset em px calibrado para o quadrado. Corrigido no DS v1.2.16 com centralização por `transform`, que serve às duas formas.
-
-### Alterado — grupos de opções passaram a usar colunas
-
-Empilhar uma opção por linha desperdiçava a tela larga (as 4 opções de comportamento do incidente ocupavam ~40% do card). O DS ganhou o **`CheckGroup`** (v1.2.17) e as duas telas passaram a usá-lo:
-
-- **Incidente → "Comportamento do assistente"**: `columns={2}` — os rótulos são frases inteiras; em 3 colunas cada uma quebraria em três linhas.
-- **Editor de assistente → listas de habilidades / bases / memória**: `columns={3}`, e a **grade `auto-fill` que eu tinha montado à mão** na v0.9.91 foi deletada. O responsivo agora é responsabilidade do componente, não da tela — se amanhã o comportamento de coluna mudar, muda no DS e chega em todo mundo.
 
 ### Testar após aplicar
 
