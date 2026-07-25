@@ -1,5 +1,52 @@
 # Changelog — IA Studio
 
+## v0.9.99 - 2026-07-25 (Automação — as 5 telas independentes migradas pro DS)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.22`**.
+
+### Origem
+
+Sétima família da adoção do Studio UX. A Automação foi partida em três: **A** (estas 5 telas, que não dependem umas das outras), **B** (Fluxos + editor de lista + os 4 arquivos de `editor/`) e **C** (o canvas, 773 linhas). Esta é a A.
+
+### Alterado
+
+- **Notificações** — o log de envios. Lista pura: sem linha clicável, sem seleção, sem ação. É registro de coisa que já aconteceu — não há o que abrir nem o que fazer, e oferecer clique seria prometer uma tela que não existe.
+- **Eventos** — o log do Event Bus. A linha abre um Modal de leitura (metadados + o conteúdo do evento em JSON). **O "Reprocessar" saiu da linha e foi pro rodapé desse Modal**: reprocessar re-emite o evento para assinantes e fluxos publicados, ou seja, dispara efeito de verdade — não se faz sem ler primeiro o que vai ser re-emitido. Sem barra de lote, de propósito.
+- **Execuções** — virou lista, e o detalhe virou **rota** `/automacao/execucoes/:id`. Era um Modal `size="xl"` aberto por `?open=<id>`: a URL já carregava o id, então o requisito de endereçar uma execução já existia — só faltava a URL ser honesta. O `?open=<id>` antigo **continua funcionando** (redireciona para a rota), então link em notificação ou e-mail não quebra.
+- **Execução (detalhe, novo)** — situação, tempo, código de rastreio, o que entrou, o que saiu, e o **passo a passo no `Timeline` do DS**. O legado desenhava a bolinha de cada passo com hex cravado (`#ef4444`/`#eab308`/`#22c55e`), fora do tema — agora o nível do passo é um `Badge`. Reexecutar e Cancelar no cabeçalho, com os 5 patrasques.
+- **Agendamentos** — os calendários saíram da grade de cards com lápis e lixeira no canto e viraram tabela: a linha abre, as ações vivem na barra de lote (excluir aceita vários; "Editar" aparece só com 1 marcado). O **editor de calendário virou rota** — o campo de feriados é uma lista de datas escrita à mão, exatamente o caso que a regra do Modal do DS proíbe. Os 7 dias da semana eram `<button>` com borda inline imitando checkbox; agora são `Checkbox` do DS num `CheckGroup`. A aba de agendamentos segue **só leitura**: a recorrência mora no gatilho do fluxo, então a linha leva pro fluxo.
+- **Templates** — mesma história: lista com linha clicável + barra de lote, e o **editor virou rota** (o corpo da mensagem é um TextArea de 12 linhas). O filtro de canal foi pra toolbar da tabela, em vez de grudado no título. As variáveis detectadas ganharam um cartão próprio, explicando que o passo falha se o nome estiver errado.
+- `extractTemplateVars` foi extraído para `template.helpers.js` — com o editor virando rota, a função ficaria duplicada em dois arquivos.
+- **Breadcrumbs e rotas** das 5 telas novas registrados no `Layout.jsx` e no `App.jsx`, com gate de permissão (`automation.calendars.manage` para criar calendário, `automation.templates.write` para criar template).
+
+### Corrigido de arrasto — o achado grande: 47 badges cinza
+
+Auditando os editores novos, descobri que **`<Badge tone=...>` não fazia nada**: o `Badge` do DS chamava a prop de `status` (só ele — `StatCard` e `Banner` já chamavam `tone`), então tudo que escrevi por analogia caía no vazio. Resultado: **47 badges em 19 arquivos** — telas já validadas e no ar — renderizando **cinza neutro**. "Falhou", "Concluída", "Enviada", "sem permissão", canal, situação de execução: tudo sem cor, sem erro de build, sem aviso no console. Passou por validação visual porque um badge cinza **parece uma escolha de design**.
+
+Corrigido no DS (**v1.2.22**): `tone` é o nome canônico e `status` fica como apelido. As 47 ocorrências voltam a colorir **sem eu tocar em nenhum arquivo** — o que é a prova de que o lugar do conserto era o DS, não o consumidor. Só padronizei os 7 lugares que ainda usavam `status` (Dashboard e a página de demonstração) para o codebase falar um nome só.
+
+- **`<Tabs active={tab}>` em Agendamentos** — o `Tabs` do DS usa `value`, não `active` (o `Tabs` local usa `active`). A aba nunca ficaria marcada como ativa. Varri o resto: os outros `active=` que existem são arquivos que **ainda usam o Tabs local**, não migrados — legítimos.
+- **`<Field required>` era prop morta** no DS (corrigido lá na v1.2.22, ver o CHANGELOG do Studio UX). Já estava vazendo em `ContaSenha.jsx` desde a v0.9.87 — os 3 campos obrigatórios de lá agora mostram o asterisco sem nenhuma mudança no arquivo.
+
+### O que dá pra verificar agora (sem dado no sistema)
+
+1. **Automação → Notificações / Eventos / Execuções**: as três abrem com o texto de lista vazia certo, cada um explicando o que faria aquela linha aparecer. Nenhuma delas mostra lápis ou lixeira em linha.
+2. **Automação → Agendamentos**: as duas abas trocam de verdade e a aba ativa fica marcada (era o bug do `active`). Em Calendários, o botão **"Novo calendário"** abre a rota `/automacao/calendarios/novo`, com breadcrumb "Automação / Agendamentos / Novo calendário".
+3. **No editor de calendário**: os 7 dias são quadradinhos do DS, em colunas; **Tab** percorre com anel de foco visível; "Nome" e "Dias úteis" mostram **asterisco** de obrigatório. Salvar sem nome → toast pedindo o nome. Escrever `25/12/2026` nos feriados → toast dizendo o formato certo. Desmarcar todos os dias → toast pedindo pelo menos um.
+4. **Automação → Templates → Novo template**: rota própria (não Modal), TextArea grande, e o cartão de variáveis reagindo enquanto se digita `{{alguma.coisa}}` no conteúdo. Criar sem workspace/ambiente escolhido no topo → toast explicando.
+5. **Badges com cor de volta em TODO o sistema** (efeito do conserto do DS, não desta família): IA Studio → Pendências, Habilidades, Custos, Assistentes; ISP → Incidentes; Painel. Antes tudo cinza; agora "Falhou" vermelho, "Concluída" verde, "Executando" amarelo, "Na fila" azul. Vale a olhada porque é a mudança visual mais ampla desta versão.
+6. **Claro/escuro** nas 7 telas: nenhuma cor cravada sobrou (o vermelho/amarelo/verde do passo a passo e o roxo do canal agora vêm do tema).
+7. **Deep-link antigo**: abrir `/automacao/execucoes?open=qualquer-coisa` na barra do navegador redireciona para `/automacao/execucoes/qualquer-coisa` — que vai dar "não encontrado" e voltar pra lista, o que é o comportamento correto para um id inventado.
+
+### O que só dá pra verificar quando houver movimento
+
+Estas dependem de dado real e ficam para quando o sistema estiver rodando fluxo:
+
+- linha na tabela de Notificações / Eventos / Execuções, e a **paginação com contagem** ("N execuções") — a contagem e a janela de páginas só aparecem com volume;
+- o **passo a passo** de uma execução (precisa de um fluxo que rodou e gerou log);
+- **Reprocessar** um evento e **Reexecutar/Cancelar** uma execução — os dois disparam efeito de verdade, então não são teste de tela;
+- o **badge de nível** (erro/aviso) no passo a passo.
+
 ## v0.9.98 - 2026-07-25 (Opção em card virou padrão — sweep nos dois lugares que tinham o cenário)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.20`**.

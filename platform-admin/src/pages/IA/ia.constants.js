@@ -111,15 +111,9 @@ export function friendlyTarget(key) {
   return TARGET_LABELS[key] || key;
 }
 
-// Mapeia a `variant` do legado (verde/vermelho/…) para o `tone` do Badge do DS.
-// Mantém APPROVAL_STATUS/DOC_STATUS/RUN_STATUS intactos (fonte compartilhada) e
-// traduz na borda de renderização.
-export function statusToTone(variant) {
-  return {
-    green: 'success', red: 'danger', yellow: 'warning',
-    blue: 'info', purple: 'info', gray: 'neutral',
-  }[variant] || 'neutral';
-}
+// `statusToTone` MUDOU DE CASA (v0.9.99): virou `src/lib/tone.js`, porque a
+// família Automação também precisou dele — copiar seria duplicar helper, o
+// anti-padrão que o CLAUDE.md proíbe. Importe de `../../lib/tone`.
 
 export const MCP_TRANSPORTS = [
   { value: 'HTTP',  label: 'HTTP' },

@@ -28,8 +28,11 @@ import Fluxos from './pages/Automacao/Fluxos';
 import FluxoEditor from './pages/Automacao/FluxoEditor';
 import FluxoCanvas from './pages/Automacao/FluxoCanvas';
 import Agendamentos from './pages/Automacao/Agendamentos';
+import CalendarioEditor from './pages/Automacao/CalendarioEditor';
 import Execucoes from './pages/Automacao/Execucoes';
+import ExecucaoDetalhe from './pages/Automacao/ExecucaoDetalhe';
 import TemplatesAutomacao from './pages/Automacao/TemplatesAutomacao';
+import TemplateEditor from './pages/Automacao/TemplateEditor';
 import Eventos from './pages/Automacao/Eventos';
 import Notificacoes from './pages/Automacao/Notificacoes';
 import Agentes from './pages/IA/Agentes';
@@ -103,8 +106,13 @@ export default function App() {
                 <Route path="/automacao/fluxos/:id" element={<PermissionRoute perm="automation.workflows.read"><FluxoCanvas /></PermissionRoute>} />
                 <Route path="/automacao/fluxos/:id/lista" element={<PermissionRoute perm="automation.workflows.read"><FluxoEditor /></PermissionRoute>} />
                 <Route path="/automacao/agendamentos" element={<PermissionRoute perm="automation.workflows.read"><Agendamentos /></PermissionRoute>} />
+                <Route path="/automacao/calendarios/novo" element={<PermissionRoute perm="automation.calendars.manage"><CalendarioEditor /></PermissionRoute>} />
+                <Route path="/automacao/calendarios/:id" element={<PermissionRoute perm="automation.workflows.read"><CalendarioEditor /></PermissionRoute>} />
                 <Route path="/automacao/execucoes" element={<PermissionRoute perm="automation.executions.read"><Execucoes /></PermissionRoute>} />
+                <Route path="/automacao/execucoes/:id" element={<PermissionRoute perm="automation.executions.read"><ExecucaoDetalhe /></PermissionRoute>} />
                 <Route path="/automacao/templates" element={<PermissionRoute perm="automation.templates.read"><TemplatesAutomacao /></PermissionRoute>} />
+                <Route path="/automacao/templates/novo" element={<PermissionRoute perm="automation.templates.write"><TemplateEditor /></PermissionRoute>} />
+                <Route path="/automacao/templates/:id" element={<PermissionRoute perm="automation.templates.read"><TemplateEditor /></PermissionRoute>} />
                 <Route path="/automacao/eventos" element={<PermissionRoute perm="automation.events.read"><Eventos /></PermissionRoute>} />
                 <Route path="/automacao/notificacoes" element={<PermissionRoute perm="automation.notifications.read"><Notificacoes /></PermissionRoute>} />
                 <Route path="/ia/agentes" element={<PermissionRoute perm="ai.agents.read"><Agentes /></PermissionRoute>} />

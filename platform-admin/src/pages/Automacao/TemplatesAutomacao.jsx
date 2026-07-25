@@ -1,30 +1,43 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { FileText, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import Modal from '../../components/ui/Modal';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import EmptyState from '../../components/ui/EmptyState';
-import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
-import { FormField, TextInput, Textarea, Select } from '../../components/ui/FormField';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import {
-  listAutomationTemplates, createAutomationTemplate, updateAutomationTemplate, deleteAutomationTemplate,
-} from '../../services/automation';
+  PageHeader, Card, DataTable, EmptyState, Badge, Button, Select,
+  ConfirmDialog, useToast,
+} from '@studio-ux-ds/react';
+import { listAutomationTemplates, deleteAutomationTemplate } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { useToast } from '@studio-ux-ds/react';
 import { CHANNEL_LABEL, formatDateTime } from './automation.constants';
+import { extractTemplateVars } from './template.helpers';
 
-// Catálogo de Templates (diretriz 11): conteúdo + {{variáveis}} por canal.
-// A automação referencia o template e troca só o canal.
+// Automação/Templates — catálogo multi-canal com {{variáveis}} (diretriz 11).
+// Migrada pro DS na v0.9.99.
+//
+// Decisões de composição:
+//
+//  · **O template saiu do Modal e virou rota** (`/automacao/templates/:id`). O
+//    corpo da mensagem é um TextArea de 8 linhas — o caso mais literal da regra
+//    do Modal do DS. Além disso o editor mostra as variáveis detectadas enquanto
+//    se escreve: é tela de trabalho, não caixinha de confirmação.
+//  · **Lápis e lixeira saíram da linha.** A linha abre o template; excluir vive
+//    na barra de lote (aceita vários — são registros independentes) e "Editar"
+//    aparece lá só quando há exatamente 1 marcado.
+//  · O filtro de canal foi pra `toolbar` do `DataTable`, e não mais grudado no
+//    título da tela.
+
 export default function TemplatesAutomacao() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
+  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [deleting, setDeleting] = useState(null);
+  const [deleting, setDeleting] = useState(null); // { ids, clear }
   const [deletingBusy, setDeletingBusy] = useState(false);
+
+  const canWrite = can('automation.templates.write');
 
   async function load() {
     setLoading(true);
@@ -45,230 +58,139 @@ export default function TemplatesAutomacao() {
 
   async function confirmDelete() {
     setDeletingBusy(true);
-    try {
-      await deleteAutomationTemplate(deleting.id);
-      toast.success('Template excluído.');
-      setDeleting(null);
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setDeletingBusy(false);
+    const { ids, clear } = deleting;
+    let ok = 0;
+    const falhas = [];
+    for (const id of ids) {
+      try { await deleteAutomationTemplate(id); ok += 1; }
+      catch (err) { falhas.push(err.message); }
     }
+    setDeletingBusy(false);
+    setDeleting(null);
+    clear();
+    if (ok) toast.success(ok === 1 ? 'Template excluído.' : `${ok} templates excluídos.`);
+    if (falhas.length) toast.error(`Não deu pra excluir ${falhas.length}: ${falhas[0]}`);
+    load();
   }
 
-  const canWrite = can('automation.templates.write');
+  const novo = canWrite && (
+    <Button variant="primary" icon="plus" onClick={() => navigate('/automacao/templates/novo')}>
+      Novo template
+    </Button>
+  );
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Templates</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-            Catálogo multi-canal com {'{{variáveis}}'} — usados pelos nós Renderizar template e Notificação.
-          </p>
+  const columns = [
+    { key: 'name', header: 'Nome', render: (t) => (
+      <span style={{ fontWeight: 500, color: 'var(--su-text-primary)' }}>{t.name}</span>
+    ) },
+    { key: 'channel', header: 'Onde é usado', render: (t) => (
+      <Badge tone="info">{CHANNEL_LABEL[t.channel] || t.channel}</Badge>
+    ) },
+    { key: 'vars', header: 'Variáveis', render: (t) => {
+      const vars = extractTemplateVars(t);
+      if (!vars.length) return <span style={{ fontSize: 12, color: 'var(--su-text-muted)' }}>nenhuma</span>;
+      return (
+        <div className="flex gap-1 flex-wrap">
+          {vars.slice(0, 4).map((v) => <Badge key={v} tone="neutral">{v}</Badge>)}
+          {vars.length > 4 && <Badge tone="neutral">+{vars.length - 4}</Badge>}
         </div>
-        <Select value={channel} onChange={(e) => setChannel(e.target.value)} className="max-w-[160px]">
+      );
+    } },
+    { key: 'updated_at', header: 'Atualizado', render: (t) => formatDateTime(t.updated_at) },
+  ];
+
+  const bulkActions = canWrite
+    ? (ids, clear) => (
+      <>
+        {ids.length === 1 && (
+          <Button variant="ghost" icon="edit" onClick={() => navigate(`/automacao/templates/${ids[0]}`)}>
+            Editar
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          icon="trash"
+          title="Fluxos que usam o template passam a falhar no passo de mensagem"
+          onClick={() => setDeleting({ ids, clear })}
+        >
+          Excluir
+        </Button>
+      </>
+    )
+    : undefined;
+
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2" style={{ padding: 'var(--su-space-2) var(--su-space-4)' }}>
+      <div style={{ width: 200 }}>
+        <Select value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Filtrar por onde é usado">
           <option value="">Todos os canais</option>
           {Object.entries(CHANNEL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select>
-        {canWrite && (
-          <button className="btn-primary" onClick={() => setEditing({})}><Plus size={14} /> Novo template</button>
-        )}
       </div>
+      <Button variant="ghost" icon="refresh" loading={loading} aria-label="Atualizar" onClick={load} />
+    </div>
+  );
 
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
-      ) : !items.length ? (
-        <div className="card">
-          <EmptyState
-            icon={FileText}
-            title="Nenhum template"
-            description="Crie templates com {{variáveis}} pra reutilizar em fluxos e notificações."
-            action={canWrite && <button className="btn-primary" onClick={() => setEditing({})}><Plus size={14} /> Novo template</button>}
-          />
+  const nomesSelecionados = (deleting?.ids || [])
+    .map((id) => items.find((t) => t.id === id)?.name)
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Templates"
+        subtitle={`Textos prontos com ${'{{variáveis}}'} que os fluxos reaproveitam — a automação escolhe o template e o sistema preenche o resto.`}
+        actions={novo}
+      />
+
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
         </div>
+      ) : !items.length ? (
+        <Card>
+          <EmptyState
+            icon="file"
+            title={channel ? 'Nenhum template para esse canal' : 'Nenhum template ainda'}
+            description={channel
+              ? 'Troque o filtro para ver os outros canais, ou crie um template para este.'
+              : `Um template guarda o texto uma vez e deixa os pedaços que mudam como ${'{{variáveis}}'} — assim o mesmo aviso serve para todo mundo.`}
+            action={novo}
+          />
+        </Card>
       ) : (
         <>
-          <div className="hidden md:block card p-0 overflow-hidden">
-            <Table>
-              <Thead>
-                <Th>Nome</Th>
-                <Th>Canal</Th>
-                <Th>Variáveis</Th>
-                <Th>Atualizado</Th>
-                <Th className="text-right">Ações</Th>
-              </Thead>
-              <Tbody>
-                {items.map((t) => (
-                  <Tr key={t.id} onClick={() => setEditing(t)}>
-                    <Td><span className="font-medium" style={{ color: 'var(--ap-text-1)' }}>{t.name}</span></Td>
-                    <Td><Badge variant="purple">{CHANNEL_LABEL[t.channel] || t.channel}</Badge></Td>
-                    <Td>
-                      <div className="flex gap-1 flex-wrap">
-                        {extractVars(t).slice(0, 4).map((v) => <Badge key={v} variant="gray">{v}</Badge>)}
-                        {extractVars(t).length > 4 && <Badge variant="gray">+{extractVars(t).length - 4}</Badge>}
-                      </div>
-                    </Td>
-                    <Td>{formatDateTime(t.updated_at)}</Td>
-                    <Td className="text-right">
-                      {canWrite && (
-                        <>
-                          <button className="btn-ghost p-1.5" title="Editar" onClick={(ev) => { ev.stopPropagation(); setEditing(t); }}>
-                            <Pencil size={14} className="text-brand" />
-                          </button>
-                          <button className="btn-ghost p-1.5" title="Excluir" onClick={(ev) => { ev.stopPropagation(); setDeleting(t); }}>
-                            <Trash2 size={14} className="text-red-500" />
-                          </button>
-                        </>
-                      )}
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </div>
-          <div className="md:hidden space-y-2">
-            {items.map((t) => (
-              <button key={t.id} className="card w-full text-left" onClick={() => setEditing(t)}>
-                <div className="flex items-center gap-2">
-                  <span className="flex-1 font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{t.name}</span>
-                  <Badge variant="purple">{CHANNEL_LABEL[t.channel] || t.channel}</Badge>
-                </div>
-              </button>
-            ))}
-          </div>
+          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+            Clique num template para ler e editar o conteúdo dele.
+          </p>
+          <DataTable
+            columns={columns}
+            rows={items}
+            getRowId={(t) => t.id}
+            onRowClick={(t) => navigate(`/automacao/templates/${t.id}`)}
+            getRowLabel={(t) => `Abrir template ${t.name}`}
+            toolbar={toolbar}
+            bulkActions={bulkActions}
+          />
         </>
       )}
 
-      <TemplateModal
-        template={editing}
-        canWrite={canWrite}
-        workspaceId={workspaceId}
-        environmentId={environmentId}
-        onClose={() => setEditing(null)}
-        onSaved={() => { setEditing(null); load(); }}
-      />
+      {/* 5 patrasques: ConfirmDialog + a consequência escrita + tooltip no botão
+          + loading + gate can('automation.templates.write'). */}
       <ConfirmDialog
         open={!!deleting}
         danger
         loading={deletingBusy}
-        title="Excluir template"
-        message={`Excluir "${deleting?.name}"? Fluxos que o referenciam passam a falhar no passo de render/notificação.`}
+        title={nomesSelecionados.length > 1 ? 'Excluir templates' : 'Excluir template'}
+        message={
+          nomesSelecionados.length > 1
+            ? `Excluir ${nomesSelecionados.length} templates (${nomesSelecionados.slice(0, 3).join(', ')}${nomesSelecionados.length > 3 ? '…' : ''})? Qualquer fluxo que use um deles passa a falhar no passo de mensagem — e isso só aparece quando o fluxo rodar.`
+            : `Excluir "${nomesSelecionados[0] || ''}"? Qualquer fluxo que use esse template passa a falhar no passo de mensagem — e isso só aparece quando o fluxo rodar.`
+        }
         confirmLabel="Excluir"
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
       />
     </div>
-  );
-}
-
-function extractVars(t) {
-  const out = new Set();
-  const re = /\{\{\s*([\w.[\]-]+)\s*\}\}/g;
-  let m;
-  const text = `${t.subject ?? ''} ${t.body ?? ''}`;
-  while ((m = re.exec(text)) !== null) out.add(m[1]);
-  return [...out];
-}
-
-function TemplateModal({ template, canWrite, workspaceId, environmentId, onClose, onSaved }) {
-  const toast = useToast();
-  const isEdit = Boolean(template?.id);
-  const [name, setName] = useState('');
-  const [channel, setChannel] = useState('WHATSAPP');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!template) return;
-    setName(template.name || '');
-    setChannel(template.channel || 'WHATSAPP');
-    setSubject(template.subject || '');
-    setBody(template.body || '');
-  }, [template]);
-
-  const variables = useMemo(() => extractVars({ subject, body }), [subject, body]);
-
-  if (!template) return null;
-
-  async function handleSave() {
-    if (!name.trim()) { toast.error('Informe o nome do template.'); return; }
-    if (!body.trim()) { toast.error('Informe o conteúdo.'); return; }
-    if (!isEdit && (!workspaceId || !environmentId)) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
-    setSaving(true);
-    try {
-      if (isEdit) {
-        await updateAutomationTemplate(template.id, { name: name.trim(), subject: subject.trim() || undefined, body });
-      } else {
-        await createAutomationTemplate({
-          name: name.trim(),
-          channel,
-          subject: subject.trim() || undefined,
-          body,
-          workspace_id: workspaceId,
-          environment_id: environmentId,
-        });
-      }
-      toast.success(isEdit ? 'Template atualizado.' : 'Template criado.');
-      onSaved();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      open
-      onClose={saving ? undefined : onClose}
-      title={isEdit ? 'Editar template' : 'Novo template'}
-      size="lg"
-      dismissable={!saving}
-      footer={
-        canWrite ? (
-          <>
-            <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
-            <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 size={14} className="animate-spin" />} Salvar
-            </button>
-          </>
-        ) : undefined
-      }
-    >
-      <div className="space-y-3">
-        {isEdit && (
-          <p className="text-xs rounded-lg p-2" style={{ border: '1px solid var(--ap-border)', color: 'var(--ap-text-3)' }}>
-            O canal não muda após a criação — crie outro template pra outro canal.
-          </p>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField label="Nome" required>
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} disabled={!canWrite} />
-          </FormField>
-          <FormField label="Canal" required>
-            <Select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={isEdit || !canWrite}>
-              {Object.entries(CHANNEL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </Select>
-          </FormField>
-        </div>
-        <FormField label="Assunto" hint="Usado em e-mail/notificação (opcional).">
-          <TextInput value={subject} onChange={(e) => setSubject(e.target.value)} disabled={!canWrite} />
-        </FormField>
-        <FormField label="Conteúdo" required hint="Use {{variáveis}} — ex.: {{input.name}}, {{vars.passo_1.status}}.">
-          <Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} disabled={!canWrite} />
-        </FormField>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--ap-text-5)' }}>Variáveis detectadas</p>
-          <div className="flex gap-1 flex-wrap">
-            {variables.length ? variables.map((v) => <Badge key={v} variant="blue">{`{{${v}}}`}</Badge>) : (
-              <span className="text-xs" style={{ color: 'var(--ap-text-4)' }}>nenhuma</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Modal>
   );
 }

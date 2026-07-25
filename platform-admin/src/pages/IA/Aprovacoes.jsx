@@ -9,8 +9,9 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import {
   APPROVAL_STATUS, APPROVAL_TARGET_TYPES, formatDateTime,
-  friendlyTarget, statusToTone,
+  friendlyTarget,
 } from './ia.constants';
+import { statusToTone } from '../../lib/tone';
 
 // IA/Aprovacoes — migrada pro DS na v0.9.86; padronizada na v0.9.88.
 //

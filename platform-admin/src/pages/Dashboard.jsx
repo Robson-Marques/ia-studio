@@ -110,7 +110,7 @@ export default function Dashboard() {
               </p>
               <p className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>{planName}</p>
             </div>
-            <Badge status={statusInfo.status}>{statusInfo.label}</Badge>
+            <Badge tone={statusInfo.status}>{statusInfo.label}</Badge>
           </div>
           {trialOrExpiryText && (
             <p className="text-xs mt-3" style={{ color: 'var(--ap-text-4)' }}>{trialOrExpiryText}</p>

@@ -48,6 +48,22 @@
   "Copiar código PIX" do IXC (recon: F12→Network no botão, ou doc da API). Por ora o PIX vem pela
   página da Efí (botão do boleto). **Não é bloqueio.**
 
+### 🎨 Adoção do Studio UX — onde está (2026-07-25)
+
+Frente de UI em curso, **paralela e independente** do backend/assistente acima. Estado completo em
+[`docs/adocao-studio-ux.md`](adocao-studio-ux.md) (documento vivo, com a tabela de regras do DS e as
+armadilhas). Resumo para re-ancorar:
+
+- **Casca `AppShell` + Dashboard** no DS desde a v0.9.80; toast global do DS desde a v0.9.84.
+- **Famílias migradas:** IA Studio (v0.9.84→v0.9.91), ISP (v0.9.92), **Automação sub-frente A** (v0.9.99).
+- **Faltam:** Automação **B** (Fluxos + editor + `editor/*`) e **C** (FluxoCanvas, frente própria),
+  Configurações, Integrações, WhatsApp (chat full-bleed — frente própria), Recursos, Desenvolvedor.
+- **DS consumido: `^1.2.22`.** A migração já rendeu 13 releases do próprio Studio UX — a regra é
+  **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
+- **Armadilha que mais custou: PROP MORTA.** React não avisa prop desconhecida em componente próprio.
+  `<Badge tone>` ficou 47 vezes sem efeito (badge cinza em 19 arquivos, telas já validadas) até o DS
+  v1.2.22 aceitar o nome. **Conferir a assinatura real do componente antes de usar prop "óbvia".**
+
 ### 🧠 Lições que se repetem (re-ancorar antes de codar)
 - **ID de infra a IA NUNCA escolhe** (conexão/setor/assunto/fila) — vem da CONFIG curada ou auto-resolve
   pelo escopo. Regra no CLAUDE.md (Governança). Bugs que vieram de violar isso: conexão="torre3pratinha"

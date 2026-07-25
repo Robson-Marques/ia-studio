@@ -15,8 +15,9 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import {
   AGENT_MODELS, PERSONA_TONES, PERSONA_EMOJIS, PERSONA_BREVITY,
-  RUN_STATUS, statusToTone, formatTokens, formatUsd,
+  RUN_STATUS, formatTokens, formatUsd,
 } from './ia.constants';
+import { statusToTone } from '../../lib/tone';
 import AgentVersionsModal from './editor/AgentVersionsModal';
 
 // IA/AgenteEditor — editor de assistente (v0.9.90).

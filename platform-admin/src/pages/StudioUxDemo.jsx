@@ -43,7 +43,7 @@ export default function StudioUxDemo() {
     { key: 'cliente', header: 'Cliente' },
     { key: 'canal', header: 'Canal' },
     { key: 'valor', header: 'Valor', align: 'right' },
-    { key: 'rotulo', header: 'Status', render: (r) => <Badge status={r.status}>{r.rotulo}</Badge> },
+    { key: 'rotulo', header: 'Status', render: (r) => <Badge tone={r.status}>{r.rotulo}</Badge> },
   ];
 
   const TABS = [
@@ -85,11 +85,11 @@ export default function StudioUxDemo() {
                 <Button variant="danger" icon="trash">Excluir</Button>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Badge status="success">Ativo</Badge>
-                <Badge status="warning">Pendente</Badge>
-                <Badge status="danger">Vencido</Badge>
-                <Badge status="info">Novo</Badge>
-                <Badge status="neutral">Rascunho</Badge>
+                <Badge tone="success">Ativo</Badge>
+                <Badge tone="warning">Pendente</Badge>
+                <Badge tone="danger">Vencido</Badge>
+                <Badge tone="info">Novo</Badge>
+                <Badge tone="neutral">Rascunho</Badge>
               </div>
               <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
                 <SegmentedControl items={[{ id: '7d', label: '7 dias' }, { id: '30d', label: '30 dias' }, { id: 'ano', label: 'Ano' }]} value={range} onChange={setRange} />

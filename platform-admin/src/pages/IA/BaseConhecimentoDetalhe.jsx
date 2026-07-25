@@ -9,7 +9,8 @@ import {
   getKnowledgeBase, deleteKnowledgeBase, queryKnowledgeBase,
 } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { DOC_STATUS, formatDateTime, statusToTone } from './ia.constants';
+import { DOC_STATUS, formatDateTime } from './ia.constants';
+import { statusToTone } from '../../lib/tone';
 
 // IA/BaseConhecimentoDetalhe — uma base de conhecimento (v0.9.89).
 //

@@ -1,36 +1,47 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarClock, CalendarDays, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import Modal from '../../components/ui/Modal';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import EmptyState from '../../components/ui/EmptyState';
-import Tabs from '../../components/ui/Tabs';
-import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
-import { FormField, TextInput, Textarea } from '../../components/ui/FormField';
-import { listSchedules, listCalendars, createCalendar, updateCalendar, deleteCalendar } from '../../services/automation';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, Tabs, DataTable, EmptyState, Badge, Button,
+  ConfirmDialog, useToast,
+} from '@studio-ux-ds/react';
+import { listSchedules, listCalendars, deleteCalendar } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useToast } from '@studio-ux-ds/react';
 import { formatDateTime, WEEKDAYS } from './automation.constants';
+import { statusToTone } from '../../lib/tone';
+
+// Automação/Agendamentos — próximos disparos dos fluxos agendados + calendários
+// de feriados/dias úteis (diretriz 12). Migrada pro DS na v0.9.99.
+//
+// Decisões de composição:
+//
+//  · **O calendário saiu do Modal e virou rota** (`/automacao/calendarios/:id`).
+//    O campo "Feriados" é uma lista de datas escrita à mão, uma por linha — texto
+//    longo, com scroll, do tipo que o usuário revisa e reescreve. É exatamente o
+//    caso que a regra do Modal do DS proíbe (todo TextArea vai pra rota).
+//  · **Os calendários viraram tabela, não grade de cards com lápis e lixeira.**
+//    A linha abre o calendário; as ações vivem na barra de lote. Card com dois
+//    botõezinhos no canto era a forma que a taxonomia do DS aposentou.
+//  · A aba "Agendamentos" é **só leitura de propósito**: a recorrência mora no
+//    gatilho do fluxo, então clicar na linha leva pro fluxo — não há o que editar
+//    aqui, e por isso ela não tem coluna de seleção.
 
 const TABS = [
-  { id: 'agendamentos', label: 'Agendamentos', Icon: CalendarClock },
-  { id: 'calendarios', label: 'Calendários', Icon: CalendarDays },
+  { id: 'agendamentos', label: 'Agendamentos', icon: 'calendar' },
+  { id: 'calendarios', label: 'Calendários', icon: 'calendar' },
 ];
 
-// Agendamentos ativos (fluxos publicados com gatilho agendado) + calendários
-// de feriados/dias úteis (diretriz 12). A recorrência edita-se no fluxo.
 export default function Agendamentos() {
   const [tab, setTab] = useState('agendamentos');
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Agendamentos</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Próximos disparos dos fluxos agendados e calendários de feriados. A recorrência é configurada no gatilho do fluxo.
-        </p>
-      </div>
-      <Tabs items={TABS} active={tab} onChange={setTab} bleed={false} />
+    <div className="space-y-6">
+      <PageHeader
+        title="Agendamentos"
+        subtitle="Quando cada fluxo agendado roda de novo, e quais dias contam como úteis. A recorrência em si é configurada no gatilho do fluxo."
+      />
+      {/* `value`, não `active` — o Tabs do DS tem outra API que o Tabs local. */}
+      <Tabs items={TABS} value={tab} onChange={setTab} />
       {tab === 'agendamentos' ? <SchedulesTab /> : <CalendarsTab />}
     </div>
   );
@@ -47,49 +58,66 @@ function SchedulesTab() {
       .then((r) => setItems(r.items))
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>;
-  if (!items.length) {
+  if (loading) {
     return (
-      <div className="card">
-        <EmptyState icon={CalendarClock} title="Nenhum agendamento" description='Publique um fluxo com gatilho "Agendado" pra ele aparecer aqui.' />
+      <div className="flex justify-center py-16">
+        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
       </div>
     );
   }
 
+  if (!items.length) {
+    return (
+      <Card>
+        <EmptyState
+          icon="calendar"
+          title="Nenhum fluxo agendado"
+          description='Publique um fluxo com o gatilho "Agendado" e o próximo disparo dele aparece aqui.'
+        />
+      </Card>
+    );
+  }
+
+  const columns = [
+    { key: 'workflow', header: 'Fluxo', render: (s) => (
+      <span style={{ fontWeight: 500, color: 'var(--su-text-primary)' }}>{s.workflow?.name || '—'}</span>
+    ) },
+    { key: 'enabled', header: 'Vai rodar', render: (s) => {
+      const on = s.enabled && s.workflow?.status === 'PUBLISHED';
+      return <Badge tone={statusToTone(on ? 'green' : 'gray')}>{on ? 'Sim' : 'Não'}</Badge>;
+    } },
+    { key: 'next', header: 'Próxima vez', render: (s) => formatDateTime(s.next_run_at) },
+    { key: 'last', header: 'Última vez', render: (s) => formatDateTime(s.last_run_at) },
+  ];
+
   return (
-    <div className="card p-0 overflow-hidden">
-      <Table>
-        <Thead>
-          <Th>Fluxo</Th>
-          <Th>Ativo</Th>
-          <Th>Próximo disparo</Th>
-          <Th>Último disparo</Th>
-        </Thead>
-        <Tbody>
-          {items.map((s) => (
-            <Tr key={s.id} onClick={() => navigate(`/automacao/fluxos/${s.workflow?.id}`)}>
-              <Td><span className="font-medium" style={{ color: 'var(--ap-text-1)' }}>{s.workflow?.name || '—'}</span></Td>
-              <Td><Badge variant={s.enabled && s.workflow?.status === 'PUBLISHED' ? 'green' : 'gray'}>{s.enabled && s.workflow?.status === 'PUBLISHED' ? 'Sim' : 'Não'}</Badge></Td>
-              <Td>{formatDateTime(s.next_run_at)}</Td>
-              <Td>{formatDateTime(s.last_run_at)}</Td>
-            </Tr>
-          ))}
-        </Tbody>
-      </Table>
-    </div>
+    <>
+      <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+        Clique num agendamento para abrir o fluxo — é lá que se muda o horário e a repetição.
+      </p>
+      <DataTable
+        columns={columns}
+        rows={items}
+        getRowId={(s) => s.id}
+        onRowClick={(s) => s.workflow?.id && navigate(`/automacao/fluxos/${s.workflow.id}`)}
+        getRowLabel={(s) => `Abrir fluxo ${s.workflow?.name || ''}`.trim()}
+      />
+    </>
   );
 }
 
 function CalendarsTab() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null); // null | {} novo | calendario
-  const [deleting, setDeleting] = useState(null);
+  const [deleting, setDeleting] = useState(null); // { ids, clear }
   const [deletingBusy, setDeletingBusy] = useState(false);
+
+  const canManage = can('automation.calendars.manage');
 
   async function load() {
     setLoading(true);
@@ -103,168 +131,121 @@ function CalendarsTab() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function confirmDelete() {
     setDeletingBusy(true);
-    try {
-      await deleteCalendar(deleting.id);
-      toast.success('Calendário excluído.');
-      setDeleting(null);
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setDeletingBusy(false);
+    const { ids, clear } = deleting;
+    let ok = 0;
+    const falhas = [];
+    for (const id of ids) {
+      try { await deleteCalendar(id); ok += 1; }
+      catch (err) { falhas.push(err.message); }
     }
+    setDeletingBusy(false);
+    setDeleting(null);
+    clear();
+    if (ok) toast.success(ok === 1 ? 'Calendário excluído.' : `${ok} calendários excluídos.`);
+    if (falhas.length) toast.error(`Não deu pra excluir ${falhas.length}: ${falhas[0]}`);
+    load();
   }
 
-  const canManage = can('automation.calendars.manage');
+  const novo = canManage && (
+    <Button variant="primary" icon="plus" onClick={() => navigate('/automacao/calendarios/novo')}>
+      Novo calendário
+    </Button>
+  );
+
+  const columns = [
+    { key: 'name', header: 'Nome', render: (c) => (
+      <span style={{ fontWeight: 500, color: 'var(--su-text-primary)' }}>{c.name}</span>
+    ) },
+    { key: 'workdays', header: 'Dias úteis', render: (c) => {
+      const dias = (Array.isArray(c.workdays) ? c.workdays : [])
+        .map((d) => WEEKDAYS.find((w) => w.value === d)?.label)
+        .filter(Boolean);
+      return dias.length ? dias.join(', ') : '—';
+    } },
+    { key: 'holidays', header: 'Feriados', align: 'right', render: (c) => (Array.isArray(c.holidays) ? c.holidays.length : 0) },
+  ];
+
+  // Excluir calendário aceita lote (são registros independentes), então
+  // `selectionMode` fica no default `multiple` — quadrado. Com 1 marcado cabe
+  // também "Editar", que é ação de um só.
+  const bulkActions = canManage
+    ? (ids, clear) => (
+      <>
+        {ids.length === 1 && (
+          <Button variant="ghost" icon="edit" onClick={() => navigate(`/automacao/calendarios/${ids[0]}`)}>
+            Editar
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          icon="trash"
+          title="Agendamentos que usam o calendário passam a considerar só seg-sex, sem feriados"
+          onClick={() => setDeleting({ ids, clear })}
+        >
+          Excluir
+        </Button>
+      </>
+    )
+    : undefined;
+
+  const nomesSelecionados = (deleting?.ids || [])
+    .map((id) => items.find((c) => c.id === id)?.name)
+    .filter(Boolean);
 
   return (
     <div className="space-y-3">
-      {canManage && (
-        <div className="flex justify-end">
-          <button className="btn-primary" onClick={() => setEditing({})}><Plus size={14} /> Novo calendário</button>
-        </div>
-      )}
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
       ) : !items.length ? (
-        <div className="card">
+        <Card>
           <EmptyState
-            icon={CalendarDays}
+            icon="calendar"
             title="Nenhum calendário"
-            description="Calendários definem feriados e dias úteis usados pelos agendamentos."
-            action={canManage && <button className="btn-primary" onClick={() => setEditing({})}><Plus size={14} /> Novo calendário</button>}
+            description="Um calendário diz quais dias da semana valem como úteis e quais datas são feriado — os agendamentos consultam isso antes de disparar."
+            action={novo}
           />
-        </div>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {items.map((c) => (
-            <div key={c.id} className="card space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="flex-1 font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{c.name}</span>
-                {canManage && (
-                  <>
-                    <button className="btn-ghost p-1.5" onClick={() => setEditing(c)} title="Editar calendário">
-                      <Pencil size={14} className="text-brand" />
-                    </button>
-                    <button className="btn-ghost p-1.5" onClick={() => setDeleting(c)} title="Excluir calendário">
-                      <Trash2 size={14} className="text-red-500" />
-                    </button>
-                  </>
-                )}
-              </div>
-              <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-                Dias úteis: {(Array.isArray(c.workdays) ? c.workdays : []).map((d) => WEEKDAYS.find((w) => w.value === d)?.label).filter(Boolean).join(', ') || '—'}
-              </p>
-              <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-                {Array.isArray(c.holidays) ? c.holidays.length : 0} feriado(s)
-              </p>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+              Clique num calendário para ver e editar os feriados dele.
+            </p>
+            {novo}
+          </div>
+          <DataTable
+            columns={columns}
+            rows={items}
+            getRowId={(c) => c.id}
+            onRowClick={(c) => navigate(`/automacao/calendarios/${c.id}`)}
+            getRowLabel={(c) => `Abrir calendário ${c.name}`}
+            bulkActions={bulkActions}
+          />
+        </>
       )}
 
-      <CalendarModal calendar={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
+      {/* 5 patrasques: ConfirmDialog + a consequência escrita + tooltip no botão
+          + loading + gate can('automation.calendars.manage'). */}
       <ConfirmDialog
         open={!!deleting}
         danger
         loading={deletingBusy}
-        title="Excluir calendário"
-        message={`Excluir "${deleting?.name}"? Agendamentos que o referenciam passam a considerar apenas seg-sex sem feriados.`}
+        title={nomesSelecionados.length > 1 ? 'Excluir calendários' : 'Excluir calendário'}
+        message={
+          nomesSelecionados.length > 1
+            ? `Excluir ${nomesSelecionados.length} calendários (${nomesSelecionados.slice(0, 3).join(', ')}${nomesSelecionados.length > 3 ? '…' : ''})? Os agendamentos que usam qualquer um deles passam a considerar apenas segunda a sexta, sem feriado nenhum.`
+            : `Excluir "${nomesSelecionados[0] || ''}"? Os agendamentos que usam esse calendário passam a considerar apenas segunda a sexta, sem feriado nenhum.`
+        }
         confirmLabel="Excluir"
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
       />
     </div>
-  );
-}
-
-function CalendarModal({ calendar, onClose, onSaved }) {
-  const toast = useToast();
-  const isEdit = Boolean(calendar?.id);
-  const [name, setName] = useState('');
-  const [holidays, setHolidays] = useState('');
-  const [workdays, setWorkdays] = useState([1, 2, 3, 4, 5]);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!calendar) return;
-    setName(calendar.name || '');
-    setHolidays(Array.isArray(calendar.holidays) ? calendar.holidays.join('\n') : '');
-    setWorkdays(Array.isArray(calendar.workdays) && calendar.workdays.length ? calendar.workdays : [1, 2, 3, 4, 5]);
-  }, [calendar]);
-
-  if (!calendar) return null;
-
-  function toggleWorkday(d) {
-    setWorkdays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
-  }
-
-  async function handleSave() {
-    if (!name.trim()) { toast.error('Informe o nome do calendário.'); return; }
-    const dates = holidays.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
-    const invalid = dates.filter((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d));
-    if (invalid.length) { toast.error(`Datas inválidas (use AAAA-MM-DD): ${invalid.slice(0, 3).join(', ')}…`); return; }
-    if (!workdays.length) { toast.error('Selecione pelo menos um dia útil.'); return; }
-    setSaving(true);
-    try {
-      if (isEdit) await updateCalendar(calendar.id, { name: name.trim(), holidays: dates, workdays });
-      else await createCalendar({ name: name.trim(), holidays: dates, workdays });
-      toast.success(isEdit ? 'Calendário atualizado.' : 'Calendário criado.');
-      onSaved();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      open
-      onClose={saving ? undefined : onClose}
-      title={isEdit ? 'Editar calendário' : 'Novo calendário'}
-      size="md"
-      dismissable={!saving}
-      footer={
-        <>
-          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 size={14} className="animate-spin" />} Salvar
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-3">
-        <FormField label="Nome" required>
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Feriados nacionais" />
-        </FormField>
-        <FormField label="Dias úteis" required>
-          <div className="flex flex-wrap gap-1.5">
-            {WEEKDAYS.map((d) => (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => toggleWorkday(d.value)}
-                className="px-2.5 py-1.5 rounded-lg text-xs min-h-[36px] transition-colors"
-                style={{
-                  border: `1px solid ${workdays.includes(d.value) ? 'var(--ap-accent, #6366f1)' : 'var(--ap-border)'}`,
-                  backgroundColor: workdays.includes(d.value) ? 'var(--ap-surface-3)' : 'transparent',
-                  color: workdays.includes(d.value) ? 'var(--ap-text-1)' : 'var(--ap-text-4)',
-                }}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-        </FormField>
-        <FormField label="Feriados" hint="Uma data por linha, formato AAAA-MM-DD.">
-          <Textarea rows={6} value={holidays} onChange={(e) => setHolidays(e.target.value)} placeholder={'2026-12-25\n2027-01-01'} className="font-mono text-xs" />
-        </FormField>
-      </div>
-    </Modal>
   );
 }

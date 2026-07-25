@@ -60,6 +60,17 @@ export const WEEKDAYS = [
 
 export const NODE_CATEGORY_ORDER = ['Gatilhos', 'Lógica', 'IA', 'Comunicação', 'Integrações', 'Plataforma'];
 
+// Canal do LOG de notificação — chaves minúsculas, como o backend grava em
+// `notification_log.channel`. NÃO confundir com `CHANNEL_LABEL` acima, que é de
+// outro domínio (canais de template, em MAIÚSCULAS): usar um no lugar do outro
+// faz o rótulo cair no fallback e a tela mostrar a chave crua.
+export const NOTIFICATION_CHANNEL = {
+  whatsapp: 'WhatsApp',
+  email:    'E-mail',
+  in_app:   'Sino do sistema',
+  none:     '—',
+};
+
 export const NOTIFICATION_STATUS = {
   SENT:      { label: 'Enviada',   variant: 'green' },
   FAILED:    { label: 'Falhou',    variant: 'red' },

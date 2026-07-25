@@ -8,7 +8,8 @@ import {
 import { listApprovals, decideApproval } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { APPROVAL_STATUS, formatDateTime, friendlyTarget, statusToTone } from './ia.constants';
+import { APPROVAL_STATUS, formatDateTime, friendlyTarget } from './ia.constants';
+import { statusToTone } from '../../lib/tone';
 
 // IA/AprovacaoDetalhe — página de decisão de uma pendência (v0.9.88).
 //

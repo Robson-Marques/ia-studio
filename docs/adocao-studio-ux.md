@@ -6,15 +6,19 @@
 > governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
 
-## Estado atual — passo 2 da expansão (2026-07-24)
+## Estado atual — migração por família em curso (2026-07-25, v0.9.99 / DS ^1.2.22)
 
 O `platform-admin` opera com a **casca AppShell do Studio UX** e o **Dashboard**
 migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
 `/studio-ux-demo` (fase v0.9.79) continua funcional dentro da casca nova — nada
-foi removido dele. Todas as demais telas (Automação, WhatsApp, ISP, IA,
-Integrações, Configurações etc.) seguem funcionando com o padrão visual antigo
-(`--ap-*` + Tailwind) dentro do AppShell, num regime de **coexistência
-deliberada**.
+foi removido dele.
+
+**Famílias já no padrão DS:** IA Studio (6 telas), ISP (2 telas) e Automação
+sub-frente A (5 telas + 3 rotas de detalhe/editor novas). As demais (Automação B
+e C, WhatsApp, Integrações, Configurações, Recursos, Desenvolvedor) seguem com o
+padrão visual antigo (`--ap-*` + Tailwind) dentro do AppShell, num regime de
+**coexistência deliberada** — uma família por sub-frente, com validação humana
+entre elas.
 
 ### O que o `platform-admin` tem hoje
 
@@ -97,7 +101,7 @@ O AppShell usa `DSIcon` interno, cuja biblioteca é curada e menor que a `lucide
 | 2 | ~~Sweep de `lib/toast` → `useToast()` do DS + remover `UIToastContainer`~~ | ✅ Concluído em 2026-07-24 (55 arquivos migrados; `lib/toast.js` e `UIToastContainer.jsx` esvaziados) |
 | 3 | ~~9 páginas com modais siblings + estados independentes~~ → **as 3 do grupo IA foram resolvidas** pela regra do Modal (`IA/Ferramentas`, `IA/BasesConhecimento`, `IA/Aprovacoes`: os modais com `TextArea` viraram rota, o que dissolveu os estados concorrentes). Restam 6 fora do grupo IA: `WhatsApp/EquipesFilas`, `Automacao/FluxoCanvas`, `Automacao/FluxoEditor`, `Automacao/Fluxos`, `Integracoes/Conexoes`, `ISP/Incidentes` | Cada uma resolve na migração da sua família — a regra do Modal (DS v1.2.12) já dá o caminho |
 | 4 | Instalação do `@studio-ux-ds/icons` (não está no `package.json`) | Quando a primeira família de tela migrar e precisar de ícones DS dentro do conteúdo |
-| 5 | Migração das famílias de tela para o padrão visual do DS. **Família IA Studio: CONCLUÍDA** (v0.9.84→v0.9.91 — Custos, Memória, Pendências, Habilidades, Conhecimento, Assistentes + 2 sweeps retroativos). Restam: **Configurações** (Usuarios, PerfisAcesso, Workspaces, Auditoria, MinhaConta — 5 telas), **Integrações** (6 arquivos), **Automação** (12 arquivos, inclui o Canvas), **WhatsApp** (11 arquivos, inclui o layout de chat full-bleed), **ISP** (2), **Recursos** (2), **Desenvolvedor** (2) | Uma sub-frente por família. Automação (Canvas) e WhatsApp (chat) são as mais complexas — merecem frente dedicada, não devem ser as próximas |
+| 5 | Migração das famílias de tela para o padrão visual do DS. **Concluídas: IA Studio** (v0.9.84→v0.9.91 — 6 telas + 2 sweeps retroativos), **ISP** (v0.9.92 — 2 telas), **Automação sub-frente A** (v0.9.99 — Notificações, Eventos, Execuções + detalhe, Agendamentos + editor de calendário, Templates + editor). Restam: **Automação B** (Fluxos + FluxoEditor + os 4 de `editor/`), **Automação C** (FluxoCanvas, 773 linhas), **Configurações** (5), **Integrações** (6), **WhatsApp** (11, inclui o chat full-bleed), **Recursos** (2), **Desenvolvedor** (2) | Uma sub-frente por família. Automação C (Canvas) e WhatsApp (chat) são as mais complexas — frente dedicada, nunca junto de outra coisa |
 
 ### Regras do DS que nasceram desta adoção
 
@@ -110,6 +114,10 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 | v1.2.12 → v1.2.14 | **Taxonomia de ações em 3 lugares:** abre o registro → a linha (`onRowClick`, zero botão); age sobre 1+ registros → **barra de lote** (`bulkActions`); só existe dentro do registro → tela de destino. Ações **variam com a quantidade marcada**; `selectionMode="single"` quando nada pode ser feito em massa |
 | v1.2.13 | `Button` tem `loading` (spinner real + `disabled` + `aria-busy`). Nunca fingir com `icon={saving ? 'loader-2' : …}` |
 | v1.2.14 | `.su-input`/`.su-textarea`/`.su-select` preenchem o container (antes só dentro do `Field`); `.su-pagehead__actions` quebra linha |
+| v1.2.15 → v1.2.16 | Seleção de linha do `DataTable` é `<input>` real: **quadrado = cabem vários, círculo = cabe um** (`selectionMode`). "Limpar" da barra de lote é `<button>`, não `<span onClick>` |
+| v1.2.20 | **Opção em card** (`variant="card"` + `meta` no `Checkbox`/`Radio`): quando a opção tem explicação/condição própria, ela ganha moldura e a condição vai pro `meta` — não no meio do rótulo. Grade de opção usa `CheckGroup` (`columns` numérico = teto; `"auto"` = quantas couberem) |
+| v1.2.21 | `Pagination` navegável por teclado, com **janela** de páginas (não só as 5 primeiras) + contagem via `total`/`itemLabel`. `itemLabel` aceita `[singular, plural]` — obrigatório em português (`execuçãos` não existe) |
+| v1.2.22 | **`tone` é o nome do papel semântico em TODO componente** (`Badge`, `StatCard`, `Banner`) — `Badge status=` fica só como apelido legado. `Field` tem `required` (asterisco + "(obrigatório)" para leitor de tela) |
 
 **Armadilhas que custaram retrabalho e valem conferir antes de codar:**
 
@@ -117,12 +125,14 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 - **CSS var inexistente não quebra** — não aplica e o elemento herda do pai. Os nomes certos são `--su-text-primary` e `--su-border-default` (**não** `--su-text`/`--su-border`).
 - **`PageHeader` não tem `breadcrumb`** (ele vive na TopBar do AppShell, pelo mapa do `Layout`) e **`Card` não tem `title`** (viraria atributo HTML).
 - **Campo "um por linha" com valor em array**: `join('\n')` no value + `split + filter(Boolean)` no onChange **apaga a quebra no mesmo keystroke** — o Enter não funciona. Guardar o texto cru em state local e converter no `blur` (ver `LinesTextArea` no `AgenteEditor.jsx`).
-- **Antes de improvisar um estado ou variante**, pergunte: *"a spec já prevê isso e o adapter não expõe?"* Nos 3 casos desta adoção a resposta foi sim.
+- **PROP MORTA é a armadilha mais cara — confira a assinatura real do componente antes de usar uma prop "óbvia".** React não avisa prop desconhecida em componente próprio: ela cai no `...rest` (virando atributo inválido no DOM) ou é simplesmente ignorada. O build passa, o console fica limpo, e **o resultado é plausível** — foi assim que 47 `<Badge tone=…>` ficaram cinza em 19 arquivos até a v1.2.22, atravessando validação visual. Casos já queimados: `Badge status` vs `tone` (resolvido), `Field required` (resolvido), `PageHeader breadcrumb` e `Card title` (não existem, nunca vão existir). O `Tabs` do DS usa **`value`**; o `Tabs` local usa `active` — trocar não dá erro, só nunca marca a aba.
+- **Antes de improvisar um estado ou variante**, pergunte: *"a spec já prevê isso e o adapter não expõe?"* Nos 7 casos desta adoção a resposta foi sim — e em 2 deles a spec estava certa desde a v1.0.0.
 | 6 | Multi-tenant branding via Customize (accent/tema por organização) | Quando o backend expuser as preferências por org |
 | 7 | Aposentar `Header.jsx` (órfão), `NotificationsBell.jsx` (só usado pelos legados), `Sidebar.legacy.jsx`, `Header.legacy.jsx`, `Layout.legacy.jsx`, `Dashboard.legacy.jsx`, `lib/toast.js` (esvaziado), `components/ui/UIToastContainer.jsx` (esvaziado) | Quando a casca+Dashboard novos estiverem validados em produção — sub-frente própria; pode ser um único `rm` desses 8 caminhos |
 | 8 | Regressão do dropdown do sino de notificações — hoje o AppShell só oferece um sinal + link direto para `/automacao/notificacoes` (ADR §3). Se você quiser o dropdown de volta, precisa de sub-frente que extraia o conteúdo do `NotificationsBell.jsx` para um `<Drawer>` do DS acionado pelo `onNotifications` | Sub-frente futura, opcional |
 | 9 | **`DELETE` de base de conhecimento não existe no backend.** O `knowledge.controller.ts` tem `GET`/`POST`/`PATCH` mas nenhum `@Delete`; o `deleteKnowledgeBase()` do frontend chama uma rota inexistente → `Cannot DELETE /api/v1/ai/knowledge/bases/:id`. **NÃO é regressão da migração** — o botão existia no legado (lixeira na linha) com a mesma chamada, só nunca havia sido clicado. Decisão do Robson em 2026-07-24: **resolver no backend depois, não mexer na UI por agora** (o botão "Excluir base" segue visível no detalhe e segue dando erro). | Frente de backend — fora do escopo da adoção do DS |
 | 11 | ~~**`upgrade.sh` move o marcador de versão antes de construir.**~~ ✅ **Resolvido na v0.9.96** (2026-07-25): `revert_checkout()` volta o repo para a versão de origem quando a falha acontece depois do checkout, com duas linhas `[ROLLBACK]` no log; e o script passou a se copiar para `/tmp` antes de tocar no git (o `git checkout` reescrevia o próprio `upgrade.sh` em execução). Descrição original abaixo. **`upgrade.sh` move o marcador de versão antes de construir.** O `GIT_CHECKOUT` roda antes do `ADMIN_BUILD`; se o build falha, o `dist` servido continua o da versão anterior mas o `GET /system/version` (que lê a tag do deploy) já responde a versão nova. Consequência: o painel mostra "atual = vX, disponível = Nenhuma" e **não deixa reaplicar** — obriga a publicar uma tag nova só para reexecutar o mesmo código (aconteceu na v0.9.94 → v0.9.95, 2026-07-25). Correções possíveis: (a) `git checkout` de volta na versão anterior no `trap` de falha, ou (b) construir num diretório temporário e só mover o marcador depois do build passar. É o mesmo desenho de risco que o CLAUDE.md do AquaPark chama de "release fantasma" — versão nova com código antigo | Frente de infra própria — mexer no mecanismo de deploy exige cuidado e teste isolado |
+| 12 | **Apagar os `*.legacy.jsx`.** São ~12 arquivos de backup criados durante a migração (nenhum importado — não entram no bundle). Servem de conforto para rollback **enquanto a família não foi validada em produção**; passado isso são lixo, e o CLAUDE.md manda código vivo sem lixo (o histórico mora no git). Nota: as 3 telas de log da Automação (Notificações, Eventos, Execuções) **não** têm `.legacy.jsx` — foram reescritas no lugar, e o backup delas é o git. | Um único `rm` quando as famílias IA + ISP + Automação estiverem validadas |
 | 10 | **`is_active` no cadastro de servidor MCP é recusado pelo backend.** O `CreateMcpServerDto` não declara `is_active` (só o `UpdateMcpServerDto`), e o `ValidationPipe` com whitelist rejeita → `property is_active should not exist`. É **deliberado**: o `mcp.repository.ts` documenta "Servidor MCP nasce OFF (is_active=false)" — a diretriz de flags proíbe nascer ativo. A UI (legado e migrado, idênticos) oferece "Ativar imediatamente" que a arquitetura não permite. Decisão do Robson em 2026-07-24: **deixar quieto** (checkbox segue na tela e segue causando 400 quando marcado). | Decisão de produto pendente — fora do escopo da adoção do DS |
 
 ## Rollback

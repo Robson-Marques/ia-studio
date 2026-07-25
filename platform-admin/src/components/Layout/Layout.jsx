@@ -211,6 +211,11 @@ const BREADCRUMB_PATTERNS = [
   [/^\/ia\/conhecimento\/[^/]+\/documentos\/novo$/,'IA Studio / Conhecimento / Novo documento'],
   [/^\/ia\/conhecimento\/[^/]+$/,                  'IA Studio / Conhecimento / Base'],
   [/^\/automacao\/fluxos\/[^/]+/,                  'Automação / Fluxos / Editor'],
+  [/^\/automacao\/execucoes\/[^/]+$/,              'Automação / Execuções / Detalhe'],
+  [/^\/automacao\/calendarios\/novo$/,             'Automação / Agendamentos / Novo calendário'],
+  [/^\/automacao\/calendarios\/[^/]+$/,            'Automação / Agendamentos / Calendário'],
+  [/^\/automacao\/templates\/novo$/,               'Automação / Templates / Novo'],
+  [/^\/automacao\/templates\/[^/]+$/,              'Automação / Templates / Editar'],
 ];
 
 function resolveCrumb(pathname) {
