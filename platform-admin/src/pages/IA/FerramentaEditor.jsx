@@ -157,14 +157,13 @@ export default function FerramentaEditor() {
     ? 'Habilidade pronta da plataforma — você pode ligar/desligar, exigir aprovação e ajustar o tempo limite.'
     : 'O que essa habilidade faz e como o assistente deve preencher os parâmetros.';
 
-  const breadcrumb = isEdit
-    ? [{ label: 'IA Studio' }, { label: 'Habilidades', href: '/ia/ferramentas' }, { label: tool?.name || 'Editar' }]
-    : [{ label: 'IA Studio' }, { label: 'Habilidades', href: '/ia/ferramentas' }, { label: 'Nova' }];
+  // Breadcrumb NÃO vai no PageHeader (o componente do DS não tem essa prop) —
+  // ele vive na TopBar do AppShell, alimentado pelo mapa BREADCRUMBS do Layout.
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Carregando…" breadcrumb={breadcrumb} />
+        <PageHeader title="Carregando…" />
         <div className="flex justify-center py-16">
           <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
         </div>
@@ -177,7 +176,6 @@ export default function FerramentaEditor() {
       <PageHeader
         title={title}
         subtitle={subtitle}
-        breadcrumb={breadcrumb}
         actions={
           <>
             <Button variant="secondary" onClick={() => navigate('/ia/ferramentas')} disabled={saving}>

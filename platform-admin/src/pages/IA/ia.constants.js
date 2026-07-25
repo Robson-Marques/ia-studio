@@ -98,6 +98,29 @@ export const APPROVAL_TARGET_TYPES = [
   { value: 'ADMIN',     label: 'Ação administrativa' },
 ];
 
+// Nome amigável da ação pendente (o usuário não deve ver a chave técnica crua).
+// Compartilhado entre a fila (Aprovacoes) e o detalhe (AprovacaoDetalhe).
+const TARGET_LABELS = {
+  abrir_os: 'Abrir chamado',
+  desbloqueio_confianca: 'Desbloqueio de confiança',
+  enviar_whatsapp: 'Enviar WhatsApp',
+  executar_sql: 'Executar SQL',
+};
+
+export function friendlyTarget(key) {
+  return TARGET_LABELS[key] || key;
+}
+
+// Mapeia a `variant` do legado (verde/vermelho/…) para o `tone` do Badge do DS.
+// Mantém APPROVAL_STATUS/DOC_STATUS/RUN_STATUS intactos (fonte compartilhada) e
+// traduz na borda de renderização.
+export function statusToTone(variant) {
+  return {
+    green: 'success', red: 'danger', yellow: 'warning',
+    blue: 'info', purple: 'info', gray: 'neutral',
+  }[variant] || 'neutral';
+}
+
 export const MCP_TRANSPORTS = [
   { value: 'HTTP',  label: 'HTTP' },
   { value: 'SSE',   label: 'SSE' },

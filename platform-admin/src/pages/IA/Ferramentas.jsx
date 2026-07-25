@@ -144,15 +144,8 @@ function CatalogTab() {
           columns={columns}
           rows={items}
           getRowId={(t) => t.id || t.key}
-          renderRowMenu={canWrite ? (t) => (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon="edit"
-              aria-label={t.builtin ? 'Ajustes de governança' : 'Editar'}
-              onClick={() => navigate(`/ia/ferramentas/tool/${t.id}/editar`, { state: { tool: t } })}
-            />
-          ) : undefined}
+          onRowClick={canWrite ? (t) => navigate(`/ia/ferramentas/tool/${t.id}/editar`, { state: { tool: t } }) : undefined}
+          getRowLabel={(t) => t.builtin ? `Ajustes de ${t.name}` : `Editar ${t.name}`}
         />
       )}
     </div>
@@ -261,27 +254,8 @@ function McpTab() {
           columns={columns}
           rows={items}
           getRowId={(s) => s.id}
-          renderRowMenu={(s) => (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                icon="search"
-                aria-label="Ver habilidades"
-                onClick={() => openTools(s)}
-              />
-              {canWrite && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={syncing === s.id ? 'loader-2' : 'refresh-cw'}
-                  aria-label="Sincronizar"
-                  disabled={syncing === s.id}
-                  onClick={() => handleSync(s)}
-                />
-              )}
-            </div>
-          )}
+          onRowClick={(s) => openTools(s)}
+          getRowLabel={(s) => `Ver habilidades de ${s.name}`}
         />
       )}
 
@@ -298,6 +272,28 @@ function McpTab() {
         onClose={() => setToolsServer(null)}
         title={`Habilidades de ${toolsServer?.name ?? ''}`}
         maxWidth={640}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setToolsServer(null)}>Fechar</Button>
+            {canWrite && toolsServer && (
+              <Button
+                variant="primary"
+                icon={syncing === toolsServer.id ? 'loader-2' : 'refresh-cw'}
+                disabled={syncing === toolsServer.id}
+                onClick={async () => {
+                  await handleSync(toolsServer);
+                  // Recarrega habilidades descobertas do servidor atual.
+                  try {
+                    const { items: list } = await getMcpServerTools(toolsServer.id);
+                    setTools(list);
+                  } catch (err) { toast.error(err.message); }
+                }}
+              >
+                {syncing === toolsServer.id ? 'Sincronizando…' : 'Sincronizar'}
+              </Button>
+            )}
+          </>
+        }
       >
         {!tools.length ? (
           <EmptyState

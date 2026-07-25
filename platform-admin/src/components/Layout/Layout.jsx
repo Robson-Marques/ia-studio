@@ -191,6 +191,26 @@ const BREADCRUMBS = {
   '/studio-ux-demo':        'Studio UX (piloto)',
 };
 
+// Rotas com parâmetro (:id) não cabem no mapa estático acima. Lista ordenada de
+// padrões — o PRIMEIRO que casar ganha, então padrões mais específicos vêm
+// antes. Substituiu os ternários encadeados que estavam crescendo aqui.
+const BREADCRUMB_PATTERNS = [
+  [/^\/ia\/ferramentas\/tool\/nova$/,              'IA Studio / Habilidades / Nova'],
+  [/^\/ia\/ferramentas\/tool\/[^/]+\/editar$/,     'IA Studio / Habilidades / Editar'],
+  [/^\/ia\/memoria\/perfis\/nova$/,                'IA Studio / Memória / Novo perfil'],
+  [/^\/ia\/memoria\/perfis\/[^/]+\/editar$/,       'IA Studio / Memória / Editar perfil'],
+  [/^\/ia\/memoria\/[^/]+$/,                       'IA Studio / Memória / Entradas'],
+  [/^\/ia\/aprovacoes\/politicas\/nova$/,          'IA Studio / Pendências / Nova política'],
+  [/^\/ia\/aprovacoes\/[^/]+$/,                    'IA Studio / Pendências / Detalhe'],
+  [/^\/automacao\/fluxos\/[^/]+/,                  'Automação / Fluxos / Editor'],
+];
+
+function resolveCrumb(pathname) {
+  if (BREADCRUMBS[pathname]) return BREADCRUMBS[pathname];
+  const hit = BREADCRUMB_PATTERNS.find(([re]) => re.test(pathname));
+  return hit ? hit[1] : 'IA Studio';
+}
+
 const ENV_BADGE = {
   PRODUCTION:  { label: 'Produção',        variant: 'green' },
   STAGING:     { label: 'Homologação',     variant: 'yellow' },
@@ -308,11 +328,7 @@ export default function Layout() {
     };
   }, [wsOpen]);
 
-  const crumb = BREADCRUMBS[location.pathname]
-    || (location.pathname.startsWith('/automacao/fluxos/') ? 'Automação / Fluxos / Editor'
-      : (location.pathname === '/ia/ferramentas/tool/nova' ? 'IA Studio / Habilidades / Nova'
-        : (location.pathname.match(/^\/ia\/ferramentas\/tool\/[^/]+\/editar$/) ? 'IA Studio / Habilidades / Editar'
-          : 'IA Studio')));
+  const crumb = resolveCrumb(location.pathname);
   const breadcrumb = crumb.split(' / ').map((label) => ({ label }));
 
   const envInfo = environment

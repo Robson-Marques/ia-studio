@@ -1,5 +1,77 @@
 # Changelog — IA Studio
 
+## v0.9.88 - 2026-07-24 (Padronização pós-auditoria — linha clicável + Modal→rota retroativo nas 4 telas migradas)
+
+Sem `db push`. Só frontend. **Nenhuma tela nova** — esta release aplica retroativamente 2 regras do DS nas telas já migradas (Custos, Memória, Pendências, Habilidades), depois de uma auditoria que encontrou violações em todas as 4.
+
+### As 2 regras aplicadas
+
+1. **`STUDIO_UX_TABLES.md` §3 — a linha é o alvo.** "A ação mais comum de todas — abrir o detalhe do registro — costuma ser a própria linha clicável… a linha não precisa de um botão 'abrir' redundante quando ela inteira já é o alvo." Estava sendo violada em todas as tabelas (lápis por linha, ou 2 botões grandes competindo com a linha).
+2. **Modal sem `TextArea` (regra registrada na v1.2.11 do DS, endurecida na v1.2.12).** Modal serve pra form curto com campos simples (Input / NumericInput / Select / Checkbox). **Qualquer** `TextArea` — descrição, JSON, motivo, mesmo curto e opcional — vai pra tela dedicada.
+
+### Habilidades (`pages/IA/Ferramentas.jsx`)
+
+- Aba **Catálogo**: lápis por linha removido; a linha inteira agora abre o editor (`/ia/ferramentas/tool/:id/editar`).
+- Aba **Servidores MCP**: coluna de ações removida (tinha 2 botões); a linha abre "Habilidades de …", e o **Sincronizar** desceu pro footer desse modal — recarrega a lista de habilidades descobertas no mesmo lugar.
+
+### Memória (`pages/IA/Memoria.jsx`)
+
+- Lápis "Editar perfil" removido da linha (competia com o clique da linha, que já abria as entradas).
+- `ProfileModal` (tinha `TextArea` de Descrição) → rotas **`/ia/memoria/perfis/nova`** e **`/ia/memoria/perfis/:id/editar`** (`MemoriaPerfilEditor.jsx`). Carrega por `getMemoryProfile(id)`, então refresh/deep-link funcionam.
+- **Master-detail falso promovido a rota real.** As entradas do perfil eram um `useState('selected')` com botão "voltar" fabricado: a URL não mudava, F5 perdia o contexto e o botão voltar do navegador saía da tela em vez de subir um nível. Agora é **`/ia/memoria/:id`** (`MemoriaEntradas.jsx`) — destino do clique na linha, com "Editar perfil" no header.
+- Colunas em linguagem do usuário: "TTL (s)" → **Validade** (`nunca expira` quando null), "Máx. itens" mostra `ilimitado` quando null (era `—` nos dois, ambíguo).
+
+### Pendências (`pages/IA/Aprovacoes.jsx`)
+
+- Aba **Fila**: os 2 botões por linha (Aprovar / Rejeitar) saíram. A linha abre **`/ia/aprovacoes/:id`** (`AprovacaoDetalhe.jsx`) — página onde a decisão é tomada **com o contexto da ação na frente**, em `DescriptionList` legível (era só um `JSON.stringify` truncado na linha). Decidir passou de 1 clique cego pra 2 cliques informados: mais coerente com o peso da ação (liberar execução real de um assistente).
+- **`RejectModal` absorvido** pelo detalhe: o motivo é um `TextArea` inline na página, não mais overlay.
+- Aprovar mantém os 5 patrasques (`ConfirmDialog` + disclaimer + tooltip + loading + gate `can()`).
+- `PolicyModal` (tinha `TextArea` de Descrição + de Condição JSON) → rota **`/ia/aprovacoes/politicas/nova`** (`AprovacaoPoliticaEditor.jsx`). Só criação — o backend expõe `POST /ai/approvals/policies` e **não tem PATCH**; por isso a tabela de políticas fica sem linha clicável (não há destino). Registrado no código.
+- Esta tela ficou sendo **só listagem** — zero overlay.
+
+### Custos (`pages/IA/Custos.jsx`)
+
+- Lápis removido; a linha do orçamento abre o editor. **`BudgetModal` continua Modal** — só tem `NumericInput` + `Checkbox`, nenhum `TextArea`: respeita a regra.
+
+### Corrigido — 2 props mortas que eu passei na v0.9.87
+
+- **`PageHeader` não tem prop `breadcrumb`.** Eu estava passando em `FerramentaEditor` (v0.9.87, já no ar) — era silenciosamente ignorada. O breadcrumb vive na TopBar do `AppShell`, alimentado pelo mapa do `Layout`. Prop removida dos editores + comentário no código pra não repetir.
+- **`Card` não tem prop `title`.** Ia virar atributo HTML `title` (tooltip no card inteiro). Títulos de seção agora são `<h2>` real dentro do Card.
+
+### Alterado — infra
+
+- `Layout.jsx`: o mapa estático de breadcrumbs não cobre rota com `:id`, e os ternários encadeados estavam crescendo a cada release. Trocado por **`BREADCRUMB_PATTERNS`** — lista ordenada de `[regex, label]` + `resolveCrumb(pathname)`. Primeiro padrão que casa ganha; mais específico primeiro. Cobre as 7 rotas dinâmicas atuais.
+- `ia.constants.js`: `friendlyTarget()` e `statusToTone()` promovidos de locais do `Aprovacoes.jsx` pra compartilhados (lista + detalhe usam os dois).
+- `App.jsx`: 5 rotas novas — 2 de memória (perfil nova/editar) + 1 de entradas + 1 de detalhe de pendência + 1 de nova política. Todas sob `PermissionRoute` com a perm correta (`ai.memory.write`, `ai.memory.read`, `ai.approvals.read`, `ai.approvals.decide`).
+
+### Testar após aplicar
+
+**Habilidades**
+1. Catálogo: passar o mouse na linha → linha inteira destacada, **sem lápis**. Clicar em qualquer ponto abre o editor. Habilidade "Da plataforma" abre em modo governança (nome/descrição/schema bloqueados).
+2. MCP: linha clicável abre "Habilidades de …". Dentro do modal, botão **Sincronizar** roda e atualiza a lista ali mesmo.
+
+**Memória**
+3. Lista: colunas Validade (`nunca expira` quando vazio) e Máx. itens (`ilimitado` quando vazio). **Sem lápis**. Clicar na linha → URL vira `/ia/memoria/<id>`, breadcrumb "IA Studio / Memória / Entradas".
+4. Na tela de entradas: **F5** mantém a tela (antes voltava pra lista). Botão **voltar do navegador** sobe pra lista. Filtro por chave de escopo funciona.
+5. "Editar perfil" → `/ia/memoria/perfis/<id>/editar`, form com Descrição em TextArea grande, Escopo desabilitado. Salvar volta pras entradas.
+6. "Novo perfil" na lista → `/ia/memoria/perfis/nova`. Salvar volta pra lista.
+
+**Pendências**
+7. Fila: **sem botões na linha**. Texto de ajuda "Clique numa pendência para ver…". Clicar → `/ia/aprovacoes/<id>`.
+8. No detalhe: card "O que o assistente vai fazer" com o contexto em pares chave/valor legíveis (não JSON cru). Card "Sua decisão" com TextArea de motivo + Aprovar e Rejeitar.
+9. **Aprovar** → ConfirmDialog, confirmar executa e volta pra fila com toast.
+10. **Rejeitar** com motivo preenchido → executa direto (sem ConfirmDialog, é a ação não-destrutiva: nada é alterado) e volta pra fila.
+11. **F5** na URL do detalhe → recarrega via `listApprovals + filter`. Pendência já decidida → toast "talvez já tenha sido decidida" + volta pra fila.
+12. Usuário **sem** `ai.approvals.decide` → vê o detalhe mas com aviso "não tem permissão para decidir", sem os botões.
+13. Políticas: **Nova política** → `/ia/aprovacoes/politicas/nova` (Descrição e Condição JSON em TextArea grandes). Tabela de políticas **não** tem linha clicável (sem edição no backend).
+
+**Custos**
+14. Orçamentos: **sem lápis**; clicar na linha abre o modal de edição (que continua Modal, corretamente).
+
+### Restantes na família (2 telas)
+
+`v0.9.89 BasesConhecimento` → `v0.9.90 Agentes + 3 editors` (o maior: ~12 `TextArea` em `AgentEditorModal`).
+
 ## v0.9.87 - 2026-07-24 (Migração visual — IA/Ferramentas pro Studio UX + refactor ToolModal→rota; 4/6 da família IA Studio)
 
 Sem `db push`. Só frontend. Quarta tela da família IA Studio migrada, com **primeira aplicação retroativa** da regra de Modal que o DS acabou de registrar (v1.2.11): form com TextArea de descrição/escrita reflexiva vai pra rota, não pra Modal.

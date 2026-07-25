@@ -173,14 +173,24 @@ function BudgetsTab() {
           <EmptyState icon="file" title="Nenhum orçamento" description="Crie um orçamento para controlar o gasto mensal com IA." />
         </Card>
       ) : (
-        <DataTable
-          columns={columns}
-          rows={items}
-          getRowId={(b) => b.id}
-          renderRowMenu={canManage ? (b) => (
-            <Button variant="ghost" size="sm" icon="edit" aria-label="Editar" onClick={() => { setEditing(b); setEditorOpen(true); }} />
-          ) : undefined}
-        />
+        <>
+          {canManage && (
+            <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+              Clique num orçamento para ajustar limite, alerta e bloqueio.
+            </p>
+          )}
+          {/* Linha clicável em vez de lápis por linha (regra do DS
+              STUDIO_UX_TABLES.md §3 — a linha é o alvo, sem botão redundante).
+              O BudgetModal continua Modal: só tem NumericInput + Checkbox,
+              nenhum TextArea — respeita a regra do Modal (v1.2.11+ do DS). */}
+          <DataTable
+            columns={columns}
+            rows={items}
+            getRowId={(b) => b.id}
+            onRowClick={canManage ? (b) => { setEditing(b); setEditorOpen(true); } : undefined}
+            getRowLabel={(b) => `Editar orçamento de ${formatUsd(b.limit_usd)}/mês`}
+          />
+        </>
       )}
 
       <BudgetModal
