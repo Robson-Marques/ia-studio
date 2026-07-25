@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
   PageHeader, Tabs, Card, Field, Input, Select, NumericInput, TextArea,
-  Button, Checkbox, Badge, EmptyState, useToast,
+  Button, Checkbox, CheckGroup, Badge, EmptyState, useToast,
 } from '@studio-ux-ds/react';
 import {
   getAgent, createAgent, updateAgent, saveAgentVersion, executeAgent,
@@ -863,12 +863,11 @@ function MultiSelectList({ items, selected, onToggle, getId, renderTitle, render
       </p>
     );
   }
-  // Grade responsiva: os rótulos são curtos ("2ª via de boleto", "Data e hora
-  // atual") e uma coluna única deixava 2/3 da largura vazia com uma lista longa
-  // pra rolar. `auto-fill` + `minmax` resolve sem media query: 3 colunas no
-  // desktop largo, 2 no médio, 1 no mobile.
+  // `CheckGroup` do DS (v1.2.16) no lugar da grade que eu tinha montado à mão
+  // aqui na v0.9.91: os rótulos são curtos ("2ª via de boleto", "Data e hora
+  // atual"), então 3 colunas. Quem cuida do responsivo é o componente.
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
+    <CheckGroup columns={3}>
       {items.map((it) => {
         const itemId = getId(it);
         const on = set.has(itemId);
@@ -902,7 +901,7 @@ function MultiSelectList({ items, selected, onToggle, getId, renderTitle, render
           </label>
         );
       })}
-    </div>
+    </CheckGroup>
   );
 }
 

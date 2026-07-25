@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
   PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, ConfirmDialog,
-  Field, Input, Select, TextArea, NumericInput, Button, Checkbox, useToast,
+  Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast,
 } from '@studio-ux-ds/react';
 import {
   getIncident, createIncident, updateIncident,
@@ -332,33 +332,38 @@ export default function IncidenteEditor() {
 
           <Card>
             <div style={{ padding: 20 }} className="space-y-3">
-              <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+              <h2 id="inc-comportamento" style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
                 Comportamento do assistente
               </h2>
-              <Checkbox
-                id="inc-suppress-os"
-                label="Não abrir chamado para clientes cobertos por este incidente"
-                checked={form.suppress_os}
-                onChange={(e) => patch({ suppress_os: e.target.checked })}
-              />
-              <Checkbox
-                id="inc-inform-forecast"
-                label="Informar a previsão de normalização ao cliente"
-                checked={form.inform_forecast}
-                onChange={(e) => patch({ inform_forecast: e.target.checked })}
-              />
-              <Checkbox
-                id="inc-notify-normalization"
-                label="Avisar quando normalizar (só nos modos proativo e combinado)"
-                checked={form.notify_normalization}
-                onChange={(e) => patch({ notify_normalization: e.target.checked })}
-              />
-              <Checkbox
-                id="inc-auto-detect"
-                label="Detectar instabilidade automaticamente — só sugere um rascunho, nunca ativa sozinho"
-                checked={form.auto_detect}
-                onChange={(e) => patch({ auto_detect: e.target.checked })}
-              />
+              {/* `columns={2}`: os rótulos são frases inteiras — em 3 colunas
+                  quebrariam em três linhas cada. Em tela estreita cai pra 1
+                  sozinho (o CheckGroup usa auto-fill, sem media query). */}
+              <CheckGroup columns={2} role="group" aria-labelledby="inc-comportamento">
+                <Checkbox
+                  id="inc-suppress-os"
+                  label="Não abrir chamado para clientes cobertos por este incidente"
+                  checked={form.suppress_os}
+                  onChange={(e) => patch({ suppress_os: e.target.checked })}
+                />
+                <Checkbox
+                  id="inc-inform-forecast"
+                  label="Informar a previsão de normalização ao cliente"
+                  checked={form.inform_forecast}
+                  onChange={(e) => patch({ inform_forecast: e.target.checked })}
+                />
+                <Checkbox
+                  id="inc-notify-normalization"
+                  label="Avisar quando normalizar (só nos modos proativo e combinado)"
+                  checked={form.notify_normalization}
+                  onChange={(e) => patch({ notify_normalization: e.target.checked })}
+                />
+                <Checkbox
+                  id="inc-auto-detect"
+                  label="Detectar instabilidade automaticamente — só sugere um rascunho, nunca ativa sozinho"
+                  checked={form.auto_detect}
+                  onChange={(e) => patch({ auto_detect: e.target.checked })}
+                />
+              </CheckGroup>
             </div>
           </Card>
         </div>
