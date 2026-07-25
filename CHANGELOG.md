@@ -1,5 +1,61 @@
 # Changelog — IA Studio
 
+## v0.9.90 - 2026-07-24 (Assistentes migrado — família IA Studio 6/6 CONCLUÍDA)
+
+Sem `db push`. Só frontend. **Última tela da família.** Era a maior: um Modal `size="xl"` com 8 abas e ~12 `TextArea` dentro.
+
+### Assistentes (`pages/IA/Agentes.jsx`)
+
+A tela virou **só listagem**. Tudo que era overlay ou state saiu:
+
+- **`AgentEditorModal` (8 abas, ~12 `TextArea`) → rotas `/ia/agentes/nova` e `/ia/agentes/:id`** (`AgenteEditor.jsx`). Era o caso mais extremo da regra do Modal do DS: a pessoa escreve a personalidade (sempre/nunca), o objetivo, a descrição de cada passo, o "faça" de cada situação, as instruções adicionais e as palavras bloqueadas — o roteiro inteiro de um atendente — atrás de um scrim, sem ver nada do resto do sistema. Cada aba agora vive em `Card`s próprios, com os campos respirando (as regras de persona passaram de 3 para 4 linhas, as instruções adicionais de 4 para 6, a mensagem de teste de 2 para 4).
+- **`ImportAgentModal` → rota `/ia/agentes/importar`** (`AgenteImportar.jsx`). `TextArea` de JSON passou de 12 para 18 linhas. O `hint` agora avisa que segredos não viajam no arquivo e a conexão de IA precisa ser reescolhida.
+- **`AgentExecuteModal` foi ABSORVIDO pela aba Testar do editor.** Havia **duas** UIs de teste no código — o `AgentExecuteModal` (aberto pelo ▶ da linha) e o `TestTab` dentro do editor —, com o mesmo propósito e comportamentos diferentes. Agora é uma. Consequência de ACL: a rota `/ia/agentes/:id` ficou como **`ai.agents.read`** (não `write`), com o Salvar gateado por `can('ai.agents.write')` — assim quem só tem `ai.agents.execute` continua alcançando o teste. Antes, um usuário só-execute testava pelo ▶ da lista; se a rota fosse `write`, ele perderia o acesso.
+- **`AgentVersionsModal` segue Modal**, de propósito: não tem campo nenhum (lista de versões + publicar/reverter), então respeita a regra — que é sobre `TextArea`/escrita reflexiva, não sobre overlay em si. Migrado pros componentes do DS e agora aberto pelo **cabeçalho do editor**, não pela linha.
+- **Linha clicável:** a linha tinha **4 botões** (▶ Testar, Versões, Exportar, ✎ Editar) **mais** o nome clicável — cinco alvos disputando o mesmo clique. Sobrou um: a linha inteira abre o assistente. **Versões** e **Exportar** desceram pro cabeçalho do editor, onde têm contexto (regra do `STUDIO_UX_TABLES.md` §3, caso 2).
+- O checkbox **"Salvar como nova versão"** saiu do rodapé do modal e ficou ao lado da **"Nota da versão"**, na aba Visão geral — é onde ele faz sentido, junto do campo que ele controla.
+- **Versão publicada agora é lida de volta.** No legado, salvar uma versão nova ou publicar/reverter não atualizava nada na tela aberta (o modal recebia `current_version` da linha da lista, que ficava velha). Agora um `refreshVersionMeta()` relê só o metadado de versão — sem re-hidratar o formulário, para não descartar edições não salvas do usuário.
+- Linguagem do usuário: "Versão ativa" → **"Versão publicada"** (`nenhuma ainda` em vez de `—`), "Ativa" → **"Em uso"**, "Reverter" → **"Voltar para esta"**, "Rollback aplicado" → "Voltou para a vN", "Nome que a IA usa" → "Nome que o assistente usa", "Quantas ações a IA encadeia" → "…o assistente encadeia".
+
+### Também corrigido
+
+- `MultiSelectList` (as listas de marcar habilidades / bases / memória) era um `<button>` com um `<input type="checkbox" readOnly>` dentro — clicável mas semanticamente errado, e o checkbox não era focável. Virou `<label>` + checkbox real: o rótulo inteiro continua clicável, o teclado funciona, e o leitor de tela anuncia o estado.
+- Último resquício de `components/ui/*` local, `text-red-500`/`text-emerald-500` hardcoded e `var(--ap-*)` legada no grupo IA — todos removidos. **O grupo IA está 100% no DS.**
+
+### Adicionado
+
+- `pages/IA/AgenteEditor.jsx`, `pages/IA/AgenteImportar.jsx`, `pages/IA/Agentes.legacy.jsx` (backup).
+- 3 rotas em `App.jsx` + 3 padrões de breadcrumb no `Layout.jsx`.
+
+### Órfãos para a limpeza futura
+
+`editor/AgentEditorModal.jsx` e `editor/AgentExecuteModal.jsx` **seguem no repo** porque o `Agentes.legacy.jsx` os importa — é o que faz o rollback funcionar. Entram na sub-frente de limpeza (item 7 da tabela de dívida em `docs/adocao-studio-ux.md`) junto com os outros `.legacy`, **depois** de a família estar validada em produção.
+
+### Testar após aplicar
+
+**Assistentes — lista**
+1. Colunas Nome (com descrição embaixo) / Modelo / Versão publicada (`nenhuma ainda` quando não há) / Status / Atualizado. **Nenhum botão na linha** e o nome **não** é um link separado. Header com **Importar** e **Novo assistente**.
+2. Clicar na linha → `/ia/agentes/<id>`, breadcrumb "IA Studio / Assistentes / Editar".
+
+**Editor — abas**
+3. **Visão geral**: card "Pronto para publicar?" com os 4 itens marcando ✓ conforme você preenche. Nome, Descrição, checkbox "Salvar como nova versão" e (se marcado) Nota da versão.
+4. **Quem é**: nome do assistente, tom, emojis, tamanho das respostas + Sempre/Nunca (uma regra por linha).
+5. **O que faz**: Objetivo + card de Passos (adicionar, subir, descer, remover) + card de Situações (adicionar, remover). Testar o **subir/descer** de um passo do meio.
+6. **O que sabe** / **O que pode fazer**: listas de marcar. Clicar em **qualquer parte da linha** marca/desmarca; navegar por **Tab** e marcar com **Espaço** também. Sem a permissão de ações, as habilidades "grava dados" ficam esmaecidas com tooltip explicando.
+7. **Testar**: sem salvar ainda → EmptyState "Salve antes de testar". Depois de salvo → mensagem de teste + botão com spinner + resultado com status, tokens, custo e a resposta.
+8. **Ajustes avançados**: conexão, modelo, criatividade/passos/tokens, memória (se houver perfis), instruções adicionais, limites de segurança.
+
+**Editor — ações do cabeçalho**
+9. **Salvar** com "nova versão" marcado → toast com o número da versão. Abrir **Versões** logo depois: a nova versão tem que aparecer, e a badge **Em uso** tem que estar na versão certa (era isso que ficava velho no legado).
+10. **Versões** → **Publicar** numa versão mais nova, ou **Voltar para esta** numa mais antiga (esta é vermelha, com ConfirmDialog explicando que nenhuma versão é apagada). Após confirmar, reabrir Versões: a badge "Em uso" tem que ter mudado.
+11. **Exportar** → baixa o `.json`. **Importar** (pela lista) → cola o conteúdo, importa e **abre o assistente importado** para revisão.
+12. **Novo assistente** → salvar pela primeira vez: a URL troca de `/nova` para `/ia/agentes/<id>` **sem recarregar**, e as abas Testar/Versões/Exportar ficam disponíveis na hora.
+13. **F5** em `/ia/agentes/<id>` → recarrega o assistente certo.
+
+### Família IA Studio — concluída
+
+`v0.9.84 Custos` · `v0.9.85 Memória` · `v0.9.86 Pendências` · `v0.9.87 Habilidades` · `v0.9.88 padronização retroativa` · `v0.9.89 Conhecimento` · **`v0.9.90 Assistentes`**. Próximas famílias (Automação, WhatsApp, Integrações, ISP, Recursos, Desenvolvedor, Configurações) seguem no legado — cada uma é uma frente própria.
+
 ## v0.9.89 - 2026-07-24 (Conhecimento migrado + bump DS ^1.2.13 + 3 bugs silenciosos corrigidos; 5/6 da família IA Studio)
 
 Sem `db push`. Só frontend. Quinta tela da família migrada — a primeira que **nasce** já alinhada às duas regras (não precisou de refactor retroativo).

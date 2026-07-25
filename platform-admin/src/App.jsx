@@ -33,6 +33,8 @@ import TemplatesAutomacao from './pages/Automacao/TemplatesAutomacao';
 import Eventos from './pages/Automacao/Eventos';
 import Notificacoes from './pages/Automacao/Notificacoes';
 import Agentes from './pages/IA/Agentes';
+import AgenteEditor from './pages/IA/AgenteEditor';
+import AgenteImportar from './pages/IA/AgenteImportar';
 import BasesConhecimento from './pages/IA/BasesConhecimento';
 import BaseConhecimentoEditor from './pages/IA/BaseConhecimentoEditor';
 import BaseConhecimentoDetalhe from './pages/IA/BaseConhecimentoDetalhe';
@@ -105,6 +107,12 @@ export default function App() {
                 <Route path="/automacao/eventos" element={<PermissionRoute perm="automation.events.read"><Eventos /></PermissionRoute>} />
                 <Route path="/automacao/notificacoes" element={<PermissionRoute perm="automation.notifications.read"><Notificacoes /></PermissionRoute>} />
                 <Route path="/ia/agentes" element={<PermissionRoute perm="ai.agents.read"><Agentes /></PermissionRoute>} />
+                <Route path="/ia/agentes/nova" element={<PermissionRoute perm="ai.agents.write"><AgenteEditor /></PermissionRoute>} />
+                <Route path="/ia/agentes/importar" element={<PermissionRoute perm="ai.agents.write"><AgenteImportar /></PermissionRoute>} />
+                {/* `read` (não `write`): a aba Testar vive aqui, e quem só tem
+                    ai.agents.execute precisa alcançá-la. O Salvar é gateado por
+                    can('ai.agents.write') dentro do editor. */}
+                <Route path="/ia/agentes/:id" element={<PermissionRoute perm="ai.agents.read"><AgenteEditor /></PermissionRoute>} />
                 <Route path="/ia/conhecimento" element={<PermissionRoute perm="ai.knowledge.read"><BasesConhecimento /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/nova" element={<PermissionRoute perm="ai.knowledge.write"><BaseConhecimentoEditor /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/:id" element={<PermissionRoute perm="ai.knowledge.read"><BaseConhecimentoDetalhe /></PermissionRoute>} />

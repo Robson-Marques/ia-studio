@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
-import { RotateCcw, Rocket } from 'lucide-react';
-import Modal from '../../../components/ui/Modal';
-import ConfirmDialog from '../../../components/ui/ConfirmDialog';
-import { Badge } from '../../../components/ui/Table';
+import {
+  Modal, ConfirmDialog, Badge, Button, EmptyState, useToast,
+} from '@studio-ux-ds/react';
 import { publishAgent } from '../../../services/ai';
 import { usePermissions } from '../../../hooks/usePermissions';
-import { useToast } from '@studio-ux-ds/react';
 import { formatDateTime } from '../ia.constants';
 
-// Histórico de versões do agente (imutáveis — diretriz 3): publicar aponta a
-// current_version; rollback repontar para versão anterior. Mesmo padrão do
-// VersionsModal de Automação (Fase 4).
+// Histórico de versões do assistente (imutáveis — diretriz 3): publicar aponta a
+// current_version; reverter repontar para uma versão anterior.
+//
+// Migrado pro DS na v0.9.90. **Segue Modal de propósito**: não tem campo nenhum
+// (é lista + duas ações), então respeita a regra do Modal do DS (v1.2.12) — a
+// regra é sobre `TextArea`/escrita reflexiva, não sobre overlay em si. Agora
+// abre do cabeçalho do editor (`AgenteEditor`), não mais da linha da lista.
+//
+// O ConfirmDialog aqui é um overlay sobre overlay — tolerado porque o
+// ConfirmDialog é confirmação de ação, não um segundo nível de formulário
+// (é o mesmo arranjo que o legado já tinha e que o DS aceita para P13).
 export default function AgentVersionsModal({ open, onClose, agent, versions, onPublished }) {
   const toast = useToast();
   const { can } = usePermissions();
@@ -23,7 +29,7 @@ export default function AgentVersionsModal({ open, onClose, agent, versions, onP
       await publishAgent(agent.id, confirming.version);
       toast.success(
         confirming.isRollback
-          ? `Rollback para v${confirming.version} aplicado.`
+          ? `Voltou para a v${confirming.version}.`
           : `Versão v${confirming.version} publicada.`,
       );
       setConfirming(null);
@@ -36,56 +42,75 @@ export default function AgentVersionsModal({ open, onClose, agent, versions, onP
   }
 
   const current = agent?.current_version ?? 0;
+  const list = versions || [];
 
   return (
-    <Modal open={open} onClose={onClose} title="Versões do assistente" size="lg">
-      <div className="space-y-2">
-        {(versions || []).map((v) => {
-          const isActive = v.version === current && current > 0;
-          const isRollback = v.version < current;
-          return (
-            <div
-              key={v.id || v.version}
-              className="rounded-lg p-3 flex flex-wrap items-center gap-2"
-              style={{ border: `1px solid ${isActive ? 'var(--ap-accent, #6366f1)' : 'var(--ap-border)'}` }}
-            >
-              <span className="font-mono font-semibold text-sm" style={{ color: 'var(--ap-text-1)' }}>v{v.version}</span>
-              {isActive && <Badge variant="green">Ativa</Badge>}
-              {v.published_at && !isActive && <Badge variant="gray">Já publicada</Badge>}
-              <span className="text-xs flex-1 min-w-[120px] truncate" style={{ color: 'var(--ap-text-4)' }}>
-                {v.note || 'sem nota'} · {formatDateTime(v.created_at)}
-              </span>
-              {can('ai.agents.publish') && !isActive && (
-                <button
-                  className="btn-secondary text-xs"
-                  title={isRollback ? 'Reverter: tornar esta a versão ativa' : 'Publicar esta versão'}
-                  onClick={() => setConfirming({ version: v.version, isRollback })}
-                >
-                  {isRollback ? <RotateCcw size={13} /> : <Rocket size={13} />}
-                  {isRollback ? 'Reverter' : 'Publicar'}
-                </button>
-              )}
-            </div>
-          );
-        })}
-        {!(versions || []).length && (
-          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-            Nenhuma versão salva ainda. Salve as configurações do assistente para gerar a v1.
-          </p>
-        )}
-      </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Versões do assistente"
+      maxWidth={680}
+      footer={<Button variant="secondary" onClick={onClose}>Fechar</Button>}
+    >
+      {!list.length ? (
+        <EmptyState
+          icon="file"
+          title="Nenhuma versão salva ainda"
+          description="Salve o assistente com “Salvar como nova versão” marcado para gerar a v1."
+        />
+      ) : (
+        <div className="space-y-2">
+          {list.map((v) => {
+            const isActive = v.version === current && current > 0;
+            const isRollback = v.version < current;
+            return (
+              <div
+                key={v.id || v.version}
+                className="flex flex-wrap items-center gap-2"
+                style={{
+                  border: `1px solid ${isActive ? 'var(--su-action)' : 'var(--su-border-default)'}`,
+                  borderRadius: 8,
+                  padding: 12,
+                }}
+              >
+                <span style={{ fontFamily: 'var(--su-font-mono, monospace)', fontWeight: 600, fontSize: 14, color: 'var(--su-text-primary)' }}>
+                  v{v.version}
+                </span>
+                {isActive && <Badge tone="success">Em uso</Badge>}
+                {v.published_at && !isActive && <Badge tone="neutral">Já foi publicada</Badge>}
+                <span style={{ fontSize: 12, flex: 1, minWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--su-text-muted)' }}>
+                  {v.note || 'sem nota'} · {formatDateTime(v.created_at)}
+                </span>
+                {can('ai.agents.publish') && !isActive && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={isRollback ? 'arrow-left' : 'check'}
+                    title={isRollback
+                      ? 'Voltar a usar esta versão — nenhuma versão é apagada'
+                      : 'Passar a atender com esta versão'}
+                    onClick={() => setConfirming({ version: v.version, isRollback })}
+                  >
+                    {isRollback ? 'Voltar para esta' : 'Publicar'}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <ConfirmDialog
         open={!!confirming}
         danger={confirming?.isRollback}
         loading={publishing}
-        title={confirming?.isRollback ? 'Reverter versão' : 'Publicar versão'}
+        title={confirming?.isRollback ? 'Voltar para uma versão anterior' : 'Publicar versão'}
         message={
           confirming?.isRollback
-            ? `Reverter a versão ativa do assistente para v${confirming?.version}? Os atendimentos passam a usar essa versão. Nenhuma versão é apagada.`
+            ? `Voltar a versão em uso para a v${confirming?.version}? Os atendimentos passam a usar essa versão a partir de agora. Nenhuma versão é apagada — você pode publicar a mais nova de novo depois.`
             : `Publicar a v${confirming?.version}? O assistente passa a atender usando essa versão.`
         }
-        confirmLabel={confirming?.isRollback ? 'Reverter' : 'Publicar'}
+        confirmLabel={confirming?.isRollback ? 'Voltar para esta versão' : 'Publicar'}
         onClose={() => setConfirming(null)}
         onConfirm={confirmPublish}
       />
