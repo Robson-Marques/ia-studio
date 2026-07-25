@@ -1,5 +1,25 @@
 # Changelog — IA Studio
 
+## v0.9.98 - 2026-07-25 (Opção em card virou padrão — sweep nos dois lugares que tinham o cenário)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.20`**.
+
+### Origem
+
+Comparando duas telas lado a lado, o Robson cravou o padrão: as habilidades do assistente (opção em **card** com borda que acende) contra as opções de comportamento do incidente (opção **nua**) — *"ficou muito mais elegante e isso tem que ser padrão do DS"*. Virou `variant="card"` + `meta` no `Checkbox`/`Radio` (DS v1.2.20), com a regra escrita no catálogo: quando a borda ganha da opção nua, quando ela é só moldura, e os anti-padrões.
+
+### Alterado
+
+- **Incidente → "Comportamento do assistente"**: as 4 opções viraram **card em 4 colunas** (a densidade que o Robson aprovou). A condição de aplicação saiu do meio do rótulo e foi pra `meta` — em vez de "Avisar quando normalizar (só nos modos proativo e combinado)" numa linha só, o rótulo virou **"Avisar quando normalizar"** com *"Só nos modos proativo e combinado"* embaixo. Mesma informação, hierarquia legível.
+- **Editor de assistente → habilidades / bases / memória**: o card **montado à mão** (um `<label>` com borda e `<input>` solto) foi substituído pelo componente do DS. Não é só cosmético — ganhou **foco visível** por teclado, a borda de "marcado" deixou de ser sincronizada por JS, e o motivo do bloqueio saiu do `title` (só no hover) para um `Badge "sem permissão"` **na tela**, seguindo a regra do DS de que informação essencial não vive em tooltip. `columns="auto"` mantém a densidade original.
+- Varri as demais telas migradas: os outros `Checkbox` são **toggles soltos de configuração** (salvar como versão, ocultar dados pessoais, exigir aprovação, ativar orçamento) e pela regra do DS **não** levam card — ali a borda seria moldura sem função. O `Radio` do par padrão em Abertura de chamado também segue nu, porque já vive dentro do card do par. Nenhuma grade de opção montada à mão restou no consumidor (conferido por `grep`).
+
+### Testar após aplicar
+
+1. **Incidente → Informativo → "Comportamento do assistente"**: 4 cards em 4 colunas, cada um com rótulo curto + condição embaixo. Marcar acende a **borda** no accent. **Tab** percorre os quatro com anel de foco visível.
+2. **Editor de assistente → "O que pode fazer"**: mesma aparência de antes, mas agora com anel de foco ao navegar por Tab. Sem a permissão de ações, as habilidades que gravam dados mostram **`sem permissão`** escrito no card (antes era só tooltip).
+3. Estreitando a janela, os dois grupos caem para menos colunas sozinhos.
+
 ## v0.9.97 - 2026-07-25 (Mesmo conteúdo da v0.9.96, apontando para o DS `^1.2.19`)
 
 Sem `db push`. **Mesmo código da v0.9.96** — o que muda é a faixa da dependência.

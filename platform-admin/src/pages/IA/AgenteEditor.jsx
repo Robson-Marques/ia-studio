@@ -863,42 +863,33 @@ function MultiSelectList({ items, selected, onToggle, getId, renderTitle, render
       </p>
     );
   }
-  // `CheckGroup` do DS (v1.2.16) no lugar da grade que eu tinha montado à mão
-  // aqui na v0.9.91: os rótulos são curtos ("2ª via de boleto", "Data e hora
-  // atual"), então 3 colunas. Quem cuida do responsivo é o componente.
+  // `CheckGroup` + `Checkbox variant="card"` do DS. Antes daqui isto era um
+  // `<label>` com borda e `<input>` soltos montados na mão: mesma aparência, mas
+  // sem foco visível, com a borda de "marcado" sincronizada por JS e o motivo do
+  // desabilitado escondido num `title`. O DS assumiu os três (v1.2.20).
+  // `columns="auto"`: rótulos curtos ("2ª via de boleto", "Data e hora atual") —
+  // usa quantas colunas couberem, que é a densidade que o Robson aprovou.
   return (
-    <CheckGroup columns={3}>
+    <CheckGroup columns="auto">
       {items.map((it) => {
         const itemId = getId(it);
         const on = set.has(itemId);
         const disabled = isDisabled ? isDisabled(it) : false;
         return (
-          <label
+          <Checkbox
             key={itemId}
-            title={disabled ? disabledHint : undefined}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 8,
-              border: `1px solid ${on ? 'var(--su-action)' : 'var(--su-border-default)'}`,
-              opacity: disabled ? 0.5 : 1,
-              cursor: disabled ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={on}
-              disabled={disabled}
-              onChange={() => !disabled && onToggle(itemId)}
-              style={{ width: 16, height: 16, flexShrink: 0, accentColor: 'var(--su-action)' }}
-            />
-            <span style={{ minWidth: 0, flex: 1 }}>
-              <span style={{ display: 'block', fontSize: 14, fontWeight: 500, color: 'var(--su-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {renderTitle(it)}
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11, color: 'var(--su-text-muted)' }}>
-                {renderSub(it)}
-              </span>
-            </span>
-          </label>
+            id={`opt-${itemId}`}
+            variant="card"
+            label={renderTitle(it)}
+            // O motivo do bloqueio aparece NA TELA em vez de só no hover — regra
+            // do DS: informação essencial não vive em tooltip.
+            meta={disabled && disabledHint
+              ? <><Badge tone="neutral">sem permissão</Badge>{renderSub(it)}</>
+              : renderSub(it)}
+            checked={on}
+            disabled={disabled}
+            onChange={() => !disabled && onToggle(itemId)}
+          />
         );
       })}
     </CheckGroup>

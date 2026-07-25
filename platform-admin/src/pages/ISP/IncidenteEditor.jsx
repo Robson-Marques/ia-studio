@@ -335,31 +335,40 @@ export default function IncidenteEditor() {
               <h2 id="inc-comportamento" style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
                 Comportamento do assistente
               </h2>
-              {/* `columns={2}`: os rótulos são frases inteiras — em 3 colunas
-                  quebrariam em três linhas cada. Em tela estreita cai pra 1
-                  sozinho (o CheckGroup usa auto-fill, sem media query). */}
-              <CheckGroup columns={2} role="group" aria-labelledby="inc-comportamento">
+              {/* `variant="card"` + `columns={4}`: as 4 opções ocupam a largura
+                  do card em fronteiras visíveis, em vez de empilhar. A `meta` de
+                  cada uma diz QUANDO ela se aplica — antes essa condição estava
+                  entre parênteses no meio do rótulo, competindo com a leitura. */}
+              <CheckGroup columns={4} role="group" aria-labelledby="inc-comportamento">
                 <Checkbox
                   id="inc-suppress-os"
-                  label="Não abrir chamado para clientes cobertos por este incidente"
+                  variant="card"
+                  label="Não abrir chamado duplicado"
+                  meta="Para clientes cobertos por este incidente"
                   checked={form.suppress_os}
                   onChange={(e) => patch({ suppress_os: e.target.checked })}
                 />
                 <Checkbox
                   id="inc-inform-forecast"
-                  label="Informar a previsão de normalização ao cliente"
+                  variant="card"
+                  label="Informar a previsão"
+                  meta="O cliente ouve o prazo de normalização"
                   checked={form.inform_forecast}
                   onChange={(e) => patch({ inform_forecast: e.target.checked })}
                 />
                 <Checkbox
                   id="inc-notify-normalization"
-                  label="Avisar quando normalizar (só nos modos proativo e combinado)"
+                  variant="card"
+                  label="Avisar quando normalizar"
+                  meta="Só nos modos proativo e combinado"
                   checked={form.notify_normalization}
                   onChange={(e) => patch({ notify_normalization: e.target.checked })}
                 />
                 <Checkbox
                   id="inc-auto-detect"
-                  label="Detectar instabilidade automaticamente — só sugere um rascunho, nunca ativa sozinho"
+                  variant="card"
+                  label="Detectar instabilidade sozinho"
+                  meta="Só sugere um rascunho — nunca ativa por conta própria"
                   checked={form.auto_detect}
                   onChange={(e) => patch({ auto_detect: e.target.checked })}
                 />
