@@ -1,5 +1,64 @@
 # Changelog — IA Studio
 
+## v0.9.89 - 2026-07-24 (Conhecimento migrado + bump DS ^1.2.13 + 3 bugs silenciosos corrigidos; 5/6 da família IA Studio)
+
+Sem `db push`. Só frontend. Quinta tela da família migrada — a primeira que **nasce** já alinhada às duas regras (não precisou de refactor retroativo).
+
+### 1. Bump `@studio-ux-ds/*` para `^1.2.13`
+
+Traz o **`Button` com prop `loading`** (spinner real + `disabled` + `aria-busy`), que a spec do DS já declarava e o adapter não expunha. Os 3 pacotes (`tokens`, `components`, `react`) sobem juntos por lockstep.
+
+### 2. Conhecimento migrado (`pages/IA/BasesConhecimento.jsx`)
+
+A tela virou **só listagem**, sem nenhum overlay. Tudo que era Modal ou state virou rota:
+
+- **`CreateBaseModal` → rota `/ia/conhecimento/nova`** (`BaseConhecimentoEditor.jsx`). Tinha `TextArea` de Descrição. Além de migrar, os campos técnicos (conexão de embeddings, modelo, chunk size/overlap) foram para um segundo card **"Ajustes avançados"** com o aviso de que os padrões servem para a maioria dos casos — e renomeados para a língua do dono do negócio: "Onde gerar a indexação", "Tamanho do trecho", "Sobreposição entre trechos".
+- **`AddDocumentModal` → rota `/ia/conhecimento/:id/documentos/novo`** (`BaseDocumentoEditor.jsx`). Era o pior caso da família: colar um documento inteiro num `TextArea` de 8 linhas dentro de um Modal, sem ver a base a que pertence. Agora o campo tem 18 linhas e o cabeçalho diz *"Vai entrar na base «X»"*. Rótulos em linguagem do usuário ("De onde vem o conteúdo", "Como chamar este documento", "Endereço da página").
+- **Master-detail falso → rota `/ia/conhecimento/:id`** (`BaseConhecimentoDetalhe.jsx`), mesmo tratamento que a Memória levou na v0.9.88.
+- **Linha clicável:** o legado tinha `onClick` na linha **e** uma lixeira "Excluir base" na mesma linha — dois alvos disputando o clique, com o destrutivo colado no navegacional (pedindo clique errado). O excluir mudou para o detalhe, onde o operador vê **quantos documentos vai perder**: a mensagem do `ConfirmDialog` agora diz o número e o efeito ("os assistentes que consultam esta base param de encontrar essas respostas").
+- **`QueryModal` ("Testar consulta") virou ABA, não Modal.** Passaria no teste mecânico da regra (não tem `TextArea`), mas é uma bancada iterativa — digita, roda, lê os trechos, refina — e os trechos podem ser longos. Aba de tela de detalhe é o padrão do DS para "entidade com múltiplas dimensões" e dá a altura que os trechos precisam. Nada inventado: `Tabs` já é do catálogo. Também ficou mais claro: "relevância 0.842" em vez de "score", "trecho 1" em vez de "chunk #0", e um `EmptyState` explicando o que fazer quando nada é encontrado.
+- Tabela de documentos **sem linha clicável de propósito**: não existe endpoint de leitura de documento individual, então a linha não tem destino (caso 3 da árvore de decisão do `STUDIO_UX_TABLES.md` — não inventar rota que não existe só para cumprir a regra). Registrado no código.
+
+### 3. Três bugs silenciosos que eu vinha propagando desde a v0.9.84
+
+Achados auditando os nomes que eu passava contra o que o DS realmente define. Nenhum deles quebra a tela — todos falham **em silêncio**, que é o que os tornou perigosos:
+
+- **`var(--su-text)` e `var(--su-border)` não existem.** Os nomes reais são `--su-text-primary` e `--su-border-default`. CSS com variável inexistente não dá erro: só não aplica, e o elemento herda a cor do pai. Estavam em **9 lugares** de 6 arquivos (Custos, Memória, Pendências, Habilidades e as telas novas). Todos corrigidos, e agora **toda** var usada nas telas migradas foi conferida contra o `tokens.css`.
+- **`icon="refresh-cw"` e `icon="server"` não existem** no `DSIcon` — nome não resolvido cai no fallback `"help"`, ou seja, renderiza um **"?"** na interface. Estavam no botão Sincronizar e no `EmptyState` do MCP (visíveis na v0.9.88 que está no ar). Corrigidos para `refresh` e `settings`.
+- **`icon={saving ? 'loader-2' : X}` era um spinner falso.** `loader-2` existe como *alias* → `refresh`, então renderizava um ícone de refresh **estático**. Trocado em 6 call-sites por `loading={saving}` do DS, que é spinner de verdade. O `icon` volta a ser sempre o ícone real da ação.
+
+**Causa comum dos três:** eu escrevia o nome que *parecia* certo (vindo de Tailwind/lucide/outros DS) em vez de conferir no DS. E os três falham calados. Registrado como dívida do DS: avaliar `console.warn` em dev para nome de ícone e/ou var não resolvido.
+
+### 4. Correções de props mortas (arrastadas da v0.9.88)
+
+- `Card` não tem prop `title` — os 2 usos em `AprovacaoDetalhe` viraram `<h2>` real (como prop, ia virar atributo HTML `title`, um tooltip no card inteiro).
+
+### Adicionado
+
+- `pages/IA/BaseConhecimentoDetalhe.jsx`, `pages/IA/BaseConhecimentoEditor.jsx`, `pages/IA/BaseDocumentoEditor.jsx`, `pages/IA/BasesConhecimento.legacy.jsx` (backup).
+- 3 rotas em `App.jsx` (`/ia/conhecimento/nova`, `/ia/conhecimento/:id`, `/ia/conhecimento/:id/documentos/novo`) + 3 padrões de breadcrumb no `Layout.jsx`.
+
+### Testar após aplicar
+
+**Conhecimento**
+1. Lista: colunas Nome (com descrição embaixo) / Documentos / Modelo de indexação / Atualizado. **Sem lixeira na linha.** Clicar na linha → `/ia/conhecimento/<id>`.
+2. Detalhe: card com resumo (documentos, modelo, tamanho do trecho, atualizada em) + 2 abas. Header com **Voltar**, **Excluir base** (vermelho) e **Adicionar documento**.
+3. **Excluir base** → ConfirmDialog dizendo o número de documentos que serão perdidos. Cancelar não faz nada; confirmar volta pra lista.
+4. Aba **Documentos**: tabela sem linha clicável (correto). Documento com erro mostra a mensagem em vermelho embaixo do status.
+5. Aba **Testar consulta**: digitar pergunta + Enter (ou botão) → trechos em cards com "relevância" e "trecho N". Sem resultado → EmptyState explicando. Botão mostra **spinner girando** durante a consulta.
+6. **Adicionar documento** → rota nova; subtítulo diz em qual base vai entrar. Trocar "De onde vem o conteúdo" para URL troca o form; para Markdown, o campo fica mono com 18 linhas.
+7. **Nova base** → rota nova; segundo card "Ajustes avançados" com os campos técnicos.
+8. **F5** em qualquer uma das 3 rotas novas → carrega certo (todas têm `getKnowledgeBase`).
+
+**Regressão das 4 telas anteriores (por causa dos bugs de var/ícone)**
+9. Habilidades → MCP: botão **Sincronizar** agora tem ícone de refresh (era **"?"**) e gira durante a sincronização. EmptyState do MCP com ícone de engrenagem (era "?").
+10. Qualquer botão de salvar (Custos, Memória, Pendências, Habilidades): durante o salvamento aparece **spinner girando** + rótulo no gerúndio.
+11. Nomes em negrito nas tabelas (Habilidades, Memória, Conhecimento, detalhe de Pendência): devem estar na cor de texto principal, com contraste — antes a var não existia e herdavam a cor do pai.
+
+### Restante na família (1 tela)
+
+`v0.9.90 Agentes + 3 editors` — o maior: `AgentEditorModal` tem ~12 `TextArea` (persona, roteiro, passos, situações, prompt, guardrails), `AgentExecuteModal` e `AgentVersionsModal` também são overlays, e é o último lugar do grupo IA com `components/ui/*` local, cores hardcoded (`text-red-500`, `text-emerald-500`) e `var(--ap-*)` legada.
+
 ## v0.9.88 - 2026-07-24 (Padronização pós-auditoria — linha clicável + Modal→rota retroativo nas 4 telas migradas)
 
 Sem `db push`. Só frontend. **Nenhuma tela nova** — esta release aplica retroativamente 2 regras do DS nas telas já migradas (Custos, Memória, Pendências, Habilidades), depois de uma auditoria que encontrou violações em todas as 4.

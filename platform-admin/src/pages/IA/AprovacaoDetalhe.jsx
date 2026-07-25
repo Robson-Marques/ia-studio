@@ -150,7 +150,7 @@ export default function AprovacaoDetalhe() {
       {contextRows.length > 0 && (
         <Card>
           <div style={{ padding: 20 }} className="space-y-3">
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text)' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
               O que o assistente vai fazer
             </h2>
             <DescriptionList items={contextRows} />
@@ -169,7 +169,7 @@ export default function AprovacaoDetalhe() {
       {isPending && canDecide && (
         <Card>
           <div style={{ padding: 20 }} className="space-y-4">
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text)' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
               Sua decisão
             </h2>
             <p style={{ fontSize: 14, color: 'var(--su-text-secondary)', margin: 0 }}>
@@ -203,7 +203,7 @@ export default function AprovacaoDetalhe() {
                 variant="danger"
                 icon="close"
                 title="Rejeitar a ação — a execução é encerrada"
-                disabled={deciding}
+                loading={deciding}
                 onClick={handleReject}
               >
                 {deciding ? 'Processando…' : 'Rejeitar'}

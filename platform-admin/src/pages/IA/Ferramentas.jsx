@@ -70,7 +70,7 @@ function CatalogTab() {
       header: 'Nome',
       render: (t) => (
         <div>
-          <div style={{ fontWeight: 500, color: 'var(--su-text)' }}>{t.name}</div>
+          <div style={{ fontWeight: 500, color: 'var(--su-text-primary)' }}>{t.name}</div>
           {t.description && (
             <div style={{ fontSize: 11, color: 'var(--su-text-muted)', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {t.description}
@@ -244,7 +244,7 @@ function McpTab() {
       ) : !items.length ? (
         <Card>
           <EmptyState
-            icon="server"
+            icon="settings"
             title="Nenhum servidor MCP"
             description="Cadastre um servidor para importar habilidades externas."
           />
@@ -278,8 +278,8 @@ function McpTab() {
             {canWrite && toolsServer && (
               <Button
                 variant="primary"
-                icon={syncing === toolsServer.id ? 'loader-2' : 'refresh-cw'}
-                disabled={syncing === toolsServer.id}
+                icon="refresh"
+                loading={syncing === toolsServer.id}
                 onClick={async () => {
                   await handleSync(toolsServer);
                   // Recarrega habilidades descobertas do servidor atual.
@@ -306,9 +306,9 @@ function McpTab() {
             {tools.map((t, i) => (
               <div
                 key={t.name || i}
-                style={{ border: '1px solid var(--su-border)', borderRadius: 8, padding: 12 }}
+                style={{ border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12 }}
               >
-                <div style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 13, fontWeight: 500, color: 'var(--su-text)' }}>
+                <div style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 13, fontWeight: 500, color: 'var(--su-text-primary)' }}>
                   {t.name}
                 </div>
                 {t.description && (
@@ -367,7 +367,7 @@ function McpServerModal({ open, onClose, onSaved, workspaceId, environmentId }) 
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave} disabled={saving} icon={saving ? 'loader-2' : undefined}>
+          <Button variant="primary" onClick={handleSave} loading={saving}>
             {saving ? 'Cadastrando…' : 'Cadastrar'}
           </Button>
         </>

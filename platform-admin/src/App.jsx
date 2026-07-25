@@ -34,6 +34,9 @@ import Eventos from './pages/Automacao/Eventos';
 import Notificacoes from './pages/Automacao/Notificacoes';
 import Agentes from './pages/IA/Agentes';
 import BasesConhecimento from './pages/IA/BasesConhecimento';
+import BaseConhecimentoEditor from './pages/IA/BaseConhecimentoEditor';
+import BaseConhecimentoDetalhe from './pages/IA/BaseConhecimentoDetalhe';
+import BaseDocumentoEditor from './pages/IA/BaseDocumentoEditor';
 import Memoria from './pages/IA/Memoria';
 import MemoriaEntradas from './pages/IA/MemoriaEntradas';
 import MemoriaPerfilEditor from './pages/IA/MemoriaPerfilEditor';
@@ -103,6 +106,9 @@ export default function App() {
                 <Route path="/automacao/notificacoes" element={<PermissionRoute perm="automation.notifications.read"><Notificacoes /></PermissionRoute>} />
                 <Route path="/ia/agentes" element={<PermissionRoute perm="ai.agents.read"><Agentes /></PermissionRoute>} />
                 <Route path="/ia/conhecimento" element={<PermissionRoute perm="ai.knowledge.read"><BasesConhecimento /></PermissionRoute>} />
+                <Route path="/ia/conhecimento/nova" element={<PermissionRoute perm="ai.knowledge.write"><BaseConhecimentoEditor /></PermissionRoute>} />
+                <Route path="/ia/conhecimento/:id" element={<PermissionRoute perm="ai.knowledge.read"><BaseConhecimentoDetalhe /></PermissionRoute>} />
+                <Route path="/ia/conhecimento/:id/documentos/novo" element={<PermissionRoute perm="ai.knowledge.write"><BaseDocumentoEditor /></PermissionRoute>} />
                 <Route path="/ia/memoria" element={<PermissionRoute perm="ai.memory.read"><Memoria /></PermissionRoute>} />
                 <Route path="/ia/memoria/perfis/nova" element={<PermissionRoute perm="ai.memory.write"><MemoriaPerfilEditor /></PermissionRoute>} />
                 <Route path="/ia/memoria/perfis/:id/editar" element={<PermissionRoute perm="ai.memory.write"><MemoriaPerfilEditor /></PermissionRoute>} />

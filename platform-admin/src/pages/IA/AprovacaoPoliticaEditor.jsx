@@ -82,8 +82,9 @@ export default function AprovacaoPoliticaEditor() {
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={saving || !canDecide}
-              icon={saving ? 'loader-2' : 'check'}
+              disabled={!canDecide}
+              loading={saving}
+              icon="check"
             >
               {saving ? 'Criando…' : 'Criar política'}
             </Button>

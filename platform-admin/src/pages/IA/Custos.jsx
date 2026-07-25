@@ -251,7 +251,7 @@ function BudgetModal({ open, budget, onClose, onSaved, workspaceId, environmentI
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave} disabled={saving} icon={saving ? 'loader-2' : undefined}>
+          <Button variant="primary" onClick={handleSave} loading={saving}>
             {saving ? 'Salvando…' : 'Salvar'}
           </Button>
         </>
@@ -336,7 +336,7 @@ function SimulatorTab() {
             </Field>
           </div>
           <div className="flex justify-end">
-            <Button variant="primary" onClick={handleSimulate} disabled={running} icon={running ? 'loader-2' : 'settings'}>
+            <Button variant="primary" onClick={handleSimulate} loading={running} icon="settings">
               {running ? 'Simulando…' : 'Simular custo'}
             </Button>
           </div>

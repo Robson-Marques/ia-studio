@@ -53,7 +53,7 @@ export default function Memoria() {
   const columns = [
     { key: 'name', header: 'Nome', render: (p) => (
       <div>
-        <div style={{ fontWeight: 500, color: 'var(--su-text)' }}>{p.name}</div>
+        <div style={{ fontWeight: 500, color: 'var(--su-text-primary)' }}>{p.name}</div>
         {p.description && (
           <div style={{ fontSize: 11, color: 'var(--su-text-muted)', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {p.description}

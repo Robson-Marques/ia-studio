@@ -129,8 +129,9 @@ export default function MemoriaPerfilEditor() {
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={saving || !canWrite}
-              icon={saving ? 'loader-2' : 'check'}
+              disabled={!canWrite}
+              loading={saving}
+              icon="check"
             >
               {saving ? 'Salvando…' : 'Salvar'}
             </Button>
