@@ -1,6 +1,30 @@
 # Changelog — IA Studio
 
-## v0.9.94 - 2026-07-25 (Grupos de opções em colunas — `CheckGroup` do DS)
+## v0.9.95 - 2026-07-25 (Reaplica a v0.9.94 com o DS corrigido — `^1.2.18`)
+
+Sem `db push`. Só frontend. **Mesmo código da v0.9.94**; o que muda é a faixa da dependência.
+
+### Por que existe
+
+A v0.9.94 **falhou no `ADMIN_BUILD`** e não entrou. A causa não estava no IA Studio: o `@studio-ux-ds/react@1.2.17` foi publicado com o `Controls.jsx` **sintaticamente inválido** — um JSDoc escrito com `**3**/**4**` contém a sequência `*/`, que fecha o comentário de bloco no meio da frase, e o resto virou código. O esbuild do Vite quebrou exatamente nesse trecho (`ERRO: vite build falhou: , quando o grupo tem`). Corrigido no DS **v1.2.18**.
+
+**Por que não bastava reaplicar a v0.9.94:** o `upgrade.sh` faz `GIT_CHECKOUT` **antes** do build. Como o checkout passou e o build quebrou depois, o marcador de versão avançou para v0.9.94 enquanto o `dist` servido continuou o da v0.9.93 — e o painel, vendo "atual = v0.9.94", passou a mostrar **"Nenhuma versão disponível"**. Sem tag nova não havia o que aplicar. (Registrado como dívida: o upgrade deveria voltar o checkout ao falhar, ou construir antes de mover o marcador — ver `docs/adocao-studio-ux.md`.)
+
+### Alterado
+
+- Faixa `@studio-ux-ds/*` de `^1.2.17` para **`^1.2.18`**. `^1.2.17` já pegaria a 1.2.18 no `npm install` (não há lockfile no `platform-admin`), mas deixar explícito documenta qual versão o build exige e não depende de resolução implícita.
+
+### Testar após aplicar
+
+Os mesmos 3 pontos da v0.9.94, que ainda não foram vistos no ar:
+
+1. **Incidente → aba Informativo → "Comportamento do assistente"**: as 4 opções em **2 colunas**, preenchendo o card. Estreitando a janela, caem pra 1 sozinhas.
+2. **Editor de assistente → "O que pode fazer"**: habilidades em **3 colunas**.
+3. Em ambas: nenhuma opção encostando na vizinha, e rótulo que quebra em duas linhas alinhando a caixa com a **primeira** linha.
+
+## v0.9.94 - 2026-07-25 (Grupos de opções em colunas — `CheckGroup` do DS) — NÃO APLICADA
+
+**Esta versão não entrou em produção:** falhou no `ADMIN_BUILD` por causa do `@studio-ux-ds/react@1.2.17` quebrado (ver v0.9.95). O código é o mesmo que a v0.9.95 entrega.
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.17`**, que trouxe o `CheckGroup`.
 
