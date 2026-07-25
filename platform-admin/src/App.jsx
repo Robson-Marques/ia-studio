@@ -36,6 +36,7 @@ import Agentes from './pages/IA/Agentes';
 import BasesConhecimento from './pages/IA/BasesConhecimento';
 import Memoria from './pages/IA/Memoria';
 import Ferramentas from './pages/IA/Ferramentas';
+import FerramentaEditor from './pages/IA/FerramentaEditor';
 import Aprovacoes from './pages/IA/Aprovacoes';
 import Custos from './pages/IA/Custos';
 import Incidentes from './pages/ISP/Incidentes';
@@ -100,6 +101,8 @@ export default function App() {
                 <Route path="/ia/conhecimento" element={<PermissionRoute perm="ai.knowledge.read"><BasesConhecimento /></PermissionRoute>} />
                 <Route path="/ia/memoria" element={<PermissionRoute perm="ai.memory.read"><Memoria /></PermissionRoute>} />
                 <Route path="/ia/ferramentas" element={<PermissionRoute perm="ai.tools.read"><Ferramentas /></PermissionRoute>} />
+                <Route path="/ia/ferramentas/tool/nova" element={<PermissionRoute perm="ai.tools.write"><FerramentaEditor /></PermissionRoute>} />
+                <Route path="/ia/ferramentas/tool/:id/editar" element={<PermissionRoute perm="ai.tools.write"><FerramentaEditor /></PermissionRoute>} />
                 <Route path="/ia/aprovacoes" element={<PermissionRoute perm="ai.approvals.read"><Aprovacoes /></PermissionRoute>} />
                 <Route path="/ia/custos" element={<PermissionRoute perm="ai.costs.read"><Custos /></PermissionRoute>} />
                 <Route path="/isp/incidentes" element={<PermissionRoute perm="isp.incidents.read"><Incidentes /></PermissionRoute>} />

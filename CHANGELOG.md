@@ -1,5 +1,38 @@
 # Changelog — IA Studio
 
+## v0.9.87 - 2026-07-24 (Migração visual — IA/Ferramentas pro Studio UX + refactor ToolModal→rota; 4/6 da família IA Studio)
+
+Sem `db push`. Só frontend. Quarta tela da família IA Studio migrada, com **primeira aplicação retroativa** da regra de Modal que o DS acabou de registrar (v1.2.11): form com TextArea de descrição/escrita reflexiva vai pra rota, não pra Modal.
+
+### Alterado
+
+- `pages/IA/Ferramentas.jsx` — reescrito com componentes do DS: `PageHeader`, `Tabs`, `Card`, `DataTable`, `EmptyState`, `Badge` (tone), `Modal` (maxWidth), `Field`, `Input`, `Select`, `Checkbox`, `Button` (variant). `useToast` já vinha do sweep.
+- **Refactor ToolModal → rota dedicada.** O form de habilidade tem `TextArea` de Descrição + `TextArea` de JSON schema (parâmetros de entrada — escrita reflexiva com formato mono e várias linhas). Segundo a regra que registramos no DS na v1.2.11, esse tipo de conteúdo NÃO cabe em Modal — vai pra tela dedicada com espaço, breadcrumb e URL própria. Botões "Nova habilidade" e "Editar" da CatalogTab agora fazem `navigate('/ia/ferramentas/tool/nova')` e `navigate('/ia/ferramentas/tool/:id/editar', { state: { tool } })`.
+- `McpServerModal` **mantido como Modal**: form curto (Nome, Transporte, Endpoint, Checkbox) sem escrita reflexiva — respeita a regra.
+- Modal "Habilidades de `<server>`" **mantido**: leitura curta em cards de descoberta, não é form.
+
+### Adicionado
+
+- `pages/IA/FerramentaEditor.jsx` — página nova para criar/editar habilidade. Recebe a tool via `location.state.tool` (navegação da lista); em refresh/deep-link, cai em `listTools + filter` (não há `GET /ai/tools/:id` no backend hoje). Header com breadcrumb "IA Studio / Habilidades / Nova" (ou / Editar) + ações **Cancelar** e **Salvar**. Governança preservada 1:1 (perms `ai.tools.write`, `requires_approval`, `timeout_ms`, `is_active`).
+- `pages/IA/Ferramentas.legacy.jsx` — backup literal do arquivo antigo para rollback.
+- Duas rotas novas em `App.jsx`:
+  - `/ia/ferramentas/tool/nova` (perm `ai.tools.write`)
+  - `/ia/ferramentas/tool/:id/editar` (perm `ai.tools.write`)
+- Breadcrumbs correspondentes em `Layout.jsx` (pattern matching por regex pra rota com `:id`).
+
+### Testar após aplicar
+
+1. **IA Studio → Habilidades**, aba **Catálogo**: `DataTable` do DS com colunas Nome/Identificador/Categoria/Origem (Da plataforma × Personalizada)/Status/Aprovação. Botão "Nova habilidade" à direita (perm `ai.tools.write`).
+2. Clicar em **Nova habilidade** → navega pra `/ia/ferramentas/tool/nova` (URL muda, breadcrumb "IA Studio / Habilidades / Nova"). Header com Cancelar/Salvar. Card com Identificador, Nome, Categoria, Descrição (TextArea), Parâmetros de entrada (TextArea mono), Checkbox de aprovação, Tempo limite. Cancelar volta pra lista; Salvar valida JSON + cria + volta.
+3. Clicar em **⋯ Editar** numa linha de habilidade custom → navega pra `/ia/ferramentas/tool/:id/editar` (URL com id, breadcrumb "IA Studio / Habilidades / Editar"). Form pré-preenchido. Identificador desabilitado.
+4. Clicar em **⋯ Ajustes de governança** numa habilidade da plataforma (linha com badge "Da plataforma") → mesma rota, mas só os campos de governança editáveis (nome/descrição/schema bloqueados). Badge "Habilidade da plataforma" no topo do card.
+5. **F5 direto na URL de editar** → carrega via `listTools + filter` (loading, depois form). Tool inexistente → toast "Habilidade não encontrada" + volta pra lista.
+6. Aba **Servidores MCP**: `DataTable` com colunas Nome/Transporte/Endpoint/Status/Última sincronização. Botão "Novo servidor" abre `Modal` do DS (curto, respeita a regra) com Nome/Transporte/Endpoint/Checkbox. Botão ⋯ da linha tem "Ver habilidades" (abre Modal de leitura com cards) e "Sincronizar" (spinner enquanto rola).
+
+### Restantes na família (2 telas)
+
+`v0.9.88 BasesConhecimento` → `v0.9.89 Agentes + 3 editors`.
+
 ## v0.9.86 - 2026-07-24 (Migração visual — IA/Aprovacoes pro Studio UX; 3/6 da família IA Studio)
 
 Sem `db push`. Só frontend. Terceira tela da família IA Studio migrada.

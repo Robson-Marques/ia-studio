@@ -309,7 +309,10 @@ export default function Layout() {
   }, [wsOpen]);
 
   const crumb = BREADCRUMBS[location.pathname]
-    || (location.pathname.startsWith('/automacao/fluxos/') ? 'Automação / Fluxos / Editor' : 'IA Studio');
+    || (location.pathname.startsWith('/automacao/fluxos/') ? 'Automação / Fluxos / Editor'
+      : (location.pathname === '/ia/ferramentas/tool/nova' ? 'IA Studio / Habilidades / Nova'
+        : (location.pathname.match(/^\/ia\/ferramentas\/tool\/[^/]+\/editar$/) ? 'IA Studio / Habilidades / Editar'
+          : 'IA Studio')));
   const breadcrumb = crumb.split(' / ').map((label) => ({ label }));
 
   const envInfo = environment
