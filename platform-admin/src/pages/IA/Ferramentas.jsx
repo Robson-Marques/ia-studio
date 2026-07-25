@@ -160,6 +160,7 @@ function McpTab() {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [syncing, setSyncing] = useState(null);
+  const [syncingMany, setSyncingMany] = useState(false);
   const [toolsServer, setToolsServer] = useState(null);
   const [tools, setTools] = useState([]);
   const canWrite = can('ai.mcp.write');
@@ -189,6 +190,30 @@ function McpTab() {
       toast.error(err.message);
     } finally {
       setSyncing(null);
+    }
+  }
+
+  // Sincroniza N servidores em sequência. É a ação que justifica seleção
+  // múltipla aqui: mandar buscar habilidades novas em todos de uma vez.
+  async function handleSyncMany(ids) {
+    setSyncingMany(true);
+    let ok = 0;
+    const falhas = [];
+    try {
+      for (const serverId of ids) {
+        try {
+          await syncMcpServer(serverId);
+          ok += 1;
+        } catch (err) {
+          falhas.push(items.find((s) => s.id === serverId)?.name || serverId);
+        }
+      }
+      if (ok) toast.success(ok > 1 ? `${ok} servidores sincronizados.` : 'Servidor sincronizado.');
+      // Erro por servidor não some em silêncio — diz QUAIS falharam.
+      if (falhas.length) toast.error(`Falhou em: ${falhas.join(', ')}.`);
+      load();
+    } finally {
+      setSyncingMany(false);
     }
   }
 
@@ -250,12 +275,47 @@ function McpTab() {
           />
         </Card>
       ) : (
+        // Taxonomia de ações do DS (STUDIO_UX_TABLES.md §3):
+        // · ver as habilidades do servidor → a linha inteira;
+        // · sincronizar 1+                 → barra de lote (roda em N);
+        // · com 1 marcado                  → também "Ver habilidades" (atalho).
         <DataTable
           columns={columns}
           rows={items}
           getRowId={(s) => s.id}
           onRowClick={(s) => openTools(s)}
           getRowLabel={(s) => `Ver habilidades de ${s.name}`}
+          selectionMode="multiple"
+          bulkActions={canWrite ? (ids, clear) => (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="refresh"
+                loading={syncingMany}
+                title={ids.length > 1
+                  ? `Buscar habilidades novas nos ${ids.length} servidores`
+                  : 'Buscar habilidades novas neste servidor'}
+                onClick={async () => { await handleSyncMany(ids); clear(); }}
+              >
+                {ids.length > 1 ? `Sincronizar ${ids.length}` : 'Sincronizar'}
+              </Button>
+              {ids.length === 1 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon="search"
+                  title="Ver as habilidades que este servidor já trouxe"
+                  onClick={() => {
+                    const server = items.find((s) => s.id === ids[0]);
+                    if (server) openTools(server);
+                  }}
+                >
+                  Ver habilidades
+                </Button>
+              )}
+            </>
+          ) : undefined}
         />
       )}
 

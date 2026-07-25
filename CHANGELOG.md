@@ -1,5 +1,61 @@
 # Changelog — IA Studio
 
+## v0.9.91 - 2026-07-24 (Barra de ações em lote + 3 colunas nas habilidades + Enter volta a funcionar)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.14`**, que trouxe o `selectionMode` do `DataTable`, a largura dos controles de formulário e a taxonomia de ações reescrita.
+
+### 1. Barra de ações em lote (a correção que o Robson pediu)
+
+Na v0.9.90 eu tirei os 4 botões da linha de Assistentes e mandei dois deles (Versões, Exportar) pro cabeçalho do editor. Estava **errado pela metade**: a regra que eu tinha escrito no DS (v1.2.12) não citava a **barra de lote**, que é o comportamento canônico do `DataTable` — está no JSDoc do componente desde sempre. Corrigido no DS (v1.2.14) e aplicado aqui:
+
+- **Assistentes** — a tabela ganhou seleção. Marcar caixas → barra contextual com **Exportar** (roda em N: baixa um arquivo por assistente, com toast dizendo quantos) e, **só com 1 marcado**, **Versões**. Ver versões de cinco assistentes ao mesmo tempo não significa nada, então o botão não aparece — é o `bulkActions` ramificando em `ids.length === 1`. **Testar não entra na barra**: é sobre o assistente aberto, com o resultado na frente — vive na aba Testar do editor.
+- **Habilidades → Servidores MCP** — barra com **Sincronizar** (roda em N, em sequência) e, com 1 marcado, **Ver habilidades**. O erro por servidor **não** some em silêncio: se falha em alguns, o toast diz **quais** pelo nome.
+- **Assistentes** manteve o Versões/Exportar **também** no cabeçalho do editor. Não é duplicação sem propósito: na lista você age sobre a seleção; dentro do editor você age sobre o assistente que está aberto. São os dois lugares que a taxonomia prevê.
+
+**As tabelas que NÃO ganharam barra, e por quê** (a taxonomia foi aplicada a todas as 11):
+
+| Tabela | Ação que existia | Onde ficou |
+|---|---|---|
+| Custos → Orçamentos | editar | é o clique na linha — nada pra barra |
+| Custos → Consumo | nenhuma | linha sem destino, sem seleção |
+| Memória → Perfis | editar | clique na linha abre as entradas; editar está lá dentro |
+| Memória → Entradas | nenhuma | leitura |
+| Pendências → Fila | aprovar / rejeitar | **deliberadamente fora da barra** — aprovar em massa uma ação de IA é exatamente o que não se faz sem ler cada caso. Fica no detalhe, com o contexto na frente |
+| Pendências → Políticas | nenhuma | backend não tem update |
+| Habilidades → Catálogo | editar | é o clique na linha |
+| Conhecimento → Bases | excluir | pela taxonomia iria pra barra, mas **o backend não tem DELETE** (dívida registrada, decisão de não mexer). Segue no cabeçalho do detalhe até o endpoint existir |
+| Conhecimento → Documentos | nenhuma | sem endpoint individual |
+
+### 2. Habilidades em 3 colunas
+
+As listas de marcar (habilidades, bases de conhecimento, perfis de memória) no editor de assistente ocupavam **uma coluna** com rótulos curtos ("2ª via de boleto", "Data e hora atual") — dois terços da largura vazios e uma lista longa pra rolar. Agora é grade responsiva (`auto-fill` + `minmax(260px, 1fr)`): 3 colunas no desktop largo, 2 no médio, 1 no mobile. Sem media query.
+
+### 3. Enter volta a funcionar nos campos "um por linha"
+
+**Bug que existia desde antes da migração** e que o Robson pegou: nos campos Sempre / Nunca / Palavras bloqueadas era **impossível pular linha**. O campo fazia round-trip `array → join('\n')` no `value` e `split('\n') + filter(Boolean)` no `onChange` — e o `filter(Boolean)` **descarta linha vazia**. No instante em que você aperta Enter, `"aa\n"` virava `["aa"]` e voltava como `"aa"`: a quebra era apagada no mesmo keystroke, e a segunda regra nunca podia ser escrita.
+
+Corrigido com um `LinesTextArea`: o texto cru vive num state local **enquanto o campo está focado** (aí a quebra sobrevive) e só é convertido para array no `blur`. O array do pai re-hidrata o texto apenas quando o campo **não** está sendo editado, então os dois não brigam.
+
+### 4. Largura dos controles (vinha do DS)
+
+Os `Input`/`TextArea` das linhas de **Passo** e **Situação** apareciam com ~180px, esmagados. Não era esta tela: `.su-input`/`.su-textarea` do DS só preenchiam **dentro** do `Field` (o stretch vinha do flex do wrapper). Corrigido no DS v1.2.14 (`width: 100%` + `box-sizing`), chega aqui pelo bump.
+
+### 5. Ações do cabeçalho não somem mais
+
+`.su-pagehead__actions` era `flex: none` **sem wrap** — o cabeçalho do editor com 4 ações (Voltar · Versões · Exportar · Salvar) estourava pra fora da viewport em tela estreita, e as ações ficavam invisíveis. Isso explica provavelmente por que você não achou Versões/Exportar no editor. Corrigido no DS v1.2.14 com `flex-wrap`.
+
+### Testar após aplicar
+
+1. **Assistentes**: marcar 1 caixa → barra roxa "1 selecionado" com **Exportar** e **Versões**. Marcar 3 → o botão vira **"Exportar 3"** e o **Versões desaparece** (não faz sentido em três). "Limpar" à direita esvazia.
+2. **Exportar 3** → baixa 3 arquivos, toast "3 assistentes exportados". A seleção limpa sozinha depois.
+3. **Versões** (1 marcado) → abre o modal com a badge **Em uso** na versão certa.
+4. Clicar na linha (fora da caixa) → abre o editor, sem selecionar.
+5. **Habilidades → Servidores MCP**: marcar vários → **"Sincronizar N"**. Se algum falhar, o toast diz **quais** pelo nome.
+6. **Editor → O que pode fazer**: as habilidades em **3 colunas** (2 em tela média, 1 no celular).
+7. **Editor → Quem é**: no campo **Nunca**, escrever uma regra, apertar **Enter** e escrever a segunda. A quebra tem que ficar. Salvar, sair e voltar: as duas linhas continuam lá.
+8. **Editor → O que faz**: os campos de **Passo** e **Situação** agora ocupam a largura toda do card.
+9. **Editor** em janela estreita: as 4 ações do cabeçalho quebram pra segunda linha em vez de sumir.
+
 ## v0.9.90 - 2026-07-24 (Assistentes migrado — família IA Studio 6/6 CONCLUÍDA)
 
 Sem `db push`. Só frontend. **Última tela da família.** Era a maior: um Modal `size="xl"` com 8 abas e ~12 `TextArea` dentro.

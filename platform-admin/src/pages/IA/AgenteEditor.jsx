@@ -435,18 +435,18 @@ export default function AgenteEditor() {
               </Field>
             </div>
             <Field label="Sempre (uma regra por linha)" hint="O que o assistente deve sempre fazer.">
-              <TextArea
+              <LinesTextArea
                 rows={4}
-                value={(form.persona.rules_always || []).join('\n')}
-                onChange={(e) => patchPersona({ rules_always: linesToArr(e.target.value) })}
+                value={form.persona.rules_always}
+                onChange={(arr) => patchPersona({ rules_always: arr })}
                 placeholder={'Confirmar o nome do cliente\nResponder em português'}
               />
             </Field>
             <Field label="Nunca (uma regra por linha)" hint="O que ele nunca deve fazer.">
-              <TextArea
+              <LinesTextArea
                 rows={4}
-                value={(form.persona.rules_never || []).join('\n')}
-                onChange={(e) => patchPersona({ rules_never: linesToArr(e.target.value) })}
+                value={form.persona.rules_never}
+                onChange={(arr) => patchPersona({ rules_never: arr })}
                 placeholder={'Prometer prazos sem confirmação\nInventar valores'}
               />
             </Field>
@@ -722,10 +722,10 @@ export default function AgenteEditor() {
                 </Field>
               </div>
               <Field label="Palavras bloqueadas (uma por linha)" hint="Respostas com estes termos são bloqueadas.">
-                <TextArea
+                <LinesTextArea
                   rows={3}
-                  value={(form.guardrails.blocked_words || []).join('\n')}
-                  onChange={(e) => patchGuard({ blocked_words: linesToArr(e.target.value) })}
+                  value={form.guardrails.blocked_words}
+                  onChange={(arr) => patchGuard({ blocked_words: arr })}
                 />
               </Field>
               <Checkbox
@@ -863,8 +863,12 @@ function MultiSelectList({ items, selected, onToggle, getId, renderTitle, render
       </p>
     );
   }
+  // Grade responsiva: os rótulos são curtos ("2ª via de boleto", "Data e hora
+  // atual") e uma coluna única deixava 2/3 da largura vazia com uma lista longa
+  // pra rolar. `auto-fill` + `minmax` resolve sem media query: 3 colunas no
+  // desktop largo, 2 no médio, 1 no mobile.
   return (
-    <div className="space-y-1.5">
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
       {items.map((it) => {
         const itemId = getId(it);
         const on = set.has(itemId);
@@ -899,6 +903,43 @@ function MultiSelectList({ items, selected, onToggle, getId, renderTitle, render
         );
       })}
     </div>
+  );
+}
+
+// LinesTextArea — campo "uma coisa por linha" cujo VALOR é um array.
+//
+// Bug que isto corrige (existia desde o legado): o campo fazia round-trip
+// `array → join('\n')` no value e `split('\n') + filter(Boolean)` no onChange.
+// O `filter(Boolean)` descarta linhas vazias — então, no instante em que o
+// usuário aperta Enter, o valor "aa\n" virava ["aa"] e voltava como "aa". A
+// quebra era apagada no mesmo keystroke e era **impossível** chegar na segunda
+// linha. Valia para Sempre / Nunca / Palavras bloqueadas.
+//
+// Solução: o texto cru vive num state local enquanto o campo está sendo editado
+// (aí a quebra sobrevive) e só é convertido para array no `blur`. O array de
+// fora só re-hidrata o texto quando NÃO se está editando — assim o campo não
+// briga com o valor que o pai guarda.
+function LinesTextArea({ value, onChange, rows = 4, placeholder }) {
+  const arr = React.useMemo(() => (Array.isArray(value) ? value : []), [value]);
+  const [text, setText] = useState(() => arr.join('\n'));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setText(arr.join('\n'));
+  }, [arr, editing]);
+
+  return (
+    <TextArea
+      rows={rows}
+      value={text}
+      placeholder={placeholder}
+      onFocus={() => setEditing(true)}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        setEditing(false);
+        onChange(linesToArr(text));
+      }}
+    />
   );
 }
 
