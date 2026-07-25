@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, EmptyState, Field, Input, Select, Button, useToast,
+  PageHeader, Card, EmptyState, Field, Input, Select, Radio, Button, useToast,
 } from '@studio-ux-ds/react';
 import {
   discoverOsResources, getOsConfig, saveOsConfig,
@@ -242,74 +242,70 @@ export default function AberturaChamado() {
                   <div
                     key={i}
                     style={{ border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12 }}
-                    className="flex flex-wrap items-end gap-3"
+                    className="space-y-3"
                   >
-                    <div className="flex-1" style={{ minWidth: 180 }}>
-                      <Field label="Departamento">
-                        {setores.length > 0 ? (
+                    {/* Linha 1: os dois campos do par + remover. */}
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="flex-1" style={{ minWidth: 180 }}>
+                        <Field label="Departamento">
+                          {setores.length > 0 ? (
+                            <Select
+                              value={p.setor_id}
+                              disabled={!canManage}
+                              onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
+                            >
+                              <option value="">Selecione…</option>
+                              {setores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </Select>
+                          ) : (
+                            // Nenhum departamento descoberto: cai no id manual.
+                            <Input
+                              value={p.setor_id}
+                              disabled={!canManage}
+                              placeholder="Id do departamento no ERP"
+                              onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
+                            />
+                          )}
+                        </Field>
+                      </div>
+
+                      <div className="flex-1" style={{ minWidth: 180 }}>
+                        <Field label="Assunto">
                           <Select
-                            value={p.setor_id}
+                            value={p.assunto_id}
                             disabled={!canManage}
-                            onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
+                            onChange={(e) => updatePair(i, 'assunto_id', e.target.value)}
                           >
                             <option value="">Selecione…</option>
-                            {setores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {assuntos.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                           </Select>
-                        ) : (
-                          // Nenhum departamento descoberto: cai no id manual.
-                          <Input
-                            value={p.setor_id}
-                            disabled={!canManage}
-                            placeholder="Id do departamento no ERP"
-                            onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
-                          />
-                        )}
-                      </Field>
+                        </Field>
+                      </div>
+
+                      {canManage && (
+                        <Button
+                          variant="ghost"
+                          icon="trash"
+                          aria-label="Remover este par"
+                          style={{ marginBottom: 1 }}
+                          onClick={() => removePair(i)}
+                        />
+                      )}
                     </div>
 
-                    <div className="flex-1" style={{ minWidth: 180 }}>
-                      <Field label="Assunto">
-                        <Select
-                          value={p.assunto_id}
-                          disabled={!canManage}
-                          onChange={(e) => updatePair(i, 'assunto_id', e.target.value)}
-                        >
-                          <option value="">Selecione…</option>
-                          {assuntos.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                        </Select>
-                      </Field>
-                    </div>
-
-                    {/* Escolha única → círculo (regra do DS v1.2.15). Era uma
-                        estrela amarela hardcoded, que não dizia "só um" nem era
-                        alcançável por teclado. */}
-                    <label
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13,
-                        color: 'var(--su-text-secondary)', cursor: canManage ? 'pointer' : 'default',
-                        paddingBottom: 9,
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        className="su-radio"
-                        name="os-par-padrao"
-                        checked={!!p.is_default}
-                        disabled={!canManage}
-                        onChange={() => setDefault(i)}
-                      />
-                      Padrão do suporte
-                    </label>
-
-                    {canManage && (
-                      <Button
-                        variant="ghost"
-                        icon="trash"
-                        aria-label="Remover este par"
-                        style={{ marginBottom: 1 }}
-                        onClick={() => removePair(i)}
-                      />
-                    )}
+                    {/* Linha 2: a escolha do par padrão. Ganhou linha própria
+                        porque é uma decisão SOBRE o par inteiro, não um terceiro
+                        campo dele — encaixada no fim da linha dos selects ela
+                        ficava sem rótulo de cabeçalho como os vizinhos, num
+                        baseline diferente e disputando espaço com a lixeira.
+                        Escolha única → círculo (regra do DS v1.2.15). */}
+                    <Radio
+                      name="os-par-padrao"
+                      label="Usar este par como padrão do suporte"
+                      checked={!!p.is_default}
+                      disabled={!canManage}
+                      onChange={() => setDefault(i)}
+                    />
                   </div>
                 ))}
               </div>

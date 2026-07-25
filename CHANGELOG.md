@@ -2,9 +2,15 @@
 
 ## v0.9.92 - 2026-07-25 (Família ISP migrada — 2ª família concluída)
 
-Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.15`** (seleção real na `DataTable` + `.su-checkbox`/`.su-radio` desenhados pelo DS).
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.16`** (seleção real na `DataTable`, `.su-checkbox`/`.su-radio` desenhados pelo DS, e o rótulo de opção deixando de ser inline).
 
-Segunda família, e a primeira migrada **já com todas as regras prontas** — não gerou release nova do DS.
+Segunda família migrada. Rendeu **uma** release do DS (v1.2.16) — contra cinco da família IA.
+
+### Corrigido na revisão visual (achados do Robson, ainda nesta release)
+
+- **As 4 opções de "Comportamento do assistente" apareciam em duas linhas corridas**, com o rótulo de uma encostando no controle da próxima ("…por este incidente✓ Informar a previsão…"). Era do DS: o rótulo de `Checkbox`/`Radio` era `inline-flex`, e elemento inline não quebra linha — nem com `space-y-*` no container. Corrigido no DS v1.2.16 (default virou `flex`, com a prop `inline` para o caso raro de lado a lado).
+- **O "Padrão do suporte" ficava estranho** encaixado no fim da linha dos dois selects: sem rótulo de cabeçalho como os vizinhos, num baseline diferente e disputando espaço com a lixeira. Ganhou **linha própria** dentro do card do par, com o rótulo explícito *"Usar este par como padrão do suporte"* — é uma decisão **sobre o par inteiro**, não um terceiro campo dele. (Funcionava: marcar um desmarcava o outro. O problema era só de leitura.)
+- O ✓ do círculo estava **desalinhado** — vinha de offset em px calibrado para o quadrado. Corrigido no DS v1.2.16 com centralização por transform, que serve às duas formas.
 
 ### Incidentes (`pages/ISP/Incidentes.jsx` + `IncidenteEditor.jsx`)
 
