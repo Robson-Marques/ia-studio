@@ -95,9 +95,29 @@ O AppShell usa `DSIcon` interno, cuja biblioteca é curada e menor que a `lucide
 |---|---|---|
 | 1 | Criar `.npmrc` no `platform-admin/` (bloqueado pela sandbox nesta execução) | Robson faz manualmente — **antes do próximo deploy limpo** |
 | 2 | ~~Sweep de `lib/toast` → `useToast()` do DS + remover `UIToastContainer`~~ | ✅ Concluído em 2026-07-24 (55 arquivos migrados; `lib/toast.js` e `UIToastContainer.jsx` esvaziados) |
-| 3 | 9 páginas com modais siblings + estados independentes (`WhatsApp/EquipesFilas`, `Automacao/FluxoCanvas`, `Automacao/FluxoEditor`, `Integracoes/Conexoes`, `IA/Ferramentas`, `IA/BasesConhecimento`, `Automacao/Fluxos`, `IA/Aprovacoes`, `ISP/Incidentes` — este único defende manualmente) | Sub-frente própria antes de migrar essas telas para o DS |
+| 3 | ~~9 páginas com modais siblings + estados independentes~~ → **as 3 do grupo IA foram resolvidas** pela regra do Modal (`IA/Ferramentas`, `IA/BasesConhecimento`, `IA/Aprovacoes`: os modais com `TextArea` viraram rota, o que dissolveu os estados concorrentes). Restam 6 fora do grupo IA: `WhatsApp/EquipesFilas`, `Automacao/FluxoCanvas`, `Automacao/FluxoEditor`, `Automacao/Fluxos`, `Integracoes/Conexoes`, `ISP/Incidentes` | Cada uma resolve na migração da sua família — a regra do Modal (DS v1.2.12) já dá o caminho |
 | 4 | Instalação do `@studio-ux-ds/icons` (não está no `package.json`) | Quando a primeira família de tela migrar e precisar de ícones DS dentro do conteúdo |
-| 5 | Migração das demais famílias de tela para o padrão visual do DS | Sub-frentes futuras — uma por família (Automação, WhatsApp, ISP, IA etc.) |
+| 5 | Migração das famílias de tela para o padrão visual do DS. **Família IA Studio: CONCLUÍDA** (v0.9.84→v0.9.91 — Custos, Memória, Pendências, Habilidades, Conhecimento, Assistentes + 2 sweeps retroativos). Restam: **Configurações** (Usuarios, PerfisAcesso, Workspaces, Auditoria, MinhaConta — 5 telas), **Integrações** (6 arquivos), **Automação** (12 arquivos, inclui o Canvas), **WhatsApp** (11 arquivos, inclui o layout de chat full-bleed), **ISP** (2), **Recursos** (2), **Desenvolvedor** (2) | Uma sub-frente por família. Automação (Canvas) e WhatsApp (chat) são as mais complexas — merecem frente dedicada, não devem ser as próximas |
+
+### Regras do DS que nasceram desta adoção
+
+A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como referência ao migrar as próximas famílias — estas regras **já valem** e não precisam ser redescobertas:
+
+| DS | O que passou a valer |
+|---|---|
+| v1.2.10 | `NumericInput` tem `fullWidth` (o default é largura natural) |
+| v1.2.11 → v1.2.12 | **Modal não tem `TextArea`.** Teste mecânico, sem exceção de tamanho: se o form tem `TextArea`, é rota (`/…/nova`, `/…/:id/editar`). Modal aceita só `Input`/`NumericInput`/`Select`/`Combobox`/`Checkbox`/`Switch`/`RadioGroup`/`DatePicker`. `ConfirmDialog` (sem campo) segue Modal |
+| v1.2.12 → v1.2.14 | **Taxonomia de ações em 3 lugares:** abre o registro → a linha (`onRowClick`, zero botão); age sobre 1+ registros → **barra de lote** (`bulkActions`); só existe dentro do registro → tela de destino. Ações **variam com a quantidade marcada**; `selectionMode="single"` quando nada pode ser feito em massa |
+| v1.2.13 | `Button` tem `loading` (spinner real + `disabled` + `aria-busy`). Nunca fingir com `icon={saving ? 'loader-2' : …}` |
+| v1.2.14 | `.su-input`/`.su-textarea`/`.su-select` preenchem o container (antes só dentro do `Field`); `.su-pagehead__actions` quebra linha |
+
+**Armadilhas que custaram retrabalho e valem conferir antes de codar:**
+
+- **Nome de ícone inexistente não quebra** — o `DSIcon` cai em `"help"` e renderiza um **"?"** silencioso. Confira contra `ICON_NAMES` + `ALIASES`. Não existem: `refresh-cw`, `server`, `loader-2` (este é alias pra `refresh` — ícone **estático**, não spinner).
+- **CSS var inexistente não quebra** — não aplica e o elemento herda do pai. Os nomes certos são `--su-text-primary` e `--su-border-default` (**não** `--su-text`/`--su-border`).
+- **`PageHeader` não tem `breadcrumb`** (ele vive na TopBar do AppShell, pelo mapa do `Layout`) e **`Card` não tem `title`** (viraria atributo HTML).
+- **Campo "um por linha" com valor em array**: `join('\n')` no value + `split + filter(Boolean)` no onChange **apaga a quebra no mesmo keystroke** — o Enter não funciona. Guardar o texto cru em state local e converter no `blur` (ver `LinesTextArea` no `AgenteEditor.jsx`).
+- **Antes de improvisar um estado ou variante**, pergunte: *"a spec já prevê isso e o adapter não expõe?"* Nos 3 casos desta adoção a resposta foi sim.
 | 6 | Multi-tenant branding via Customize (accent/tema por organização) | Quando o backend expuser as preferências por org |
 | 7 | Aposentar `Header.jsx` (órfão), `NotificationsBell.jsx` (só usado pelos legados), `Sidebar.legacy.jsx`, `Header.legacy.jsx`, `Layout.legacy.jsx`, `Dashboard.legacy.jsx`, `lib/toast.js` (esvaziado), `components/ui/UIToastContainer.jsx` (esvaziado) | Quando a casca+Dashboard novos estiverem validados em produção — sub-frente própria; pode ser um único `rm` desses 8 caminhos |
 | 8 | Regressão do dropdown do sino de notificações — hoje o AppShell só oferece um sinal + link direto para `/automacao/notificacoes` (ADR §3). Se você quiser o dropdown de volta, precisa de sub-frente que extraia o conteúdo do `NotificationsBell.jsx` para um `<Drawer>` do DS acionado pelo `onNotifications` | Sub-frente futura, opcional |

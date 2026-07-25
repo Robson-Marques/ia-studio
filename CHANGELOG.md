@@ -1,5 +1,61 @@
 # Changelog — IA Studio
 
+## v0.9.92 - 2026-07-25 (Família ISP migrada — 2ª família concluída)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.15`** (seleção real na `DataTable` + `.su-checkbox`/`.su-radio` desenhados pelo DS).
+
+Segunda família, e a primeira migrada **já com todas as regras prontas** — não gerou release nova do DS.
+
+### Incidentes (`pages/ISP/Incidentes.jsx` + `IncidenteEditor.jsx`)
+
+A lista tinha **cinco botões por linha** (Afetados, Editar, Disparar, Ativar, Encerrar), com visibilidade variando por status *e* por permissão: o pior caso de coluna de ações do sistema. Agora a lista é só listagem e a linha abre `/isp/incidentes/:id`.
+
+O editor novo absorveu **três overlays**:
+
+- **`IncidentModal`** (tinha `TextArea` da mensagem) → é a aba **Informativo**, agora em 3 cards: o aviso, o escopo de rede, e o comportamento do assistente.
+- **`TargetsModal`** → é a aba **Afetados**. Era uma bancada inteira dentro de um Modal `size="lg"`: tabela com scroll interno de 320px, botão de resolver, e um form de 4 campos comprimido no rodapé. Agora a tabela respira e o "incluir um cliente à mão" é um card próprio, com explicação de quando usar.
+- **Os 5 botões da linha** → cabeçalho do editor, onde a decisão é tomada vendo o modo de comunicação e a contagem de afetados. Um card de status mostra situação + quantos afetados + um aviso explícito quando o modo é proativo.
+
+**Sem barra de lote, de propósito.** Ativar um incidente proativo dispara WhatsApp em massa; encerrar pode disparar o aviso de normalização. É o caso que a regra do DS cita como o que não se faz em lote — a tabela não tem nem coluna de seleção.
+
+**O que seguiu Modal, corretamente:** o passo do disparo (só um `NumericInput` de limite por segundo) e o `ConfirmDialog`. A mensagem do confirm agora diz **o número exato** de clientes que vão receber e a taxa de envio — antes dizia só "todos os afetados incluídos".
+
+### Abertura de chamado (`pages/ISP/AberturaChamado.jsx`)
+
+Tela de configuração com 5 assuntos, cada um com endpoint próprio de gravação. Migrada para 5 `Card`s com `Field`/`Input`/`Select`/`Button` do DS. **Cada card mantém seu próprio botão de salvar** — não é violação de P6: cada card é um contexto, e o rótulo diz o que grava ("Salvar filas", "Salvar limite", "Salvar plantão") em vez de um "Salvar" ambíguo. Um botão único daria a impressão falsa de que tudo grava junto, e um erro num assunto derrubaria a gravação dos outros.
+
+- Os `<select className="input">` e `<input className="input">` crus (classe legada do projeto) e os `<label>` montados à mão viraram `Field` + `Select`/`Input` do DS.
+- **A estrela virou radio.** "Qual par é o padrão de suporte" é escolha **única** — e pela regra que acabou de entrar no DS (v1.2.15), escolha única tem forma de **círculo**. A estrela amarela (`#f59e0b` hardcoded) não comunicava "só um" e não era alcançável por teclado.
+- Linguagem do usuário nos títulos: "Filas de setor" → **"Para onde encaminhar a conversa"**; "Envio de boletos" → **"Quantos boletos por mensagem"**; "Equipe de plantão (alerta de incidente)" → **"Quem é avisado de instabilidade na rede"**; "Setor" → **"Departamento"** (o próprio texto do legado já avisava que era o departamento do atendimento).
+
+### Adicionado
+
+- `pages/ISP/IncidenteEditor.jsx`, `pages/ISP/isp.constants.js` (os mapas de status/modo/escopo saíram de dentro do `Incidentes.jsx` porque o editor também usa), `pages/ISP/Incidentes.legacy.jsx` e `pages/ISP/AberturaChamado.legacy.jsx` (backups).
+- 2 rotas em `App.jsx` + 2 padrões de breadcrumb no `Layout.jsx`.
+
+### Testar após aplicar
+
+**Incidentes**
+1. Lista: colunas Título (com previsão embaixo) / Comunicação / Afetados / Situação. **Nenhum botão na linha.** Clicar na linha abre o incidente.
+2. **Novo incidente** → aba Informativo com 3 cards. O seletor "Como comunicar" diz a consequência no próprio rótulo ("Proativo — dispara aviso em massa").
+3. Salvar um incidente novo → a URL troca de `/novo` para `/isp/incidentes/<id>` **sem recarregar**, e a aba **Afetados** aparece.
+4. Aba **Afetados** → "Buscar afetados no ERP" popula a tabela. A coluna **Incluir** marca/desmarca quem recebe (é edição de dado, não seleção em lote — por isso não há barra).
+5. **Incluir um cliente à mão**: card próprio embaixo da tabela, com os 3 campos e o botão.
+6. **Ativar** um incidente **reativo** → ConfirmDialog dizendo que **nenhuma mensagem é disparada**.
+7. **Ativar** um incidente **proativo** → botão fica **vermelho** e o ConfirmDialog diz o **número exato** de clientes que vão receber. (Cuidado: dispara de verdade.)
+8. Com o incidente ativo e proativo → botão **Disparar aviso** na aba Afetados: modal com o limite por segundo → ConfirmDialog com a contagem e a taxa.
+9. **Encerrar** → ConfirmDialog avisando que o aviso de normalização sai agora se estiver ligado.
+10. **F5** em `/isp/incidentes/<id>` → recarrega certo.
+
+**Abertura de chamado**
+11. Os 5 cards, cada um com seu botão de salvar e spinner próprio ao gravar.
+12. No card de pares: o "Padrão do suporte" agora é **círculo** (radio) — marcar um desmarca o outro, e funciona por **Tab + Espaço**.
+13. Sem conexão de provedor ativa → `EmptyState` no primeiro card, os outros 4 continuam funcionando.
+
+### Estado da adoção
+
+**2 famílias concluídas:** IA Studio (6 telas) e ISP (2 telas). Restam: Configurações (5), Integrações (6), Recursos (2), Desenvolvedor (2), Automação (12, com o Canvas), WhatsApp (11, com o chat).
+
 ## v0.9.91 - 2026-07-24 (Barra de ações em lote + 3 colunas nas habilidades + Enter volta a funcionar)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.14`**, que trouxe o `selectionMode` do `DataTable`, a largura dos controles de formulário e a taxonomia de ações reescrita.

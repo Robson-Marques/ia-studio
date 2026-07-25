@@ -202,6 +202,8 @@ const BREADCRUMB_PATTERNS = [
   [/^\/ia\/memoria\/[^/]+$/,                       'IA Studio / Memória / Entradas'],
   [/^\/ia\/aprovacoes\/politicas\/nova$/,          'IA Studio / Pendências / Nova política'],
   [/^\/ia\/aprovacoes\/[^/]+$/,                    'IA Studio / Pendências / Detalhe'],
+  [/^\/isp\/incidentes\/novo$/,                    'ISP / Incidentes / Novo'],
+  [/^\/isp\/incidentes\/[^/]+$/,                   'ISP / Incidentes / Detalhe'],
   [/^\/ia\/agentes\/nova$/,                        'IA Studio / Assistentes / Novo'],
   [/^\/ia\/agentes\/importar$/,                    'IA Studio / Assistentes / Importar'],
   [/^\/ia\/agentes\/[^/]+$/,                       'IA Studio / Assistentes / Editar'],

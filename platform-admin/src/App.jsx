@@ -49,6 +49,7 @@ import AprovacaoDetalhe from './pages/IA/AprovacaoDetalhe';
 import AprovacaoPoliticaEditor from './pages/IA/AprovacaoPoliticaEditor';
 import Custos from './pages/IA/Custos';
 import Incidentes from './pages/ISP/Incidentes';
+import IncidenteEditor from './pages/ISP/IncidenteEditor';
 import AberturaChamado from './pages/ISP/AberturaChamado';
 import Mapeamentos from './pages/Recursos/Mapeamentos';
 import Explorer from './pages/Recursos/Explorer';
@@ -129,6 +130,10 @@ export default function App() {
                 <Route path="/ia/aprovacoes/:id" element={<PermissionRoute perm="ai.approvals.read"><AprovacaoDetalhe /></PermissionRoute>} />
                 <Route path="/ia/custos" element={<PermissionRoute perm="ai.costs.read"><Custos /></PermissionRoute>} />
                 <Route path="/isp/incidentes" element={<PermissionRoute perm="isp.incidents.read"><Incidentes /></PermissionRoute>} />
+                <Route path="/isp/incidentes/novo" element={<PermissionRoute perm="isp.incidents.write"><IncidenteEditor /></PermissionRoute>} />
+                {/* `read`: a aba Afetados e as ações de ativar/disparar têm gate
+                    próprio por permissão dentro da tela. */}
+                <Route path="/isp/incidentes/:id" element={<PermissionRoute perm="isp.incidents.read"><IncidenteEditor /></PermissionRoute>} />
                 <Route path="/isp/abertura-chamado" element={<PermissionRoute perm="isp.incidents.read"><AberturaChamado /></PermissionRoute>} />
                 <Route path="/recursos/mapeamentos" element={<PermissionRoute perm="resource.mappings.read"><Mapeamentos /></PermissionRoute>} />
                 <Route path="/recursos/explorer" element={<PermissionRoute perm="resource.explore.read"><Explorer /></PermissionRoute>} />
