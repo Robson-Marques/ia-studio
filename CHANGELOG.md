@@ -1,6 +1,29 @@
 # Changelog — IA Studio
 
-## v0.9.96 - 2026-07-25 (Upgrade que falha volta o repo — fim do "atual = versão nova, código antigo")
+## v0.9.97 - 2026-07-25 (Mesmo conteúdo da v0.9.96, apontando para o DS `^1.2.19`)
+
+Sem `db push`. **Mesmo código da v0.9.96** — o que muda é a faixa da dependência.
+
+### Por que existe
+
+A v0.9.96 pinava `^1.2.18`, e **essa versão do DS nunca chegou ao registry**: a tag `v1.2.18` foi criada, mas eu esqueci de bumpar os `package.json` do monorepo (continuaram em `1.2.17`), então o workflow republicou `1.2.17` com o CI verde e o número `1.2.18` não passou a existir. O `npm install` do `ADMIN_BUILD` respondeu `ETARGET — No matching version found for @studio-ux-ds/components@^1.2.18`. O conteúdo que era pra ser a 1.2.18 saiu como **DS v1.2.19**.
+
+Como a tag `v0.9.96` aponta para um commit que pede uma versão inexistente, ela é irrecuperável — daí a v0.9.97 com a mesma coisa e a faixa certa.
+
+**Gate criado no DS para não repetir:** o `check-packages.mjs` (que o workflow de publish já roda) agora **falha se a tag não bater com a versão dos pacotes**. Republicar uma versão existente não é erro para o npm — era por isso que passava verde.
+
+### Alterado
+
+- Faixa `@studio-ux-ds/*` de `^1.2.18` para **`^1.2.19`**.
+
+### Testar após aplicar
+
+1. Os 3 pontos do `CheckGroup`, ainda não vistos no ar: **incidente → "Comportamento do assistente"** em 2 colunas; **editor de assistente → "O que pode fazer"** em 3 colunas; nenhuma opção encostando na vizinha.
+2. **O rollback do upgrade** (entrou na v0.9.96, chega ao ar agora): na próxima vez que um upgrade falhar depois do checkout, o log deve terminar com duas linhas `[ROLLBACK]`, o card "Versão atual" deve continuar na versão **anterior** e a que falhou deve seguir **listada como disponível** — sem precisar de tag nova.
+
+## v0.9.96 - 2026-07-25 (Upgrade que falha volta o repo — fim do "atual = versão nova, código antigo") — NÃO APLICADA
+
+**Não entrou em produção:** falhou no `ADMIN_BUILD` porque pinava `@studio-ux-ds/*@^1.2.18`, versão que nunca foi publicada (ver v0.9.97). O código é o mesmo que a v0.9.97 entrega.
 
 Sem `db push`. Mexe em `scripts/upgrade.sh` (mecanismo de deploy) + faixa do DS.
 
