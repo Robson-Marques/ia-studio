@@ -1,5 +1,29 @@
 # Changelog — IA Studio
 
+## v0.9.96 - 2026-07-25 (Upgrade que falha volta o repo — fim do "atual = versão nova, código antigo")
+
+Sem `db push`. Mexe em `scripts/upgrade.sh` (mecanismo de deploy) + faixa do DS.
+
+### Corrigido — a dívida que apareceu duas vezes seguidas
+
+O `upgrade.sh` fazia `GIT_CHECKOUT` **antes** de construir. Quando o build falhava depois, o repo ficava na versão nova mas o `dist` servido continuava o da anterior. Efeito colateral cruel: o `GET /system/version` (que lê a tag do deploy) passava a responder a versão nova, o painel via "atual = versão nova" e mostrava **"Nenhuma versão disponível"** — **impedindo reaplicar**. Duas vezes seguidas isso obrigou a publicar tag nova só pra reexecutar o mesmo código (v0.9.94 → v0.9.95 → v0.9.96). E é a forma clássica do **release fantasma**: versão nova anunciada com código antigo rodando.
+
+- **`revert_checkout()` novo, chamado pelo `mark_failed()`** antes de gravar `FAILED`: se a falha aconteceu depois do checkout (flag `CHECKED_OUT`), o repo volta para a `FROM_VERSION` que o `PREFLIGHT` já detectava. Duas linhas novas em `log_lines` (`[ROLLBACK] voltando o repo para vX` / `[ROLLBACK] repo de volta em vX — a versão segue disponível para reaplicar`), então o operador **vê** o que aconteceu no mesmo log. Se não der para identificar a origem, registra o aviso e segue — nunca troca uma falha de build por um repo em estado desconhecido.
+- **O script agora se copia para `/tmp` e reexecuta de lá** (`UPGRADE_SELF_COPIED`, idempotente). Motivo: o `git checkout` **reescreve o próprio `upgrade.sh`** enquanto o bash o executa, e o bash lê o script em pedaços conforme avança — trocar o arquivo no meio pode fazê-lo continuar num offset que agora aponta pra outro conteúdo. Vinha funcionando por sorte (o arquivo cabia no buffer); com o script crescendo, deixa de ser sorte confiável. Rodando de `/tmp`, o arquivo em execução não é mais o que o git substitui.
+
+### Alterado
+
+- Faixa `@studio-ux-ds/*` para **`^1.2.18`** (mantida da v0.9.95, que não entrou).
+
+### Pré-requisito
+
+**O DS `v1.2.18` precisa estar publicado antes de aplicar esta versão.** Foi o que derrubou a v0.9.95: o `npm install` respondeu `ETARGET — No matching version found for @studio-ux-ds/components@^1.2.18` porque a tag do DS ainda não tinha subido. Confira no GitHub Packages antes de aplicar.
+
+### Testar após aplicar
+
+1. Os 3 pontos do `CheckGroup`, que ainda não foram vistos no ar: **incidente → "Comportamento do assistente"** em 2 colunas; **editor de assistente → "O que pode fazer"** em 3 colunas; nenhuma opção encostando na vizinha.
+2. **O comportamento novo do upgrade** (vale testar de propósito na próxima release): se um upgrade falhar no build, o log deve terminar com duas linhas `[ROLLBACK]`, o card "Versão atual" deve continuar mostrando a **versão anterior**, e a versão que falhou deve seguir **listada como disponível** para reaplicar sem precisar de tag nova.
+
 ## v0.9.95 - 2026-07-25 (Reaplica a v0.9.94 com o DS corrigido — `^1.2.18`)
 
 Sem `db push`. Só frontend. **Mesmo código da v0.9.94**; o que muda é a faixa da dependência.

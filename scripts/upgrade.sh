@@ -17,6 +17,19 @@
 set -euo pipefail
 [ "$(id -u)" -ne 0 ] && echo "ERRO: execute como root" && exit 1
 
+# ---------- AUTO-CÓPIA (roda de /tmp, nao de dentro do repo) ----------
+# O `git checkout <tag>` mais abaixo REESCREVE este proprio arquivo, e o bash le
+# o script em pedacos conforme executa — trocar o arquivo no meio da execucao
+# pode fazer o bash continuar num offset que agora aponta pra outro conteudo.
+# Copiando pra /tmp e reexecutando de la, o arquivo em execucao nao e mais o que
+# o git substitui. Idempotente via UPGRADE_SELF_COPIED.
+if [ "${UPGRADE_SELF_COPIED:-}" != "1" ]; then
+  _self_copy="/tmp/iastudio-upgrade-$$.sh"
+  cp -- "$0" "$_self_copy"
+  export UPGRADE_SELF_COPIED=1
+  exec bash "$_self_copy" "$@"
+fi
+
 # ---------- ARGS (posicionais OU flags) ----------
 TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="/opt/iastudio"; DO_RESTART=1
 POS=()
@@ -82,9 +95,34 @@ SET log_lines = array_append(COALESCE(log_lines, ARRAY[]::text[]), '$line')
 WHERE id = '$UPGRADE_ID';
 SQL
 }
+# Volta o repo para a versao de origem quando a falha aconteceu DEPOIS do
+# checkout. Sem isto, o `GET /system/version` (que le a tag do deploy) passava a
+# responder a versao NOVA enquanto o `dist` servido continuava o da ANTIGA — e o
+# painel, vendo "atual = versao nova", mostrava "Nenhuma versao disponivel" e
+# nao deixava reaplicar. Obrigava a publicar uma tag nova so pra reexecutar o
+# mesmo codigo (aconteceu em v0.9.94 e v0.9.95). E o pior: e a forma classica do
+# "release fantasma" — versao nova anunciada com codigo antigo rodando.
+CHECKED_OUT=0
+revert_checkout() {
+  [ "$CHECKED_OUT" = "1" ] || return 0
+  [ -n "${FROM_VERSION:-}" ] && [ "$FROM_VERSION" != "unknown" ] || {
+    log_db "ROLLBACK" "AVISO: nao foi possivel identificar a versao de origem — repo segue em $TO_VERSION"
+    return 0
+  }
+  log_db "ROLLBACK" "voltando o repo para $FROM_VERSION (o build falhou; o dist em uso e o de $FROM_VERSION)"
+  if (cd "$REPO_PATH" && git checkout -- . 2>/dev/null; git checkout "$FROM_VERSION" 2>/tmp/iastudio_git_revert.err); then
+    log_db "ROLLBACK" "repo de volta em $FROM_VERSION — a versao segue disponivel para reaplicar no painel"
+  else
+    log_db "ROLLBACK" "AVISO: falhou ao voltar para $FROM_VERSION: $(head -c 300 /tmp/iastudio_git_revert.err)"
+  fi
+}
+
 mark_failed() {
   local step="$1"; local msg="$2"
   log_db "$step" "ERRO: $msg"
+  # Desfaz o checkout ANTES de marcar FAILED: assim, quando o front recarregar,
+  # a versao lida ja e a antiga e o painel volta a oferecer o upgrade.
+  revert_checkout
   local s; s=$(sql_escape "$step")
   psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
 UPDATE system_upgrades
@@ -125,6 +163,8 @@ git rev-parse --verify "$TO_VERSION" >/dev/null 2>&1 || mark_failed "GIT_FETCH" 
 git checkout -- . 2>/dev/null || true
 log_db "GIT_CHECKOUT" "git checkout $TO_VERSION"
 git checkout "$TO_VERSION" 2>/tmp/iastudio_git.err || mark_failed "GIT_CHECKOUT" "git checkout falhou: $(head -c 400 /tmp/iastudio_git.err)"
+# A partir daqui uma falha precisa voltar o repo (ver revert_checkout).
+CHECKED_OUT=1
 
 # ---------- 5) API_INSTALL ----------
 log_db "API_INSTALL" "npm install (platform-api)"
