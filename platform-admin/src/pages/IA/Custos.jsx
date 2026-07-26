@@ -95,14 +95,14 @@ function SummaryTab() {
         </div>
       ) : (
         <>
-          {/* Todos `neutral` + ícone (v0.10.6): custo, tokens e nº de assistentes
-              não são "bom" nem "ruim" — são contagens do período. Os tones
-              anteriores (success/info/neutral) vinham de quando a cor só tocava
-              a borda; com o card tingido, três cores num trio viram enfeite. */}
+          {/* Matiz por assunto, igual ao Painel e ao console (DS v1.2.29):
+              custo = verde-água, consumo de IA = roxo, gente = azul. A cor tem de
+              ser a MESMA para o mesmo assunto em toda tela — é o que a torna
+              informação em vez de enfeite. */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <StatCard label="Custo total" value={formatUsd(totals.cost_usd ?? totals.total_cost_usd)} icon={<DSIcon name="chart-bar" />} />
-            <StatCard label="Tokens" value={formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens)} sub="prompt + resposta" icon={<DSIcon name="message" />} />
-            <StatCard label="Assistentes ativos" value={formatTokens(totals.agent_count ?? rows.length)} icon={<DSIcon name="users" />} />
+            <StatCard label="Custo total" value={formatUsd(totals.cost_usd ?? totals.total_cost_usd)} icon={<DSIcon name="chart-bar" />} hue="teal" />
+            <StatCard label="Tokens" value={formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens)} sub="prompt + resposta" icon={<DSIcon name="message" />} hue="indigo" />
+            <StatCard label="Assistentes ativos" value={formatTokens(totals.agent_count ?? rows.length)} icon={<DSIcon name="users" />} hue="blue" />
           </div>
 
           {!rows.length ? (
@@ -350,8 +350,8 @@ function SimulatorTab() {
 
       {result && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <StatCard label="Custo por execução" value={formatUsd(result.cost_per_run ?? result.unit_cost_usd)} icon={<DSIcon name="chart-bar" />} />
-          <StatCard label="Custo total estimado" value={formatUsd(result.total_cost_usd ?? result.cost_usd)} sub={`${form.runs} execuções`} icon={<DSIcon name="chart-bar" />} />
+          <StatCard label="Custo por execução" value={formatUsd(result.cost_per_run ?? result.unit_cost_usd)} icon={<DSIcon name="chart-bar" />} hue="teal" />
+          <StatCard label="Custo total estimado" value={formatUsd(result.total_cost_usd ?? result.cost_usd)} sub={`${form.runs} execuções`} icon={<DSIcon name="chart-bar" />} hue="teal" />
         </div>
       )}
     </div>

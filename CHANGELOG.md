@@ -1,5 +1,26 @@
 # Changelog — IA Studio
 
+## v0.10.7 - 2026-07-25 (Cards com cor por assunto, como no console)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.29`**.
+
+### Alterado
+
+- **Cada card de indicador voltou a ter a sua cor** — como nos prints do console. O que mudou no DS para isso não ser decoração: a cor do `StatCard` deixou de ser `tone` (papel semântico: bom/ruim) e passou a ser **`hue`** (matiz **categórica**: de que assunto o número é). Sete matizes fixas, independentes do accent.
+- **A matiz é estável por assunto, não por posição:** consumo de IA é roxo no Painel *e* em Custos de IA; custo é verde-água nos dois lugares; gente é azul; execuções, verde-água. É isso que faz a cor virar informação — dá para reencontrar o assunto entre telas — em vez de enfeite que muda de lugar.
+- Aplicado no Painel (4 cards), em Custos de IA (3) e no simulador de custo (2).
+
+### Por que isso é diferente de "colorir por gosto"
+
+Na v0.10.6 eu tinha deixado tudo numa cor só, argumentando que sete cores viram decoração. O princípio estava certo e o mecanismo errado: o problema nunca foi cor variada — foi **usar a prop de status para conseguir cor** (`tone="success"` só para ter verde, o que estraga o significado de `success` em todo o sistema). Faltava um conceito no DS, não disciplina no consumidor. Agora existe: `tone` responde "é bom ou ruim?", `hue` responde "de que assunto é?".
+
+### O que dá pra verificar agora
+
+1. **Painel**: os 4 cards em cores diferentes (roxo, azul, verde-água, índigo), cada um com ícone.
+2. **IA Studio → Custos**: "Custo total" **verde-água** e "Tokens" **roxo** — as mesmas cores que consumo/custo têm no Painel.
+3. **Claro/escuro**: as matizes têm tom próprio por tema (as do escuro são mais claras para contrastar com o fundo).
+4. **Trocar o accent**: os cards com `hue` **não** mudam (a cor é do assunto); um card sem `hue` acompanha o accent.
+
 ## v0.10.6 - 2026-07-25 (Cards de indicador: uma cor só, com ícone)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.28`**.

@@ -74,41 +74,40 @@ export default function Dashboard() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* Duas correções que andam juntas (v0.10.6):
-            · `sub`, não `delta` — "Limite: 5" é legenda, não variação no período,
-              e o `delta` é colorido por natureza (significa direção). Os quatro
-              cards mostravam a legenda em verde desde a v0.9.80.
-            · **todos `neutral`** — os tones eram `info`/`info`/`success`/`neutral`,
-              herdados de quando a cor só tocava a borda. Nenhum destes quatro é
-              "bom" ou "ruim": são contagens. Com o card inteiro tingido (DS
-              v1.2.27), quatro cores viravam decoração — e quando cada card tem a
-              sua, nenhuma é sinal. `neutral` usa o accent, então o painel fica
-              coeso e acompanha a personalização.
-            · `icon` — o desenho tem o ícone à esquerda como âncora; sem ele o
-              conteúdo encosta na borda e sobra um vazio grande à direita. */}
+        {/* `hue` = matiz por ASSUNTO (DS v1.2.29, onde o `tone` semântico saiu do
+            StatCard). A cor não diz "bom/ruim" — diz de que domínio o número é, e
+            é **estável**: consumo de IA é sempre roxo, aqui e em Custos de IA;
+            execuções é sempre verde-água, aqui e no console. É isso que faz o olho
+            reencontrar o assunto entre telas.
+            `sub` (não `delta`) porque "Limite: 5" é legenda, não variação — o
+            `delta` é colorido por direção e pintava a legenda de verde. */}
         <StatCard
           label="Usuários"
           value={formatNumber(usage.users ?? 0)}
           sub={`Limite: ${formatLimit(limits.users)}`}
           icon={<DSIcon name="users" />}
+          hue="violet"
         />
         <StatCard
           label="Workspaces"
           value={formatNumber(workspacesCount)}
           sub={`Limite: ${formatLimit(limits.workspaces)}`}
           icon={<DSIcon name="home" />}
+          hue="blue"
         />
         <StatCard
           label="Execuções no mês"
           value={formatNumber(usage.executions ?? 0)}
           sub={`Limite: ${formatLimit(limits.executions)}`}
           icon={<DSIcon name="play" />}
+          hue="teal"
         />
         <StatCard
           label="Consumo de IA no mês"
           value={formatNumber(usage.tokens ?? 0)}
           sub={`Limite: ${formatLimit(limits.tokens)}`}
           icon={<DSIcon name="chart-bar" />}
+          hue="indigo"
         />
       </div>
 
