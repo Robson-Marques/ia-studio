@@ -97,7 +97,7 @@ function SummaryTab() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatCard label="Custo total" value={formatUsd(totals.cost_usd ?? totals.total_cost_usd)} tone="success" />
-            <StatCard label="Tokens" value={formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens)} delta="prompt + resposta" tone="info" />
+            <StatCard label="Tokens" value={formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens)} sub="prompt + resposta" tone="info" />
             <StatCard label="Assistentes ativos" value={formatTokens(totals.agent_count ?? rows.length)} tone="neutral" />
           </div>
 
@@ -347,7 +347,7 @@ function SimulatorTab() {
       {result && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <StatCard label="Custo por execução" value={formatUsd(result.cost_per_run ?? result.unit_cost_usd)} tone="info" />
-          <StatCard label="Custo total estimado" value={formatUsd(result.total_cost_usd ?? result.cost_usd)} delta={`${form.runs} execuções`} tone="success" />
+          <StatCard label="Custo total estimado" value={formatUsd(result.total_cost_usd ?? result.cost_usd)} sub={`${form.runs} execuções`} tone="success" />
         </div>
       )}
     </div>

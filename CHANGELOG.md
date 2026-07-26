@@ -1,5 +1,28 @@
 # Changelog — IA Studio
 
+## v0.10.5 - 2026-07-25 (Cards de indicador com o desenho novo do DS)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.27`**.
+
+### Alterado
+
+- **Os cards de indicador ganharam o desenho do console** (ícone à esquerda em caixa tonalizada, rótulo em caixa alta, número em destaque, degradê leve da cor do papel). O desenho subiu para o **DS** (v1.2.27), então valem em qualquer tela que use `StatCard` — hoje o Painel e Custos de IA — e nos outros sistemas do ecossistema.
+  - A regra que ficou junto: **o tom pinta o entorno, nunca o número** (sobre fundo tonalizado, número colorido perde contraste) e o tom continua **semântico** — `neutral` (que agora usa o accent) para indicador que não é bom nem ruim. O card do console escolhe cor por gosto; isso não subiu, de propósito: quando cada card tem sua cor, nenhuma cor é sinal.
+- **Corrigido: "Limite: N" estava escrito em verde** nos 4 cards do Painel e em 2 de Custos. O `delta` do `StatCard` é a **variação** e por isso é colorido — mas ali era legenda. O DS ganhou `sub` (linha secundária neutra) e os 6 callsites passaram a usá-la. Estava verde desde a v0.9.80.
+
+### Também no DS (v1.2.27)
+
+- **Storybook do Studio UX voltou a funcionar** — estava com "React is not defined" em toda story que renderiza ícone. O pacote de ícones era o único `.jsx` sem `import React`, e o pré-bundle do Vite compila JSX no runtime clássico.
+- **Ícone com nome errado não derruba mais a tela** — desenha "ajuda" e avisa no console, em vez de lançar exceção no render (que desmontava a árvore inteira).
+- **Gradiente deixou de ser proibido no DS** (decisão sua): permitido tonal e discreto, com régua escrita — uma matiz de token, baixa saturação, peça pequena. Saturado/multicor/de marca seguem vetados. Reconciliado nos 5 documentos que repetiam a proibição.
+
+### O que dá pra verificar agora
+
+1. **Painel**: os 4 cards com ícone à esquerda, degradê suave e **"Limite: N" em cinza**, não em verde.
+2. **IA Studio → Custos**: os 3 cards do topo com o mesmo desenho; "prompt + resposta" agora neutro.
+3. **Trocar o accent** na personalização: o card `neutral` ("Consumo de IA") acompanha a cor escolhida.
+4. **Claro/escuro**: o degradê é derivado da superfície, então clareia/escurece junto.
+
 ## v0.10.4 - 2026-07-25 (Automação sub-frente C — o canvas. Família Automação concluída)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.26`**.

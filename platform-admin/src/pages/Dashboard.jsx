@@ -74,28 +74,31 @@ export default function Dashboard() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* `sub`, não `delta`: "Limite: 5" é legenda, não variação no período — e o
+            `delta` é verde por natureza (ele significa direção). Os quatro cards
+            estavam com a legenda pintada de verde desde a v0.9.80. */}
         <StatCard
           label="Usuários"
           value={formatNumber(usage.users ?? 0)}
-          delta={`Limite: ${formatLimit(limits.users)}`}
+          sub={`Limite: ${formatLimit(limits.users)}`}
           tone="info"
         />
         <StatCard
           label="Workspaces"
           value={formatNumber(workspacesCount)}
-          delta={`Limite: ${formatLimit(limits.workspaces)}`}
+          sub={`Limite: ${formatLimit(limits.workspaces)}`}
           tone="info"
         />
         <StatCard
           label="Execuções no mês"
           value={formatNumber(usage.executions ?? 0)}
-          delta={`Limite: ${formatLimit(limits.executions)}`}
+          sub={`Limite: ${formatLimit(limits.executions)}`}
           tone="success"
         />
         <StatCard
           label="Consumo de IA no mês"
           value={formatNumber(usage.tokens ?? 0)}
-          delta={`Limite: ${formatLimit(limits.tokens)}`}
+          sub={`Limite: ${formatLimit(limits.tokens)}`}
           tone="neutral"
         />
       </div>
