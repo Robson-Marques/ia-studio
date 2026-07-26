@@ -1,11 +1,3 @@
-// Editor VISUAL do fluxo (canvas React Flow). Porta a UX do WorkflowCanvas do
-// Aquapark (paleta recolhível agrupada por categoria, inspector recolhível com
-// os campos do nó renderizados inline, nó custom com handles por saída,
-// auto-centralização ao adicionar) — mas alimentado pelo catálogo DECLARATIVO
-// do IA Studio (getNodesCatalog) e pelo grafo { nodes:[{id,type,name,config}],
-// edges:[{from,to,when}] } com a posição em config.__pos. Salvar = nova versão
-// imutável (saveWorkflowVersion). Versões/publicar/rollback, dry-run e
-// export/import continuam nos modais da Fase 4.
 import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
@@ -15,26 +7,48 @@ import {
   Handle, Position, addEdge, applyNodeChanges, applyEdgeChanges, useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { ChevronDown, Layers, Loader2, Plus, SlidersHorizontal } from 'lucide-react';
 import {
-  ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, History,
-  Layers, List, Loader2, Play, Plus, Power, Save, SlidersHorizontal, Trash2, Zap,
-} from 'lucide-react';
-import Modal from '../../components/ui/Modal';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { FormField, TextInput, Textarea, Select, NumberInput } from '../../components/ui/FormField';
+  PageHeader, Badge, Button, IconButton, SegmentedControl, Modal, ConfirmDialog,
+  Field, Input, useToast,
+} from '@studio-ux-ds/react';
 import {
   getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions,
-  exportWorkflow, listAutomationTemplates, publishWorkflow, unpublishWorkflow,
+  exportWorkflow, publishWorkflow, unpublishWorkflow,
 } from '../../services/automation';
-import { listConnections } from '../../services/integrations';
-import { listAgents } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useToast } from '@studio-ux-ds/react';
 import { NODE_CATEGORY_ORDER } from './automation.constants';
 import WorkflowStatusBadge from './WorkflowStatusBadge';
 import TriggerEditor from './editor/TriggerEditor';
 import VersionsModal from './editor/VersionsModal';
 import ExecuteDrawer from './editor/ExecuteDrawer';
+import { NodeFields, useNodeFieldRefs } from './editor/NodeFields';
+
+// Automação/FluxoCanvas — o fluxo desenhado (React Flow). Migrado pro DS na
+// v0.10.4. Consome o MESMO grafo `{nodes,edges}` do editor em lista; a posição de
+// cada passo mora em `config.__pos`.
+//
+// Decisões desta frente:
+//
+//  · **O painel de propriedades continua FIXO à direita** (recolhível), não virou
+//    Drawer. É o padrão *inspetor* na sua forma persistente (`DESKTOP` §6): num
+//    canvas, cobrir o desenho enquanto se configura um nó tira justamente o que
+//    se precisa ver — as ligações dele. O Drawer fica com o editor em lista, onde
+//    não há desenho atrás para preservar.
+//  · **Os campos do passo agora são compartilhados** (`editor/NodeFields`). Havia
+//    dois renderizadores do mesmo catálogo declarativo, e eles já tinham
+//    divergido: o tipo `agent` existia aqui e não na lista — lá o campo
+//    "Assistente" caía num input de texto pedindo o id na mão.
+//  · **As duas vistas passam a ter as mesmas ações** (decisão do Robson): o
+//    alternador Canvas/Lista, Gatilho, Exportar, Versões, Rodar agora,
+//    Ligar/Desligar e Salvar versão. Antes só o canvas ligava/desligava o fluxo —
+//    quem estivesse na lista tinha de descobrir que a ação existia na outra tela.
+//  · **Desligar agora pede confirmação.** Rodava direto no clique, sem
+//    ConfirmDialog — e é ação que muda estado (para os gatilhos de um fluxo em
+//    produção). Os 5 patrasques valem para ela como para publicar.
+//  · A **paleta** e os trilhos recolhidos seguem escritos aqui: são infra de
+//    canvas/node-editor, que o DS ainda não cobre (está no audit dele como zona
+//    cinzenta). Usam tokens `--su-*`, não cor crua.
 
 // Rótulos amigáveis das saídas (handles) — o id do handle = nome do output.
 const OUTPUT_LABELS = {
@@ -46,8 +60,6 @@ const OUTPUT_LABELS = {
 const outputLabel = (out) => (out in OUTPUT_LABELS ? OUTPUT_LABELS[out] : out);
 
 // ─── Nó custom ───────────────────────────────────────────────
-// Rótulo + id + handle de entrada (esquerda, exceto gatilhos) + um handle de
-// saída por output (direita). Cores via vars do tema.
 function StudioNode({ data, selected }) {
   const def = data.definition;
   const outputs = def?.outputs?.length ? def.outputs : ['success'];
@@ -56,31 +68,38 @@ function StudioNode({ data, selected }) {
   return (
     <div style={{
       minWidth: 150, maxWidth: 230, borderRadius: 10, padding: '8px 12px',
-      background: 'var(--ap-surface)', color: 'var(--ap-text-1)',
-      border: `2px solid ${selected ? 'var(--ap-accent, #6366f1)' : 'var(--ap-border)'}`,
-      fontSize: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+      background: 'var(--su-surface-raised)', color: 'var(--su-text-primary)',
+      border: `2px solid ${selected ? 'var(--su-action)' : 'var(--su-border-default)'}`,
+      fontSize: 12, boxShadow: 'var(--su-elevation-card, 0 1px 3px rgba(0,0,0,0.12))',
     }}>
-      {!isTrigger && <Handle type="target" position={Position.Left} style={{ background: '#64748b' }} />}
+      {!isTrigger && <Handle type="target" position={Position.Left} style={{ background: 'var(--su-border-strong)' }} />}
       {category && (
-        <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--ap-text-5)' }}>{category}</div>
+        <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--su-text-muted)' }}>
+          {category}
+        </div>
       )}
-      <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--ap-text-1)' }} className="truncate">
+      <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--su-text-primary)' }} className="truncate">
         {data.name || def?.label || 'Passo'}
       </div>
       {/* Descrição amigável em vez do tipo técnico cru (ex.: era "AGENT"). */}
       {def?.description && (
-        <div style={{ color: 'var(--ap-text-5)', fontSize: 10, lineHeight: 1.25 }} className="line-clamp-2">{def.description}</div>
+        <div style={{ color: 'var(--su-text-muted)', fontSize: 10, lineHeight: 1.25 }} className="line-clamp-2">
+          {def.description}
+        </div>
       )}
       {outputs.map((out, i) => (
         <Handle
           key={out} type="source" id={out} position={Position.Right}
-          style={{ background: out === 'error' ? '#ef4444' : '#64748b', top: `${((i + 1) * 100) / (outputs.length + 1)}%` }}
+          style={{
+            background: out === 'error' ? 'var(--su-danger)' : 'var(--su-border-strong)',
+            top: `${((i + 1) * 100) / (outputs.length + 1)}%`,
+          }}
         />
       ))}
       {outputs.some((o) => outputLabel(o)) && (
         <div style={{ position: 'absolute', right: -4, top: 0, bottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', pointerEvents: 'none' }}>
           {outputs.map((o) => (
-            <span key={o} style={{ fontSize: 8, color: o === 'error' ? '#ef4444' : 'var(--ap-text-4)', transform: 'translateX(100%)', paddingLeft: 6, whiteSpace: 'nowrap' }}>
+            <span key={o} style={{ fontSize: 8, color: o === 'error' ? 'var(--su-danger-fg)' : 'var(--su-text-muted)', transform: 'translateX(100%)', paddingLeft: 6, whiteSpace: 'nowrap' }}>
               {outputLabel(o)}
             </span>
           ))}
@@ -131,7 +150,6 @@ function flowToGraph(rfNodes, rfEdges) {
       id: n.id,
       type: n.data.nodeType,
       name: n.data.name,
-      // Persiste a posição dentro do config para reidratar o canvas.
       config: { ...(n.data.config || {}), __pos: { x: Math.round(n.position.x), y: Math.round(n.position.y) } },
     })),
     edges: rfEdges.map((e) => ({
@@ -143,8 +161,7 @@ function flowToGraph(rfNodes, rfEdges) {
 }
 
 function stripPos(config) {
-  if (!config || typeof config !== 'object') return {};
-  const { __pos, ...rest } = config; // eslint-disable-line no-unused-vars
+  const { __pos, ...rest } = config || {};
   return rest;
 }
 
@@ -153,88 +170,38 @@ function normalizeTrigger(raw) {
   return { type: t.type || 'manual', event: t.event, schedule: t.schedule };
 }
 
-// ─── Paleta recolhível (rail lateral quando fechada) ─────────
+// Trilho do painel recolhido — clique para abrir de volta.
 function CollapsedRail({ side, icon: Icon, label, onExpand }) {
   return (
-    <div style={{
-      width: 34, background: 'var(--ap-surface-2)', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', gap: 8, padding: '8px 0',
-      [side === 'left' ? 'borderRight' : 'borderLeft']: '1px solid var(--ap-border)',
-    }}>
-      <button onClick={onExpand} title={`Expandir ${label}`} className="rounded p-1"
-        style={{ border: '1px solid var(--ap-border)', background: 'var(--ap-surface)', color: 'var(--ap-text-3)' }}>
-        {side === 'left' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
-      <Icon size={14} style={{ color: 'var(--ap-text-4)' }} />
-      <span style={{ writingMode: 'vertical-rl', fontSize: 10, letterSpacing: 1, color: 'var(--ap-text-4)', textTransform: 'uppercase' }}>{label}</span>
-    </div>
+    <button
+      type="button"
+      onClick={onExpand}
+      title={`Abrir ${label.toLowerCase()}`}
+      aria-label={`Abrir ${label.toLowerCase()}`}
+      style={{
+        width: 34, background: 'var(--su-surface-sunken, var(--su-surface-raised))',
+        [side === 'left' ? 'borderRight' : 'borderLeft']: '1px solid var(--su-border-default)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+        paddingTop: 10, cursor: 'pointer', color: 'var(--su-text-muted)',
+        border: 'none', font: 'inherit',
+      }}
+    >
+      <Icon size={15} />
+      <span style={{ writingMode: 'vertical-rl', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+        {label}
+      </span>
+    </button>
   );
 }
 
-// Agrupa o catálogo por categoria, na ordem oficial (não-listadas vão ao fim).
 function groupByCategory(catalog) {
   const map = new Map();
-  for (const def of (catalog || [])) {
+  for (const def of catalog) {
     if (!map.has(def.category)) map.set(def.category, []);
     map.get(def.category).push(def);
   }
-  const order = [
-    ...NODE_CATEGORY_ORDER,
-    ...[...map.keys()].filter((c) => !NODE_CATEGORY_ORDER.includes(c)),
-  ];
-  return order.filter((c) => map.has(c)).map((c) => [c, map.get(c)]);
-}
-
-// ─── Um campo do Inspector (renderiza a definição declarativa do nó) ──
-// Espelha os tipos que o NodeConfigModal já entende: text/textarea/number/
-// select/json/connection/template. Campo JSON usa um rascunho de texto pra
-// permitir digitação livre (parse no serialize).
-function InspectorField({ field, value, jsonDraft, refs, disabled, onChange, onJsonDraft }) {
-  const common = { disabled };
-  let control = null;
-  if (field.type === 'textarea') {
-    control = <Textarea rows={3} className="text-xs" value={value ?? ''} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} {...common} />;
-  } else if (field.type === 'number') {
-    control = <NumberInput className="text-xs" value={value ?? field.default ?? 0} onChange={(v) => onChange(v)} allowEmpty={false} {...common} />;
-  } else if (field.type === 'select') {
-    control = (
-      <Select className="text-xs" value={value ?? field.default ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
-        {(field.options || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </Select>
-    );
-  } else if (field.type === 'json') {
-    control = (
-      <Textarea rows={4} className="font-mono text-[11px]" value={jsonDraft ?? ''} placeholder='{ "chave": "valor" }' spellCheck={false}
-        onChange={(e) => onJsonDraft(e.target.value)} {...common} />
-    );
-  } else if (field.type === 'agent') {
-    control = (
-      <Select className="text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
-        <option value="">— escolha um assistente —</option>
-        {(refs.agents || []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-      </Select>
-    );
-  } else if (field.type === 'connection') {
-    control = (
-      <Select className="text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
-        <option value="">— nenhuma —</option>
-        {(refs.connections || []).map((c) => <option key={c.id} value={c.id}>{c.name} ({c.provider_key})</option>)}
-      </Select>
-    );
-  } else if (field.type === 'template') {
-    control = (
-      <Select className="text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
-        <option value="">— nenhum —</option>
-        {(refs.templates || []).map((t) => <option key={t.id} value={t.id}>{t.name} ({t.channel})</option>)}
-      </Select>
-    );
-  } else {
-    control = <TextInput className="text-xs" value={value ?? field.default ?? ''} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} {...common} />;
-  }
-  return (
-    <FormField label={field.label} required={field.required} hint={field.help}>
-      {control}
-    </FormField>
+  return [...map.entries()].sort(
+    (a, b) => NODE_CATEGORY_ORDER.indexOf(a[0]) - NODE_CATEGORY_ORDER.indexOf(b[0]),
   );
 }
 
@@ -259,7 +226,6 @@ function FluxoCanvasInner() {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [openCat, setOpenCat] = useState(NODE_CATEGORY_ORDER[0]);
   const [jsonDrafts, setJsonDrafts] = useState({}); // { [nodeId]: { [fieldKey]: text } }
-  const [refs, setRefs] = useState({ connections: [], templates: [], agents: [] });
   const [removing, setRemoving] = useState(false);
 
   const [triggerOpen, setTriggerOpen] = useState(false);
@@ -268,14 +234,21 @@ function FluxoCanvasInner() {
   const [saving, setSaving] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versions, setVersions] = useState([]);
-  const [publishConfirm, setPublishConfirm] = useState(false);
+  const [powerConfirm, setPowerConfirm] = useState(null); // 'on' | 'off'
   const [publishing, setPublishing] = useState(false);
   const [executeOpen, setExecuteOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const flowWrapRef = useRef(null);
 
   const defsByType = useMemo(() => Object.fromEntries(catalog.map((d) => [d.type, d])), [catalog]);
   const canWrite = can('automation.workflows.write');
+
+  // As listas de referência (conexões/templates/assistentes) atendem QUALQUER
+  // passo que o usuário venha a selecionar, então a união dos campos do catálogo
+  // é o que decide o que carregar — não o passo selecionado no momento.
+  const allFields = useMemo(() => catalog.flatMap((d) => d.fields || []), [catalog]);
+  const { refs } = useNodeFieldRefs(allFields, { enabled: canWrite });
 
   async function load() {
     setLoading(true);
@@ -301,20 +274,6 @@ function FluxoCanvasInner() {
   }
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Referências (conexões/templates/assistentes) — carregadas uma vez pros campos
-  // do inspector. Sem os assistentes aqui, o campo "Assistente" do nó de IA ficava
-  // vazio (não dava pra escolher).
-  useEffect(() => {
-    if (!canWrite) return;
-    Promise.allSettled([
-      listConnections().then((r) => r.items),
-      listAutomationTemplates().then((r) => r.items),
-      listAgents().then((r) => r.items),
-    ]).then(([c, t, a]) => {
-      setRefs({ connections: c.value || [], templates: t.value || [], agents: a.value || [] });
-    });
-  }, [canWrite]);
 
   const onNodesChange = useCallback((changes) => {
     setRfNodes((nds) => applyNodeChanges(changes, nds));
@@ -387,15 +346,20 @@ function FluxoCanvasInner() {
     setDirty(true);
   }
 
-  // Rascunho de texto de um campo JSON do nó selecionado (lazy a partir do config).
-  function jsonDraftFor(field) {
+  // Rascunhos JSON do nó selecionado, com o valor salvo como ponto de partida.
+  const selectedJsonDrafts = useMemo(() => {
+    if (!selected || !selectedDef) return {};
     const draftForNode = jsonDrafts[selId] || {};
-    if (typeof draftForNode[field.key] === 'string') return draftForNode[field.key];
-    const v = selected?.data.config?.[field.key];
-    return v === undefined || v === null ? '' : JSON.stringify(v, null, 2);
-  }
+    const out = {};
+    for (const f of (selectedDef.fields || []).filter((x) => x.type === 'json')) {
+      if (typeof draftForNode[f.key] === 'string') { out[f.key] = draftForNode[f.key]; continue; }
+      const v = selected.data.config?.[f.key];
+      out[f.key] = v === undefined || v === null ? '' : JSON.stringify(v, null, 2);
+    }
+    return out;
+  }, [selected, selectedDef, jsonDrafts, selId]);
 
-  // Monta o grafo aplicando os rascunhos JSON (com validação). Retorna null se inválido.
+  // Monta o grafo aplicando os rascunhos JSON (com validação). Null = inválido.
   function buildGraph() {
     const nodes = [];
     for (const n of rfNodes) {
@@ -407,7 +371,7 @@ function FluxoCanvasInner() {
         const raw = String(draftForNode[f.key] ?? '').trim();
         if (!raw) { delete config[f.key]; continue; }
         try { config[f.key] = JSON.parse(raw); } catch {
-          toast.error(`Nó "${n.data.name}", campo "${f.label}": JSON inválido.`);
+          toast.error(`No passo "${n.data.name}", o campo "${f.label}" não está num JSON válido.`);
           return null;
         }
       }
@@ -421,17 +385,13 @@ function FluxoCanvasInner() {
   }
 
   async function handleSaveVersion() {
-    if (!rfNodes.length) { toast.error('Adicione pelo menos um passo.'); return; }
+    if (!rfNodes.length) { toast.error('O fluxo precisa de pelo menos um passo.'); return; }
     const graph = buildGraph();
     if (!graph) return; // JSON inválido já avisou
     setSaving(true);
     try {
-      const result = await saveWorkflowVersion(id, {
-        graph,
-        trigger,
-        note: saveNote.trim() || undefined,
-      });
-      toast.success(`Versão v${result.version} salva.`);
+      const result = await saveWorkflowVersion(id, { graph, trigger, note: saveNote.trim() || undefined });
+      toast.success(`v${result.version} salva. Ela ainda não está no ar — use Ligar quando quiser.`);
       (result.warnings || []).forEach((w) => toast.warn(w));
       setSaveOpen(false);
       setSaveNote('');
@@ -444,9 +404,8 @@ function FluxoCanvasInner() {
   }
 
   function openSave() {
-    // Valida os rascunhos JSON antes de abrir o modal de nota.
-    if (!rfNodes.length) { toast.error('Adicione pelo menos um passo.'); return; }
-    if (!buildGraph()) return;
+    if (!rfNodes.length) { toast.error('O fluxo precisa de pelo menos um passo.'); return; }
+    if (!buildGraph()) return; // valida os rascunhos JSON antes de pedir a nota
     setSaveOpen(true);
   }
 
@@ -460,31 +419,29 @@ function FluxoCanvasInner() {
     }
   }
 
-  // Publicar/Despublicar direto na barra (padrão Aquapark: um botão só, sem
-  // entrar em "Versões"). Publica a última versão salva; despublicar volta a
-  // rascunho mantendo o fluxo visível.
-  async function doPublish() {
-    const v = versions[0]?.version ?? workflow?.current_version ?? 0;
-    if (!v) { toast.error('Salve o fluxo antes de publicar.'); return; }
+  async function confirmPower() {
     setPublishing(true);
     try {
-      await publishWorkflow(id, v);
-      toast.success('Fluxo publicado — está ativo.');
-      setPublishConfirm(false);
+      if (powerConfirm === 'on') {
+        const v = versions[0]?.version ?? workflow?.current_version ?? 0;
+        if (!v) { toast.error('Salve uma versão antes de ligar o fluxo.'); return; }
+        await publishWorkflow(id, v);
+        toast.success('Fluxo ligado — vai rodar quando o gatilho acontecer.');
+      } else {
+        await unpublishWorkflow(id);
+        toast.success('Fluxo desligado — parou de rodar. Continua salvo.');
+      }
+      setPowerConfirm(null);
       await load();
-    } catch (err) { toast.error(err.message); } finally { setPublishing(false); }
-  }
-
-  async function doUnpublish() {
-    setPublishing(true);
-    try {
-      await unpublishWorkflow(id);
-      toast.success('Fluxo desligado — parou de rodar (continua salvo).');
-      await load();
-    } catch (err) { toast.error(err.message); } finally { setPublishing(false); }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setPublishing(false);
+    }
   }
 
   async function handleExport() {
+    setExporting(true);
     try {
       const data = await exportWorkflow(id);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -494,98 +451,135 @@ function FluxoCanvasInner() {
       a.download = `fluxo-${(workflow?.name || 'export').toLowerCase().replace(/\s+/g, '-')}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Fluxo exportado (sem segredos).');
+      toast.success('Arquivo baixado — ele não carrega senhas nem chaves.');
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      setExporting(false);
     }
   }
 
   if (loading || !workflow) {
-    return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>;
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Carregando…" />
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
+      </div>
+    );
   }
+
+  const ligado = workflow.status === 'PUBLISHED';
+  const proximaVersao = (versions[0]?.version ?? 0) + 1;
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button className="btn-ghost p-2" onClick={() => navigate('/automacao/fluxos')} aria-label="Voltar"><ArrowLeft size={16} /></button>
-        <div className="flex-1 min-w-[180px]">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold truncate" style={{ color: 'var(--ap-text-1)' }}>{workflow.name}</h1>
-            <WorkflowStatusBadge status={workflow.status} />
-            {workflow.current_version > 0 && <span className="text-xs font-mono" style={{ color: 'var(--ap-text-4)' }}>v{workflow.current_version} ativa</span>}
-            {dirty && <span className="text-xs" style={{ color: 'var(--ap-text-4)' }}>alterações não salvas</span>}
-          </div>
-          {workflow.description && <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{workflow.description}</p>}
-        </div>
-        <button className="btn-secondary" onClick={() => navigate(`/automacao/fluxos/${id}/lista`)} title="Abrir o editor em modo lista">
-          <List size={14} /> Lista
-        </button>
-        <button className="btn-secondary" onClick={() => setTriggerOpen(true)} title="Configurar o que dispara este fluxo">
-          <Zap size={14} /> Gatilho
-        </button>
-        <button className="btn-secondary" onClick={handleExport} title="Baixar uma cópia do fluxo (sem senhas nem segredos)">
-          <Download size={14} /> Exportar
-        </button>
-        <button className="btn-secondary" onClick={openVersions} title="Histórico de versões — reverter e comparar">
-          <History size={14} /> Versões
-        </button>
-        {can('automation.workflows.publish') && (
-          <button
-            className="btn-secondary"
-            onClick={workflow.status === 'PUBLISHED' ? doUnpublish : () => setPublishConfirm(true)}
-            disabled={publishing}
-            title={workflow.status === 'PUBLISHED'
-              ? 'Desligar: o fluxo para de rodar (continua salvo)'
-              : 'Ligar: o fluxo passa a rodar quando o gatilho acontecer'}
-          >
-            {publishing
-              ? <Loader2 size={14} className="animate-spin" />
-              : <Power size={14} style={{ color: workflow.status === 'PUBLISHED' ? '#ef4444' : '#10b981' }} />}
-            {workflow.status === 'PUBLISHED' ? 'Despublicar' : 'Publicar'}
-          </button>
-        )}
-        {can('automation.workflows.execute') && (
-          <button className="btn-secondary" onClick={() => setExecuteOpen(true)} title="Executar manualmente (com opção de simulação)">
-            <Play size={14} /> Executar
-          </button>
-        )}
-        {canWrite && (
-          <button className="btn-primary" onClick={openSave} title="Salvar como uma nova versão (o histórico é preservado)">
-            <Save size={14} /> Salvar versão
-          </button>
-        )}
+      <PageHeader
+        title={workflow.name}
+        subtitle={workflow.description || undefined}
+        actions={
+          <>
+            <Button variant="ghost" icon="arrow-left" title="Voltar para a lista de fluxos" onClick={() => navigate('/automacao/fluxos')}>
+              Voltar
+            </Button>
+            <Button variant="secondary" icon="zap" title="Escolher o que dispara este fluxo" onClick={() => setTriggerOpen(true)}>
+              Gatilho
+            </Button>
+            <Button variant="secondary" icon="download" loading={exporting} title="Baixa uma cópia do fluxo, sem senhas nem chaves" onClick={handleExport}>
+              Exportar
+            </Button>
+            <Button variant="secondary" icon="history" title="Ver as versões salvas — pôr no ar ou voltar para uma anterior" onClick={openVersions}>
+              Versões
+            </Button>
+            {can('automation.workflows.execute') && (
+              <Button variant="secondary" icon="play" title="Roda o fluxo agora, com opção de só simular" onClick={() => setExecuteOpen(true)}>
+                Rodar agora
+              </Button>
+            )}
+            {can('automation.workflows.publish') && (
+              <Button
+                variant={ligado ? 'danger' : 'secondary'}
+                icon="power"
+                disabled={publishing}
+                title={ligado
+                  ? 'Desliga: o fluxo para de rodar (continua salvo)'
+                  : 'Liga: o fluxo passa a rodar quando o gatilho acontecer'}
+                onClick={() => setPowerConfirm(ligado ? 'off' : 'on')}
+              >
+                {ligado ? 'Desligar' : 'Ligar'}
+              </Button>
+            )}
+            {canWrite && (
+              <Button variant="primary" icon="save" title="Guarda o desenho como uma versão nova — o histórico não se perde" onClick={openSave}>
+                Salvar versão
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Duas VISTAS do mesmo fluxo — alternador, não navegação para outro lugar. */}
+        <SegmentedControl
+          items={[{ id: 'canvas', label: 'Desenho' }, { id: 'lista', label: 'Lista' }]}
+          value="canvas"
+          onChange={(v) => { if (v === 'lista') navigate(`/automacao/fluxos/${id}/lista`); }}
+        />
+        <WorkflowStatusBadge status={workflow.status} />
+        {workflow.current_version > 0 && <Badge tone="info">v{workflow.current_version} no ar</Badge>}
+        {dirty && <Badge tone="warning">alterações ainda não salvas</Badge>}
       </div>
 
-      {/* Editor: paleta + canvas + inspector */}
+      {/* Editor: paleta + canvas + inspetor */}
       <div style={{
-        display: 'flex', height: 'calc(100dvh - 190px)', minHeight: 420,
-        border: '1px solid var(--ap-border)', borderRadius: 12, overflow: 'hidden',
+        display: 'flex', height: 'calc(100dvh - 240px)', minHeight: 420,
+        border: '1px solid var(--su-border-default)', borderRadius: 12, overflow: 'hidden',
       }}>
-        {/* Paleta (biblioteca de nós) */}
         {canWrite && (paletteOpen ? (
-          <div style={{ width: 190, borderRight: '1px solid var(--ap-border)', background: 'var(--ap-surface-2)', display: 'flex', flexDirection: 'column' }}>
-            <div className="flex items-center justify-between px-2 py-1.5" style={{ borderBottom: '1px solid var(--ap-border)' }}>
-              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: 'var(--ap-text-4)' }}>Biblioteca de passos</p>
-              <button onClick={() => setPaletteOpen(false)} title="Recolher" className="p-0.5 rounded" style={{ color: 'var(--ap-text-4)' }}><ChevronLeft size={14} /></button>
+          <div style={{ width: 200, borderRight: '1px solid var(--su-border-default)', background: 'var(--su-surface-raised)', display: 'flex', flexDirection: 'column' }}>
+            <div className="flex items-center justify-between" style={{ padding: '6px 8px', borderBottom: '1px solid var(--su-border-default)' }}>
+              <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', margin: 0, color: 'var(--su-text-muted)' }}>
+                Passos disponíveis
+              </p>
+              <IconButton icon="chevron-left" aria-label="Recolher a lista de passos" title="Recolher" onClick={() => setPaletteOpen(false)} />
             </div>
             <div style={{ overflowY: 'auto', padding: 8 }}>
               {groupByCategory(catalog).map(([cat, items]) => {
                 const open = openCat === cat;
                 return (
-                  <div key={cat} className="mb-1">
-                    <button onClick={() => setOpenCat(open ? null : cat)}
-                      className="w-full flex items-center justify-between px-1.5 py-1.5 rounded text-[10px] uppercase tracking-wide font-bold"
-                      style={{ color: 'var(--ap-text-4)', background: open ? 'var(--ap-surface-3)' : 'transparent' }}>
+                  <div key={cat} style={{ marginBottom: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenCat(open ? null : cat)}
+                      aria-expanded={open}
+                      className="w-full flex items-center justify-between"
+                      style={{
+                        padding: '6px', borderRadius: 6, fontSize: 10, fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '.08em',
+                        color: 'var(--su-text-muted)', background: open ? 'var(--su-action-tint)' : 'transparent',
+                        border: 'none', cursor: 'pointer', font: 'inherit',
+                      }}
+                    >
                       <span>{cat}</span>
                       <ChevronDown size={13} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
                     </button>
                     {open && (
-                      <div className="pt-1 pb-1">
+                      <div style={{ paddingTop: 4, paddingBottom: 4 }}>
                         {items.map((def) => (
-                          <button key={def.type} onClick={() => addNode(def)} title={def.description}
-                            className="w-full text-left text-[11px] rounded px-2 py-1.5 mb-1 flex items-center gap-1"
-                            style={{ background: 'var(--ap-surface)', border: '1px solid var(--ap-border)', color: 'var(--ap-text-2)', cursor: 'pointer' }}>
+                          <button
+                            key={def.type}
+                            type="button"
+                            onClick={() => addNode(def)}
+                            title={def.description}
+                            className="w-full text-left flex items-center gap-1"
+                            style={{
+                              fontSize: 11, borderRadius: 6, padding: '6px 8px', marginBottom: 4,
+                              background: 'var(--su-surface-overlay, var(--su-surface-raised))',
+                              border: '1px solid var(--su-border-default)',
+                              color: 'var(--su-text-secondary)', cursor: 'pointer', font: 'inherit',
+                            }}
+                          >
                             <Plus size={11} className="shrink-0" />
                             <span className="truncate">{def.label || def.type}</span>
                           </button>
@@ -617,69 +611,88 @@ function FluxoCanvasInner() {
             fitView
             proOptions={{ hideAttribution: true }}
           >
-            <Background gap={18} color="var(--ap-border)" />
-            <Controls showInteractive={false}
-              style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--ap-border)', boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }} />
-            <MiniMap pannable zoomable
-              style={{ width: 132, height: 88, background: 'var(--ap-surface-2)', border: '1px solid var(--ap-border)', borderRadius: 8 }}
-              nodeColor="#94a3b8" nodeStrokeColor="#64748b" maskColor="rgba(100,116,139,0.14)" />
+            <Background gap={18} color="var(--su-border-default)" />
+            <Controls
+              showInteractive={false}
+              style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--su-border-default)' }}
+            />
+            <MiniMap
+              pannable zoomable
+              style={{ width: 132, height: 88, background: 'var(--su-surface-raised)', border: '1px solid var(--su-border-default)', borderRadius: 8 }}
+              nodeColor="var(--su-border-strong)"
+              nodeStrokeColor="var(--su-text-muted)"
+              maskColor="color-mix(in srgb, var(--su-text-muted) 14%, transparent)"
+            />
           </ReactFlow>
         </div>
 
-        {/* Inspector (propriedades do nó selecionado) */}
+        {/* Inspetor — propriedades do passo selecionado. Fixo de propósito: num
+            canvas, cobrir o desenho tira o contexto de que se precisa. */}
         {inspectorOpen ? (
-          <div style={{ width: 260, borderLeft: '1px solid var(--ap-border)', background: 'var(--ap-surface-2)', display: 'flex', flexDirection: 'column' }}>
-            <div className="flex items-center justify-between px-2 py-1.5" style={{ borderBottom: '1px solid var(--ap-border)' }}>
-              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: 'var(--ap-text-4)' }}>Propriedades</p>
-              <button onClick={() => setInspectorOpen(false)} title="Recolher" className="p-0.5 rounded" style={{ color: 'var(--ap-text-4)' }}><ChevronRight size={14} /></button>
+          <div style={{ width: 320, borderLeft: '1px solid var(--su-border-default)', background: 'var(--su-surface-raised)', display: 'flex', flexDirection: 'column' }}>
+            <div className="flex items-center justify-between" style={{ padding: '6px 8px', borderBottom: '1px solid var(--su-border-default)' }}>
+              <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', margin: 0, color: 'var(--su-text-muted)' }}>
+                Propriedades
+              </p>
+              <IconButton icon="chevron-right" aria-label="Recolher as propriedades" title="Recolher" onClick={() => setInspectorOpen(false)} />
             </div>
-            <div style={{ overflowY: 'auto', padding: 10 }}>
+            <div style={{ overflowY: 'auto', padding: 12 }}>
               {!selected ? (
-                <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Clique num passo para configurar.</p>
+                <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }}>
+                  Clique num passo do desenho para configurar.
+                </p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--ap-text-1)' }}>{selectedDef?.label || 'Passo'}</p>
-                    {selectedDef?.description && <p className="text-[11px] mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{selectedDef.description}</p>}
+                    <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+                      {selectedDef?.label || 'Passo'}
+                    </p>
+                    {selectedDef?.description && (
+                      <p style={{ fontSize: 11, margin: '2px 0 0', color: 'var(--su-text-muted)' }}>{selectedDef.description}</p>
+                    )}
                   </div>
 
-                  <FormField label="Nome do passo">
-                    <TextInput className="text-xs" value={selected.data.name ?? ''} placeholder={selectedDef?.label} disabled={!canWrite}
-                      onChange={(e) => setNodeName(e.target.value)} />
-                  </FormField>
+                  <Field label="Nome do passo" hint="Só para você reconhecer o passo no desenho.">
+                    <Input
+                      value={selected.data.name ?? ''}
+                      placeholder={selectedDef?.label}
+                      disabled={!canWrite}
+                      onChange={(e) => setNodeName(e.target.value)}
+                    />
+                  </Field>
 
-                  {selectedDef ? (
-                    (selectedDef.fields || []).length ? (
-                      <div className="space-y-2.5">
-                        <p className="text-[10px] mt-1" style={{ color: 'var(--ap-text-5)' }}>
-                          Use {'{{ }}'} para inserir dados nos campos de texto — ex.: o telefone do contato ({'{{input.phone}}'}) ou o resultado de um passo anterior.
-                        </p>
-                        {(selectedDef.fields || []).map((f) => (
-                          <InspectorField
-                            key={`${selected.id}:${f.key}`}
-                            field={f}
-                            value={selected.data.config?.[f.key]}
-                            jsonDraft={f.type === 'json' ? jsonDraftFor(f) : undefined}
-                            refs={refs}
-                            disabled={!canWrite}
-                            onChange={(v) => setField(f.key, v)}
-                            onJsonDraft={(text) => setJsonDraft(f.key, text)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Este passo não precisa de configuração.</p>
-                    )
+                  {!selectedDef ? (
+                    <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }}>
+                      Este passo não existe mais no sistema — remova-o ou troque por outro.
+                    </p>
+                  ) : (selectedDef.fields || []).length === 0 ? (
+                    <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }}>
+                      Este passo não precisa de configuração.
+                    </p>
                   ) : (
-                    <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>Este passo não é mais reconhecido pelo sistema.</p>
+                    <>
+                      <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>
+                        Nos campos de texto você pode inserir dados do fluxo entre chaves duplas — por
+                        exemplo {'{{input.phone}}'} ou {'{{vars.passo_1.status}}'}.
+                      </p>
+                      <NodeFields
+                        key={selected.id}
+                        fields={selectedDef.fields}
+                        config={selected.data.config || {}}
+                        jsonDrafts={selectedJsonDrafts}
+                        refs={refs}
+                        disabled={!canWrite}
+                        onValue={setField}
+                        onJsonDraft={setJsonDraft}
+                      />
+                    </>
                   )}
 
                   {canWrite && (
-                    <button className="btn-secondary text-xs w-full" onClick={() => setRemoving(true)}>
-                      <Trash2 size={12} /> Remover passo
-                    </button>
+                    <Button variant="secondary" icon="trash" size="sm" className="w-full" onClick={() => setRemoving(true)}>
+                      Remover passo
+                    </Button>
                   )}
-
                 </div>
               )}
             </div>
@@ -689,12 +702,15 @@ function FluxoCanvasInner() {
         )}
       </div>
 
-      <p className="text-[11px]" style={{ color: 'var(--ap-text-5)' }}>
-        Clique num passo para configurar. Arraste dos pontos à direita de cada passo para ligá-los; a saída "erro"/"falso" cria um caminho alternativo.
+      <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>
+        Clique num passo para configurar. Arraste dos pontos à direita de um passo até outro para ligá-los;
+        a saída "erro"/"falso" cria um caminho alternativo.
       </p>
 
-      {/* Gatilho */}
-      <Modal open={triggerOpen} onClose={() => setTriggerOpen(false)} title="Gatilho do fluxo" size="md">
+      {/* Gatilho: campos curtos, sem texto longo → Modal é o container certo.
+          (No editor em lista o gatilho é um card fixo — aqui não há espaço para
+          um card sem tirar o desenho da tela.) */}
+      <Modal open={triggerOpen} onClose={() => setTriggerOpen(false)} title="O que dispara este fluxo" maxWidth={560}>
         <TriggerEditor
           trigger={trigger}
           onChange={(t) => { setTrigger(t); setDirty(true); }}
@@ -702,50 +718,53 @@ function FluxoCanvasInner() {
         />
       </Modal>
 
-      {/* Remover passo */}
       <ConfirmDialog
         open={removing}
         danger
         title="Remover passo"
-        message={`Remover o passo "${selected?.data.name || ''}" da edição atual? A remoção só vale ao salvar uma nova versão.`}
+        message={`Tirar o passo "${selected?.data.name || ''}" do desenho? A versão que está no ar continua como está — a remoção só vale quando você salvar uma versão nova.`}
         confirmLabel="Remover"
         onClose={() => setRemoving(false)}
         onConfirm={removeSelected}
       />
 
+      {/* Ligar/Desligar: os 5 patrasques nos DOIS sentidos. Desligar rodava direto
+          no clique, sem confirmação — e é o que para um fluxo em produção. */}
       <ConfirmDialog
-        open={publishConfirm}
-        title="Publicar o fluxo?"
-        message={`O fluxo "${workflow.name}" passa a rodar automaticamente quando o gatilho acontecer.${dirty ? ' Atenção: há alterações não salvas — elas não entram até você salvar uma nova versão.' : ''}`}
-        confirmLabel="Publicar"
+        open={!!powerConfirm}
+        danger={powerConfirm === 'off'}
         loading={publishing}
-        onClose={() => setPublishConfirm(false)}
-        onConfirm={doPublish}
+        title={powerConfirm === 'off' ? 'Desligar o fluxo' : 'Ligar o fluxo'}
+        message={
+          powerConfirm === 'off'
+            ? `Desligar "${workflow.name}"? Ele para de rodar quando o gatilho acontecer. Nada é apagado — o fluxo e o histórico ficam, e você pode ligar de novo depois.`
+            : `Ligar "${workflow.name}"? Ele passa a rodar automaticamente quando o gatilho acontecer.${dirty ? ' Atenção: há alterações não salvas no desenho — elas NÃO entram até você salvar uma versão nova.' : ''}`
+        }
+        confirmLabel={powerConfirm === 'off' ? 'Desligar' : 'Ligar'}
+        onClose={() => setPowerConfirm(null)}
+        onConfirm={confirmPower}
       />
 
-      {/* Salvar versão */}
+      {/* Só um Input (a anotação) → Modal. */}
       <Modal
         open={saveOpen}
         onClose={saving ? undefined : () => setSaveOpen(false)}
-        title="Salvar nova versão"
-        size="sm"
-        dismissable={!saving}
+        title={`Salvar como v${proximaVersao}`}
+        maxWidth={460}
         footer={
           <>
-            <button className="btn-secondary disabled:opacity-60" onClick={() => setSaveOpen(false)} disabled={saving}>Cancelar</button>
-            <button className="btn-primary disabled:opacity-60" onClick={handleSaveVersion} disabled={saving}>
-              {saving && <Loader2 size={14} className="animate-spin" />} Salvar v{(versions[0]?.version ?? 0) + 1}
-            </button>
+            <Button variant="secondary" onClick={() => setSaveOpen(false)} disabled={saving}>Cancelar</Button>
+            <Button variant="primary" loading={saving} onClick={handleSaveVersion}>Salvar v{proximaVersao}</Button>
           </>
         }
       >
         <div className="space-y-3">
-          <p className="text-xs" style={{ color: 'var(--ap-text-3)' }}>
-            Cada vez que você salva, é criada a v{(versions[0]?.version ?? 0) + 1}. Depois é só clicar em Publicar pra ativar; reverter fica no botão Versões.
+          <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
+            Salvar cria a <strong>v{proximaVersao}</strong> e não muda o que está no ar. Para pôr essa versão em uso, use <strong>Ligar</strong> (ou escolha outra em Versões).
           </p>
-          <FormField label="Nota da versão" hint="O que mudou (aparece no histórico).">
-            <TextInput value={saveNote} onChange={(e) => setSaveNote(e.target.value)} placeholder="Ex.: reorganiza o fluxo e adiciona o assistente" />
-          </FormField>
+          <Field label="O que mudou" hint="Aparece no histórico — ajuda a saber por que essa versão existe.">
+            <Input value={saveNote} onChange={(e) => setSaveNote(e.target.value)} placeholder="Ex.: reorganiza o desenho e acrescenta o assistente" />
+          </Field>
         </div>
       </Modal>
 
@@ -761,9 +780,6 @@ function FluxoCanvasInner() {
   );
 }
 
-// Editor VISUAL do fluxo (canvas React Flow). Consome o MESMO grafo JSON
-// { nodes:[{id,type,name,config}], edges:[{from,to,when}] } do editor em lista.
-// Salvar = nova versão imutável. Versões/publicar/dry-run/export preservados.
 export default function FluxoCanvas() {
   return (
     <ReactFlowProvider>

@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, Badge, Button, Modal, ConfirmDialog, EmptyState,
+  PageHeader, Card, Badge, Button, Modal, ConfirmDialog, EmptyState, SegmentedControl,
   Field, Input, Select, IconButton, useToast,
 } from '@studio-ux-ds/react';
 import {
   getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions, exportWorkflow,
+  publishWorkflow, unpublishWorkflow,
 } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { NODE_CATEGORY_ORDER } from './automation.constants';
@@ -57,6 +58,8 @@ export default function FluxoEditor() {
   const [versions, setVersions] = useState([]);
   const [executeOpen, setExecuteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [powerConfirm, setPowerConfirm] = useState(null); // 'on' | 'off'
+  const [publishing, setPublishing] = useState(false);
 
   const defsByType = useMemo(() => Object.fromEntries(catalog.map((d) => [d.type, d])), [catalog]);
   const canWrite = can('automation.workflows.write');
@@ -140,6 +143,30 @@ export default function FluxoEditor() {
     }
   }
 
+  // Ligar/Desligar existia SÓ no canvas — quem estivesse aqui tinha de descobrir
+  // que a ação morava na outra vista do mesmo fluxo. As duas vistas passaram a
+  // oferecer o mesmo conjunto de ações (v0.10.4).
+  async function confirmPower() {
+    setPublishing(true);
+    try {
+      if (powerConfirm === 'on') {
+        const v = versions[0]?.version ?? workflow?.current_version ?? 0;
+        if (!v) { toast.error('Salve uma versão antes de ligar o fluxo.'); return; }
+        await publishWorkflow(id, v);
+        toast.success('Fluxo ligado — vai rodar quando o gatilho acontecer.');
+      } else {
+        await unpublishWorkflow(id);
+        toast.success('Fluxo desligado — parou de rodar. Continua salvo.');
+      }
+      setPowerConfirm(null);
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   async function handleExport() {
     setExporting(true);
     try {
@@ -200,6 +227,19 @@ export default function FluxoEditor() {
                 Rodar agora
               </Button>
             )}
+            {can('automation.workflows.publish') && (
+              <Button
+                variant={workflow.status === 'PUBLISHED' ? 'danger' : 'secondary'}
+                icon="power"
+                disabled={publishing}
+                title={workflow.status === 'PUBLISHED'
+                  ? 'Desliga: o fluxo para de rodar (continua salvo)'
+                  : 'Liga: o fluxo passa a rodar quando o gatilho acontecer'}
+                onClick={() => setPowerConfirm(workflow.status === 'PUBLISHED' ? 'off' : 'on')}
+              >
+                {workflow.status === 'PUBLISHED' ? 'Desligar' : 'Ligar'}
+              </Button>
+            )}
             {canWrite && (
               <Button variant="primary" icon="save" title="Guarda o que está na tela como uma versão nova — o histórico não se perde" onClick={() => setSaveOpen(true)}>
                 Salvar versão
@@ -209,7 +249,13 @@ export default function FluxoEditor() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Duas VISTAS do mesmo fluxo — alternador, não navegação para outro lugar. */}
+        <SegmentedControl
+          items={[{ id: 'canvas', label: 'Desenho' }, { id: 'lista', label: 'Lista' }]}
+          value="lista"
+          onChange={(v) => { if (v === 'canvas') navigate(`/automacao/fluxos/${id}`); }}
+        />
         <WorkflowStatusBadge status={workflow.status} />
         {workflow.current_version > 0 && <Badge tone="info">v{workflow.current_version} no ar</Badge>}
         {dirty && <Badge tone="warning">alterações ainda não salvas</Badge>}
@@ -347,6 +393,22 @@ export default function FluxoEditor() {
           mutateSteps((list) => { list.splice(removingIndex, 1); return list; });
           setRemovingIndex(null);
         }}
+      />
+
+      {/* Ligar/Desligar: os 5 patrasques nos dois sentidos. */}
+      <ConfirmDialog
+        open={!!powerConfirm}
+        danger={powerConfirm === 'off'}
+        loading={publishing}
+        title={powerConfirm === 'off' ? 'Desligar o fluxo' : 'Ligar o fluxo'}
+        message={
+          powerConfirm === 'off'
+            ? `Desligar "${workflow.name}"? Ele para de rodar quando o gatilho acontecer. Nada é apagado — o fluxo e o histórico ficam, e você pode ligar de novo depois.`
+            : `Ligar "${workflow.name}"? Ele passa a rodar automaticamente quando o gatilho acontecer.${dirty ? ' Atenção: há alterações não salvas — elas NÃO entram até você salvar uma versão nova.' : ''}`
+        }
+        confirmLabel={powerConfirm === 'off' ? 'Desligar' : 'Ligar'}
+        onClose={() => setPowerConfirm(null)}
+        onConfirm={confirmPower}
       />
 
       {/* Só um Input — Modal é o container certo aqui. */}

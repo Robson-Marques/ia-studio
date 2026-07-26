@@ -1,5 +1,40 @@
 # Changelog — IA Studio
 
+## v0.10.4 - 2026-07-25 (Automação sub-frente C — o canvas. Família Automação concluída)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.26`**.
+
+### O achado: os campos do passo existiam DUAS vezes, e já tinham divergido
+
+O canvas e o editor em lista tinham cada um o seu renderizador dos campos de configuração de um passo. Não era só duplicação: o canvas entendia o tipo **`agent`** (lista os assistentes num select) e a lista **não** — nela o mesmo campo caía num input de texto, pedindo que o usuário digitasse o **id do assistente na mão**. O mesmo passo, configurado de duas formas, dependendo da tela em que se abriu.
+
+Agora existe `editor/NodeFields.jsx`, usado pelos dois. Passo novo no backend aparece igual nas duas telas, e o tipo `agent` passou a funcionar na lista sem nenhuma mudança lá.
+
+### Alterado
+
+- **Canvas migrado pro DS** — nenhuma cor cravada sobrou (o nó, os conectores, o fundo, o minimapa e a borda de selecionado agora vêm do tema; antes eram `#64748b`, `#ef4444`, `rgba(...)` fixos, que no escuro ficavam errados). Cabeçalho virou `PageHeader`; os botões, `Button` do DS.
+- **O painel de PROPRIEDADES continua fixo à direita** (recolhível), como você decidiu — num canvas, cobrir o desenho tira justamente o que se precisa ver enquanto se configura um nó: as ligações dele. Ganhou largura (260 → 320px, porque JSON em 260 quebra em toda linha) e os campos do DS.
+- **As duas vistas do mesmo fluxo passaram a ter as mesmas ações** — alternador **Desenho / Lista**, Gatilho, Exportar, Versões, Rodar agora, **Ligar/Desligar** e Salvar versão. Antes só o canvas ligava/desligava: quem estivesse na lista precisava descobrir que a ação morava na outra tela. O alternador é `SegmentedControl`, porque são duas vistas do mesmo objeto — não dois lugares diferentes.
+- **Desligar passou a pedir confirmação.** Rodava direto no clique, sem ConfirmDialog — e é a ação que **para um fluxo em produção**. Agora tem os 5 patrasques nos dois sentidos, e o texto diz o que acontece: "para de rodar; nada é apagado; pode ligar de novo".
+- **"Despublicar" virou "Desligar"** e "Publicar" virou **"Ligar"** — em Versões, "Publicar" virou "Pôr no ar". O dono do negócio liga e desliga automação; publicar é vocabulário de quem escreveu o sistema.
+- A **paleta de passos** e os trilhos recolhidos seguem escritos no painel, com tokens do DS: são infra de canvas/node-editor, que o DS ainda não cobre (está registrado no audit dele; dois produtos já a têm escrita à mão — aqui e no AquaPark).
+- **DS v1.2.26**: glifos `power` e `zap`. Faltavam para "ligar/desligar" e "gatilho" — os dois conceitos mais centrais de uma tela de automação, e sem eles o ícone caía no "?".
+
+### O que dá pra verificar agora
+
+1. **Abrir um fluxo** (o canvas): o alternador **Desenho / Lista** troca de vista mantendo o fluxo; a situação, a versão no ar e "alterações não salvas" estão em etiquetas ao lado.
+2. **Clicar num passo do desenho**: o painel da direita mostra os campos; o de JSON agora tem largura de sobra. Recolher e reabrir os dois painéis (Passos à esquerda, Propriedades à direita) funciona pelos trilhos.
+3. **Num passo de IA** (ex.: "Assistente responde"): o campo do assistente é um **select com os nomes** — e agora também no editor em lista, que antes pedia o id na mão. É a correção mais concreta desta versão.
+4. **Ligar / Desligar**: pede confirmação nos dois sentidos, o botão fica vermelho quando a ação é desligar, e o texto diz o que acontece. A mesma ação existe nas duas vistas.
+5. **Claro/escuro** no canvas — antes o nó e os conectores tinham cor fixa e o escuro ficava com contraste errado.
+6. **Trocar o accent** (efeito da v0.10.3): a borda do passo selecionado e o fundo da categoria aberta na paleta acompanham.
+
+### O que só dá pra verificar com fluxo montado
+
+- salvar versão a partir do desenho (posição dos passos entra no grafo), publicar e reverter;
+- ligar um fluxo de verdade e ver o gatilho disparar;
+- exportar do canvas e reimportar.
+
 ## v0.10.3 - 2026-07-25 (Uma cor de ação só no painel + o caminho no topo passa a navegar)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.25`**.

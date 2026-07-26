@@ -55,12 +55,18 @@ Frente de UI em curso, **paralela e independente** do backend/assistente acima. 
 armadilhas). Resumo para re-ancorar:
 
 - **Casca `AppShell` + Dashboard** no DS desde a v0.9.80; toast global do DS desde a v0.9.84.
-- **Famílias migradas:** IA Studio (v0.9.84→v0.9.91), ISP (v0.9.92), **Automação A** (v0.9.99) e
-  **Automação B** (v0.10.2 — Fluxos + editor de passos + `editor/*`).
-- **Faltam:** Automação **C** (FluxoCanvas — frente própria; a execução manual dele já foi migrada),
-  Configurações, Integrações, WhatsApp (chat full-bleed — frente própria), Recursos, Desenvolvedor.
-- **DS consumido: `^1.2.24`.** A migração já rendeu 15 releases do próprio Studio UX — a regra é
+- **Famílias migradas:** IA Studio (v0.9.84→v0.9.91), ISP (v0.9.92) e **Automação INTEIRA**
+  (A: v0.9.99 · B: v0.10.2 · C: v0.10.4 — o canvas).
+- **Faltam:** Configurações, Integrações, WhatsApp (chat full-bleed — frente própria), Recursos,
+  Desenvolvedor.
+- **DS consumido: `^1.2.26`.** A migração já rendeu 17 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
+- **Uma cor de ação no painel todo** (v0.10.3): `--ap-accent` e a cor `brand` do Tailwind herdam
+  `--su-action`. Não cravar hex de cor de ação em lugar nenhum — trocar o accent tem que mudar
+  tela migrada e não-migrada junto.
+- **Conteúdo compartilhado entre as duas vistas do fluxo:** os campos de configuração de um passo
+  vivem em `pages/Automacao/editor/NodeFields.jsx`. Eram dois renderizadores e **já tinham
+  divergido** (o tipo `agent` só existia no canvas). Campo novo entra ali, não na tela.
 - **Três containers, não dois** (DS v1.2.24): **Modal** = leitura/campo curto · **rota** = registro que
   existe por si · **inspetor** (`Drawer`) = propriedade de item dentro de um editor, sem URL própria,
   com o contexto precisando ficar à vista. Foi assim que a configuração de um passo do fluxo saiu do

@@ -13,18 +13,21 @@ migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
 `/studio-ux-demo` (fase v0.9.79) continua funcional dentro da casca nova — nada
 foi removido dele.
 
-**Famílias já no padrão DS:** IA Studio (6 telas), ISP (2 telas) e Automação
-sub-frentes **A** (os 3 logs + Agendamentos + Templates) e **B** (Fluxos + editor
-de passos + os 4 de `editor/`). As demais (Automação **C** — o canvas —, WhatsApp,
-Integrações, Configurações, Recursos, Desenvolvedor) seguem com o padrão visual
-antigo (`--ap-*` + Tailwind) dentro do AppShell, num regime de **coexistência
-deliberada** — uma família por sub-frente, com validação humana entre elas.
+**Famílias já no padrão DS:** IA Studio (6 telas), ISP (2 telas) e **Automação
+inteira** — sub-frentes A (os 3 logs + Agendamentos + Templates), B (Fluxos +
+editor de passos + `editor/*`) e C (o canvas). As demais (WhatsApp, Integrações,
+Configurações, Recursos, Desenvolvedor) seguem com o padrão visual antigo
+(`--ap-*` + Tailwind) dentro do AppShell, num regime de **coexistência
+deliberada** — uma família por sub-frente, com validação humana entre elas. Desde
+a v0.10.3 a **cor de ação é única** no painel todo: o legado herda o accent do DS.
 
-**Padrão estreado na B:** o **inspetor** (`Drawer` do DS) como terceira via da
-regra de container. A configuração de um passo e a execução manual vivem em painel
-lateral, não em Modal nem em rota — ver a tabela de regras abaixo (DS v1.2.24). O
-canvas (sub-frente C) usa o mesmo inspetor quando chegar a vez dele; a execução
-manual dele **já** está migrada.
+**O inspetor tem duas formas, e as duas são legítimas** (DS v1.2.24 + v0.10.4):
+`Drawer` quando não há contexto atrás para preservar (editor em lista, execução
+manual) e **painel fixo recolhível** quando há (o canvas — cobrir o desenho tira
+justamente as ligações do nó que se está configurando). O que **não** pode
+divergir é o conteúdo: os campos do passo vivem em `editor/NodeFields.jsx`, usado
+pelos dois. Antes eram dois renderizadores, e já tinham divergido — o tipo `agent`
+existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
 ### O que o `platform-admin` tem hoje
 
@@ -107,7 +110,8 @@ O AppShell usa `DSIcon` interno, cuja biblioteca é curada e menor que a `lucide
 | 2 | ~~Sweep de `lib/toast` → `useToast()` do DS + remover `UIToastContainer`~~ | ✅ Concluído em 2026-07-24 (55 arquivos migrados; `lib/toast.js` e `UIToastContainer.jsx` esvaziados) |
 | 3 | ~~9 páginas com modais siblings + estados independentes~~ → **as 3 do grupo IA foram resolvidas** pela regra do Modal (`IA/Ferramentas`, `IA/BasesConhecimento`, `IA/Aprovacoes`: os modais com `TextArea` viraram rota, o que dissolveu os estados concorrentes). Restam 6 fora do grupo IA: `WhatsApp/EquipesFilas`, `Automacao/FluxoCanvas`, `Automacao/FluxoEditor`, `Automacao/Fluxos`, `Integracoes/Conexoes`, `ISP/Incidentes` | Cada uma resolve na migração da sua família — a regra do Modal (DS v1.2.12) já dá o caminho |
 | 4 | Instalação do `@studio-ux-ds/icons` (não está no `package.json`) | Quando a primeira família de tela migrar e precisar de ícones DS dentro do conteúdo |
-| 5 | Migração das famílias de tela para o padrão visual do DS. **Concluídas: IA Studio** (v0.9.84→v0.9.91 — 6 telas + 2 sweeps retroativos), **ISP** (v0.9.92 — 2 telas), **Automação A** (v0.9.99 — os 3 logs + Agendamentos + Templates, com 3 rotas novas), **Automação B** (v0.10.2 — Fluxos, o editor de passos e os 4 de `editor/`, com o padrão **inspetor** estreado). Restam: **Automação C** (FluxoCanvas, 773 linhas — o inspetor de execução dele já está migrado), **Configurações** (5), **Integrações** (6), **WhatsApp** (11, inclui o chat full-bleed), **Recursos** (2), **Desenvolvedor** (2) | Uma sub-frente por família. Automação C (Canvas) e WhatsApp (chat) são as mais complexas — frente dedicada, nunca junto de outra coisa |
+| 5 | Migração das famílias de tela para o padrão visual do DS. **Concluídas: IA Studio** (v0.9.84→v0.9.91 — 6 telas + 2 sweeps), **ISP** (v0.9.92), **Automação inteira** (A: v0.9.99 · B: v0.10.2 · C: v0.10.4 — o canvas). Restam: **Configurações** (5), **Integrações** (6), **WhatsApp** (11, inclui o chat full-bleed), **Recursos** (2), **Desenvolvedor** (2) | Uma sub-frente por família. WhatsApp (chat full-bleed) é a mais complexa das que restam — frente dedicada, nunca junto de outra coisa |
+| 14 | **Infra de canvas/node-editor não existe no DS** — paleta de blocos, trilho recolhível, nó com conectores, inspetor persistente. Está escrita à mão em **dois** produtos (aqui e o `WorkflowCanvas` do AquaPark), então a divergência entre eles é garantida. O canvas daqui foi migrado usando os **tokens** do DS, mas a estrutura segue no consumidor. Registrado também no audit do DS (item G1 + B.1.1) | Decisão do dono do DS: entra como pattern do Studio UX ou fica sendo infra de produto? Não é bloqueio para nada agora |
 
 ### Regras do DS que nasceram desta adoção
 
@@ -125,6 +129,7 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 | v1.2.21 | `Pagination` navegável por teclado, com **janela** de páginas (não só as 5 primeiras) + contagem via `total`/`itemLabel`. `itemLabel` aceita `[singular, plural]` — obrigatório em português (`execuçãos` não existe) |
 | v1.2.22 | **`tone` é o nome do papel semântico em TODO componente** (`Badge`, `StatCard`, `Banner`) — `Badge status=` fica só como apelido legado. `Field` tem `required` (asterisco + "(obrigatório)" para leitor de tela) |
 | v1.2.23 | **Rótulo de opção aceita `label` OU filho** — `<Checkbox>Segunda</Checkbox>` funciona (antes derrubava a página). `...rest` do DS nunca repassa `children` pro elemento |
+| v1.2.26 | Glifos `power` e `zap` — o vocabulário de **operação** (ligar/desligar, gatilho), que faltava porque a curadoria de ícones nasceu vestindo tela de cadastro |
 | v1.2.25 | **Accent também em canais RGB** (`--su-action-rgb`) — é o que permite o Tailwind do consumidor usar a cor do tema com opacidade, em vez de cravar hex. **`Breadcrumb` com `onNavigate`** (via `AppShell.onBreadcrumbNavigate`): item sem `href` não navega, `href` sem `onNavigate` recarrega a SPA — em app de página única os dois são obrigatórios |
 | v1.2.24 | **Três containers, não dois:** Modal (leitura/campo curto) · **rota** (registro que existe por si) · **inspetor** = `Drawer` (propriedade de item dentro de um editor, sem URL própria, com o contexto precisando ficar à vista). `Drawer` tem `width` — 480+ para texto longo/JSON. Glifos `play`/`archive`/`save` |
 
