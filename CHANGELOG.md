@@ -1,5 +1,20 @@
 # Changelog — IA Studio
 
+## v0.10.8 - 2026-07-25 (Degradê do card igual ao do console — os valores, não a impressão)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.30`**.
+
+### Corrigido
+
+- **O degradê estava claro demais e não parecia degradê.** Causa: eu calibrei valores próprios em vez de **traduzir** os do card do console, que era a referência que você me deu — e ainda passei duas versões ajustando por tentativa (16%, depois 10%), cada uma mais clara.
+  - Traduzido de verdade (DS v1.2.30): **20% de cor no início, 5% no fim**, transição no trajeto inteiro, borda a 20%, caixa do ícone a 10%. O erro comum às duas tentativas era **terminar em cor zero** antes do fim — aí metade do card fica branco e a peça deixa de ler como degradê.
+
+### O que dá pra verificar agora
+
+1. **Painel** e **Configurações → Atualização**: o degradê é visível de ponta a ponta do card, sem a metade branca.
+2. Comparar lado a lado com **/console/dashboard**: os cards devem parecer da mesma família.
+3. **Claro/escuro**: no escuro a matiz é o tom claro da paleta, então o degradê aparece sobre a superfície escura.
+
 ## v0.10.7 - 2026-07-25 (Cards com cor por assunto, como no console)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.29`**.
