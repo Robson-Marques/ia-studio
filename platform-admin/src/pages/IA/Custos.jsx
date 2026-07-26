@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Tabs, StatCard, Card, DataTable, EmptyState, Badge,
+  PageHeader, Tabs, StatCard, Card, DataTable, EmptyState, Badge, DSIcon,
   Field, Input, Select, NumericInput, Button, Checkbox, Modal,
   useToast,
 } from '@studio-ux-ds/react';
@@ -95,10 +95,14 @@ function SummaryTab() {
         </div>
       ) : (
         <>
+          {/* Todos `neutral` + ícone (v0.10.6): custo, tokens e nº de assistentes
+              não são "bom" nem "ruim" — são contagens do período. Os tones
+              anteriores (success/info/neutral) vinham de quando a cor só tocava
+              a borda; com o card tingido, três cores num trio viram enfeite. */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <StatCard label="Custo total" value={formatUsd(totals.cost_usd ?? totals.total_cost_usd)} tone="success" />
-            <StatCard label="Tokens" value={formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens)} sub="prompt + resposta" tone="info" />
-            <StatCard label="Assistentes ativos" value={formatTokens(totals.agent_count ?? rows.length)} tone="neutral" />
+            <StatCard label="Custo total" value={formatUsd(totals.cost_usd ?? totals.total_cost_usd)} icon={<DSIcon name="chart-bar" />} />
+            <StatCard label="Tokens" value={formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens)} sub="prompt + resposta" icon={<DSIcon name="message" />} />
+            <StatCard label="Assistentes ativos" value={formatTokens(totals.agent_count ?? rows.length)} icon={<DSIcon name="users" />} />
           </div>
 
           {!rows.length ? (
@@ -346,8 +350,8 @@ function SimulatorTab() {
 
       {result && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <StatCard label="Custo por execução" value={formatUsd(result.cost_per_run ?? result.unit_cost_usd)} tone="info" />
-          <StatCard label="Custo total estimado" value={formatUsd(result.total_cost_usd ?? result.cost_usd)} sub={`${form.runs} execuções`} tone="success" />
+          <StatCard label="Custo por execução" value={formatUsd(result.cost_per_run ?? result.unit_cost_usd)} icon={<DSIcon name="chart-bar" />} />
+          <StatCard label="Custo total estimado" value={formatUsd(result.total_cost_usd ?? result.cost_usd)} sub={`${form.runs} execuções`} icon={<DSIcon name="chart-bar" />} />
         </div>
       )}
     </div>

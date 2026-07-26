@@ -1,5 +1,26 @@
 # Changelog — IA Studio
 
+## v0.10.6 - 2026-07-25 (Cards de indicador: uma cor só, com ícone)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.28`**.
+
+### Corrigido
+
+O desenho novo do card (v0.10.5) ficou estranho no painel, e não era o degradê em si — eram três coisas somadas:
+
+- **Nenhum card passava `icon`.** O desenho tem o ícone à esquerda como âncora; sem ele o conteúdo encostava na borda e sobrava um vazio grande à direita, com o degradê correndo solto por ele. Os 4 do Painel e os 5 de Custos ganharam ícone.
+- **Quatro cards, quatro cores, nenhuma dizendo nada.** Os tones eram `info`/`info`/`success`/`neutral`, herdados de quando a cor só tocava a borda — e nenhum daqueles indicadores é "bom" ou "ruim": são contagens (usuários, workspaces, execuções, consumo). Com o card inteiro tingido, virou decoração. **Todos passaram a `neutral`**, que usa o accent: o painel fica coeso e acompanha a personalização. Mesma correção em Custos de IA (custo, tokens, assistentes) e no simulador.
+- **O degradê era forte para card largo** — corrigido no DS (v1.2.28): 10% de cor terminando em 55% do trajeto, em vez de 16% até 72%. Num card de ~400px, a diagonal longa deixava metade da peça colorida.
+
+Vale a nota: eu já tinha escrito no DS que "sete indicadores em sete cores não é o que o componente faz" e deixei quatro cores no Painel na mesma leva. A regra estava certa; faltou aplicá-la onde eu já estava mexendo.
+
+### O que dá pra verificar agora
+
+1. **Painel**: os 4 cards com ícone à esquerda, **todos na mesma cor** (a do accent), degradê perceptível mas discreto, e "Limite: N" em cinza.
+2. **IA Studio → Custos**: os 3 cards do topo e os 2 do simulador iguais entre si.
+3. **Trocar o accent**: os cards acompanham — agora todos, porque nenhum tem cor própria.
+4. **Estreitar a janela** até os cards ficarem em 1 ou 2 colunas: o degradê continua discreto (era aí que ele dominava).
+
 ## v0.10.5 - 2026-07-25 (Cards de indicador com o desenho novo do DS)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.27`**.

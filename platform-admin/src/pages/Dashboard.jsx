@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { PageHeader, StatCard, Card, Badge, useToast } from '@studio-ux-ds/react';
+import { PageHeader, StatCard, Card, Badge, DSIcon, useToast } from '@studio-ux-ds/react';
 import { getLicense } from '../services/account';
 import { useAuth } from '../context/AuthContext';
 import { formatNumber, formatLimit, formatDate } from '../lib/format';
@@ -74,32 +74,41 @@ export default function Dashboard() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* `sub`, não `delta`: "Limite: 5" é legenda, não variação no período — e o
-            `delta` é verde por natureza (ele significa direção). Os quatro cards
-            estavam com a legenda pintada de verde desde a v0.9.80. */}
+        {/* Duas correções que andam juntas (v0.10.6):
+            · `sub`, não `delta` — "Limite: 5" é legenda, não variação no período,
+              e o `delta` é colorido por natureza (significa direção). Os quatro
+              cards mostravam a legenda em verde desde a v0.9.80.
+            · **todos `neutral`** — os tones eram `info`/`info`/`success`/`neutral`,
+              herdados de quando a cor só tocava a borda. Nenhum destes quatro é
+              "bom" ou "ruim": são contagens. Com o card inteiro tingido (DS
+              v1.2.27), quatro cores viravam decoração — e quando cada card tem a
+              sua, nenhuma é sinal. `neutral` usa o accent, então o painel fica
+              coeso e acompanha a personalização.
+            · `icon` — o desenho tem o ícone à esquerda como âncora; sem ele o
+              conteúdo encosta na borda e sobra um vazio grande à direita. */}
         <StatCard
           label="Usuários"
           value={formatNumber(usage.users ?? 0)}
           sub={`Limite: ${formatLimit(limits.users)}`}
-          tone="info"
+          icon={<DSIcon name="users" />}
         />
         <StatCard
           label="Workspaces"
           value={formatNumber(workspacesCount)}
           sub={`Limite: ${formatLimit(limits.workspaces)}`}
-          tone="info"
+          icon={<DSIcon name="home" />}
         />
         <StatCard
           label="Execuções no mês"
           value={formatNumber(usage.executions ?? 0)}
           sub={`Limite: ${formatLimit(limits.executions)}`}
-          tone="success"
+          icon={<DSIcon name="play" />}
         />
         <StatCard
           label="Consumo de IA no mês"
           value={formatNumber(usage.tokens ?? 0)}
           sub={`Limite: ${formatLimit(limits.tokens)}`}
-          tone="neutral"
+          icon={<DSIcon name="chart-bar" />}
         />
       </div>
 
