@@ -63,6 +63,14 @@ armadilhas). Resumo para re-ancorar:
 - **Armadilha que mais custou: PROP MORTA.** React não avisa prop desconhecida em componente próprio.
   `<Badge tone>` ficou 47 vezes sem efeito (badge cinza em 19 arquivos, telas já validadas) até o DS
   v1.2.22 aceitar o nome. **Conferir a assinatura real do componente antes de usar prop "óbvia".**
+  Variante pior: prop repassada pro DOM — `<Checkbox>rótulo</Checkbox>` mandava `children` pro
+  `<input>` e derrubava a página inteira (tela branca em `/automacao/calendarios/novo`, DS v1.2.23).
+  **Tela branca em rota nova = prop no lugar errado; abra o console antes de investigar API.**
+- **Dívida técnica do produto agora tem casa própria:** [`docs/divida-tecnica.md`](divida-tecnica.md)
+  (DT-001…DT-004). Critério do Robson (2026-07-25): **o que não é responsabilidade do DS sai do doc
+  de adoção e vive na dívida técnica do IA Studio.** Abertos hoje: ajuda de variáveis no editor de
+  template, assimetria `workflow`/`env`/`now` no template, `DELETE` de base de conhecimento,
+  "Ativar imediatamente" do MCP.
 
 ### 🧠 Lições que se repetem (re-ancorar antes de codar)
 - **ID de infra a IA NUNCA escolhe** (conexão/setor/assunto/fila) — vem da CONFIG curada ou auto-resolve

@@ -134,12 +134,11 @@ export default function CalendarioEditor() {
               {WEEKDAYS.map((d) => (
                 <Checkbox
                   key={d.value}
+                  label={d.label}
                   checked={workdays.includes(d.value)}
                   onChange={() => toggleWorkday(d.value)}
                   disabled={!canManage}
-                >
-                  {d.label}
-                </Checkbox>
+                />
               ))}
             </CheckGroup>
           </Field>

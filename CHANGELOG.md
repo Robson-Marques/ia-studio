@@ -1,5 +1,20 @@
 # Changelog — IA Studio
 
+## v0.10.1 - 2026-07-25 (Correção: "Novo calendário" abria em branco)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.23`**.
+
+> Numeração: depois do `v0.9.99` vem `v0.10.1` — o patch para no 99, não existe `v0.9.100`.
+
+### Corrigido
+
+- **`/automacao/calendarios/novo` abria a página em branco** (sem casca, sem menu). Eu escrevi o rótulo de cada dia da semana como filho do componente — `<Checkbox>Segunda</Checkbox>` — e o `Checkbox` do DS só lia rótulo de `label`: o `children` era repassado ao `<input>`, que é elemento vazio, e o React lançava exceção **durante o render**, desmontando a árvore inteira. Não era erro de dado nem de permissão: era a tela quebrando ao montar.
+  - Consertado nos dois lados, como manda a frente: no **DS** (v1.2.23) `label` e `children` passaram a ser equivalentes e `children` nunca chega ao `<input>`; aqui, o callsite passou a usar `label={d.label}`. Varri os outros 14 usos de `Checkbox`/`Radio` do painel — **nenhum outro** passava filho, então esta era a única tela afetada.
+
+### Diagnóstico registrado (ainda NÃO implementado)
+
+- **Não há como descobrir, pela tela, quais variáveis um template aceita.** O editor só traz dois exemplos na dica, e quem vem do WhatsApp escreve `{{1}}` por hábito — que **não resolve nada** (sai string vazia no envio, sem aviso). O que o motor realmente entende num corpo de template é `{{input.…}}` (o que o gatilho trouxe), `{{vars.<id-do-nó>.…}}` (saída de um passo anterior) e o que o próprio nó "Montar mensagem de um modelo" passar em "Dados extras (JSON)". Já existe base para resolver: o `variable-resolver` do backend declara os namespaces conhecidos (`KNOWN_NAMESPACES`) e tem `unknownTokens()`, usado na validação do publish do fluxo. Falta trazer isso pro editor. Frente própria — ver a pendência nº 13 em `docs/adocao-studio-ux.md`.
+
 ## v0.9.99 - 2026-07-25 (Automação — as 5 telas independentes migradas pro DS)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.22`**.
