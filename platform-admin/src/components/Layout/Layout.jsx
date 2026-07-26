@@ -10,8 +10,8 @@ import { getNotificationsInbox } from '../../services/automation';
 
 // Layout — casca principal do painel do cliente. Adota o AppShell do Studio UX
 // (passo 2 da expansão de adoção, 2026-07-24). Substitui a dupla Sidebar+Header
-// legada (preservadas em Layout.legacy / Sidebar.legacy / Header.legacy para
-// rollback). O piloto isolado /studio-ux-demo continua funcionando dentro desta
+// legada — que vive no histórico do git, não em arquivo `.legacy` ao lado.
+// O piloto isolado /studio-ux-demo continua funcionando dentro desta
 // casca — o tema DS já vive lá.
 //
 // Slots do AppShell usados:
@@ -227,6 +227,39 @@ function resolveCrumb(pathname) {
   return hit ? hit[1] : 'IA Studio';
 }
 
+/**
+ * Monta o breadcrumb NAVEGÁVEL: `[{ label, href? }]`.
+ *
+ * Até a v0.10.2 os itens iam sem `href`, e o `Breadcrumb` do DS só vira link
+ * quando tem `href` — ou seja, o caminho no topo era **texto decorativo**. Isso
+ * passou despercebido porque toda tela tinha um botão "Voltar" próprio; quando
+ * uma passou a confiar no breadcrumb (o editor de passos, v0.10.2), a tela ficou
+ * sem saída nenhuma.
+ *
+ * Como o `href` é descoberto: para cada item que não é o último, procura-se — do
+ * prefixo mais longo do pathname para o mais curto — aquele cujo crumb resolvido
+ * seja exatamente o caminho até aquele item. Assim o link sai do MESMO mapa que
+ * escreve o rótulo, sem uma segunda tabela de path para manter em sincronia (que
+ * divergiria na primeira rota nova).
+ *
+ * O último item nunca é link: é a página onde já se está.
+ */
+function buildBreadcrumb(pathname) {
+  const labels = resolveCrumb(pathname).split(' / ');
+  const segs = pathname.split('/').filter(Boolean);
+  const prefixes = segs.map((_, i) => `/${segs.slice(0, i + 1).join('/')}`);
+
+  return labels.map((label, i) => {
+    if (i === labels.length - 1) return { label };
+    const alvo = labels.slice(0, i + 1).join(' / ');
+    for (let p = prefixes.length - 1; p >= 0; p -= 1) {
+      if (prefixes[p] === pathname) continue;
+      if (resolveCrumb(prefixes[p]) === alvo) return { label, href: prefixes[p] };
+    }
+    return { label };
+  });
+}
+
 const ENV_BADGE = {
   PRODUCTION:  { label: 'Produção',        variant: 'green' },
   STAGING:     { label: 'Homologação',     variant: 'yellow' },
@@ -344,8 +377,7 @@ export default function Layout() {
     };
   }, [wsOpen]);
 
-  const crumb = resolveCrumb(location.pathname);
-  const breadcrumb = crumb.split(' / ').map((label) => ({ label }));
+  const breadcrumb = buildBreadcrumb(location.pathname);
 
   const envInfo = environment
     ? (ENV_BADGE[environment.kind] || { label: environment.name || environment.kind, variant: 'gray' })
@@ -459,6 +491,10 @@ export default function Layout() {
         nav={nav}
         version={`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}`}
         breadcrumb={breadcrumb}
+        // Sem isto o clique no caminho recarregaria a aplicação inteira (o
+        // Breadcrumb do DS usa <a href> de verdade, de propósito — ctrl+clique
+        // abre em outra aba). Aqui o clique simples vira navegação do router.
+        onBreadcrumbNavigate={(href) => navigate(href)}
         topbarContext={topbarContext}
         user={userForShell}
         userMenuItems={userMenuItems}

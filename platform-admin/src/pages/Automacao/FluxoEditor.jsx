@@ -179,6 +179,16 @@ export default function FluxoEditor() {
         subtitle={workflow.description || undefined}
         actions={
           <>
+            {/* O "Voltar" existe porque toda tela precisa de uma saída visível.
+                Eu o havia removido na v0.10.2 alegando que o breadcrumb do topo
+                levava de volta — e não levava: os itens iam sem `href`, então
+                era texto decorativo. Consertado nos dois lugares (o breadcrumb
+                virou navegável de verdade), mas o botão fica: uma saída na
+                mesma altura das outras ações é mais achável que o caminho na
+                barra de cima. */}
+            <Button variant="ghost" icon="arrow-left" title="Voltar para a lista de fluxos" onClick={() => navigate('/automacao/fluxos')}>
+              Voltar
+            </Button>
             <Button variant="secondary" icon="download" loading={exporting} title="Baixa uma cópia do fluxo, sem senhas nem chaves" onClick={handleExport}>
               Exportar
             </Button>

@@ -1,5 +1,25 @@
 # Changelog — IA Studio
 
+## v0.10.3 - 2026-07-25 (Uma cor de ação só no painel + o caminho no topo passa a navegar)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.25`**.
+
+### Corrigido
+
+- **Duas cores de ação convivendo no mesmo painel.** O botão principal aparecia **verde** nas telas migradas (accent do Studio UX) e **azul-índigo** nas que ainda não migraram — o mesmo "Salvar versão" com cor diferente entre o editor em lista e o canvas. Causa: o padrão antigo cravava `#6366f1` em dois lugares (`--ap-accent` no `index.css` e a cor `brand` no `tailwind.config.js`), enquanto o accent do DS já era outro.
+  - Agora os dois **herdam o accent do DS**: `--ap-accent: var(--su-action)` e `brand: rgb(var(--su-action-rgb) / <alpha-value>)`. São duas linhas que acertam as ~40 telas ainda não migradas **sem tocar em nenhuma** — inclusive o canvas, o `text-brand` e o `bg-brand/5`. Trocar o accent no painel de personalização passa a mudar o painel inteiro, não só a parte nova.
+  - Isso exigiu evolução do DS (**v1.2.25**): os accents passaram a expor também os **canais RGB** (`--su-action-rgb` etc.). Sem eles o Tailwind não consegue compor opacidade a partir da cor do tema, e o app é **obrigado** a cravar o hex — a raiz do problema estava lá.
+- **O caminho no topo (breadcrumb) não navegava.** Os itens iam sem `href`, então era texto decorativo. Passou desapercebido enquanto toda tela tinha o seu próprio "Voltar"; quando o editor de passos (v0.10.2) passou a confiar nele, **a tela ficou sem saída**. Agora o caminho é clicável de verdade: o link sai do mesmo mapa que escreve o rótulo (sem uma segunda tabela para manter em sincronia), o último item nunca é link, e o clique usa o router em vez de recarregar a aplicação — Ctrl+clique continua abrindo em nova aba.
+- **Voltar de volta no editor de passos.** Reposto ao lado das outras ações. Eu o havia tirado supondo que o breadcrumb resolvia — não resolvia, e a suposição custou uma tela sem saída. As outras 10 telas de detalhe/editor já tinham Voltar ou Cancelar; agora as 11 têm.
+
+### O que dá pra verificar agora
+
+1. **Personalização → trocar o accent**: o botão principal muda de cor em **todo** o painel — inclusive no canvas de fluxo, em WhatsApp, Integrações, Configurações (as telas ainda não migradas). Antes só as migradas mudavam.
+2. **Canvas de um fluxo**: "Salvar versão" agora tem a mesma cor do "Salvar versão" do editor em lista.
+3. **Editor de passos**: o botão **Voltar** está lá, à esquerda das outras ações.
+4. **Caminho no topo** (ex.: "Automação / Fluxos / Passos"): clicar em "Fluxos" leva pra lista **sem recarregar** a página; o último item não é clicável; Ctrl+clique em "Fluxos" abre em outra aba.
+5. **Claro/escuro** depois de trocar o accent — o accent tem tom próprio para cada tema, e os dois vêm do DS.
+
 ## v0.10.2 - 2026-07-25 (Automação sub-frente B — Fluxos e o editor de passos)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.24`**.

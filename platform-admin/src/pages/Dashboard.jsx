@@ -7,9 +7,8 @@ import { formatNumber, formatLimit, formatDate } from '../lib/format';
 
 // Dashboard — primeira tela após login. Migrado para o padrão visual do
 // Studio UX (passo 3 da expansão de adoção, 2026-07-24): PageHeader + StatCard
-// + Card do DS. Dados/lógica idênticos ao Dashboard.legacy — apenas a casca da
-// tela mudou. `toast` segue apontando pro `lib/toast` do IA Studio (o sweep pra
-// useToast() do DS é o próximo passo).
+// + Card do DS. Só a casca da tela mudou — dados e lógica seguem os mesmos da
+// versão anterior (que está no histórico do git).
 
 // StatCard do DS aceita `tone` = neutral | info | success | warning | danger.
 // Mapeamento das 4 métricas do legado (que usavam `color` = brand/blue/green/purple):

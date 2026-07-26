@@ -16,8 +16,9 @@ import { PROVIDER_KINDS, formatUsd, formatTokens } from './ia.constants';
 // 2026-07-24). Substitui components/ui/* locais por @studio-ux-ds/react:
 // PageHeader + Tabs + Card + StatCard (tone info/success/neutral) + DataTable
 // + EmptyState + Modal + Field + Input + Select + NumericInput + Button +
-// Checkbox. Dados/lógica idênticos ao Custos.legacy — apenas a casca visual
-// mudou. Modal do DS usa `maxWidth` (número, não `size`). NumericInput onChange
+// Checkbox. Só a casca visual mudou — dados e lógica seguem os mesmos da versão
+// anterior (que está no histórico do git).
+// Modal do DS usa `maxWidth` (número, não `size`). NumericInput onChange
 // recebe number direto. Tabs usa `value`/`onChange` (não `active`).
 
 const PAGE_TABS = [

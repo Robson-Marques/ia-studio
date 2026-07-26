@@ -26,7 +26,15 @@
   --ap-scroll-hover: #94a3b8;
   --ap-table-head:   rgba(241, 245, 249, 0.8);
   --ap-hover:        rgba(241, 245, 249, 0.9);
-  --ap-accent:       #6366f1;
+  /* Accent do padrão ANTIGO: passou a herdar o accent do Studio UX.
+     Era `#6366f1` (índigo) cravado, enquanto o accent escolhido no DS já era
+     outro — resultado: tela migrada com o botão principal na cor do sistema e
+     tela ainda-legada com o botão azul, lado a lado (o canvas de fluxo era o
+     caso mais visível: o mesmo "Salvar versão", duas cores).
+     Uma linha resolve as ~40 telas que ainda não migraram, sem tocar em
+     nenhuma: quem manda na cor de ação passa a ser o DS, em todo o painel.
+     O fallback índigo fica só para o caso de o CSS do DS não ter carregado. */
+  --ap-accent:       var(--su-action, #6366f1);
 }
 
 /* ─────────────────────────────────────────────────────────────────
