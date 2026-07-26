@@ -1,29 +1,39 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Download, GitBranch, History, Loader2,
-  Pencil, Play, Plus, Save, Trash2, Zap,
-} from 'lucide-react';
-import Modal from '../../components/ui/Modal';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import EmptyState from '../../components/ui/EmptyState';
-import { FormField, TextInput, Select } from '../../components/ui/FormField';
+  PageHeader, Card, Badge, Button, Modal, ConfirmDialog, EmptyState,
+  Field, Input, Select, IconButton, useToast,
+} from '@studio-ux-ds/react';
 import {
-  getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions,
-  exportWorkflow,
+  getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions, exportWorkflow,
 } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useToast } from '@studio-ux-ds/react';
 import { NODE_CATEGORY_ORDER } from './automation.constants';
-import { StatusBadge } from './Fluxos';
-import NodeConfigModal from './editor/NodeConfigModal';
+import WorkflowStatusBadge from './WorkflowStatusBadge';
+import NodeInspector from './editor/NodeInspector';
 import TriggerEditor from './editor/TriggerEditor';
 import VersionsModal from './editor/VersionsModal';
-import ExecuteModal from './editor/ExecuteModal';
+import ExecuteDrawer from './editor/ExecuteDrawer';
 
-// Editor do fluxo — LISTA VERTICAL de passos nesta fase (o canvas React Flow
-// chega na Fase 5 e consome o MESMO grafo {nodes, edges}). Salvar = sempre
-// nova versão imutável; publicar/rollback no modal de versões (diretriz 3).
+// Automação/FluxoEditor — o fluxo como LISTA vertical de passos. Migrado pro DS
+// na v0.10.2. (O canvas é a rota `/automacao/fluxos/:id`; esta é a `/lista`, e as
+// duas consomem o MESMO grafo `{nodes, edges}`.)
+//
+// Onde cada coisa mora, pela regra dos três containers do DS (v1.2.24):
+//
+//  · **Configurar um passo → inspetor** (`NodeInspector`, Drawer). Tem TextArea e
+//    JSON, e o passo é rascunho da sessão: não é Modal nem rota.
+//  · **Rodar agora → inspetor** (`ExecuteDrawer`). Tem TextArea (a entrada) e age
+//    sobre o fluxo em foco.
+//  · **Escolher o tipo do passo → Modal.** É leitura + escolha, sem campo.
+//  · **Salvar versão → Modal.** Só um `Input` (a anotação) — o Modal aceita.
+//  · **Versões → Modal.** Leitura (lista + diff) + confirmação.
+//
+// O cabeçalho virou `PageHeader`: o botão "voltar" desapareceu porque o
+// breadcrumb do AppShell já leva de volta pra lista, e ter os dois era o mesmo
+// caminho duas vezes.
+
 export default function FluxoEditor() {
   const toast = useToast();
   const { id } = useParams();
@@ -46,8 +56,10 @@ export default function FluxoEditor() {
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versions, setVersions] = useState([]);
   const [executeOpen, setExecuteOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const defsByType = useMemo(() => Object.fromEntries(catalog.map((d) => [d.type, d])), [catalog]);
+  const canWrite = can('automation.workflows.write');
 
   async function load() {
     setLoading(true);
@@ -84,7 +96,7 @@ export default function FluxoEditor() {
       next_when: '',
     }]);
     setPaletteOpen(false);
-    setEditingIndex(steps.length); // abre a config do passo recém-criado
+    setEditingIndex(steps.length); // abre a configuração do passo recém-criado
   }
 
   function moveStep(index, delta) {
@@ -98,7 +110,7 @@ export default function FluxoEditor() {
   }
 
   async function handleSaveVersion() {
-    if (!steps.length) { toast.error('Adicione pelo menos um passo.'); return; }
+    if (!steps.length) { toast.error('O fluxo precisa de pelo menos um passo.'); return; }
     setSaving(true);
     try {
       const result = await saveWorkflowVersion(id, {
@@ -106,7 +118,7 @@ export default function FluxoEditor() {
         trigger,
         note: saveNote.trim() || undefined,
       });
-      toast.success(`Versão v${result.version} salva.`);
+      toast.success(`v${result.version} salva. Ela ainda não está no ar — publique em Versões.`);
       (result.warnings || []).forEach((w) => toast.warn(w));
       setSaveOpen(false);
       setSaveNote('');
@@ -129,6 +141,7 @@ export default function FluxoEditor() {
   }
 
   async function handleExport() {
+    setExporting(true);
     try {
       const data = await exportWorkflow(id);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -138,157 +151,171 @@ export default function FluxoEditor() {
       a.download = `fluxo-${(workflow?.name || 'export').toLowerCase().replace(/\s+/g, '-')}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Fluxo exportado (sem segredos).');
+      toast.success('Arquivo baixado — ele não carrega senhas nem chaves.');
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      setExporting(false);
     }
   }
 
   if (loading || !workflow) {
-    return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>;
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Carregando…" />
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
+      </div>
+    );
   }
 
-  const canWrite = can('automation.workflows.write');
+  const proximaVersao = (versions[0]?.version ?? 0) + 1;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button className="btn-ghost p-2" onClick={() => navigate('/automacao/fluxos')} aria-label="Voltar">
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex-1 min-w-[180px]">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold truncate" style={{ color: 'var(--ap-text-1)' }}>{workflow.name}</h1>
-            <StatusBadge status={workflow.status} />
-            {workflow.current_version > 0 && (
-              <span className="text-xs font-mono" style={{ color: 'var(--ap-text-4)' }}>v{workflow.current_version} ativa</span>
+    <div className="space-y-6">
+      <PageHeader
+        title={workflow.name}
+        subtitle={workflow.description || undefined}
+        actions={
+          <>
+            <Button variant="secondary" icon="download" loading={exporting} title="Baixa uma cópia do fluxo, sem senhas nem chaves" onClick={handleExport}>
+              Exportar
+            </Button>
+            <Button variant="secondary" icon="history" title="Ver as versões salvas — pôr no ar ou voltar para uma anterior" onClick={openVersions}>
+              Versões
+            </Button>
+            {can('automation.workflows.execute') && (
+              <Button variant="secondary" icon="play" title="Roda o fluxo agora, com opção de só simular" onClick={() => setExecuteOpen(true)}>
+                Rodar agora
+              </Button>
             )}
-            {dirty && <span className="text-xs" style={{ color: 'var(--ap-text-4)' }}>alterações não salvas</span>}
-          </div>
-          {workflow.description && <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{workflow.description}</p>}
-        </div>
-        <button className="btn-secondary" onClick={handleExport} title="Baixar uma cópia do fluxo (sem senhas nem segredos)">
-          <Download size={14} /> Exportar
-        </button>
-        <button className="btn-secondary" onClick={openVersions} title="Histórico de versões — publicar, reverter e comparar">
-          <History size={14} /> Versões
-        </button>
-        {can('automation.workflows.execute') && (
-          <button className="btn-secondary" onClick={() => setExecuteOpen(true)} title="Executar manualmente (com opção de simulação)">
-            <Play size={14} /> Executar
-          </button>
-        )}
-        {canWrite && (
-          <button className="btn-primary" onClick={() => setSaveOpen(true)} title="Salvar como uma nova versão (o histórico é preservado)">
-            <Save size={14} /> Salvar versão
-          </button>
-        )}
+            {canWrite && (
+              <Button variant="primary" icon="save" title="Guarda o que está na tela como uma versão nova — o histórico não se perde" onClick={() => setSaveOpen(true)}>
+                Salvar versão
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <WorkflowStatusBadge status={workflow.status} />
+        {workflow.current_version > 0 && <Badge tone="info">v{workflow.current_version} no ar</Badge>}
+        {dirty && <Badge tone="warning">alterações ainda não salvas</Badge>}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Gatilho */}
-        <div className="card space-y-3">
-          <div className="flex items-center gap-2">
-            <Zap size={15} className="text-brand" />
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--ap-text-1)' }}>Gatilho</h2>
-          </div>
-          <TriggerEditor
-            trigger={trigger}
-            onChange={(t) => { setTrigger(t); setDirty(true); }}
-            webhookToken={workflow.webhook_token}
-          />
-        </div>
-
-        {/* Passos (lista vertical) */}
-        <div className="lg:col-span-2 card space-y-3">
-          <div className="flex items-center gap-2">
-            <GitBranch size={15} className="text-brand" />
-            <h2 className="text-sm font-semibold flex-1" style={{ color: 'var(--ap-text-1)' }}>Passos</h2>
-            {canWrite && (
-              <button className="btn-secondary text-xs" onClick={() => setPaletteOpen(true)}>
-                <Plus size={13} /> Adicionar passo
-              </button>
-            )}
-          </div>
-
-          {!steps.length ? (
-            <EmptyState
-              icon={GitBranch}
-              title="Fluxo vazio"
-              description="Adicione um gatilho e os passos da automação."
-              action={canWrite && <button className="btn-primary" onClick={() => setPaletteOpen(true)}><Plus size={14} /> Adicionar passo</button>}
+        <Card>
+          <div style={{ padding: 20 }} className="space-y-3">
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+              O que dispara
+            </h2>
+            <TriggerEditor
+              trigger={trigger}
+              onChange={(t) => { setTrigger(t); setDirty(true); }}
+              webhookToken={workflow.webhook_token}
             />
-          ) : (
-            <div className="space-y-1">
-              {steps.map((step, index) => {
-                const def = defsByType[step.type];
-                return (
-                  <React.Fragment key={step.id}>
-                    <div className="rounded-lg p-3 flex items-center gap-2" style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface-2)' }}>
-                      <span
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-                        style={{ backgroundColor: 'var(--ap-surface-3)', color: 'var(--ap-text-3)' }}
-                      >
-                        {index + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{step.name || def?.label || 'Passo'}</p>
-                        <p className="text-[11px] truncate" style={{ color: 'var(--ap-text-4)' }}>
-                          {def ? `${def.category} · ${def.label}` : 'Passo não reconhecido'}
-                        </p>
-                      </div>
-                      {canWrite && (
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <button className="btn-ghost p-1.5 disabled:opacity-30" onClick={() => moveStep(index, -1)} disabled={index === 0} title="Mover para cima">
-                            <ArrowUp size={13} />
-                          </button>
-                          <button className="btn-ghost p-1.5 disabled:opacity-30" onClick={() => moveStep(index, 1)} disabled={index === steps.length - 1} title="Mover para baixo">
-                            <ArrowDown size={13} />
-                          </button>
-                          <button className="btn-ghost p-1.5" onClick={() => setEditingIndex(index)} title="Configurar o passo">
-                            <Pencil size={13} className="text-brand" />
-                          </button>
-                          <button className="btn-ghost p-1.5" onClick={() => setRemovingIndex(index)} title="Remover o passo">
-                            <Trash2 size={13} className="text-red-500" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+          </div>
+        </Card>
 
-                    {/* Condição da aresta pro próximo passo */}
-                    {index < steps.length - 1 && (
-                      <div className="flex items-center gap-2 pl-8 py-0.5">
-                        <ArrowDown size={12} style={{ color: 'var(--ap-text-5)' }} />
-                        <span className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>continua se</span>
-                        <Select
-                          value={normalizeWhen(step.next_when, defsByType[step.type])}
-                          onChange={(e) => mutateSteps((list) => {
-                            list[index] = { ...list[index], next_when: e.target.value };
-                            return list;
-                          })}
-                          disabled={!canWrite}
-                          className="text-xs py-1 max-w-[190px]"
+        <div className="lg:col-span-2">
+          <Card>
+            <div style={{ padding: 20 }} className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 style={{ flex: 1, fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+                  O que ele faz, na ordem
+                </h2>
+                {canWrite && (
+                  <Button variant="secondary" size="sm" icon="plus" onClick={() => setPaletteOpen(true)}>
+                    Adicionar passo
+                  </Button>
+                )}
+              </div>
+
+              {!steps.length ? (
+                <EmptyState
+                  icon="settings"
+                  title="Nenhum passo ainda"
+                  description="Escolha o que dispara o fluxo ao lado e adicione os passos que ele deve executar."
+                  action={canWrite && (
+                    <Button variant="primary" icon="plus" onClick={() => setPaletteOpen(true)}>Adicionar passo</Button>
+                  )}
+                />
+              ) : (
+                <div className="space-y-1">
+                  {steps.map((step, index) => {
+                    const def = defsByType[step.type];
+                    return (
+                      <React.Fragment key={step.id}>
+                        <div
+                          className="flex items-center gap-2"
+                          style={{
+                            borderRadius: 8, padding: 12,
+                            border: '1px solid var(--su-border-default)',
+                            background: 'var(--su-surface-raised)',
+                          }}
                         >
-                          {(edgeOptionsFor(defsByType[step.type]) || []).map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </Select>
-                      </div>
-                    )}
-                  </React.Fragment>
-                );
-              })}
+                          <span
+                            className="shrink-0 flex items-center justify-center"
+                            style={{
+                              width: 24, height: 24, borderRadius: '50%', fontSize: 11, fontWeight: 700,
+                              background: 'var(--su-action-tint)', color: 'var(--su-text-secondary)',
+                            }}
+                          >
+                            {index + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">
+                              {step.name || def?.label || 'Passo'}
+                            </p>
+                            <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }} className="truncate">
+                              {def ? `${def.category} · ${def.label}` : 'Este passo não existe mais no sistema'}
+                            </p>
+                          </div>
+                          {canWrite && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <IconButton icon="chevron-up" aria-label="Mover para cima" title="Mover para cima" disabled={index === 0} onClick={() => moveStep(index, -1)} />
+                              <IconButton icon="chevron-down" aria-label="Mover para baixo" title="Mover para baixo" disabled={index === steps.length - 1} onClick={() => moveStep(index, 1)} />
+                              <IconButton icon="edit" aria-label="Configurar o passo" title="Configurar o passo" onClick={() => setEditingIndex(index)} />
+                              <IconButton icon="trash" aria-label="Remover o passo" title="Remover o passo" onClick={() => setRemovingIndex(index)} />
+                            </div>
+                          )}
+                        </div>
+
+                        {index < steps.length - 1 && (
+                          <div className="flex flex-wrap items-center gap-2" style={{ paddingLeft: 32, paddingTop: 2, paddingBottom: 2 }}>
+                            <span style={{ fontSize: 11, color: 'var(--su-text-muted)' }}>segue para o próximo se</span>
+                            <div style={{ width: 200 }}>
+                              <Select
+                                value={normalizeWhen(step.next_when, defsByType[step.type])}
+                                onChange={(e) => mutateSteps((list) => {
+                                  list[index] = { ...list[index], next_when: e.target.value };
+                                  return list;
+                                })}
+                                disabled={!canWrite}
+                                aria-label={`Condição para seguir do passo ${index + 1}`}
+                              >
+                                {(edgeOptionsFor(defsByType[step.type]) || []).map((o) => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          </Card>
         </div>
       </div>
 
-      {/* Paleta de nós */}
       <NodePaletteModal open={paletteOpen} onClose={() => setPaletteOpen(false)} catalog={catalog} onPick={addStep} />
 
-      {/* Config do passo */}
-      <NodeConfigModal
+      <NodeInspector
         open={editingIndex !== null}
         node={editingIndex !== null ? steps[editingIndex] : null}
         definition={editingIndex !== null ? defsByType[steps[editingIndex]?.type] : null}
@@ -303,7 +330,7 @@ export default function FluxoEditor() {
         open={removingIndex !== null}
         danger
         title="Remover passo"
-        message={`Remover o passo "${removingIndex !== null ? (steps[removingIndex]?.name || '') : ''}" da edição atual? A remoção só vale ao salvar uma nova versão.`}
+        message={`Tirar o passo "${removingIndex !== null ? (steps[removingIndex]?.name || '') : ''}" da edição? A versão que está no ar continua como está — a remoção só vale quando você salvar uma versão nova.`}
         confirmLabel="Remover"
         onClose={() => setRemovingIndex(null)}
         onConfirm={() => {
@@ -312,29 +339,26 @@ export default function FluxoEditor() {
         }}
       />
 
-      {/* Salvar versão */}
+      {/* Só um Input — Modal é o container certo aqui. */}
       <Modal
         open={saveOpen}
         onClose={saving ? undefined : () => setSaveOpen(false)}
-        title="Salvar nova versão"
-        size="sm"
-        dismissable={!saving}
+        title={`Salvar como v${proximaVersao}`}
+        maxWidth={460}
         footer={
           <>
-            <button className="btn-secondary disabled:opacity-60" onClick={() => setSaveOpen(false)} disabled={saving}>Cancelar</button>
-            <button className="btn-primary disabled:opacity-60" onClick={handleSaveVersion} disabled={saving}>
-              {saving && <Loader2 size={14} className="animate-spin" />} Salvar v{(versions[0]?.version ?? 0) + 1}
-            </button>
+            <Button variant="secondary" onClick={() => setSaveOpen(false)} disabled={saving}>Cancelar</Button>
+            <Button variant="primary" loading={saving} onClick={handleSaveVersion}>Salvar v{proximaVersao}</Button>
           </>
         }
       >
         <div className="space-y-3">
-          <p className="text-xs" style={{ color: 'var(--ap-text-3)' }}>
-            Cada vez que você salva, é criada a v{(versions[0]?.version ?? 0) + 1}. Publicar e reverter ficam no botão Versões.
+          <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
+            Salvar cria a <strong>v{proximaVersao}</strong> e não muda o que está no ar. Para pôr essa versão em uso, use <strong>Versões</strong> depois.
           </p>
-          <FormField label="Nota da versão" hint="O que mudou (aparece no histórico).">
-            <TextInput value={saveNote} onChange={(e) => setSaveNote(e.target.value)} placeholder="Ex.: adiciona condição de horário" />
-          </FormField>
+          <Field label="O que mudou" hint="Aparece no histórico — ajuda a saber por que essa versão existe.">
+            <Input value={saveNote} onChange={(e) => setSaveNote(e.target.value)} placeholder="Ex.: passa a avisar antes de encerrar" />
+          </Field>
         </div>
       </Modal>
 
@@ -345,11 +369,12 @@ export default function FluxoEditor() {
         versions={versions}
         onPublished={() => { setVersionsOpen(false); load(); }}
       />
-      <ExecuteModal open={executeOpen} onClose={() => setExecuteOpen(false)} workflow={workflow} />
+      <ExecuteDrawer open={executeOpen} onClose={() => setExecuteOpen(false)} workflow={workflow} />
     </div>
   );
 }
 
+// Escolher o tipo do passo: leitura + escolha, sem campo → Modal.
 function NodePaletteModal({ open, onClose, catalog, onPick }) {
   const grouped = useMemo(() => {
     const map = new Map();
@@ -363,26 +388,41 @@ function NodePaletteModal({ open, onClose, catalog, onPick }) {
   }, [catalog]);
 
   return (
-    <Modal open={open} onClose={onClose} title="Adicionar passo" size="lg">
+    <Modal open={open} onClose={onClose} title="O que este passo deve fazer?" maxWidth={760}>
       <div className="space-y-4">
         {grouped.map(([category, defs]) => (
           <div key={category}>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--ap-text-5)' }}>{category}</p>
+            <p
+              style={{
+                fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em',
+                margin: '0 0 6px', color: 'var(--su-text-muted)',
+              }}
+            >
+              {category}
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {defs.map((def) => (
                 <button
                   key={def.type}
-                  className="rounded-lg p-3 text-left transition-colors min-h-[44px] hover:bg-brand/5"
-                  style={{ border: '1px solid var(--ap-border)' }}
+                  type="button"
+                  className="text-left"
+                  style={{
+                    borderRadius: 8, padding: 12, minHeight: 44, cursor: 'pointer',
+                    border: '1px solid var(--su-border-default)',
+                    background: 'transparent', font: 'inherit',
+                  }}
                   onClick={() => onPick(def)}
                 >
-                  <p className="text-sm font-medium" style={{ color: 'var(--ap-text-1)' }}>{def.label}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{def.description}</p>
+                  <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: 'var(--su-text-primary)' }}>{def.label}</p>
+                  <p style={{ fontSize: 11, margin: '2px 0 0', color: 'var(--su-text-muted)' }}>{def.description}</p>
                 </button>
               ))}
             </div>
           </div>
         ))}
+        {!grouped.length && (
+          <EmptyState icon="settings" title="Nenhum passo disponível" description="O catálogo de passos não respondeu — recarregue a tela." />
+        )}
       </div>
     </Modal>
   );
@@ -437,12 +477,12 @@ function normalizeTrigger(raw) {
 function edgeOptionsFor(definition) {
   const outputs = definition?.outputs || ['success', 'error'];
   const LABELS = {
-    success: 'sucesso',
-    error: 'erro',
-    true: 'condição verdadeira',
-    false: 'condição falsa',
+    success: 'der certo',
+    error: 'der erro',
+    true: 'a condição for verdadeira',
+    false: 'a condição for falsa',
   };
-  const opts = [{ value: '', label: 'sucesso (padrão)' }];
+  const opts = [{ value: '', label: 'der certo (padrão)' }];
   for (const o of outputs) {
     if (o === 'success') continue;
     opts.push({ value: o, label: LABELS[o] || o });

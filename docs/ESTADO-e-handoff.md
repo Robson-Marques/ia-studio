@@ -55,11 +55,16 @@ Frente de UI em curso, **paralela e independente** do backend/assistente acima. 
 armadilhas). Resumo para re-ancorar:
 
 - **Casca `AppShell` + Dashboard** no DS desde a v0.9.80; toast global do DS desde a v0.9.84.
-- **Famílias migradas:** IA Studio (v0.9.84→v0.9.91), ISP (v0.9.92), **Automação sub-frente A** (v0.9.99).
-- **Faltam:** Automação **B** (Fluxos + editor + `editor/*`) e **C** (FluxoCanvas, frente própria),
+- **Famílias migradas:** IA Studio (v0.9.84→v0.9.91), ISP (v0.9.92), **Automação A** (v0.9.99) e
+  **Automação B** (v0.10.2 — Fluxos + editor de passos + `editor/*`).
+- **Faltam:** Automação **C** (FluxoCanvas — frente própria; a execução manual dele já foi migrada),
   Configurações, Integrações, WhatsApp (chat full-bleed — frente própria), Recursos, Desenvolvedor.
-- **DS consumido: `^1.2.22`.** A migração já rendeu 13 releases do próprio Studio UX — a regra é
+- **DS consumido: `^1.2.24`.** A migração já rendeu 15 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
+- **Três containers, não dois** (DS v1.2.24): **Modal** = leitura/campo curto · **rota** = registro que
+  existe por si · **inspetor** (`Drawer`) = propriedade de item dentro de um editor, sem URL própria,
+  com o contexto precisando ficar à vista. Foi assim que a configuração de um passo do fluxo saiu do
+  Modal sem virar rota (ela é rascunho da sessão até salvar uma versão).
 - **Armadilha que mais custou: PROP MORTA.** React não avisa prop desconhecida em componente próprio.
   `<Badge tone>` ficou 47 vezes sem efeito (badge cinza em 19 arquivos, telas já validadas) até o DS
   v1.2.22 aceitar o nome. **Conferir a assinatura real do componente antes de usar prop "óbvia".**

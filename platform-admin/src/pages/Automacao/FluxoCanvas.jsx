@@ -31,10 +31,10 @@ import { listAgents } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useToast } from '@studio-ux-ds/react';
 import { NODE_CATEGORY_ORDER } from './automation.constants';
-import { StatusBadge } from './Fluxos';
+import WorkflowStatusBadge from './WorkflowStatusBadge';
 import TriggerEditor from './editor/TriggerEditor';
 import VersionsModal from './editor/VersionsModal';
-import ExecuteModal from './editor/ExecuteModal';
+import ExecuteDrawer from './editor/ExecuteDrawer';
 
 // Rótulos amigáveis das saídas (handles) — o id do handle = nome do output.
 const OUTPUT_LABELS = {
@@ -512,7 +512,7 @@ function FluxoCanvasInner() {
         <div className="flex-1 min-w-[180px]">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold truncate" style={{ color: 'var(--ap-text-1)' }}>{workflow.name}</h1>
-            <StatusBadge status={workflow.status} />
+            <WorkflowStatusBadge status={workflow.status} />
             {workflow.current_version > 0 && <span className="text-xs font-mono" style={{ color: 'var(--ap-text-4)' }}>v{workflow.current_version} ativa</span>}
             {dirty && <span className="text-xs" style={{ color: 'var(--ap-text-4)' }}>alterações não salvas</span>}
           </div>
@@ -756,7 +756,7 @@ function FluxoCanvasInner() {
         versions={versions}
         onPublished={() => { setVersionsOpen(false); load(); }}
       />
-      <ExecuteModal open={executeOpen} onClose={() => setExecuteOpen(false)} workflow={workflow} />
+      <ExecuteDrawer open={executeOpen} onClose={() => setExecuteOpen(false)} workflow={workflow} />
     </div>
   );
 }

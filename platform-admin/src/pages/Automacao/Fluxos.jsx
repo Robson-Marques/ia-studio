@@ -1,32 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, Loader2, Plus, Upload, Archive, Trash2 } from 'lucide-react';
-import Modal from '../../components/ui/Modal';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import EmptyState from '../../components/ui/EmptyState';
-import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
-import { FormField, TextInput, Textarea } from '../../components/ui/FormField';
-import { listWorkflows, createWorkflow, importWorkflow, archiveWorkflow, deleteWorkflow } from '../../services/automation';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast,
+} from '@studio-ux-ds/react';
+import { listWorkflows, archiveWorkflow, deleteWorkflow } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { useToast } from '@studio-ux-ds/react';
-import { WORKFLOW_STATUS, EXECUTION_STATUS, formatDateTime } from './automation.constants';
+import { EXECUTION_STATUS, formatDateTime } from './automation.constants';
+import { statusToTone } from '../../lib/tone';
+import WorkflowStatusBadge from './WorkflowStatusBadge';
 
-// Fluxos de automação: lista (nome, status, versão, tags, últimas execuções)
-// + criar + importar (JSON diretriz 29) + arquivar. Editor em rota própria.
+// Automação/Fluxos — a lista das automações. Migrada pro DS na v0.10.2.
+//
+// Decisões de composição:
+//
+//  · **Arquivar e excluir saíram da linha** (eram uma pastinha âmbar e uma lixeira
+//    vermelha em cada linha) e foram pra barra de lote. As duas aceitam vários —
+//    são registros independentes.
+//  · **"Novo fluxo" e "Importar" viraram rotas.** Os dois modais tinham TextArea
+//    (descrição num, JSON de 12 linhas no outro) e caem na regra do Modal do DS.
+//    Importar, além do mais, cria um registro: rota é o container certo pra isso.
+//  · A `WorkflowStatusBadge` saiu daqui pra arquivo próprio — o editor e o canvas
+//    importavam de dentro desta página.
+
 export default function Fluxos() {
   const toast = useToast();
-  const { can } = usePermissions();
   const navigate = useNavigate();
-  const { workspaceId, environmentId } = useWorkspace();
+  const { can } = usePermissions();
+  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const [archiving, setArchiving] = useState(null);
-  const [archLoading, setArchLoading] = useState(false);
-  const [deleting, setDeleting] = useState(null);
-  const [delLoading, setDelLoading] = useState(false);
+  const [confirm, setConfirm] = useState(null); // { kind: 'archive'|'delete', ids, clear }
+  const [busy, setBusy] = useState(false);
+
+  const canWrite = can('automation.workflows.write');
 
   async function load() {
     setLoading(true);
@@ -40,304 +48,174 @@ export default function Fluxos() {
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]);
+  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function confirmArchive() {
-    setArchLoading(true);
-    try {
-      await archiveWorkflow(archiving.id);
-      toast.success('Fluxo arquivado.');
-      setArchiving(null);
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setArchLoading(false);
+  async function handleConfirm() {
+    setBusy(true);
+    const { kind, ids, clear } = confirm;
+    const acao = kind === 'archive' ? archiveWorkflow : deleteWorkflow;
+    let ok = 0;
+    const falhas = [];
+    for (const id of ids) {
+      try { await acao(id); ok += 1; }
+      catch (err) { falhas.push(err.message); }
     }
+    setBusy(false);
+    setConfirm(null);
+    clear();
+    if (ok) {
+      const verbo = kind === 'archive' ? 'arquivado' : 'excluído';
+      toast.success(ok === 1 ? `Fluxo ${verbo}.` : `${ok} fluxos ${verbo}s.`);
+    }
+    if (falhas.length) toast.error(`Não deu pra concluir em ${falhas.length}: ${falhas[0]}`);
+    load();
   }
 
-  async function confirmDelete() {
-    setDelLoading(true);
-    try {
-      await deleteWorkflow(deleting.id);
-      toast.success('Fluxo excluído.');
-      setDeleting(null);
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setDelLoading(false);
+  const acoesCabecalho = canWrite && (
+    <>
+      <Button
+        variant="secondary"
+        icon="upload"
+        title="Recriar um fluxo a partir de um arquivo exportado"
+        onClick={() => navigate('/automacao/fluxos/importar')}
+      >
+        Importar
+      </Button>
+      <Button variant="primary" icon="plus" onClick={() => navigate('/automacao/fluxos/novo')}>
+        Novo fluxo
+      </Button>
+    </>
+  );
+
+  const columns = [
+    { key: 'name', header: 'Nome', render: (w) => (
+      <span style={{ fontWeight: 500, color: 'var(--su-text-primary)' }}>{w.name}</span>
+    ) },
+    { key: 'status', header: 'Situação', render: (w) => <WorkflowStatusBadge status={w.status} /> },
+    { key: 'version', header: 'Versão no ar', render: (w) => (w.current_version > 0 ? `v${w.current_version}` : '—') },
+    { key: 'tags', header: 'Tags', render: (w) => {
+      const tags = w.tags || [];
+      if (!tags.length) return <span style={{ fontSize: 12, color: 'var(--su-text-muted)' }}>—</span>;
+      return (
+        <div className="flex gap-1 flex-wrap">
+          {tags.slice(0, 3).map((t) => <Badge key={t} tone="neutral">{t}</Badge>)}
+          {tags.length > 3 && <Badge tone="neutral">+{tags.length - 3}</Badge>}
+        </div>
+      );
+    } },
+    { key: 'recent', header: 'Últimas vezes que rodou', render: (w) => {
+      const execs = w.recent_executions || [];
+      if (!execs.length) return <span style={{ fontSize: 12, color: 'var(--su-text-muted)' }}>nunca rodou</span>;
+      return (
+        <div className="flex gap-1 flex-wrap">
+          {execs.map((e) => {
+            const info = EXECUTION_STATUS[e.status] || { label: e.status, variant: 'gray' };
+            return <Badge key={e.id} tone={statusToTone(info.variant)}>{info.label}</Badge>;
+          })}
+        </div>
+      );
+    } },
+    { key: 'updated_at', header: 'Atualizado', render: (w) => formatDateTime(w.updated_at) },
+  ];
+
+  // Arquivar só faz sentido no que não está arquivado — com uma seleção que mistura
+  // os dois, a ação some em vez de falhar depois (P13).
+  const bulkActions = canWrite
+    ? (ids, clear) => {
+      const selecionados = items.filter((w) => ids.includes(w.id));
+      const arquivaveis = selecionados.filter((w) => w.status !== 'ARCHIVED');
+      return (
+        <>
+          {arquivaveis.length === selecionados.length && (
+            <Button
+              variant="ghost"
+              icon="archive"
+              title="Guarda o fluxo e para os gatilhos — o histórico fica"
+              onClick={() => setConfirm({ kind: 'archive', ids, clear })}
+            >
+              Arquivar
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            icon="trash"
+            title="Apaga o fluxo e todo o histórico dele, sem volta"
+            onClick={() => setConfirm({ kind: 'delete', ids, clear })}
+          >
+            Excluir
+          </Button>
+        </>
+      );
     }
-  }
+    : undefined;
+
+  const nomes = (confirm?.ids || [])
+    .map((id) => items.find((w) => w.id === id)?.name)
+    .filter(Boolean);
+  const varios = nomes.length > 1;
+  const lista = `${nomes.slice(0, 3).join(', ')}${nomes.length > 3 ? '…' : ''}`;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Fluxos</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-            Automações com versões imutáveis — editar cria versão nova; publicar aponta a ativa.
-          </p>
-        </div>
-        {can('automation.workflows.write') && (
-          <>
-            <button className="btn-secondary" onClick={() => setImportOpen(true)} title="Importar fluxo de um JSON exportado">
-              <Upload size={14} /> Importar
-            </button>
-            <button className="btn-primary" onClick={() => setCreateOpen(true)}>
-              <Plus size={14} /> Novo fluxo
-            </button>
-          </>
-        )}
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Fluxos"
+        subtitle="Cada fluxo é uma automação. Salvar cria uma versão nova; publicar escolhe qual versão está no ar — as anteriores ficam guardadas."
+        actions={acoesCabecalho}
+      />
 
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
-      ) : !items.length ? (
-        <div className="card">
-          <EmptyState
-            icon={GitBranch}
-            title="Nenhum fluxo neste ambiente"
-            description="Crie um fluxo e monte os passos no editor."
-            action={can('automation.workflows.write') && (
-              <button className="btn-primary" onClick={() => setCreateOpen(true)}><Plus size={14} /> Novo fluxo</button>
-            )}
-          />
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
         </div>
+      ) : !items.length ? (
+        <Card>
+          <EmptyState
+            icon="settings"
+            title="Nenhum fluxo neste ambiente"
+            description="Um fluxo tem um gatilho (o que o dispara) e uma sequência de passos. Crie um e monte os passos no editor."
+            action={acoesCabecalho}
+          />
+        </Card>
       ) : (
         <>
-          {/* Desktop */}
-          <div className="hidden md:block card p-0 overflow-hidden">
-            <Table>
-              <Thead>
-                <Th>Nome</Th>
-                <Th>Status</Th>
-                <Th>Versão ativa</Th>
-                <Th>Tags</Th>
-                <Th>Últimas execuções</Th>
-                <Th>Atualizado</Th>
-                <Th className="text-right">Ações</Th>
-              </Thead>
-              <Tbody>
-                {items.map((w) => (
-                  <Tr key={w.id} onClick={() => navigate(`/automacao/fluxos/${w.id}`)}>
-                    <Td><span className="font-medium" style={{ color: 'var(--ap-text-1)' }}>{w.name}</span></Td>
-                    <Td><StatusBadge status={w.status} /></Td>
-                    <Td>{w.current_version > 0 ? `v${w.current_version}` : '—'}</Td>
-                    <Td>
-                      <div className="flex gap-1 flex-wrap">
-                        {(w.tags || []).map((t) => <Badge key={t} variant="gray">{t}</Badge>)}
-                      </div>
-                    </Td>
-                    <Td>
-                      <div className="flex gap-1">
-                        {(w.recent_executions || []).map((e) => {
-                          const info = EXECUTION_STATUS[e.status] || { label: e.status, variant: 'gray' };
-                          return <Badge key={e.id} variant={info.variant}>{info.label}</Badge>;
-                        })}
-                        {!(w.recent_executions || []).length && <span className="text-xs" style={{ color: 'var(--ap-text-5)' }}>nenhuma</span>}
-                      </div>
-                    </Td>
-                    <Td>{formatDateTime(w.updated_at)}</Td>
-                    <Td className="text-right">
-                      <div className="flex items-center justify-end gap-0.5">
-                        {can('automation.workflows.write') && w.status !== 'ARCHIVED' && (
-                          <button
-                            className="btn-ghost p-1.5"
-                            title="Arquivar: guarda o fluxo mas para os gatilhos e tira das listas ativas"
-                            onClick={(ev) => { ev.stopPropagation(); setArchiving(w); }}
-                          >
-                            <Archive size={14} className="text-amber-500" />
-                          </button>
-                        )}
-                        {can('automation.workflows.write') && (
-                          <button
-                            className="btn-ghost p-1.5"
-                            title="Excluir de vez este fluxo"
-                            onClick={(ev) => { ev.stopPropagation(); setDeleting(w); }}
-                          >
-                            <Trash2 size={14} className="text-red-500" />
-                          </button>
-                        )}
-                      </div>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </div>
-
-          {/* Mobile — cards */}
-          <div className="md:hidden space-y-2">
-            {items.map((w) => (
-              <button
-                key={w.id}
-                className="card w-full text-left"
-                onClick={() => navigate(`/automacao/fluxos/${w.id}`)}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="flex-1 font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{w.name}</span>
-                  <StatusBadge status={w.status} />
-                </div>
-                <p className="text-xs mt-1" style={{ color: 'var(--ap-text-4)' }}>
-                  {w.current_version > 0 ? `v${w.current_version} · ` : ''}{formatDateTime(w.updated_at)}
-                </p>
-              </button>
-            ))}
-          </div>
+          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+            Clique num fluxo para abrir o editor.
+          </p>
+          <DataTable
+            columns={columns}
+            rows={items}
+            getRowId={(w) => w.id}
+            onRowClick={(w) => navigate(`/automacao/fluxos/${w.id}`)}
+            getRowLabel={(w) => `Abrir fluxo ${w.name}`}
+            bulkActions={bulkActions}
+          />
         </>
       )}
 
-      <CreateWorkflowModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={(w) => { setCreateOpen(false); navigate(`/automacao/fluxos/${w.id}`); }}
-        workspaceId={workspaceId}
-        environmentId={environmentId}
-      />
-      <ImportWorkflowModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImported={(w) => { setImportOpen(false); toast.success('Fluxo importado.'); navigate(`/automacao/fluxos/${w.id}`); }}
-        workspaceId={workspaceId}
-        environmentId={environmentId}
-      />
+      {/* 5 patrasques: ConfirmDialog + a consequência escrita + tooltip no botão
+          + loading + gate can('automation.workflows.write'). */}
       <ConfirmDialog
-        open={!!archiving}
+        open={!!confirm}
         danger
-        loading={archLoading}
-        title="Arquivar fluxo"
-        message={`Arquivar "${archiving?.name}"? Os gatilhos param de disparar e o fluxo sai das listas ativas. O histórico é mantido — nada é excluído.`}
-        confirmLabel="Arquivar"
-        onClose={() => setArchiving(null)}
-        onConfirm={confirmArchive}
-      />
-      <ConfirmDialog
-        open={!!deleting}
-        danger
-        loading={delLoading}
-        title="Excluir fluxo"
-        message={`Excluir "${deleting?.name}" de vez? O fluxo e todo o seu histórico (versões e execuções) serão removidos permanentemente. Esta ação não pode ser desfeita.`}
-        confirmLabel="Excluir"
-        onClose={() => setDeleting(null)}
-        onConfirm={confirmDelete}
+        loading={busy}
+        title={
+          confirm?.kind === 'archive'
+            ? (varios ? 'Arquivar fluxos' : 'Arquivar fluxo')
+            : (varios ? 'Excluir fluxos' : 'Excluir fluxo')
+        }
+        message={
+          confirm?.kind === 'archive'
+            ? (varios
+              ? `Arquivar ${nomes.length} fluxos (${lista})? Os gatilhos param de disparar e eles saem das listas ativas. Nada é apagado — dá pra consultar depois.`
+              : `Arquivar "${nomes[0] || ''}"? Os gatilhos param de disparar e o fluxo sai das listas ativas. Nada é apagado — dá pra consultar depois.`)
+            : (varios
+              ? `Excluir ${nomes.length} fluxos (${lista}) de vez? Cada um vai embora com TODO o histórico: versões salvas e execuções. Não tem como desfazer.`
+              : `Excluir "${nomes[0] || ''}" de vez? O fluxo vai embora com TODO o histórico: versões salvas e execuções. Não tem como desfazer.`)
+        }
+        confirmLabel={confirm?.kind === 'archive' ? 'Arquivar' : 'Excluir'}
+        onClose={() => setConfirm(null)}
+        onConfirm={handleConfirm}
       />
     </div>
-  );
-}
-
-export function StatusBadge({ status }) {
-  const info = WORKFLOW_STATUS[status] || { label: status, variant: 'gray' };
-  return <Badge variant={info.variant}>{info.label}</Badge>;
-}
-
-function CreateWorkflowModal({ open, onClose, onCreated, workspaceId, environmentId }) {
-  const toast = useToast();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [tags, setTags] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => { if (open) { setName(''); setDescription(''); setTags(''); } }, [open]);
-
-  async function handleSave() {
-    if (!name.trim()) { toast.error('Informe o nome do fluxo.'); return; }
-    if (!workspaceId || !environmentId) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
-    setSaving(true);
-    try {
-      const workflow = await createWorkflow({
-        name: name.trim(),
-        description: description.trim() || undefined,
-        workspace_id: workspaceId,
-        environment_id: environmentId,
-        tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-      });
-      toast.success('Fluxo criado — monte os passos no editor.');
-      onCreated(workflow);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={saving ? undefined : onClose}
-      title="Novo fluxo"
-      size="md"
-      dismissable={!saving}
-      footer={
-        <>
-          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 size={14} className="animate-spin" />} Criar
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-3">
-        <FormField label="Nome" required>
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Boas-vindas WhatsApp" />
-        </FormField>
-        <FormField label="Descrição">
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-        </FormField>
-        <FormField label="Tags" hint="Separadas por vírgula.">
-          <TextInput value={tags} onChange={(e) => setTags(e.target.value)} placeholder="onboarding, whatsapp" />
-        </FormField>
-      </div>
-    </Modal>
-  );
-}
-
-function ImportWorkflowModal({ open, onClose, onImported, workspaceId, environmentId }) {
-  const toast = useToast();
-  const [json, setJson] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => { if (open) setJson(''); }, [open]);
-
-  async function handleImport() {
-    if (!workspaceId || !environmentId) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
-    let data;
-    try {
-      data = JSON.parse(json);
-    } catch {
-      toast.error('JSON inválido — cole o conteúdo exportado do fluxo.');
-      return;
-    }
-    setSaving(true);
-    try {
-      const workflow = await importWorkflow({ workspace_id: workspaceId, environment_id: environmentId, data });
-      onImported(workflow);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={saving ? undefined : onClose}
-      title="Importar fluxo"
-      size="lg"
-      dismissable={!saving}
-      footer={
-        <>
-          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn-primary disabled:opacity-60" onClick={handleImport} disabled={saving}>
-            {saving && <Loader2 size={14} className="animate-spin" />} Importar
-          </button>
-        </>
-      }
-    >
-      <FormField label="JSON exportado" required hint="Exportado pela ação Exportar de um fluxo (sem segredos — diretriz 29).">
-        <Textarea value={json} onChange={(e) => setJson(e.target.value)} rows={12} className="font-mono text-xs" placeholder='{"schema_version":1,"kind":"iastudio.workflow",...}' />
-      </FormField>
-    </Modal>
   );
 }

@@ -14,11 +14,17 @@ migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
 foi removido dele.
 
 **Famílias já no padrão DS:** IA Studio (6 telas), ISP (2 telas) e Automação
-sub-frente A (5 telas + 3 rotas de detalhe/editor novas). As demais (Automação B
-e C, WhatsApp, Integrações, Configurações, Recursos, Desenvolvedor) seguem com o
-padrão visual antigo (`--ap-*` + Tailwind) dentro do AppShell, num regime de
-**coexistência deliberada** — uma família por sub-frente, com validação humana
-entre elas.
+sub-frentes **A** (os 3 logs + Agendamentos + Templates) e **B** (Fluxos + editor
+de passos + os 4 de `editor/`). As demais (Automação **C** — o canvas —, WhatsApp,
+Integrações, Configurações, Recursos, Desenvolvedor) seguem com o padrão visual
+antigo (`--ap-*` + Tailwind) dentro do AppShell, num regime de **coexistência
+deliberada** — uma família por sub-frente, com validação humana entre elas.
+
+**Padrão estreado na B:** o **inspetor** (`Drawer` do DS) como terceira via da
+regra de container. A configuração de um passo e a execução manual vivem em painel
+lateral, não em Modal nem em rota — ver a tabela de regras abaixo (DS v1.2.24). O
+canvas (sub-frente C) usa o mesmo inspetor quando chegar a vez dele; a execução
+manual dele **já** está migrada.
 
 ### O que o `platform-admin` tem hoje
 
@@ -101,7 +107,7 @@ O AppShell usa `DSIcon` interno, cuja biblioteca é curada e menor que a `lucide
 | 2 | ~~Sweep de `lib/toast` → `useToast()` do DS + remover `UIToastContainer`~~ | ✅ Concluído em 2026-07-24 (55 arquivos migrados; `lib/toast.js` e `UIToastContainer.jsx` esvaziados) |
 | 3 | ~~9 páginas com modais siblings + estados independentes~~ → **as 3 do grupo IA foram resolvidas** pela regra do Modal (`IA/Ferramentas`, `IA/BasesConhecimento`, `IA/Aprovacoes`: os modais com `TextArea` viraram rota, o que dissolveu os estados concorrentes). Restam 6 fora do grupo IA: `WhatsApp/EquipesFilas`, `Automacao/FluxoCanvas`, `Automacao/FluxoEditor`, `Automacao/Fluxos`, `Integracoes/Conexoes`, `ISP/Incidentes` | Cada uma resolve na migração da sua família — a regra do Modal (DS v1.2.12) já dá o caminho |
 | 4 | Instalação do `@studio-ux-ds/icons` (não está no `package.json`) | Quando a primeira família de tela migrar e precisar de ícones DS dentro do conteúdo |
-| 5 | Migração das famílias de tela para o padrão visual do DS. **Concluídas: IA Studio** (v0.9.84→v0.9.91 — 6 telas + 2 sweeps retroativos), **ISP** (v0.9.92 — 2 telas), **Automação sub-frente A** (v0.9.99 — Notificações, Eventos, Execuções + detalhe, Agendamentos + editor de calendário, Templates + editor). Restam: **Automação B** (Fluxos + FluxoEditor + os 4 de `editor/`), **Automação C** (FluxoCanvas, 773 linhas), **Configurações** (5), **Integrações** (6), **WhatsApp** (11, inclui o chat full-bleed), **Recursos** (2), **Desenvolvedor** (2) | Uma sub-frente por família. Automação C (Canvas) e WhatsApp (chat) são as mais complexas — frente dedicada, nunca junto de outra coisa |
+| 5 | Migração das famílias de tela para o padrão visual do DS. **Concluídas: IA Studio** (v0.9.84→v0.9.91 — 6 telas + 2 sweeps retroativos), **ISP** (v0.9.92 — 2 telas), **Automação A** (v0.9.99 — os 3 logs + Agendamentos + Templates, com 3 rotas novas), **Automação B** (v0.10.2 — Fluxos, o editor de passos e os 4 de `editor/`, com o padrão **inspetor** estreado). Restam: **Automação C** (FluxoCanvas, 773 linhas — o inspetor de execução dele já está migrado), **Configurações** (5), **Integrações** (6), **WhatsApp** (11, inclui o chat full-bleed), **Recursos** (2), **Desenvolvedor** (2) | Uma sub-frente por família. Automação C (Canvas) e WhatsApp (chat) são as mais complexas — frente dedicada, nunca junto de outra coisa |
 
 ### Regras do DS que nasceram desta adoção
 
@@ -118,6 +124,8 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 | v1.2.20 | **Opção em card** (`variant="card"` + `meta` no `Checkbox`/`Radio`): quando a opção tem explicação/condição própria, ela ganha moldura e a condição vai pro `meta` — não no meio do rótulo. Grade de opção usa `CheckGroup` (`columns` numérico = teto; `"auto"` = quantas couberem) |
 | v1.2.21 | `Pagination` navegável por teclado, com **janela** de páginas (não só as 5 primeiras) + contagem via `total`/`itemLabel`. `itemLabel` aceita `[singular, plural]` — obrigatório em português (`execuçãos` não existe) |
 | v1.2.22 | **`tone` é o nome do papel semântico em TODO componente** (`Badge`, `StatCard`, `Banner`) — `Badge status=` fica só como apelido legado. `Field` tem `required` (asterisco + "(obrigatório)" para leitor de tela) |
+| v1.2.23 | **Rótulo de opção aceita `label` OU filho** — `<Checkbox>Segunda</Checkbox>` funciona (antes derrubava a página). `...rest` do DS nunca repassa `children` pro elemento |
+| v1.2.24 | **Três containers, não dois:** Modal (leitura/campo curto) · **rota** (registro que existe por si) · **inspetor** = `Drawer` (propriedade de item dentro de um editor, sem URL própria, com o contexto precisando ficar à vista). `Drawer` tem `width` — 480+ para texto longo/JSON. Glifos `play`/`archive`/`save` |
 
 **Armadilhas que custaram retrabalho e valem conferir antes de codar:**
 
@@ -133,7 +141,7 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 | 8 | Regressão do dropdown do sino de notificações — hoje o AppShell só oferece um sinal + link direto para `/automacao/notificacoes` (ADR §3). Se você quiser o dropdown de volta, precisa de sub-frente que extraia o conteúdo do `NotificationsBell.jsx` para um `<Drawer>` do DS acionado pelo `onNotifications` | Sub-frente futura, opcional |
 | 9 | ~~`DELETE` de base de conhecimento não existe no backend~~ → **movido para [`docs/divida-tecnica.md`](divida-tecnica.md) como `DT-003`**. Não é do DS: é buraco de backend que a migração só revelou. Critério do Robson em 2026-07-25: *o que não é responsabilidade do DS vive na dívida técnica do IA Studio* | — |
 | 11 | ~~`upgrade.sh` movia o marcador de versão antes de construir~~ ✅ **Resolvido na v0.9.96** (2026-07-25): `revert_checkout()` volta o repo para a versão de origem quando a falha acontece depois do checkout, com duas linhas `[ROLLBACK]` no log; e o script passou a se copiar para `/tmp` antes de tocar no git (o `git checkout` reescrevia o próprio `upgrade.sh` em execução). Registro completo em [`docs/divida-tecnica.md`](divida-tecnica.md) → Resolvidos | — |
-| 12 | **Apagar os `*.legacy.jsx`.** São ~12 arquivos de backup criados durante a migração (nenhum importado — não entram no bundle). Servem de conforto para rollback **enquanto a família não foi validada em produção**; passado isso são lixo, e o CLAUDE.md manda código vivo sem lixo (o histórico mora no git). Nota: as 3 telas de log da Automação (Notificações, Eventos, Execuções) **não** têm `.legacy.jsx` — foram reescritas no lugar, e o backup delas é o git. | Um único `rm` quando as famílias IA + ISP + Automação estiverem validadas |
+| 12 | **Apagar os `*.legacy.jsx` e 2 arquivos órfãos.** São ~18 arquivos de backup criados durante a migração (nenhum importado — não entram no bundle), mais **`editor/NodeConfigModal.jsx`** e **`editor/ExecuteModal.jsx`**, que foram substituídos pelo `NodeInspector`/`ExecuteDrawer` na v0.10.2 e ficaram sem nenhum importador (tentei apagar, mas o ambiente não me deixa remover arquivo no seu disco — só criar e editar). Servem de conforto para rollback **enquanto a família não foi validada**; passado isso são lixo, e o CLAUDE.md manda código vivo sem lixo (o histórico mora no git). Nota: as 3 telas de log da Automação (Notificações, Eventos, Execuções) **não** têm `.legacy.jsx` — foram reescritas no lugar. | Um único `Remove-Item` quando as famílias IA + ISP + Automação estiverem validadas |
 | 10 | ~~`is_active` no cadastro de servidor MCP é recusado pelo backend~~ → **movido para [`docs/divida-tecnica.md`](divida-tecnica.md) como `DT-004`**. Decisão de produto, não do DS | — |
 
 ## Rollback

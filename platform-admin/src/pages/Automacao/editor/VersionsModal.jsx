@@ -1,16 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, RotateCcw, Rocket } from 'lucide-react';
-import Modal from '../../../components/ui/Modal';
-import ConfirmDialog from '../../../components/ui/ConfirmDialog';
-import { Badge } from '../../../components/ui/Table';
-import { Select } from '../../../components/ui/FormField';
+import {
+  Modal, ConfirmDialog, Badge, Button, Select, EmptyState, useToast,
+} from '@studio-ux-ds/react';
 import { publishWorkflow } from '../../../services/automation';
 import { usePermissions } from '../../../hooks/usePermissions';
-import { useToast } from '@studio-ux-ds/react';
 import { formatDateTime, TRIGGER_LABEL } from '../automation.constants';
 
-// Histórico de versões (imutáveis — diretriz 3): publicar, rollback e diff
-// textual entre duas versões (linhas +/- do JSON do grafo).
+// Automação/editor/VersionsModal — histórico de versões: publicar, reverter e
+// comparar duas versões. Migrado pro DS na v0.10.2.
+//
+// **Segue Modal, e isso está correto:** não tem campo de escrita nenhum — é
+// leitura (a lista de versões, o diff) mais duas ações de confirmação. O `Select`
+// do comparador é campo de resposta fechada, que o Modal aceita.
+//
+// As cores do diff eram `#22c55e` e `#ef4444` cravados; agora vêm do tema
+// (`--su-success-fg` / `--su-danger-fg`), então funcionam no claro e no escuro.
+
 export default function VersionsModal({ open, onClose, workflow, versions, onPublished }) {
   const toast = useToast();
   const { can } = usePermissions();
@@ -32,7 +37,11 @@ export default function VersionsModal({ open, onClose, workflow, versions, onPub
     setPublishing(true);
     try {
       const result = await publishWorkflow(workflow.id, confirming.version);
-      toast.success(confirming.isRollback ? `Fluxo revertido para a v${confirming.version}.` : `Versão v${confirming.version} publicada.`);
+      toast.success(
+        confirming.isRollback
+          ? `Fluxo voltou para a v${confirming.version}.`
+          : `v${confirming.version} publicada.`,
+      );
       (result.warnings || []).forEach((w) => toast.warn(w));
       setConfirming(null);
       onPublished();
@@ -44,64 +53,108 @@ export default function VersionsModal({ open, onClose, workflow, versions, onPub
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Versões do fluxo" size="xl">
+    <Modal open={open} onClose={onClose} title="Versões deste fluxo" maxWidth={860}>
       <div className="space-y-4">
-        <div className="space-y-2">
-          {versions.map((v) => {
-            const isActive = workflow.status === 'PUBLISHED' && v.version === workflow.current_version;
-            const isRollback = v.version < workflow.current_version;
-            return (
-              <div
-                key={v.id}
-                className="rounded-lg p-3 flex flex-wrap items-center gap-2"
-                style={{ border: `1px solid ${isActive ? 'var(--ap-accent, #6366f1)' : 'var(--ap-border)'}` }}
-              >
-                <span className="font-mono font-semibold text-sm" style={{ color: 'var(--ap-text-1)' }}>v{v.version}</span>
-                {isActive && <Badge variant="green">Ativa</Badge>}
-                {v.published_at && !isActive && <Badge variant="gray">Já publicada</Badge>}
-                <Badge variant="purple">{TRIGGER_LABEL[(v.trigger || {}).type] || 'Manual'}</Badge>
-                <span className="text-xs flex-1 min-w-[120px] truncate" style={{ color: 'var(--ap-text-4)' }}>
-                  {v.note || 'sem nota'} · {formatDateTime(v.created_at)}
-                </span>
-                {can('automation.workflows.publish') && !isActive && (
-                  <button
-                    className="btn-secondary text-xs"
-                    title={isRollback ? 'Reverter: tornar esta a versão ativa' : 'Publicar esta versão'}
-                    onClick={() => setConfirming({ version: v.version, isRollback })}
+        {!versions.length ? (
+          <EmptyState
+            icon="file"
+            title="Nenhuma versão salva"
+            description="Monte os passos e use Salvar versão — cada vez que salvar, nasce uma versão que fica guardada."
+          />
+        ) : (
+          <div className="space-y-2">
+            {versions.map((v) => {
+              const isActive = workflow.status === 'PUBLISHED' && v.version === workflow.current_version;
+              const isRollback = v.version < workflow.current_version;
+              return (
+                <div
+                  key={v.id}
+                  className="flex flex-wrap items-center gap-2"
+                  style={{
+                    borderRadius: 8, padding: 12,
+                    border: `1px solid ${isActive ? 'var(--su-action)' : 'var(--su-border-default)'}`,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'var(--su-font-mono, monospace)', fontWeight: 600, fontSize: 14,
+                      color: 'var(--su-text-primary)',
+                    }}
                   >
-                    {isRollback ? <RotateCcw size={13} /> : <Rocket size={13} />}
-                    {isRollback ? 'Reverter' : 'Publicar'}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          {!versions.length && <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>Nenhuma versão salva ainda.</p>}
-        </div>
+                    v{v.version}
+                  </span>
+                  {isActive && <Badge tone="success">No ar</Badge>}
+                  {v.published_at && !isActive && <Badge tone="neutral">já esteve no ar</Badge>}
+                  <Badge tone="info">{TRIGGER_LABEL[(v.trigger || {}).type] || 'Manual'}</Badge>
+                  <span
+                    className="text-xs truncate"
+                    style={{ flex: 1, minWidth: 120, color: 'var(--su-text-muted)' }}
+                  >
+                    {v.note || 'sem anotação'} · {formatDateTime(v.created_at)}
+                  </span>
+                  {can('automation.workflows.publish') && !isActive && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={isRollback ? 'refresh' : 'send'}
+                      title={
+                        isRollback
+                          ? 'Volta o fluxo para esta versão — os gatilhos passam a usar ela na hora'
+                          : 'Põe esta versão no ar — os gatilhos passam a usar ela'
+                      }
+                      onClick={() => setConfirming({ version: v.version, isRollback })}
+                    >
+                      {isRollback ? 'Voltar para esta' : 'Pôr no ar'}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {versions.length >= 2 && (
           <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-5)' }}>Comparar versões</p>
+            <p
+              style={{
+                fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em',
+                margin: 0, color: 'var(--su-text-muted)',
+              }}
+            >
+              Comparar duas versões
+            </p>
             <div className="flex items-center gap-2">
-              <Select value={diffA} onChange={(e) => setDiffA(e.target.value)} className="max-w-[120px]">
-                <option value="">de…</option>
-                {versions.map((v) => <option key={v.id} value={v.version}>v{v.version}</option>)}
-              </Select>
-              <Select value={diffB} onChange={(e) => setDiffB(e.target.value)} className="max-w-[120px]">
-                <option value="">para…</option>
-                {versions.map((v) => <option key={v.id} value={v.version}>v{v.version}</option>)}
-              </Select>
+              <div style={{ width: 130 }}>
+                <Select value={diffA} onChange={(e) => setDiffA(e.target.value)} aria-label="Comparar de">
+                  <option value="">de…</option>
+                  {versions.map((v) => <option key={v.id} value={v.version}>v{v.version}</option>)}
+                </Select>
+              </div>
+              <div style={{ width: 130 }}>
+                <Select value={diffB} onChange={(e) => setDiffB(e.target.value)} aria-label="Comparar para">
+                  <option value="">para…</option>
+                  {versions.map((v) => <option key={v.id} value={v.version}>v{v.version}</option>)}
+                </Select>
+              </div>
             </div>
             {diff && (
               <pre
-                className="rounded-lg p-3 text-[11px] font-mono overflow-x-auto max-h-72 overflow-y-auto"
-                style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface-2)' }}
+                style={{
+                  borderRadius: 8, padding: 12, margin: 0,
+                  fontSize: 11, fontFamily: 'var(--su-font-mono, monospace)',
+                  border: '1px solid var(--su-border-default)',
+                  maxHeight: 288, overflow: 'auto',
+                }}
               >
                 {diff.map((line, i) => (
                   <div
                     key={i}
                     style={{
-                      color: line.kind === 'add' ? '#22c55e' : line.kind === 'del' ? '#ef4444' : 'var(--ap-text-4)',
+                      color: line.kind === 'add'
+                        ? 'var(--su-success-fg)'
+                        : line.kind === 'del'
+                          ? 'var(--su-danger-fg)'
+                          : 'var(--su-text-muted)',
                     }}
                   >
                     {line.kind === 'add' ? '+ ' : line.kind === 'del' ? '- ' : '  '}{line.text}
@@ -113,17 +166,19 @@ export default function VersionsModal({ open, onClose, workflow, versions, onPub
         )}
       </div>
 
+      {/* 5 patrasques: ConfirmDialog + a consequência escrita + tooltip no botão
+          + loading + gate can('automation.workflows.publish'). */}
       <ConfirmDialog
         open={!!confirming}
         danger={confirming?.isRollback}
         loading={publishing}
-        title={confirming?.isRollback ? 'Reverter versão' : 'Publicar versão'}
+        title={confirming?.isRollback ? 'Voltar para uma versão anterior' : 'Pôr esta versão no ar'}
         message={
           confirming?.isRollback
-            ? `Voltar a versão ativa do fluxo para a v${confirming?.version}? Os gatilhos passam a usar essa versão imediatamente. Nenhuma versão é apagada.`
-            : `Publicar a v${confirming?.version}? O fluxo passa a disparar por gatilhos (evento/agendamento/webhook) usando essa versão.`
+            ? `Voltar o fluxo para a v${confirming?.version}? A partir de agora os gatilhos passam a usar essa versão. Nenhuma versão é apagada — dá para vir e voltar.`
+            : `Pôr a v${confirming?.version} no ar? O fluxo passa a disparar por gatilho (acontecimento, horário ou chamada externa) usando essa versão.`
         }
-        confirmLabel={confirming?.isRollback ? 'Aplicar rollback' : 'Publicar'}
+        confirmLabel={confirming?.isRollback ? 'Voltar para esta' : 'Pôr no ar'}
         onClose={() => setConfirming(null)}
         onConfirm={confirmPublish}
       />

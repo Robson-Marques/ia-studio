@@ -25,6 +25,8 @@ import EquipesFilas from './pages/WhatsApp/EquipesFilas';
 import Numeros from './pages/WhatsApp/Numeros';
 import AtendimentoIA from './pages/WhatsApp/AtendimentoIA';
 import Fluxos from './pages/Automacao/Fluxos';
+import FluxoNovo from './pages/Automacao/FluxoNovo';
+import FluxoImportar from './pages/Automacao/FluxoImportar';
 import FluxoEditor from './pages/Automacao/FluxoEditor';
 import FluxoCanvas from './pages/Automacao/FluxoCanvas';
 import Agendamentos from './pages/Automacao/Agendamentos';
@@ -103,6 +105,10 @@ export default function App() {
                 <Route path="/whatsapp/numeros" element={<PermissionRoute perm="comm.whatsapp.numbers.read"><Numeros /></PermissionRoute>} />
                 <Route path="/whatsapp/atendimento-ia" element={<PermissionRoute perm="automation.workflows.read"><AtendimentoIA /></PermissionRoute>} />
                 <Route path="/automacao/fluxos" element={<PermissionRoute perm="automation.workflows.read"><Fluxos /></PermissionRoute>} />
+                {/* `novo` e `importar` vêm ANTES de `:id` — senão o React Router
+                    casa a rota dinâmica primeiro e trata "novo" como um id. */}
+                <Route path="/automacao/fluxos/novo" element={<PermissionRoute perm="automation.workflows.write"><FluxoNovo /></PermissionRoute>} />
+                <Route path="/automacao/fluxos/importar" element={<PermissionRoute perm="automation.workflows.write"><FluxoImportar /></PermissionRoute>} />
                 <Route path="/automacao/fluxos/:id" element={<PermissionRoute perm="automation.workflows.read"><FluxoCanvas /></PermissionRoute>} />
                 <Route path="/automacao/fluxos/:id/lista" element={<PermissionRoute perm="automation.workflows.read"><FluxoEditor /></PermissionRoute>} />
                 <Route path="/automacao/agendamentos" element={<PermissionRoute perm="automation.workflows.read"><Agendamentos /></PermissionRoute>} />

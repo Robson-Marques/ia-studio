@@ -1,5 +1,49 @@
 # Changelog — IA Studio
 
+## v0.10.2 - 2026-07-25 (Automação sub-frente B — Fluxos e o editor de passos)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.24`**.
+
+### A decisão desta frente: onde configurar um passo
+
+A regra do Modal do DS tinha duas saídas — Modal (campos curtos) ou rota. A configuração de um passo do fluxo não cabe em nenhuma: tem texto longo e JSON (fora do Modal), e é **rascunho da sessão** — só existe no servidor quando você salva uma versão, então rota exigiria persistir rascunho. Você escolheu o **painel lateral**, que é o padrão *inspetor* que a spec de Desktop do DS já declarava. Virou a **terceira via da regra**, escrita no DS v1.2.24:
+
+| Container | Quando |
+|---|---|
+| **Modal** | leitura, confirmação, formulário de campo curto |
+| **Rota** | um registro que existe por si — cadastro, edição, detalhe |
+| **Inspetor** (painel lateral) | propriedade de um item **dentro de um editor**, que não tem URL própria e cujo contexto em volta precisa continuar à vista |
+
+### Alterado
+
+- **Fluxos (lista)** — arquivar e excluir saíram da linha (eram uma pastinha âmbar e uma lixeira vermelha em cada uma) e foram pra barra de lote, as duas aceitando vários. "Arquivar" **desaparece** quando a seleção inclui algo já arquivado, em vez de falhar depois. Colunas em português de gente: "Situação", "Versão no ar", "Últimas vezes que rodou" (com "nunca rodou" quando é o caso).
+- **Novo fluxo → rota** `/automacao/fluxos/novo` (tinha TextArea de descrição). **Importar → rota** `/automacao/fluxos/importar` — importar cria um registro, e o campo era um JSON de 12 linhas dentro de um Modal.
+- **Editor de passos** — cabeçalho virou `PageHeader` com as 4 ações (Exportar, Versões, Rodar agora, Salvar versão). O botão "voltar" saiu: o breadcrumb já leva pra lista, e ter os dois era o mesmo caminho duas vezes. Situação/versão no ar/"alterações não salvas" viraram `Badge` em vez de texto solto.
+- **Configurar passo → inspetor lateral** (`NodeInspector`, 520px de largura porque JSON em 360 quebra em toda linha). O corpo continua **declarativo**: renderiza os campos que vêm do catálogo do backend, sem código por tipo de passo — passo novo no backend aparece aqui sozinho.
+- **Rodar agora → inspetor lateral** (`ExecuteDrawer`). O botão diz o que vai acontecer: **"Simular"** ou **"Rodar de verdade"** (vermelho), conforme a caixa de simulação — que nasce marcada. A opção virou card com a explicação embaixo, em vez de um checkbox cru com um parágrafo colado ao lado. Ao terminar, vai direto pra tela da execução (a rota nova da sub-frente A).
+- **O que dispara o fluxo** — os 4 tipos eram `<button>` com borda e fundo cravados imitando escolha única; agora são opção-em-card do DS (círculo = cabe um), e a explicação de cada tipo saiu do `title` (só no hover) pra tela. Os rótulos falam a língua do dono: "Só quando eu mandar", "Quando algo acontecer", "Em horários certos", "Quando outro sistema chamar".
+- **Versões** — segue Modal, e está certo: não tem campo de escrita, é leitura + duas confirmações. O diff usava `#22c55e` e `#ef4444` cravados; agora vem do tema e funciona no escuro. "Ativa" virou **"No ar"**; "Publicar" virou **"Pôr no ar"**; "Reverter" virou **"Voltar para esta"**.
+- **`WorkflowStatusBadge`** ganhou arquivo próprio. Estava dentro de `Fluxos.jsx` e era importado de lá pelo editor e pelo canvas — três telas dependendo de um componente exportado por uma **página**, o que arrasta o arquivo inteiro por causa de 4 linhas.
+- **O canvas (sub-frente C) ganhou o inspetor de execução de graça** — passou a usar o `ExecuteDrawer`. É troca de uma linha e o resto dele fica para a frente C.
+- **DS v1.2.24**: `Drawer` com `width` + `aria-labelledby` no título, e **3 glifos novos** (`play`, `archive`, `save`) — faltavam para vestir um produto de automação, e sem eles o ícone cai no "?" silencioso.
+
+### O que dá pra verificar agora
+
+1. **Automação → Fluxos**: nenhuma linha tem botão. Marcar um fluxo faz aparecer a barra com **Arquivar** e **Excluir**; marcar um já arquivado junto com outros faz **Arquivar desaparecer** (fica só Excluir).
+2. **Novo fluxo**: abre em rota (`/automacao/fluxos/novo`), com asterisco no Nome. Salvar sem nome → toast. Sem workspace/ambiente escolhido no topo → toast explicando.
+3. **Abrir um fluxo → Rodar agora**: painel entra pela direita, o fluxo continua visível atrás. Desmarcar "Só simular" pinta o botão de vermelho e aparece o aviso de execução real. **Esc** fecha.
+4. **Adicionar passo**: o Modal lista os passos por categoria; escolher um **já abre o inspetor** do passo criado. No inspetor, o campo de JSON tem largura de sobra. Aplicar com um campo obrigatório vazio → toast dizendo qual.
+5. **O que dispara**: as 4 opções são cards com círculo; **Tab** entra no grupo e as **setas** trocam a opção. Escolhendo "Em horários certos", os campos mudam conforme a frequência, e "Ver as próximas vezes" traz 5 datas.
+6. **Salvar versão**: o Modal diz que a versão nasce fora do ar; depois de salvar, o toast lembra de publicar em Versões.
+7. **Claro/escuro** nas 6 telas — inclusive o diff de versões, que antes tinha verde e vermelho fixos.
+
+### O que só dá pra verificar com fluxo montado
+
+- publicar / voltar para uma versão anterior (mexe no que está no ar);
+- o diff entre duas versões (precisa de duas versões salvas);
+- rodar de verdade (dispara efeito real) e o passo a passo da execução;
+- exportar e reimportar o arquivo.
+
 ## v0.10.1 - 2026-07-25 (Correção: "Novo calendário" abria em branco)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.23`**.
