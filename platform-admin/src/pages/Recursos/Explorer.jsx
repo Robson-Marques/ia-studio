@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   PageHeader, Card, Field, Input, Select, Button, DataTable, DescriptionList,
-  Modal, CopyButton, EmptyState, useToast,
+  Modal, CopyButton, EmptyState, FormGrid, useToast,
 } from '@studio-ux-ds/react';
 import { getResourceCatalog, exploreResource } from '../../services/resource';
 import { listConnections } from '../../services/integrations';
@@ -122,7 +122,12 @@ export default function Explorer() {
               <Loader2 size={20} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.5fr_auto] gap-3 items-end">
+            // Linha de busca no `FormGrid`: alinha os campos pelo TOPO. O grid
+            // anterior usava `items-end`, que alinha pela base — e o único campo
+            // com dica embaixo ficava mais alto, empurrando o próprio controle e
+            // o botão para cima. A dica virou **placeholder** por isso, e o botão
+            // ficou dentro do campo de busca, onde alinha sempre.
+            <FormGrid columns={3}>
               <Field label="Conexão" required>
                 <Select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}>
                   <option value="">Selecione…</option>
@@ -135,18 +140,21 @@ export default function Explorer() {
                   {catalog.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
                 </Select>
               </Field>
-              <Field label="Busca" hint="Opcional — termo livre, do jeito que o sistema do outro lado entende.">
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') buscar(); }}
-                  placeholder="nome, documento, código…"
-                />
+              <Field label="Busca (opcional)">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') buscar(); }}
+                    placeholder="nome, documento, código…"
+                    style={{ flex: 1 }}
+                  />
+                  <Button variant="primary" icon="search" loading={searching} onClick={buscar}>
+                    Buscar
+                  </Button>
+                </div>
               </Field>
-              <Button variant="primary" icon="search" loading={searching} onClick={buscar}>
-                Buscar
-              </Button>
-            </div>
+            </FormGrid>
           )}
         </div>
       </Card>

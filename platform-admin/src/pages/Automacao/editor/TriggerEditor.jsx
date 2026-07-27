@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
 import {
-  Field, Input, Select, NumericInput, Radio, CheckGroup, Button, useToast,
+  FormGrid, Field, Input, Select, NumericInput, Radio, CheckGroup, Button, useToast,
 } from '@studio-ux-ds/react';
 import { previewSchedule, listCalendars } from '../../../services/automation';
 import { SCHEDULE_KINDS, WEEKDAYS, formatDateTime } from '../automation.constants';
@@ -116,7 +116,7 @@ export default function TriggerEditor({ trigger, onChange, webhookToken }) {
 
       {t.type === 'schedule' && (
         <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <FormGrid columns={2}>
             <Field label="Com que frequência" required>
               <Select value={schedule.kind} onChange={(e) => setSchedule({ kind: e.target.value })}>
                 {SCHEDULE_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
@@ -180,7 +180,7 @@ export default function TriggerEditor({ trigger, onChange, webhookToken }) {
                 {calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </Field>
-          </div>
+          </FormGrid>
 
           <div className="flex flex-wrap items-center gap-3">
             <Button

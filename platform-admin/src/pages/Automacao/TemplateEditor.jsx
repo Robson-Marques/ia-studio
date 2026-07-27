@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, Field, Input, Select, TextArea, Badge, Button, useToast,
+  PageHeader, Card, FormGrid, Field, Input, Select, TextArea, Badge, Button, useToast,
 } from '@studio-ux-ds/react';
 import {
   listAutomationTemplates, createAutomationTemplate, updateAutomationTemplate,
@@ -128,7 +128,7 @@ export default function TemplateEditor() {
 
       <Card>
         <div style={{ padding: 20 }} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormGrid columns={2}>
             <Field label="Nome" required hint="Só pra você achar depois — o cliente não vê.">
               <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canWrite} />
             </Field>
@@ -145,7 +145,7 @@ export default function TemplateEditor() {
                 {Object.entries(CHANNEL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             </Field>
-          </div>
+          </FormGrid>
 
           <Field label="Assunto" hint="Aparece em e-mail e no sino do sistema. Opcional.">
             <Input value={subject} onChange={(e) => setSubject(e.target.value)} disabled={!canWrite} />

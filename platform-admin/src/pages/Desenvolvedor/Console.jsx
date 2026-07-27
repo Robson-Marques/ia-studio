@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, Tabs, Field, Input, TextArea, Select, NumericInput, Button,
+  PageHeader, Card, Tabs, FormGrid, Field, Input, TextArea, Select, NumericInput, Button,
   Banner, CopyButton, useToast,
 } from '@studio-ux-ds/react';
 import { listConnections } from '../../services/integrations';
@@ -349,14 +349,14 @@ function AbaIa({ connections }) {
       <Field label="Pedido" required>
         <TextArea rows={5} value={form.prompt} onChange={(e) => patch({ prompt: e.target.value })} />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <FormGrid columns={2}>
         <Field label="Criatividade" hint="0 a 2. Vazio usa o padrão do modelo.">
           <NumericInput fullWidth value={form.temperature} onChange={(v) => patch({ temperature: v })} min={0} max={2} step={0.1} allowEmpty placeholder="0,7" />
         </Field>
         <Field label="Tamanho máximo da resposta" hint="Em tokens. Vazio usa o padrão.">
           <NumericInput fullWidth value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })} min={1} max={8000} step={1} allowEmpty placeholder="1000" />
         </Field>
-      </div>
+      </FormGrid>
       <Button variant="primary" icon="zap" loading={loading} onClick={enviar}>Perguntar à IA</Button>
     </Bancada>
   );

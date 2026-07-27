@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, Field, Input, Select, Badge, Button, IconButton, Switch,
+  PageHeader, Card, FormGrid, Field, Input, Select, Badge, Button, IconButton, Switch,
   EmptyState, ConfirmDialog, useToast,
 } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -186,14 +186,14 @@ export default function EquipeEditor() {
 
       <Card>
         <div style={{ padding: 20 }} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormGrid columns={2}>
             <Field label="Nome" required>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Suporte" disabled={!canManage} />
             </Field>
             <Field label="Para que serve" hint="Aparece na lista, ajuda quem transfere a escolher.">
               <Input value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canManage} />
             </Field>
-          </div>
+          </FormGrid>
 
           {isEdit ? (
             <Field label="Fila padrão" hint="Para onde vai a conversa quando alguém transfere para esta equipe sem escolher fila.">

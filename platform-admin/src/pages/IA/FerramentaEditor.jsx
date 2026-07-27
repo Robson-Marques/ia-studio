@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, Field, Input, Select, NumericInput, TextArea,
+  PageHeader, Card, FormGrid, Field, Input, Select, NumericInput, TextArea,
   Button, Checkbox, Badge, useToast,
 } from '@studio-ux-ds/react';
 import { listTools, createTool, updateTool } from '../../services/ai';
@@ -202,7 +202,7 @@ export default function FerramentaEditor() {
 
           {!isBuiltin && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormGrid columns={2}>
                 <Field label="Identificador" hint="Único, sem espaços. Ex.: consultar_estoque">
                   <Input
                     value={form.key}
@@ -218,7 +218,7 @@ export default function FerramentaEditor() {
                     placeholder="Consultar estoque"
                   />
                 </Field>
-              </div>
+              </FormGrid>
 
               <Field label="Categoria">
                 <Input

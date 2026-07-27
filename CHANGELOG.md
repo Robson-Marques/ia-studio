@@ -2,7 +2,7 @@
 
 ## v0.10.13 - 2026-07-26 (Recursos + Desenvolvedor no DS — as duas últimas famílias)
 
-Sem `db push`. Só frontend. Bump do DS: `^1.2.33` → **`^1.2.34`** (quatro ícones do próprio DS apontavam para nomes inexistentes).
+Sem `db push`. Só frontend. Bump do DS: `^1.2.33` → **`^1.2.34`** (o `FormGrid`, que faltava, + quatro ícones do próprio DS que apontavam para nomes inexistentes).
 
 **Com isso, o `platform-admin` inteiro está no Studio UX** — só Configurações (5 telas) fica para o fim, por ser a que mexe em coisa ligada.
 
@@ -14,8 +14,16 @@ Sem `db push`. Só frontend. Bump do DS: `^1.2.33` → **`^1.2.34`** (quatro íc
 - **Chaves de API** — revogar aceita várias de uma vez, mas só as que ainda valem. A tela da chave em claro ganhou `Banner` de aviso + `CopyButton`, e **deixou de fechar por clique fora**: fechar sem copiar significa criar outra chave.
 - **Linguagem**: "Explorer de Recursos" → **Explorador de recursos**; "Console do Desenvolvedor" → **Bancada de testes**; "Tipo canônico" → **Traduz para**; "Operação de origem" continua, mas com "De onde vem" na tabela; "Escopos" → **Pode fazer**; "Expira em" → **Vence em**; `Params (JSON)` → **Parâmetros**; "Temperature" → **Criatividade**; "Max tokens" → **Tamanho máximo da resposta**.
 
+### Mudado — arranjo de formulário (sweep retroativo)
+
+- **Todo formulário do painel passou a usar o `FormGrid`** do DS (v1.2.34): duas colunas em tela larga, uma em tela estreita, largura de leitura vinda do DS. Foram **20 grids montados à mão em 12 arquivos** — Automação (Templates, Gatilho), IA (Assistente, Base de conhecimento, Ferramenta, Perfil de memória, Custos), ISP (Abertura de chamado, Incidente), WhatsApp (Equipe, Template), Desenvolvedor (bancada) e Recursos (mapeamento).
+- **Os `maxWidth` cravados nesses formulários saíram.** Havia 16 valores diferentes respondendo à mesma pergunta ("qual é a largura de leitura de um formulário?") — agora a resposta é do DS, num lugar só.
+- **O campo em que se escreve leva `wide`** e ocupa a linha inteira (anotação, texto longo, JSON): em meia coluna virava uma faixa estreita e alta.
+- Ficou de fora, deliberadamente, o grid de larguras assimétricas (Método 120px + URL) da aba HTTP — ali as colunas têm tamanhos diferentes de propósito, o que o `FormGrid` não faz nem deveria.
+
 ### Corrigido
 
+- **A linha de busca do Explorador ficava torta** (você apontou): os três campos usavam `items-end`, que alinha pela base — e o único com dica embaixo era mais alto, empurrando o próprio controle e o botão para cima. O `FormGrid` alinha pelo topo, a dica virou **placeholder** e o botão foi para dentro do campo de busca, onde alinha sempre.
 - **Mais dois `toast` indefinidos**, agora nas Chaves de API: os dois modais (criar e mostrar a chave) chamavam `toast.error`/`toast.success` sem ter o hook — no caminho de erro estourava `ReferenceError` em vez de mostrar a falha, e a validação do nome derrubava a tela em vez de avisar. Com estes, são **quatro** achados na mesma varredura; passei um verificador em toda a `src` e não sobrou nenhum.
 - **Quatro ícones errados no próprio DS** (v1.2.34): `Banner` pedia `circle-check` e `alert-triangle`, `AppShell` pedia `adjustments` e **`menu-2` no hambúrguer do mobile** — nomes que não existem, então desenhavam "?" na tela. O gate de publicação do DS passou a conferir isso.
 

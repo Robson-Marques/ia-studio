@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, Field, Input, Select, NumericInput, TextArea,
+  PageHeader, Card, FormGrid, Field, Input, Select, NumericInput, TextArea,
   Button, useToast,
 } from '@studio-ux-ds/react';
 import { getMemoryProfile, createMemoryProfile, updateMemoryProfile } from '../../services/ai';
@@ -171,7 +171,7 @@ export default function MemoriaPerfilEditor() {
             />
           </Field>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3" style={{ maxWidth: 520 }}>
+          <FormGrid columns={2}>
             <Field label="Validade padrão (segundos)" hint="Vazio = nunca expira.">
               <NumericInput
                 value={form.default_ttl_seconds}
@@ -190,7 +190,7 @@ export default function MemoriaPerfilEditor() {
                 fullWidth
               />
             </Field>
-          </div>
+          </FormGrid>
         </div>
       </Card>
     </div>

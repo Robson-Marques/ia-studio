@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Tabs, Card, Field, Input, Select, NumericInput, TextArea,
+  PageHeader, Tabs, Card, FormGrid, Field, Input, Select, NumericInput, TextArea,
   Button, Checkbox, CheckGroup, Badge, EmptyState, useToast,
 } from '@studio-ux-ds/react';
 import {
@@ -415,7 +415,7 @@ export default function AgenteEditor() {
             <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
               Como o assistente se apresenta e se comporta na conversa.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FormGrid columns={2}>
               <Field label="Nome que o assistente usa" hint="Como ele se apresenta. Vazio = sem nome.">
                 <Input value={form.persona.name || ''} onChange={(e) => patchPersona({ name: e.target.value })} placeholder="Ex.: Luan" />
               </Field>
@@ -434,7 +434,7 @@ export default function AgenteEditor() {
                   {PERSONA_BREVITY.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </Select>
               </Field>
-            </div>
+            </FormGrid>
             <Field label="Sempre (uma regra por linha)" hint="O que o assistente deve sempre fazer.">
               <LinesTextArea
                 rows={4}
@@ -656,7 +656,7 @@ export default function AgenteEditor() {
                   <Input value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
                 )}
               </Field>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <FormGrid columns={3}>
                 <Field label="Criatividade" hint="0 = direto ao ponto; 2 = mais criativo.">
                   <NumericInput value={form.temperature} onChange={(v) => patch({ temperature: v })} min={0} max={2} step={0.1} fullWidth />
                 </Field>
@@ -666,7 +666,7 @@ export default function AgenteEditor() {
                 <Field label="Máx. de tokens" hint="Vazio = sem limite próprio.">
                   <NumericInput value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })} min={1} step={1} fullWidth />
                 </Field>
-              </div>
+              </FormGrid>
             </div>
           </Card>
 

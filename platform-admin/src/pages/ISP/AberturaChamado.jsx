@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, EmptyState, Field, Input, Select, Radio, Button, useToast,
+  PageHeader, Card, EmptyState, FormGrid, Field, Input, Select, Radio, Button, useToast,
 } from '@studio-ux-ds/react';
 import {
   discoverOsResources, getOsConfig, saveOsConfig,
@@ -336,7 +336,7 @@ export default function AberturaChamado() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormGrid columns={2}>
             <Field label="Chamados técnicos (Suporte)">
               <Select value={filaSuporte} disabled={!canManage} onChange={(e) => setFilaSuporte(e.target.value)}>
                 <option value="">— não encaminhar —</option>
@@ -349,7 +349,7 @@ export default function AberturaChamado() {
                 {queues.map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
               </Select>
             </Field>
-          </div>
+          </FormGrid>
 
           {!queues.length && (
             <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
@@ -416,7 +416,7 @@ export default function AberturaChamado() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormGrid columns={2}>
             <Field label="Validade do link">
               <Select value={String(pagTtl)} disabled={!canManage} onChange={(e) => setPagTtl(Number(e.target.value))}>
                 <option value="1">1 hora</option>
@@ -433,7 +433,7 @@ export default function AberturaChamado() {
                 onChange={(e) => setPagBaseUrl(e.target.value)}
               />
             </Field>
-          </div>
+          </FormGrid>
 
           {!pagBaseUrl && (
             <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
@@ -466,7 +466,7 @@ export default function AberturaChamado() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormGrid columns={2}>
             <Field label="Equipe responsável">
               <Select
                 value={plantao.team_id}
@@ -507,7 +507,7 @@ export default function AberturaChamado() {
                 <option value="240">4 horas</option>
               </Select>
             </Field>
-          </div>
+          </FormGrid>
 
           {!plantao.template && (
             <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>

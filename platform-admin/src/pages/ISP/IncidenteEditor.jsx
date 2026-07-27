@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
   PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, ConfirmDialog,
-  Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast,
+  FormGrid, Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast,
 } from '@studio-ux-ds/react';
 import {
   getIncident, createIncident, updateIncident,
@@ -272,7 +272,7 @@ export default function IncidenteEditor() {
                 />
               </Field>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormGrid columns={2}>
                 <Field label="Conexão do provedor" hint="ERP que descobre quem está afetado pela rede.">
                   <Select value={form.connection_id} onChange={(e) => patch({ connection_id: e.target.value })}>
                     <option value="">Selecione…</option>
@@ -284,7 +284,7 @@ export default function IncidenteEditor() {
                     {INCIDENT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                   </Select>
                 </Field>
-              </div>
+              </FormGrid>
 
               <Field label="Aviso ao cliente" hint="O texto que o cliente lê. Escreva como você falaria com ele.">
                 <TextArea
@@ -317,7 +317,7 @@ export default function IncidenteEditor() {
                   Delimita quem é considerado afetado. Preencha só o que se aplica — quanto mais específico, menos gente recebe o aviso.
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormGrid columns={2}>
                 {SCOPE_FIELDS.map((f) => (
                   <Field key={f.key} label={f.label}>
                     <Input
@@ -326,7 +326,7 @@ export default function IncidenteEditor() {
                     />
                   </Field>
                 ))}
-              </div>
+              </FormGrid>
             </div>
           </Card>
 

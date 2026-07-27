@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  PageHeader, Card, Field, Input, TextArea, Select, Badge, Button, IconButton, useToast,
+  PageHeader, Card, FormGrid, Field, Input, TextArea, Select, Badge, Button, IconButton, useToast,
 } from '@studio-ux-ds/react';
 import { createTemplate, listNumbers } from '../../services/whatsapp';
 import { CATEGORY_LABEL, LANGUAGE_LABEL } from './Templates';
@@ -125,7 +125,7 @@ export default function TemplateNovo() {
 
       <Card>
         <div style={{ padding: 20 }} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormGrid columns={2}>
             <Field label="Em qual número" required hint="O template pertence ao número — não é compartilhado entre eles.">
               <Select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}>
                 {!numbers.length && <option value="">nenhum número conectado</option>}
@@ -152,7 +152,7 @@ export default function TemplateNovo() {
                 {Object.entries(LANGUAGE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             </Field>
-          </div>
+          </FormGrid>
 
           <Field label="Cabeçalho" hint="Uma linha em destaque no topo. Opcional, até 60 caracteres.">
             <Input value={form.header_text} onChange={(e) => setField('header_text', e.target.value)} maxLength={60} />

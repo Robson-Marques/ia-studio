@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   PageHeader, Tabs, StatCard, Card, DataTable, EmptyState, Badge, DSIcon,
-  Field, Input, Select, NumericInput, Button, Checkbox, Modal,
+  FormGrid, Field, Input, Select, NumericInput, Button, Checkbox, Modal,
   useToast,
 } from '@studio-ux-ds/react';
 import {
@@ -319,7 +319,7 @@ function SimulatorTab() {
     <div className="space-y-4" style={{ maxWidth: 720 }}>
       <Card>
         <div style={{ padding: 20 }} className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <FormGrid columns={2}>
             <Field label="Provedor">
               <Select value={form.provider_kind} onChange={(e) => patch({ provider_kind: e.target.value })}>
                 {PROVIDER_KINDS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
@@ -328,8 +328,8 @@ function SimulatorTab() {
             <Field label="Modelo">
               <Input value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
             </Field>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          </FormGrid>
+          <FormGrid columns={3}>
             <Field label="Tokens de prompt">
               <NumericInput value={form.prompt_tokens} onChange={(v) => patch({ prompt_tokens: v })} min={0} step={100} fullWidth />
             </Field>
@@ -339,7 +339,7 @@ function SimulatorTab() {
             <Field label="Nº de execuções">
               <NumericInput value={form.runs} onChange={(v) => patch({ runs: v })} min={1} step={1} fullWidth />
             </Field>
-          </div>
+          </FormGrid>
           <div className="flex justify-end">
             <Button variant="primary" onClick={handleSimulate} loading={running} icon="settings">
               {running ? 'Simulando…' : 'Simular custo'}

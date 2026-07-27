@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  PageHeader, Card, Field, Input, Select, NumericInput, TextArea,
+  PageHeader, Card, FormGrid, Field, Input, Select, NumericInput, TextArea,
   Button, useToast,
 } from '@studio-ux-ds/react';
 import { createKnowledgeBase } from '../../services/ai';
@@ -155,7 +155,7 @@ export default function BaseConhecimentoEditor() {
             />
           </Field>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3" style={{ maxWidth: 520 }}>
+          <FormGrid columns={2}>
             <Field
               label="Tamanho do trecho"
               hint="Em caracteres. Trechos maiores dão mais contexto; menores dão respostas mais precisas."
@@ -180,7 +180,7 @@ export default function BaseConhecimentoEditor() {
                 fullWidth
               />
             </Field>
-          </div>
+          </FormGrid>
         </div>
       </Card>
     </div>

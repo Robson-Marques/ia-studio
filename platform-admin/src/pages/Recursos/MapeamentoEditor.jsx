@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import {
-  PageHeader, Card, Field, Input, TextArea, Select, Checkbox, Button, IconButton,
-  Banner, useToast,
+  PageHeader, Card, FormGrid, Field, Input, TextArea, Select, Checkbox, Button,
+  IconButton, Banner, useToast,
 } from '@studio-ux-ds/react';
 import {
   getResourceCatalog, listMappings, createMapping, updateMapping, suggestMapping,
@@ -213,8 +213,12 @@ export default function MapeamentoEditor() {
       />
 
       <Card>
-        <div style={{ padding: 20, maxWidth: 860 }} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* `FormGrid`: duas colunas em tela larga, uma em tela estreita, e a
+            largura de leitura vem do DS — não de um `maxWidth` cravado aqui.
+            A anotação leva `wide` porque é o campo em que se escreve: em meia
+            coluna o texto vira uma faixa estreita e alta. */}
+        <div style={{ padding: 20 }}>
+          <FormGrid columns={2}>
             <Field label="Conexão" required hint={isEdit ? 'Não muda depois de criado.' : 'De qual sistema vêm os dados.'}>
               <Select value={form.connection_id} onChange={(e) => patch({ connection_id: e.target.value })} disabled={isEdit}>
                 <option value="">Selecione…</option>
@@ -227,25 +231,23 @@ export default function MapeamentoEditor() {
                 {catalog.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
               </Select>
             </Field>
-          </div>
-
-          <Field label="Operação de origem" required hint='A operação do conector que devolve estes dados. Ex.: "cliente.dados".'>
-            <Input
-              value={form.source_operation}
-              onChange={(e) => patch({ source_operation: e.target.value })}
-              placeholder="cliente.dados"
-              style={{ fontFamily: 'var(--su-font-mono, monospace)' }}
-            />
-          </Field>
-
-          <Field label="Anotação" hint="Para quem mexer nisso depois — o que este mapeamento resolve, o que tem de peculiar.">
-            <TextArea rows={2} value={form.description} onChange={(e) => patch({ description: e.target.value })} />
-          </Field>
+            <Field label="Operação de origem" required hint='A operação do conector que devolve estes dados. Ex.: "cliente.dados".'>
+              <Input
+                value={form.source_operation}
+                onChange={(e) => patch({ source_operation: e.target.value })}
+                placeholder="cliente.dados"
+                style={{ fontFamily: 'var(--su-font-mono, monospace)' }}
+              />
+            </Field>
+            <Field wide label="Anotação" hint="Para quem mexer nisso depois — o que este mapeamento resolve, o que tem de peculiar.">
+              <TextArea rows={2} value={form.description} onChange={(e) => patch({ description: e.target.value })} />
+            </Field>
+          </FormGrid>
         </div>
       </Card>
 
       <Card>
-        <div style={{ padding: 20, maxWidth: 860 }} className="space-y-4">
+        <div style={{ padding: 20, maxWidth: 880 }} className="space-y-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
@@ -273,7 +275,7 @@ export default function MapeamentoEditor() {
       </Card>
 
       <Card>
-        <div style={{ padding: 20, maxWidth: 860 }} className="space-y-3">
+        <div style={{ padding: 20, maxWidth: 880 }} className="space-y-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
@@ -331,7 +333,7 @@ export default function MapeamentoEditor() {
       </Card>
 
       <Card>
-        <div style={{ padding: 20, maxWidth: 860 }}>
+        <div style={{ padding: 20, maxWidth: 880 }}>
           {/* `Checkbox variant="card"`, não `Switch`: é um campo do formulário
               (vale ao salvar), não um interruptor de efeito imediato. E o
               `Switch` do DS não tem rótulo — um interruptor solto não diz o que
