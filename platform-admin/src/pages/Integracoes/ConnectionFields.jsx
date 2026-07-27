@@ -1,16 +1,20 @@
 import React from 'react';
-import { Copy, Sparkles } from 'lucide-react';
-import { useToast } from '@studio-ux-ds/react';
-import { FormField, TextInput, Select } from '../../components/ui/FormField';
+import { Field, Input, Select, Button, CopyButton } from '@studio-ux-ds/react';
 
-// Renderizador declarativo dos campos do wizard_schema — COMPARTILHADO entre o
-// ConnectionWizard (criação) e o EditConnectionModal (edição). Nenhum código
-// por tipo de conector: o schema descreve, isto renderiza.
+// Renderizador declarativo dos campos do `wizard_schema` — COMPARTILHADO entre a
+// criação (`ConexaoNova`) e a edição (`ConexaoEditar`). Nenhum código por tipo de
+// conector: o schema descreve, isto renderiza. Migrado pro DS na v0.10.11.
 //
-// Extras:
-//  - field.generatable → botão "Gerar" (token aleatório) + "Copiar".
-//  - editing=true em campos secretos → placeholder "Deixe em branco para
-//    manter o atual" e nunca pré-preenche o valor.
+// Comportamentos que o schema aciona:
+//  · `field.generatable` → botão "Gerar" (token aleatório) + copiar. O campo fica
+//    VISÍVEL mesmo sendo secreto: o usuário precisa enxergar o valor para colar
+//    no painel da Meta. Esconder aqui não protege nada e impede o trabalho.
+//  · `editing=true` em campo secreto → nunca pré-preenche e avisa que deixar em
+//    branco mantém o valor atual. O cofre não devolve o segredo; sem essa dica,
+//    o campo vazio parece "apagado".
+//
+// O `copyToClipboard` local morreu na v0.10.11: o `CopyButton` do DS faz a mesma
+// coisa com o fallback e a confirmação padronizados.
 
 // Token aleatório legível para o campo (ex.: verify_token do webhook).
 export function generateToken() {
@@ -20,57 +24,30 @@ export function generateToken() {
   return `ias_${hex}`;
 }
 
-// Puro: escreve no clipboard e retorna true/false. Toast é responsabilidade
-// do caller (componente React usa useToast) — assim `copyToClipboard` não é
-// mais função exportada com toast embutido (que impedia migração pro useToast
-// do DS, que é hook e só funciona em componente).
-export async function copyToClipboard(text) {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      // Fallback para contextos sem clipboard API (http/iframe antigos).
-      const el = document.createElement('textarea');
-      el.value = text;
-      el.style.position = 'fixed';
-      el.style.opacity = '0';
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // Caixa com a URL do webhook (origin + schema.webhookPath) pronta pra colar na Meta.
 export function WebhookUrlBox({ webhookPath }) {
-  const toast = useToast();
   if (!webhookPath) return null;
   const url = `${window.location.origin}${webhookPath}`;
-  async function handleCopy() {
-    const ok = await copyToClipboard(url);
-    if (ok) toast.success('Copiado');
-    else toast.error('Não foi possível copiar. Copie manualmente.');
-  }
   return (
     <div
-      className="rounded-lg px-3 py-2.5 space-y-1.5"
-      style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border-sub)' }}
+      style={{
+        border: '1px solid var(--su-border-default)',
+        borderRadius: 8,
+        padding: 12,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
     >
-      <p className="text-[11px] font-medium" style={{ color: 'var(--ap-text-2)' }}>
-        Webhook URL (cole no painel da Meta)
+      <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+        Endereço do webhook (cole no painel da Meta)
       </p>
-      <div className="flex items-center gap-1.5">
-        <TextInput value={url} readOnly onFocus={(e) => e.target.select()} className="flex-1 text-xs" />
-        <button type="button" className="btn-ghost p-2 shrink-0" title="Copiar URL" onClick={handleCopy}>
-          <Copy size={14} className="text-brand" />
-        </button>
+      <div className="flex items-center gap-2">
+        <Input value={url} readOnly onFocus={(e) => e.target.select()} style={{ flex: 1, fontSize: 12 }} />
+        <CopyButton value={url} title="Copiar o endereço" />
       </div>
-      <p className="text-[10px]" style={{ color: 'var(--ap-text-4)' }}>
-        No Meta: WhatsApp → Configuration → Webhook, cole esta URL + o Verify Token acima, e assine o campo "messages".
+      <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>
+        Na Meta: WhatsApp → Configuration → Webhook. Cole este endereço junto do token acima e assine o campo “messages”.
       </p>
     </div>
   );
@@ -78,69 +55,56 @@ export function WebhookUrlBox({ webhookPath }) {
 
 // Renderiza UM campo do schema. `editing` muda o comportamento dos secretos.
 export function ConnectionField({ field, value, onChange, namePrefix, editing = false }) {
-  const toast = useToast();
   const isSecret = field.secret || field.type === 'password';
-  // Campo generatable (ex.: verify_token) fica VISÍVEL — o usuário precisa
-  // enxergar e copiar o valor pra colar no painel da Meta.
   const masked = isSecret && !field.generatable;
-  const placeholder = editing && isSecret ? 'Deixe em branco para manter o atual' : field.placeholder;
-
-  async function handleCopyValue() {
-    const ok = await copyToClipboard(String(value ?? ''));
-    if (ok) toast.success('Copiado');
-    else toast.error('Não foi possível copiar. Copie manualmente.');
-  }
+  const hint = editing && isSecret
+    ? [field.help, 'Deixe em branco para manter o valor atual.'].filter(Boolean).join(' ')
+    : field.help;
 
   if (field.type === 'select') {
     return (
-      <FormField label={field.label} required={field.required && !editing} hint={field.help}>
+      <Field label={field.label} required={field.required && !editing} hint={hint}>
         <Select value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
           <option value="">Selecione…</option>
           {(field.options || []).map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </Select>
-      </FormField>
+      </Field>
     );
   }
 
   return (
-    <FormField label={field.label} required={field.required && !editing} hint={field.help}>
-      <div className="flex items-center gap-1.5">
-        <TextInput
+    <Field label={field.label} required={field.required && !editing} hint={hint}>
+      <div className="flex items-center gap-2">
+        <Input
           type={masked ? 'password' : field.type === 'number' ? 'number' : 'text'}
           name={`${namePrefix}-${field.key}`}
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          // Bloqueia autofill do navegador: new-password nos secretos + off nos demais.
+          placeholder={editing && isSecret ? 'Deixe em branco para manter' : field.placeholder}
+          // Bloqueia o autofill do navegador: new-password nos secretos, off nos demais.
           autoComplete={masked ? 'new-password' : 'off'}
           data-lpignore="true"
           data-1p-ignore="true"
           data-form-type="other"
-          className="flex-1"
+          style={{ flex: 1 }}
         />
         {field.generatable && (
           <>
-            <button
-              type="button"
-              className="btn-secondary px-2 py-1.5 shrink-0 text-xs"
-              title="Gerar token aleatório"
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="zap"
+              title="Gerar um token aleatório para este campo"
               onClick={() => onChange(generateToken())}
             >
-              <Sparkles size={13} /> Gerar
-            </button>
-            <button
-              type="button"
-              className="btn-ghost p-2 shrink-0"
-              title="Copiar valor"
-              onClick={handleCopyValue}
-            >
-              <Copy size={14} className="text-brand" />
-            </button>
+              Gerar
+            </Button>
+            <CopyButton value={String(value ?? '')} title="Copiar o valor" />
           </>
         )}
       </div>
-    </FormField>
+    </Field>
   );
 }

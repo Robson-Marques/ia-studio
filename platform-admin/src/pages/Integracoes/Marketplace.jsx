@@ -1,26 +1,43 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Blocks, Download, Loader2, PlugZap, Search, Trash2 } from 'lucide-react';
-import EmptyState from '../../components/ui/EmptyState';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { Badge } from '../../components/ui/Table';
-import { Select } from '../../components/ui/FormField';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, Input, Select, Badge, Button, EmptyState, ConfirmDialog, useToast,
+} from '@studio-ux-ds/react';
 import { getMarketplace, installProvider, uninstallProvider } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useToast } from '@studio-ux-ds/react';
 import { CATEGORY_LABELS, categoryLabel } from './integration.constants';
-import ConnectionWizard from './ConnectionWizard';
 
-// Marketplace de Conectores (diretriz 1): galeria por categoria com busca,
-// badge Instalado e ações Instalar / Conectar (wizard) / Desinstalar.
+// Integrações/Marketplace — a prateleira de conectores. Migrada pro DS na v0.10.11.
+//
+// Continua em GRADE, e não em tabela: aqui não se compara número nem se opera em
+// lote — se escolhe um conector lendo o que ele faz. A tabela serve quando a
+// pergunta é "qual está pior?"; a grade serve quando é "qual eu quero?".
+//
+// **Conectar deixou de abrir modal**: navega para `/integracoes/conexoes/nova
+// ?provider=<chave>`, o mesmo passo a passo da tela de Conexões. Antes existiam
+// dois caminhos para criar conexão — o wizard daqui e o de lá — e eles podiam
+// divergir sem ninguém notar.
+//
+// **Bug consertado junto:** o `load()` chamava `toast.error(...)` sem que este
+// arquivo tivesse `useToast()`. Se a lista falhasse, o `catch` estourava
+// `ReferenceError: toast is not defined` — o tratamento de erro era o erro.
+// Ninguém viu porque só acontece quando a chamada falha.
+
 export default function Marketplace() {
+  const toast = useToast();
+  const navigate = useNavigate();
   const { can } = usePermissions();
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('');
-  const [acting, setActing] = useState(null); // key em ação
-  const [uninstalling, setUninstalling] = useState(null); // item aguardando ConfirmDialog
-  const [wizardFor, setWizardFor] = useState(null);
+  const [busca, setBusca] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [agindo, setAgindo] = useState(null);   // chave em ação
+  const [removendo, setRemovendo] = useState(null); // item aguardando confirmação
+
+  const podeGerenciar = can('integrations.marketplace.manage');
+  const podeConectar = can('integrations.connections.write');
 
   async function load() {
     setLoading(true);
@@ -34,146 +51,153 @@ export default function Marketplace() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
     return items.filter((i) => {
-      if (category && i.category !== category) return false;
+      if (categoria && i.category !== categoria) return false;
       if (q && !`${i.name} ${i.description} ${i.key}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [items, search, category]);
+  }, [items, busca, categoria]);
 
-  const byCategory = useMemo(() => {
+  const porCategoria = useMemo(() => {
     const map = new Map();
-    filtered.forEach((i) => {
+    filtrados.forEach((i) => {
       if (!map.has(i.category)) map.set(i.category, []);
       map.get(i.category).push(i);
     });
     return Array.from(map.entries());
-  }, [filtered]);
+  }, [filtrados]);
 
-  async function handleInstall(item) {
-    setActing(item.key);
+  async function instalar(item) {
+    setAgindo(item.key);
     try {
       await installProvider(item.key);
-      toast.success(`Conector "${item.name}" instalado.`);
+      toast.success(`“${item.name}” instalado. Agora dá para criar conexões dele.`);
       await load();
     } catch (err) {
       toast.error(err.message);
     } finally {
-      setActing(null);
+      setAgindo(null);
     }
   }
 
-  async function handleUninstall() {
-    if (!uninstalling) return;
-    setActing(uninstalling.key);
+  async function desinstalar() {
+    if (!removendo) return;
+    setAgindo(removendo.key);
     try {
-      await uninstallProvider(uninstalling.key);
-      toast.success(`Conector "${uninstalling.name}" desinstalado.`);
-      setUninstalling(null);
+      await uninstallProvider(removendo.key);
+      toast.success(`“${removendo.name}” desinstalado.`);
+      setRemovendo(null);
       await load();
     } catch (err) {
       toast.error(err.message);
     } finally {
-      setActing(null);
+      setAgindo(null);
     }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Marketplace</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-            Instale conectores e crie conexões pelo wizard — sem deploy, tudo online.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--ap-text-5)' }} />
-            <input
-              className="input pl-8 w-56"
-              placeholder="Buscar conector…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+    <div className="space-y-6">
+      <PageHeader
+        title="Marketplace"
+        subtitle="Os sistemas com que a plataforma sabe conversar. Instalar habilita o conector para a organização; conectar é o passo seguinte."
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <Input
+              placeholder="Procurar conector…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              style={{ width: 220 }}
             />
+            <Select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ width: 190 }}>
+              <option value="">Todas as categorias</option>
+              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </Select>
           </div>
-          <Select value={category} onChange={(e) => setCategory(e.target.value)} className="w-44">
-            <option value="">Todas as categorias</option>
-            {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </Select>
-        </div>
-      </div>
+        }
+      />
 
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
-      ) : !filtered.length ? (
-        <div className="card">
-          <EmptyState icon={Blocks} title="Nenhum conector encontrado" description="Ajuste a busca ou a categoria." />
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
         </div>
+      ) : !filtrados.length ? (
+        <Card>
+          <EmptyState
+            icon="search"
+            title="Nenhum conector com esse filtro"
+            description="Mude a busca ou a categoria. Se o sistema que você procura não está aqui, ele ainda não tem conector."
+          />
+        </Card>
       ) : (
-        byCategory.map(([cat, list]) => (
+        porCategoria.map(([cat, lista]) => (
           <div key={cat} className="space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ap-text-4)' }}>
+            <h2 style={{ fontSize: 12, fontWeight: 600, margin: 0, color: 'var(--su-text-muted)' }}>
               {categoryLabel(cat)}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {list.map((item) => (
-                <div key={item.key} className="card p-4 flex flex-col gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-brand/10 text-brand shrink-0">
-                      <Blocks size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
+              {lista.map((item) => (
+                <Card key={item.key}>
+                  <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
+                    <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold truncate" style={{ color: 'var(--ap-text-1)' }}>{item.name}</p>
-                        {item.installed && <Badge variant="green">Instalado</Badge>}
-                        {!item.has_implementation && <Badge variant="gray">Em breve</Badge>}
+                        <p style={{ fontSize: 14, fontWeight: 700, margin: 0, color: 'var(--su-text-primary)' }}>
+                          {item.name}
+                        </p>
+                        {item.installed && <Badge tone="success">instalado</Badge>}
+                        {!item.has_implementation && <Badge tone="neutral">em breve</Badge>}
                       </div>
-                      <p className="text-xs mt-1 line-clamp-3" style={{ color: 'var(--ap-text-4)' }}>{item.description}</p>
+                      <p style={{ fontSize: 12, margin: '6px 0 0', color: 'var(--su-text-muted)' }}>
+                        {item.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 'auto' }}>
+                      {!item.installed && podeGerenciar && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon="download"
+                          loading={agindo === item.key}
+                          title="Habilita este conector para a organização — ainda não cria nenhuma conexão"
+                          onClick={() => instalar(item)}
+                        >
+                          Instalar
+                        </Button>
+                      )}
+                      {item.installed && podeConectar && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon="zap"
+                          disabled={!item.has_implementation}
+                          title={item.has_implementation
+                            ? 'Abre o passo a passo de conexão deste conector'
+                            : 'Este conector ainda não aceita conexão'}
+                          onClick={() => navigate(`/integracoes/conexoes/nova?provider=${item.key}`)}
+                        >
+                          Conectar
+                        </Button>
+                      )}
+                      {item.installed && podeGerenciar && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon="trash"
+                          loading={agindo === item.key}
+                          title="Tira o conector da organização — exige que as conexões dele estejam desativadas"
+                          onClick={() => setRemovendo(item)}
+                        >
+                          Desinstalar
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-auto">
-                    {!item.installed && can('integrations.marketplace.manage') && (
-                      <button
-                        className="btn-primary disabled:opacity-60"
-                        disabled={acting === item.key}
-                        title="Habilita este conector para a organização"
-                        onClick={() => handleInstall(item)}
-                      >
-                        {acting === item.key ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                        Instalar
-                      </button>
-                    )}
-                    {item.installed && can('integrations.connections.write') && (
-                      <button
-                        className="btn-primary disabled:opacity-60"
-                        disabled={!item.has_implementation}
-                        title={item.has_implementation
-                          ? 'Abre o wizard de conexão deste conector'
-                          : 'Conexão disponível em fase futura'}
-                        onClick={() => setWizardFor(item)}
-                      >
-                        <PlugZap size={14} /> Conectar
-                      </button>
-                    )}
-                    {item.installed && can('integrations.marketplace.manage') && (
-                      <button
-                        className="btn-ghost text-red-500 disabled:opacity-60"
-                        disabled={acting === item.key}
-                        title="Desinstala o conector (exige todas as conexões desativadas)"
-                        onClick={() => setUninstalling(item)}
-                      >
-                        <Trash2 size={14} /> Desinstalar
-                      </button>
-                    )}
-                  </div>
-                </div>
+                </Card>
               ))}
             </div>
           </div>
@@ -181,21 +205,14 @@ export default function Marketplace() {
       )}
 
       <ConfirmDialog
-        open={Boolean(uninstalling)}
+        open={Boolean(removendo)}
         danger
-        loading={Boolean(acting)}
+        loading={Boolean(agindo)}
         title="Desinstalar conector"
-        message={`Desinstalar "${uninstalling?.name}" da organização? As conexões existentes não são apagadas, mas precisam estar desativadas. Você pode reinstalar a qualquer momento.`}
+        message={`Tirar “${removendo?.name}” da organização? As conexões existentes NÃO são apagadas, mas precisam estar desativadas para a desinstalação passar. Dá para instalar de novo quando quiser.`}
         confirmLabel="Desinstalar"
-        onClose={() => setUninstalling(null)}
-        onConfirm={handleUninstall}
-      />
-
-      <ConnectionWizard
-        open={Boolean(wizardFor)}
-        provider={wizardFor}
-        onClose={() => setWizardFor(null)}
-        onCreated={() => { /* estado atualizado ao abrir Conexões */ }}
+        onClose={() => setRemovendo(null)}
+        onConfirm={desinstalar}
       />
     </div>
   );

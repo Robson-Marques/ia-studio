@@ -1,5 +1,48 @@
 # Changelog — IA Studio
 
+## v0.10.11 - 2026-07-26 (Família Integrações no DS — a conexão virou tela, não modal)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.31` → **`^1.2.32`** (`CopyButton` + glifo `copy`).
+
+### Mudado
+
+- **Toda a família Integrações migrada** para o Studio UX: Marketplace, Conexões, Cofre de Segredos, mais três telas novas que nasceram do desmembramento dos modais. 6 arquivos viraram 9.
+- **A conexão ganhou endereço próprio.** `/integracoes/conexoes/:id` (dados, recursos, histórico), `/integracoes/conexoes/:id/editar` e `/integracoes/conexoes/nova`. Eram quatro modais empilhados: detalhe, edição, escolha do conector e o passo a passo. Os dois últimos eram **a mesma decisão partida em duas telas**, cada uma com o seu "Cancelar".
+- **Seis ícones por linha viraram barra de lote.** A coluna de ações da lista de conexões tinha editar, testar, descobrir, ativar, desativar, pôr em manutenção e o botão do Google — sete alvos de 14 px na borda direita, três deles aparecendo e sumindo conforme o estado da linha. Agora a seleção é que diz o que dá para fazer: **ativar/desativar/manutenção** só aparecem quando a seleção **inteira** aceita aquela transição, e **editar** exige uma conexão só.
+- **"Descobrir recursos" virou aba da conexão.** Era um ícone na linha que abria outro modal com o resultado — e o resultado (os identificadores de setores, assuntos, planos e números, que existem para ser copiados) sumia ao fechar. Agora carrega sob demanda e fica onde se procura.
+- **Copiar identificador ficou padronizado** pelo `CopyButton` do DS: confirma no próprio botão e tem o fallback para quando o navegador não libera a área de transferência.
+- **Os mapas de estado desta família declaram `tone`** direto, sem passar pela ponte `lib/tone.js`. É o começo do fim da ponte — uma família de cada vez.
+
+### Corrigido
+
+- **`TOKEN_EXPIRED` era o único estado que saía cinza.** O mapa declarava `variant: 'orange'`, e `orange` **não existe** na ponte de cores (`lib/tone.js`) — caía no `|| 'neutral'`. Ou seja: exatamente o estado que precisa gritar (a credencial venceu, a integração parou) era o mais discreto da tela. Agora é `warning`, e "papel desconhecido" deixou de ser possível.
+- **Dois `toast` indefinidos** — `Marketplace.load()` e o modal de rotação do Cofre chamavam `toast.error(...)` sem que o arquivo tivesse `useToast()`. No caminho de erro, o `catch` estourava `ReferenceError: toast is not defined`: **o tratamento do erro era o erro**. Só aparecia quando a chamada falhava, que é justamente quando ninguém está olhando o console.
+- **Editar conexão era um modal que não podia fechar por clique fora** — e o legado já desligava o `dismissable` por isso. Um formulário que precisa se defender do próprio contêiner está dizendo que não é modal: virou rota.
+
+### O que dá pra verificar agora (sem depender de dado real)
+
+1. **Integrações → Conexões**: a linha abre `/integracoes/conexoes/<id>` — barra de endereço muda, F5 recarrega a mesma conexão, "voltar" do navegador volta para a lista.
+2. **Caminho no topo**: em "Integrações / Conexões / Detalhe", clicar em **Conexões** volta para a lista (o breadcrumb navega de verdade).
+3. **Barra de lote**: selecione uma conexão ativa → aparecem *Testar, Editar, Desativar, Pôr em manutenção* (não aparece *Ativar*). Selecione duas com estados diferentes → some a transição que não serve para as duas, e **Editar** some (é uma por vez).
+4. **Identificador**: na aba Dados, clicar em copiar troca o ícone por um ✓ e o texto para "Copiado" por 2 s.
+5. **Nova conexão**: `/integracoes/conexoes/nova` mostra o trilho de etapas; escolher o conector renomeia as etapas do meio conforme o schema dele; "Avançar" sem preencher obrigatório dá toast e **não** avança.
+6. **Marketplace → Conectar** leva para `/integracoes/conexoes/nova?provider=<chave>` com o conector já escolhido.
+7. **WhatsApp → Números**: a linha abre direto a conexão daquele número. Links antigos com `?open=<id>` continuam funcionando (encaminham).
+8. **Cofre**: a linha não abre nada (não há mais o que mostrar do que já está nas colunas); selecionar uma habilita *Trocar os valores*; salvar sem preencher dá **toast**, não tela branca (era o `ReferenceError`).
+9. **Tema escuro e 375 px** em todas as telas da família.
+
+### O que só dá pra conferir com o sistema em uso
+
+- **Testar em lote** — precisa de conexão real respondendo; o resumo distingue quantas passaram e mostra o motivo da primeira que não passou.
+- **Aba Recursos** — depende de um conector que exponha descoberta (IXC, Meta). Com conexão desativada, a resposta esperada é o vazio explicando que ela não responde.
+- **Trocar segredo** — só se confirma testando a conexão logo depois.
+- **Entrar com Google** — exige o app OAuth configurado e a janela de consentimento.
+- **Credencial vencida em laranja** — só aparece quando um token realmente expira.
+
+### Pendência sua
+
+- `platform-admin/src/pages/Integracoes/ConnectionWizard.jsx` ficou **órfão** (foi absorvido pelo `ConexaoNova.jsx`) e o sandbox não consegue apagar arquivo no repositório montado. Comando no fim desta entrega, junto dos demais órfãos.
+
 ## v0.10.10 - 2026-07-25 (Clicar num número abre a conexão dele, não a lista)
 
 Sem `db push`. Só frontend. Sem bump do DS (segue `^1.2.31`).

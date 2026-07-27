@@ -18,6 +18,9 @@ import Auditoria from './pages/Auditoria';
 import MinhaConta from './pages/MinhaConta';
 import Marketplace from './pages/Integracoes/Marketplace';
 import Conexoes from './pages/Integracoes/Conexoes';
+import ConexaoNova from './pages/Integracoes/ConexaoNova';
+import ConexaoDetalhe from './pages/Integracoes/ConexaoDetalhe';
+import ConexaoEditar from './pages/Integracoes/ConexaoEditar';
 import Segredos from './pages/Integracoes/Segredos';
 import Conversas from './pages/WhatsApp/Conversas';
 import Templates from './pages/WhatsApp/Templates';
@@ -101,6 +104,10 @@ export default function App() {
                 <Route path="/conta/senha" element={<ContaSenha />} />
                 <Route path="/integracoes/marketplace" element={<PermissionRoute perm="integrations.marketplace.read"><Marketplace /></PermissionRoute>} />
                 <Route path="/integracoes/conexoes" element={<PermissionRoute perm="integrations.connections.read"><Conexoes /></PermissionRoute>} />
+                {/* `nova` antes de `:id` — senão a rota dinâmica casa primeiro e trata "nova" como um id. */}
+                <Route path="/integracoes/conexoes/nova" element={<PermissionRoute perm="integrations.connections.write"><ConexaoNova /></PermissionRoute>} />
+                <Route path="/integracoes/conexoes/:id" element={<PermissionRoute perm="integrations.connections.read"><ConexaoDetalhe /></PermissionRoute>} />
+                <Route path="/integracoes/conexoes/:id/editar" element={<PermissionRoute perm="integrations.connections.write"><ConexaoEditar /></PermissionRoute>} />
                 <Route path="/integracoes/segredos" element={<PermissionRoute perm="integrations.secrets.read"><Segredos /></PermissionRoute>} />
                 <Route path="/whatsapp/conversas" element={<PermissionRoute perm={WHATSAPP_VIEW_PERMS}><Conversas /></PermissionRoute>} />
                 <Route path="/whatsapp/templates" element={<PermissionRoute perm="comm.whatsapp.templates.read"><Templates /></PermissionRoute>} />

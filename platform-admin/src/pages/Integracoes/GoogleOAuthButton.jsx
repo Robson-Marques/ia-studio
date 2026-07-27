@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, LogIn } from 'lucide-react';
-import { useToast } from '@studio-ux-ds/react';
+import { Button, useToast } from '@studio-ux-ds/react';
 import { startGoogleOAuth, getConnection } from '../../services/integrations';
 
-// Botão "Entrar com Google" (Email Platform — Fase 7). Abre a URL de
-// consentimento (retornada pelo start do OAuth) numa janela popup e faz
-// polling do status da conexão até virar ACTIVE (ou o popup fechar). Reusado
-// no Wizard (passo final) e na tela de Conexões (linha PENDING_AUTH/TOKEN_EXPIRED).
+// "Entrar com Google" — abre a tela de consentimento numa janela à parte e fica
+// perguntando pela conexão até ela virar ACTIVE (ou o usuário desistir). Usado na
+// criação da conexão e na lista, quando a conta precisa ser (re)autorizada.
+// Migrado pro DS na v0.10.11: o rótulo já dizia o que estava acontecendo
+// ("Aguardando autorização…"), então o `loading` do Button do DS entra sem perda.
 export default function GoogleOAuthButton({ connectionId, onActivated, size = 'md' }) {
   const toast = useToast();
   const [loading, setLoading] = useState(false);
@@ -20,11 +20,11 @@ export default function GoogleOAuthButton({ connectionId, onActivated, size = 'm
     setLoading(true);
     try {
       const { url } = await startGoogleOAuth(connectionId);
-      if (!url) throw new Error('URL de consentimento indisponível.');
+      if (!url) throw new Error('O endereço de autorização não veio — tente de novo em instantes.');
       const popup = window.open(url, 'iastudio_google_oauth', 'width=520,height=680');
       popupRef.current = popup;
       if (!popup) {
-        toast.error('Não foi possível abrir a janela de login. Libere pop-ups para este site.');
+        toast.error('O navegador bloqueou a janela de login. Libere pop-ups para este site e tente de novo.');
         return;
       }
       startPolling();
@@ -46,17 +46,17 @@ export default function GoogleOAuthButton({ connectionId, onActivated, size = 'm
         const conn = await getConnection(connectionId);
         if (conn.status === 'ACTIVE') {
           stopPolling();
-          toast.success('Conta Google conectada com sucesso.');
+          toast.success('Conta Google conectada.');
           onActivated?.(conn);
           return;
         }
       } catch {
-        // ignora erros transitórios de polling
+        // Erro passageiro de rede não encerra a espera — a janela do Google
+        // continua aberta e o usuário ainda pode concluir.
       }
-      // Encerra se o popup fechou sem sucesso ou após ~3 min.
       const popupClosed = popupRef.current && popupRef.current.closed;
-      if (popupClosed && elapsed > 3000) { stopPolling(); }
-      if (elapsed >= 180000) { stopPolling(); toast.warn('Tempo de autorização esgotado. Tente novamente.'); }
+      if (popupClosed && elapsed > 3000) stopPolling();
+      if (elapsed >= 180000) { stopPolling(); toast.warn('A autorização demorou demais. Tente novamente.'); }
     }, 2500);
   }
 
@@ -66,12 +66,16 @@ export default function GoogleOAuthButton({ connectionId, onActivated, size = 'm
     setPolling(false);
   }
 
-  const busy = loading || polling;
-  const cls = size === 'sm' ? 'btn-ghost p-1.5' : 'btn-primary';
   return (
-    <button className={`${cls} disabled:opacity-60`} onClick={handleClick} disabled={busy} title="Entrar com Google">
-      {busy ? <Loader2 size={14} className="animate-spin" /> : <LogIn size={14} />}
-      {size !== 'sm' && (polling ? 'Aguardando autorização…' : 'Entrar com Google')}
-    </button>
+    <Button
+      variant={size === 'sm' ? 'ghost' : 'primary'}
+      size={size === 'sm' ? 'sm' : 'md'}
+      icon="login"
+      loading={loading || polling}
+      title="Abre a tela de consentimento do Google numa janela à parte"
+      onClick={handleClick}
+    >
+      {polling ? 'Aguardando autorização…' : 'Entrar com Google'}
+    </Button>
   );
 }

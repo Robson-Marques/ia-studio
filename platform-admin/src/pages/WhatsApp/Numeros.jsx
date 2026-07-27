@@ -24,8 +24,11 @@ import { statusToTone } from '../../lib/tone';
 //  · **A linha abre a conexão DAQUELE número** em Integrações — que é onde ela se
 //    gerencia; esta tela é o painel de saúde, não o cadastro. O `id` do número é o
 //    id da própria conexão (o backend deriva a lista das conexões `whatsapp-meta`),
-//    então o deep-link `?open=<id>` é direto. Na v0.10.9 a linha caía na LISTA de
-//    conexões, obrigando a procurar de novo o que já tinha sido escolhido.
+//    então o link é direto. Na v0.10.9 a linha caía na LISTA de conexões,
+//    obrigando a procurar de novo o que já tinha sido escolhido; na v0.10.10 virou
+//    `?open=<id>`, e na v0.10.11 — quando a conexão ganhou rota própria — virou o
+//    endereço dela. O `?open=` continua funcionando para links antigos: a tela de
+//    Conexões o encaminha.
 //  · O erro de sincronização fica **na célula da situação**, visível: informação
 //    essencial não vive em tooltip (regra do DS).
 
@@ -177,7 +180,7 @@ export default function Numeros() {
             columns={columns}
             rows={items}
             getRowId={(n) => n.id}
-            onRowClick={(n) => navigate(`/integracoes/conexoes?open=${n.id}`)}
+            onRowClick={(n) => navigate(`/integracoes/conexoes/${n.id}`)}
             getRowLabel={(n) => `Abrir a conexão de ${n.name}`}
             bulkActions={bulkActions}
           />
