@@ -41,22 +41,21 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
 | Item | Descrição |
 |---|---|
-| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.38`) |
-| `.npmrc` | Aponta `@studio-ux-ds` para GitHub Packages, token via `NODE_AUTH_TOKEN` (ver abaixo) |
+| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/icons`, `@studio-ux-ds/react` (`^1.2.38`) — o `icons` é **peerDependency** do `react` e passou a ser declarado na v0.10.18 |
+| `.npmrc` | Aponta `@studio-ux-ds` para GitHub Packages, token via `NODE_AUTH_TOKEN`. ⚠️ **está com BOM** — reescrever sem (ver débito 1) |
 | `main.jsx` | Importa `tokens.css` + `components.css`, chama `configureTheme({ namespace: 'ia-studio' })` + `applyTheme()`, envolve o app com `<ToastProvider>` do DS |
 | `ThemeContext.jsx` | Wrapper fino do mecanismo de tema do DS. Fonte única = DS (chaves namespaçadas `ia-studio_su_*`); espelha `.dark` no `<html>` para compatibilidade com telas Tailwind com `dark:`; `MutationObserver` sincroniza estado quando o AppShell/Customize trocam o tema |
 | `Layout.jsx` | Casca via `AppShell` do DS. Slots: brand, nav (grupos com filtro por permissão), version, breadcrumb, topbarContext (seletor de workspace + badge de ambiente), user, userMenuItems (Minha conta, Trocar senha), `onNotifications` (redireciona pra `/automacao/notificacoes`), `notifications` (polling 30s), `customize` (painel embutido), `onLogout` |
 | `Dashboard.jsx` | Primeira tela após login. `PageHeader` + 4 `StatCard` + `Card` com Badge de status do plano |
 | `ContaSenha.jsx` (rota `/conta/senha`) | Nova. Substitui o modal de troca de senha que vivia no `Header` legado — elimina o empilhamento cross-tree modal-fora-do-outlet |
-| `Layout.legacy.jsx`, `Sidebar.legacy.jsx`, `Header.legacy.jsx`, `Dashboard.legacy.jsx` | Backups da versão anterior. Não são importados em produção — servem só para rollback rápido (trocar o import no `App.jsx`) |
 | Piloto `/studio-ux-demo` | Preservado sem alteração. Renderiza dentro do AppShell |
 
 ### Coexistência de padrões
 
-- **CSS.** `--su-*` (Studio UX) e `--ap-*` (IA Studio) coexistem sem colisão de nome. As telas legadas continuam consumindo `--ap-*`; a casca (AppShell) usa `--su-*`. O container principal do AppShell não força fundo — a página filha continua controlando sua superfície interna.
+- **CSS.** Não há mais coexistência: tudo em `--su-*`. O `--ap-*` sobreviveu apenas no `index.css`, onde `--ap-accent` herda `--su-action` (compatibilidade do Tailwind).
 - **Toast.** Fonte única: `<ToastProvider>` do DS montado no `main.jsx`. Todos os 55 callsites do painel consomem `useToast()` diretamente. `lib/toast.js` e `UIToastContainer.jsx` foram esvaziados (marcados para remoção) — passo 5 concluído em 2026-07-24.
 - **Tema.** O DS é a fonte única. `ThemeContext` reflete o estado do DS + espelha `.dark` no HTML. Telas com `dark:` do Tailwind continuam funcionando.
-- **Ícones.** Sidebar/menu de conta usam `DSIcon` (biblioteca curada do Studio UX) via mapa `LUCIDE_TO_DS` no `Layout.jsx` — proximidade semântica. Ícones dentro das páginas legadas continuam usando `lucide-react` (`Sun`, `Moon`, `LogOut` etc. — sem prejuízo).
+- **Ícones.** O menu usa `DSIcon` via mapa `LUCIDE_TO_DS` no `Layout.jsx` — a lista do menu passa a **chave do mapa** (`KeyRound`), não o nome do glifo do DS; trocar por engano faz o ícone virar "?". Dentro das páginas, `lucide-react` sobrou só para o `Loader2` do carregamento inicial.
 
 ## ADR — decisões da fase 2
 
@@ -71,10 +70,11 @@ A fase 1 (v0.9.79) documentava `.npmrc` como existente, mas o arquivo não estav
 > //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 > ```
 >
-> A sessão de execução desta frente não conseguiu escrever esse arquivo (path
-> bloqueado pela sandbox) — Robson precisa criá-lo manualmente antes de qualquer
-> `npm install` limpo. Sem ele, o `install.sh`/`upgrade.sh` vai retornar 401 na
-> primeira execução em servidor novo.
+> Criado em 2026-07-24. **Nota de 2026-07-26:** o arquivo está gravado **com BOM**
+> (`EF BB BF` antes do `@`), o que pode fazer o npm ignorar a linha do `registry`,
+> cair no registry público e devolver 404 nos pacotes `@studio-ux-ds`. Hoje
+> funciona (o npm tolera), mas é frágil — reescrever em UTF-8 sem BOM. O caminho é
+> protegido para o assistente, então é ação manual.
 
 ### 2. Rota `/studio-ux-demo` sempre esteve dentro do Layout — mudou de casca legada para AppShell
 
@@ -88,7 +88,7 @@ O AppShell tem `onNotifications` (callback ao clicar) + `notifications` (contado
 - `onNotifications` → `navigate('/automacao/notificacoes')`.
 - Nenhuma tentativa de recriar o dropdown do sino legado (`NotificationsBell`) no AppShell — a tela de notificações tem tudo. Regressão consciente para reduzir escopo.
 
-O `NotificationsBell.jsx` original foi mantido no repositório porque `Header.legacy.jsx` ainda o importa. Se `Layout.legacy` for definitivamente aposentado, o sino também sai.
+**Decidido por ação em 2026-07-26:** o `NotificationsBell.jsx` foi excluído junto dos demais órfãos, então o sino segue como sinal + link. Trazer o dropdown de volta significa recuperar o conteúdo do histórico do git e pô-lo num `Drawer` — sub-frente própria, se você quiser.
 
 ### 4. Troca de senha migrou de modal-cross-tree para rota `/conta/senha`
 
@@ -100,7 +100,7 @@ O `workflow.consuming-system-adoption@1.0.0` (herdado) proíbe adoção em lote 
 
 > "Sweep total agora (exceção registrada) — Reescrever todos os callsites que importam de `lib/toast` para `useToast` do DS. Registrar exceção explícita ao `workflow.consuming-system-adoption` no ADR. Você assume o custo/risco."
 
-O sweep será o passo 5 da frente. Até lá, o `UIToastContainer` local e o `lib/toast` seguem funcionais em coexistência com o `<ToastProvider>` do DS já montado.
+Sweep concluído em 2026-07-24; `lib/toast.js` e `UIToastContainer.jsx` foram excluídos com os demais órfãos em 2026-07-26.
 
 ### 6. Multi-tenant branding — fora do escopo desta frente
 
@@ -114,11 +114,11 @@ O AppShell usa `DSIcon` interno, cuja biblioteca é curada e menor que a `lucide
 
 | # | Item | Frente/momento |
 |---|---|---|
-| 1 | Criar `.npmrc` no `platform-admin/` (bloqueado pela sandbox nesta execução) | Robson faz manualmente — **antes do próximo deploy limpo** |
+| 1 | ~~Criar `.npmrc`~~ ✅ **criado** (2026-07-24). **MAS o arquivo tem BOM (`EF BB BF`) na primeira linha** — o npm pode ignorar a linha do `registry`, cair no registry público e falhar com 404 nos pacotes `@studio-ux-ds`. Funciona hoje porque o npm tolera, mas é frágil: reescrever sem BOM (comando entregue em 2026-07-26). O caminho é protegido para o assistente | Robson: reescrever sem BOM |
 | 2 | ~~Sweep de `lib/toast` → `useToast()` do DS + remover `UIToastContainer`~~ | ✅ Concluído em 2026-07-24 (55 arquivos migrados; `lib/toast.js` e `UIToastContainer.jsx` esvaziados) |
 | 3 | ~~9 páginas com modais siblings + estados independentes~~ → **as 3 do grupo IA foram resolvidas** pela regra do Modal (`IA/Ferramentas`, `IA/BasesConhecimento`, `IA/Aprovacoes`: os modais com `TextArea` viraram rota, o que dissolveu os estados concorrentes). Resolvidas também nas famílias seguintes; `Integracoes/Conexoes` era o caso extremo (**quatro** modais siblings) e caiu na v0.10.11 — detalhe, edição e passo a passo viraram rota, e a escolha do conector virou o primeiro passo | Cada uma resolve na migração da sua família — a regra do Modal (DS v1.2.12) já dá o caminho |
-| 4 | Instalação do `@studio-ux-ds/icons` (não está no `package.json`) | Quando a primeira família de tela migrar e precisar de ícones DS dentro do conteúdo |
-| 5 | Migração das famílias de tela para o padrão visual do DS. **Concluídas: IA Studio** (v0.9.84→v0.9.91 — 6 telas + 2 sweeps), **ISP** (v0.9.92), **Automação inteira** (A: v0.9.99 · B: v0.10.2 · C: v0.10.4 — o canvas), **WhatsApp inteira** (v0.10.9 — 11 arquivos, com o contact center, o `fullBleed` do AppShell e o split do composer), **Integrações inteira** (v0.10.11 — 6 arquivos viraram 9: o detalhe, a edição e o passo a passo de conexão saíram de modal e viraram rota). **Recursos** (v0.10.13 — 2 telas + o editor de mapeamento que saiu do modal) e **Desenvolvedor** (v0.10.13 — 2 telas). Resta: **Configurações** (5) — todas do padrão lista+form, sem layout especial | Uma sub-frente por família |
+| 4 | ~~Instalação do `@studio-ux-ds/icons`~~ ✅ **declarado na v0.10.18**. Ele é **peerDependency** do `@studio-ux-ds/react`, então o npm 7+ instalava por conta — funcionava por tolerância do gerenciador, não por declaração. Agora está explícito | — |
+| 5 | ~~Migração das famílias de tela~~ ✅ **CONCLUÍDA** (v0.9.84 → v0.10.17). Todas as famílias no DS, mais as 3 telas públicas. `components/ui/` extinta; nenhum `--ap-*` em código vivo (só no `index.css`, onde `--ap-accent` herda `--su-action`) | — |
 | 14 | **Infra de canvas/node-editor não existe no DS** — paleta de blocos, trilho recolhível, nó com conectores, inspetor persistente. Está escrita à mão em **dois** produtos (aqui e o `WorkflowCanvas` do AquaPark), então a divergência entre eles é garantida. O canvas daqui foi migrado usando os **tokens** do DS, mas a estrutura segue no consumidor. Registrado também no audit do DS (item G1 + B.1.1) | Decisão do dono do DS: entra como pattern do Studio UX ou fica sendo infra de produto? Não é bloqueio para nada agora |
 
 ### Regras do DS que nasceram desta adoção
@@ -162,11 +162,11 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 - **`Switch` do DS não tem rótulo, e o `onChange` dele entrega o BOOLEANO, não o evento.** Escrever `onChange={(e) => patch({ x: e.target.checked })}` num `Switch` lança exceção ao clicar (`e.target` é `undefined`). Mas antes disso: campo de formulário que só vale ao salvar é **`Checkbox variant="card"`** com `label` + `meta` (padrão da v1.2.20), não `Switch` — `Switch` é para alternância de efeito imediato.
 - **Antes de improvisar um estado ou variante**, pergunte: *"a spec já prevê isso e o adapter não expõe?"* Nos 8 casos desta adoção a resposta foi sim — e em 3 deles a spec estava certa desde a v1.0.0 (inclusive o anti-padrão "breadcrumb que não navega", que estava escrito e acontecendo).
 | 6 | Multi-tenant branding via Customize (accent/tema por organização) | Quando o backend expuser as preferências por org |
-| 7 | Aposentar **`components/Layout/Header.jsx`** (288 linhas, ninguém importa) e **`components/Layout/NotificationsBell.jsx`** (135 linhas, importado *só* pelo Header). Ficaram **fora** da limpeza do item 12 de propósito: o `NotificationsBell` é a referência viva do item 8 (trazer o dropdown do sino de volta num `Drawer`) — apagando, ele só existe no git, o que é resgatável mas cobra atrito na hora. Decida junto do item 8: se o dropdown vai voltar, mantenha; se não vai, os dois caem juntos | Depende da decisão do item 8, não de validação |
-| 8 | Regressão do dropdown do sino de notificações — hoje o AppShell só oferece um sinal + link direto para `/automacao/notificacoes` (ADR §3). Se você quiser o dropdown de volta, precisa de sub-frente que extraia o conteúdo do `NotificationsBell.jsx` para um `<Drawer>` do DS acionado pelo `onNotifications` | Sub-frente futura, opcional |
+| 7 | ~~Aposentar `Header.jsx` + `NotificationsBell.jsx`~~ ✅ **excluídos** (2026-07-26), junto dos 13 órfãos. Com isso o item 8 foi decidido por ação: o dropdown do sino **não volta** por enquanto — o conteúdo dele vive só no histórico do git | — |
+| 8 | **Dropdown do sino — decidido por ação:** o `NotificationsBell.jsx` foi excluído, então hoje o sino é sinal + link para `/automacao/notificacoes` (ADR §3) e assim fica. Se um dia voltar, é sub-frente própria que recupera o conteúdo do git e o põe num `Drawer` do DS | Fechado (reabre se você quiser o dropdown) |
 | 9 | ~~`DELETE` de base de conhecimento não existe no backend~~ → **movido para [`docs/divida-tecnica.md`](divida-tecnica.md) como `DT-003`**. Não é do DS: é buraco de backend que a migração só revelou. Critério do Robson em 2026-07-25: *o que não é responsabilidade do DS vive na dívida técnica do IA Studio* | — |
 | 11 | ~~`upgrade.sh` movia o marcador de versão antes de construir~~ ✅ **Resolvido na v0.9.96** (2026-07-25): `revert_checkout()` volta o repo para a versão de origem quando a falha acontece depois do checkout, com duas linhas `[ROLLBACK]` no log; e o script passou a se copiar para `/tmp` antes de tocar no git (o `git checkout` reescrevia o próprio `upgrade.sh` em execução). Registro completo em [`docs/divida-tecnica.md`](divida-tecnica.md) → Resolvidos | — |
-| 12 | **Limpeza dos órfãos — 13 arquivos** (os 20 `.legacy.jsx` já foram excluídos por você). Restam: os 8 de `components/ui/` (sem consumidor desde a v0.10.17), `components/Layout/{Header,Sidebar,NotificationsBell}.jsx` e `pages/IA/editor/Agent{Editor,Execute}Modal.jsx`. **Inventário anterior — 25 arquivos** (24 do inventário de 2026-07-25 + **`pages/Integracoes/ConnectionWizard.jsx`**, absorvido pelo `ConexaoNova.jsx` na v0.10.11 e hoje sem nenhum importador). Inventário conferido em 2026-07-25 (nenhum deles é importado por código vivo; as únicas menções eram 3 comentários, já corrigidos): **20 `*.legacy.jsx`** (backup de rollback das famílias migradas), **`editor/NodeConfigModal.jsx`** + **`editor/ExecuteModal.jsx`** (substituídos pelo `NodeInspector`/`ExecuteDrawer` na v0.10.2) e **`lib/toast.js`** + **`components/ui/UIToastContainer.jsx`** (esvaziados no sweep do toast — 4 e 5 linhas de nada). O histórico mora no git; `.legacy` ao lado do arquivo vivo é lixo, e o CLAUDE.md proíbe. **O comando PowerShell está pronto e foi entregue ao Robson** — o ambiente do assistente cria e edita arquivo no disco dele, mas não remove. Nota: as 3 telas de log da Automação **não** têm `.legacy.jsx` (foram reescritas no lugar). | `Remove-Item` único — depende só de você considerar as famílias IA + ISP + Automação A/B validadas |
+| 12 | ~~Limpeza dos órfãos~~ ✅ **FEITA** (2026-07-26). 20 `.legacy.jsx` + 13 arquivos (os 8 de `components/ui/`, `Header`/`Sidebar`/`NotificationsBell` e os 2 modais de assistente). Conferido depois: **nenhum import quebrado** em toda a `src`. `AgentVersionsModal.jsx` ficou de propósito — é vivo (usado por `AgenteEditor` e `Agentes`) | — |
 | 10 | ~~`is_active` no cadastro de servidor MCP é recusado pelo backend~~ → **movido para [`docs/divida-tecnica.md`](divida-tecnica.md) como `DT-004`**. Decisão de produto, não do DS | — |
 
 ## Rollback

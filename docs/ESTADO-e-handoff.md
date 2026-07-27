@@ -60,10 +60,13 @@ armadilhas). Resumo para re-ancorar:
   **Integrações INTEIRA** (v0.10.11 — 6 arquivos viraram 9), **Recursos** e
   **Desenvolvedor** (v0.10.13) e **as 8 últimas** (v0.10.16 — pessoas, perfis, workspaces,
   auditoria, minha conta + login, aceitar convite e página de pagamento).
-- **NÃO FALTA TELA NEM COMPONENTE.** A pasta `components/ui/` ficou sem consumidor na v0.10.17,
-  quando o `PhoneInput` do DS ganhou seletor de país (DS v1.2.38). O `--ap-*` vive só no `index.css`
-  (`--ap-accent` herda `--su-action`). **13 arquivos órfãos** esperam o `Remove-Item` — os 8 de
-  `components/ui/`, `Header/Sidebar/NotificationsBell` e os 2 modais de assistente.
+- **A FRENTE ESTÁ FECHADA.** Todas as telas no DS, `components/ui/` **excluída**, 33 órfãos removidos
+  (20 `.legacy` + 13), nenhum import quebrado. O `--ap-*` vive só no `index.css` (`--ap-accent` herda
+  `--su-action`). O dropdown do sino **não volta** (decidido por ação: `NotificationsBell.jsx` foi
+  excluído; o conteúdo está no git se um dia quiser).
+- **Resta de infra:** o `.npmrc` do `platform-admin` está gravado **com BOM** — o npm pode ignorar a
+  linha do `registry` e devolver 404 nos pacotes `@studio-ux-ds` num install limpo. Funciona hoje por
+  tolerância. Reescrever sem BOM é ação manual (caminho protegido para o assistente).
 - **A conexão tem rota própria** (v0.10.11): `/integracoes/conexoes/:id`, `/:id/editar` e `/nova`
   (que aceita `?provider=<chave>`, é assim que o Marketplace manda para lá). O `?open=<id>` da
   v0.10.10 sobrevive só como encaminhamento. "Descobrir recursos" é **aba** da conexão, não modal.

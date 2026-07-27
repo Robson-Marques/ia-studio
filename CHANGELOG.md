@@ -1,5 +1,23 @@
 # Changelog — IA Studio
 
+## v0.10.19 - 2026-07-26 (Fecho da frente: dependência declarada e débito revisado)
+
+Sem `db push`. Só `package.json` e documentação. Sem bump do DS (segue `^1.2.38`).
+
+### Mudado
+
+- **`@studio-ux-ds/icons` passou a ser declarado** no `package.json`. Ele é **peerDependency** do `@studio-ux-ds/react`, e o npm 7+ vinha instalando por conta — **funcionava por tolerância do gerenciador, não por declaração**. Num gerenciador mais estrito, ou com `--legacy-peer-deps`, o `DSIcon` não resolveria e o build quebraria com "não encontrei o módulo" numa dependência que ninguém declarou.
+- **Débito da adoção revisado contra o disco**, não de memória: os itens de migração de famílias, limpeza de órfãos e aposentadoria do `Header`/`NotificationsBell` foram fechados; o do dropdown do sino ficou **decidido por ação** (o arquivo foi excluído, então o sino segue como sinal + link).
+
+### Pendência sua
+
+- **O `.npmrc` do `platform-admin` está gravado com BOM** (`EF BB BF` antes do `@`). O npm pode **ignorar a linha do `registry`**, cair no registry público e devolver 404 nos pacotes `@studio-ux-ds` — num servidor novo o `install.sh` quebraria por um motivo que não aparece na mensagem de erro. Hoje funciona porque o npm tolera. O caminho é protegido para o assistente, então é ação manual; comando no fim.
+
+### Lição
+
+Dois achados da mesma família: **coisas que funcionam por tolerância de ferramenta, não por estarem certas.** O `icons` instalava porque o npm 7+ resolve peer sozinho; o `.npmrc` é lido porque o npm engole o BOM. Nenhum dos dois aparece como erro hoje — os dois aparecem no primeiro ambiente um pouco diferente. Vale procurar por esse padrão quando uma frente parece terminada: o que está de pé só porque alguma ferramenta é generosa?
+
+
 ## v0.10.18 - 2026-07-26 (O menu passou a dizer o mesmo que a tela)
 
 Sem `db push`. Só frontend. Sem bump do DS (segue `^1.2.38`).

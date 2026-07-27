@@ -11,6 +11,7 @@
   "dependencies": {
     "@studio-ux-ds/tokens": "^1.2.38",
     "@studio-ux-ds/components": "^1.2.38",
+    "@studio-ux-ds/icons": "^1.2.38",
     "@studio-ux-ds/react": "^1.2.38",
     "@xyflow/react": "^12.3.5",
     "axios": "^1.7.7",
