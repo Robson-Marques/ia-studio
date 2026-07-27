@@ -6,7 +6,7 @@
 > governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
 
-## Estado atual — migração por família em curso (2026-07-26, v0.10.11 / DS ^1.2.32)
+## Estado atual — migração por família em curso (2026-07-26, v0.10.11 / DS ^1.2.33)
 
 O `platform-admin` opera com a **casca AppShell do Studio UX** e o **Dashboard**
 migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
@@ -35,7 +35,7 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
 | Item | Descrição |
 |---|---|
-| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.32`) |
+| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.33`) |
 | `.npmrc` | Aponta `@studio-ux-ds` para GitHub Packages, token via `NODE_AUTH_TOKEN` (ver abaixo) |
 | `main.jsx` | Importa `tokens.css` + `components.css`, chama `configureTheme({ namespace: 'ia-studio' })` + `applyTheme()`, envolve o app com `<ToastProvider>` do DS |
 | `ThemeContext.jsx` | Wrapper fino do mecanismo de tema do DS. Fonte única = DS (chaves namespaçadas `ia-studio_su_*`); espelha `.dark` no `<html>` para compatibilidade com telas Tailwind com `dark:`; `MutationObserver` sincroniza estado quando o AppShell/Customize trocam o tema |
@@ -135,6 +135,7 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 | v1.2.27 | **`StatCard` novo**: ícone à esquerda + degradê tonal; o `tone` pinta o entorno e **nunca o número**; `sub` para legenda neutra (o `delta` é a variação, e só ela leva cor). **Gradiente tonal e discreto passou a ser permitido** no DS (régua em `VISUAL_DNA` §6.4) |
 | v1.2.26 | Glifos `power` e `zap` — o vocabulário de **operação** (ligar/desligar, gatilho), que faltava porque a curadoria de ícones nasceu vestindo tela de cadastro |
 | v1.2.25 | **Accent também em canais RGB** (`--su-action-rgb`) — é o que permite o Tailwind do consumidor usar a cor do tema com opacidade, em vez de cravar hex. **`Breadcrumb` com `onNavigate`** (via `AppShell.onBreadcrumbNavigate`): item sem `href` não navega, `href` sem `onNavigate` recarrega a SPA — em app de página única os dois são obrigatórios |
+| v1.2.33 | **`Tabs` avisa quando um item vem sem `id`** — item é `{ id, label }`; `value` é a prop da aba ATIVA. Sem `id` nenhuma aba casa, o `onChange` devolve `undefined` e o conteúdo some ao clicar. Prop morta **dentro de um array de dados**, que a assinatura do componente não protege |
 | v1.2.32 | **`CopyButton`** (+ glifo `copy`) — "valor técnico + botão de copiar" é um par recorrente, e copiar são **três** coisas: o `try/catch`, o **fallback** para contexto sem Clipboard API e o aviso. Cada tela acertava a primeira e esquecia a segunda; sem fallback o clique não faz nada e não diz nada. A confirmação é **no próprio botão** (ícone vira ✓, rótulo vira "Copiado" por 2 s), não em toast no canto |
 | v1.2.24 | **Três containers, não dois:** Modal (leitura/campo curto) · **rota** (registro que existe por si) · **inspetor** = `Drawer` (propriedade de item dentro de um editor, sem URL própria, com o contexto precisando ficar à vista). `Drawer` tem `width` — 480+ para texto longo/JSON. Glifos `play`/`archive`/`save` |
 

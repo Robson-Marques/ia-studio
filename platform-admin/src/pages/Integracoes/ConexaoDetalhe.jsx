@@ -137,10 +137,14 @@ export default function ConexaoDetalhe() {
   const meta = statusMeta(conexao.status);
   const precisaAutorizar = conexao.provider_key === 'google-workspace' && conexao.status !== 'ACTIVE';
 
+  // O item do `Tabs` do DS é identificado por **`id`** (não `value` — esse é o
+  // da aba ativa, no componente). Declarar `{ value, label }` não dá erro: o
+  // `it.id` fica `undefined`, nenhuma aba casa com a ativa e o `onChange` devolve
+  // `undefined` — a tela some ao clicar em qualquer aba. Prop morta de novo.
   const abas = [
-    { value: 'dados', label: 'Dados' },
-    { value: 'recursos', label: 'Recursos' },
-    ...(podeVerLogs ? [{ value: 'logs', label: 'Histórico de chamadas' }] : []),
+    { id: 'dados', label: 'Dados' },
+    { id: 'recursos', label: 'Recursos' },
+    ...(podeVerLogs ? [{ id: 'logs', label: 'Histórico de chamadas' }] : []),
   ];
 
   return (
