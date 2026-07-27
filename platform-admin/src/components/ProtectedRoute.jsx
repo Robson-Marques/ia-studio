@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Spinner } from '@studio-ux-ds/react';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import Aviso from '../pages/Aviso';
@@ -11,7 +11,7 @@ export default function ProtectedRoute({ children }) {
   if (checking) {
     return (
       <div className="flex items-center justify-center h-[100dvh]">
-        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        <Spinner size="lg" />
       </div>
     );
   }

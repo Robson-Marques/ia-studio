@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, DescriptionList, Badge, Field, TextArea,
-  Button, ConfirmDialog, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, DescriptionList, Badge, Field, TextArea, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
 import { listApprovals, decideApproval } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -98,9 +94,7 @@ export default function AprovacaoDetalhe() {
     return (
       <div className="space-y-6">
         <PageHeader title="Carregando…" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }

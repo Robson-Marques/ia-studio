@@ -29,9 +29,10 @@ import { getNotificationsInbox } from '../../services/automation';
 //   onLogout        — logout do AuthContext
 //
 // Observações:
-//   * DSIcon do @studio-ux-ds/icons tem biblioteca curada — usamos nomes semanticamente
-//     próximos aos ícones lucide-react do legado. Ícones sem equivalente exato caem
-//     em fallbacks razoáveis (documentado no ADR).
+//   * Os ícones vêm todos do catálogo curado do DS (`DSIcon`), cada item do menu
+//     declarando o seu glifo. Não há mais tradução "por proximidade" de outra
+//     biblioteca — e desde a v0.10.22 nenhum arquivo do painel importa ícone de
+//     fora: o catálogo cobre navegação, ação, dados, status e mídia/gravação.
 //   * Multi-tenant branding não existe hoje na plataforma — quando existir, o
 //     Customize/AppShell aceitará accent/tema por organização.
 

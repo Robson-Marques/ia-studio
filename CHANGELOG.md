@@ -1,5 +1,35 @@
 # Changelog — IA Studio
 
+## v0.10.22 - 2026-07-27 (Fim da segunda biblioteca de ícones — 62 arquivos)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.40` → **`^1.2.41`** (10 glifos de mídia/gravação + `Spinner` com `size`/`center`).
+
+Execução da lacuna medida na v0.10.21: **62 arquivos ainda importavam ícone de outra biblioteca.** Agora são zero, e a dependência **saiu do `package.json`**.
+
+### O que mudou
+
+| Antes | Agora | Onde |
+|---|---|---|
+| `<div className="flex justify-center py-16"><Loader2 size={24} .../></div>` | `<Spinner size="lg" center />` | 54 lugares |
+| `<Loader2 size={13..28} className="animate-spin" .../>` | `<Spinner size="sm\|lg" />` | 17 lugares |
+| `<Button disabled={saving}>{saving && <Loader2 .../>}Salvar` | `<Button loading={saving}>` | `ContaSenha` |
+| 18 glifos de outra biblioteca | `<DSIcon name="…" />` | canvas, composer de áudio, anexo, player, bolha de conversa |
+| `"lucide-react": "^0.383.0"` | — | `package.json` |
+
+O `check`/`check-double`/`clock`/`alert-triangle` da **bolha de conversa** (enviado, entregue, lido, falhou, na fila) passaram a vir do DS — mantendo as cores fixas do WhatsApp, que são convenção do aplicativo e continuam em `DT-005`.
+
+### Dois casos que o sweep quase quebrou — e por que a verificação achou
+
+O ícone estava sendo passado **como valor**, não como elemento: `<CollapsedRail icon={Layers} />` no canvas e `{ icon: Camera, label: 'Câmera' }` no seletor de anexo. A troca mecânica cuidou do JSX (`<Layers />`), não achou uso do identificador, **removeu o `import`** — e deixou a referência viva. O resultado seria `ReferenceError` no clique: **trilho do canvas e menu de anexo em branco**, sem erro no build e sem aviso no console até alguém clicar.
+
+Achado por uma checagem própria: *para cada nome removido de um `import`, ele ainda aparece no corpo do arquivo?* Cinco acusações, três reais. Os dois componentes passaram a receber o **nome do glifo** (`icon="layers"`, `icon: 'camera'`), que é o formato do DS e elimina o motivo de importar ícone de fora — era só para ter algo que se pudesse passar como valor.
+
+É a terceira vez que o mesmo tipo de armadilha aparece num sweep, sempre com roupa nova: em `Checkbox` foi `children` indo pro DOM, em `Tabs` foi `id` faltando dentro de um array de dados, aqui foi identificador órfão depois de limpar `import`. **Sweep mecânico não é trivial** — e a regra prática é que a verificação tem que ser diferente da transformação: quem procura pelo mesmo padrão que trocou não acha o que escapou.
+
+### Verificado
+
+Todos os 113 arquivos parseiam · nenhum `Spinner`/`DSIcon` usado sem `import` · nenhum importado sem uso · nenhum nome de glifo fora do catálogo (91 glifos) · nenhum identificador órfão · `package.json` válido · `import` do `@xyflow/react` intacto (um regex meu chegou a comê-lo numa passada intermediária — refeito do zero em vez de remendado).
+
 ## v0.10.21 - 2026-07-27 (As telas de acesso passam a instanciar o molde do DS)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.39` → **`^1.2.40`** (`AuthScreen` + `MessageScreen`).
@@ -26,6 +56,15 @@ Mesmo molde, **sem o painel de marca**. Quem chega ali já foi convidado e só p
 As duas telas de aviso (criadas na v0.10.20 à mão com `Card` + `EmptyState`) passam a instanciar `MessageScreen`, o molde `empty` de tela inteira. Mesmo comportamento, agora vindo do DS — e a regra que ele carrega ("nenhum desses casos redireciona em silêncio") deixa de morar só neste repositório.
 
 Também movi o catch-all de rota para **dentro da casca autenticada**: o comentário dizia que o aviso aparecia com menu e caminho de volta, mas a rota estava fora do `Layout` — aparecia nua, e quem não estava logado via um 404 em vez de cair no login.
+
+### Auditoria do que ainda falta (medida, não estimada)
+
+Você perguntou "falta alguma coisa?" — então medi em vez de responder de cabeça. **Confirmado em ordem:** 70 de 70 rotas com casca têm breadcrumb (34 estáticas + 36 por padrão); toda tela de lista tem estado vazio; toda ação destrutiva tem `ConfirmDialog`; nenhum import inexistente no barrel do DS; nenhum nome de ícone fora do catálogo; os 113 arquivos da `src` e os 22 do `@studio-ux-ds/react` parseiam. **Duas correções de documentação viva:** o `.npmrc` **já está sem BOM** (os docs diziam que estava com — débito fechado), e a frase "o `lucide-react` sobrou só para o `Loader2`" **era falsa**.
+
+**Duas lacunas reais, ainda abertas, cada uma frente própria:**
+
+1. **`lucide-react` em 62 arquivos.** 57 usam `Loader2` — o DS tem `Spinner` e ninguém adotou; 14 usam glifos, sendo 5 que o DS já tem (`plus`, `square`, `play`, `layers`, `chevron-down` — duas famílias de desenho na mesma tela, sem motivo) e **9 que o DS não tem** (`pause`, `mic`, `sliders`, `rotate`, `music`, `image`, `file-text`, `clock`, `camera`). Os 9 são **vocabulário de mídia e gravação** que o composer de áudio do WhatsApp precisa — pela regra "onde o consumidor sai do DS há lacuna do DS", são pedido ao DS antes de qualquer sweep aqui.
+2. **6 dos 9 moldes de tela não existem em React** (`dashboard`, `detail`, `form`, `search`, `settings`, `wizard`), e temos telas em todas essas classes: **18 detalhe/editor em rota**, 16 formulários, 1 assistente de passos, 3 painéis. Cada uma foi arranjada à mão — é **exatamente a lacuna que o login tinha**, ainda não disparada porque ninguém pôs as duas versões lado a lado.
 
 ### Lição
 

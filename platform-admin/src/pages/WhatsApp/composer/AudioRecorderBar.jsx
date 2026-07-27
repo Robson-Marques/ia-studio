@@ -1,6 +1,5 @@
 import React from 'react';
-import { Mic, Pause, RotateCcw, Square } from 'lucide-react';
-import { Button, IconButton } from '@studio-ux-ds/react';
+import { Button, IconButton, DSIcon } from '@studio-ux-ds/react';
 import AudioPlayer from '../AudioPlayer';
 import { fmtTime } from './useAudioRecorder';
 
@@ -41,15 +40,15 @@ export default function AudioRecorderBar({ rec, sending, onSend }) {
         <div className="flex gap-2">
           {rec.state === 'recording' ? (
             <Button variant="secondary" size="sm" className="flex-1" onClick={rec.pause}>
-              <Pause size={13} /> Pausar
+              <DSIcon name="pause" size="sm" /> Pausar
             </Button>
           ) : (
             <Button variant="secondary" size="sm" className="flex-1" onClick={rec.resume}>
-              <Mic size={13} /> Continuar
+              <DSIcon name="mic" size="sm" /> Continuar
             </Button>
           )}
           <Button variant="primary" size="sm" className="flex-1" onClick={rec.stop}>
-            <Square size={13} /> Concluir
+            <DSIcon name="square" size="sm" /> Concluir
           </Button>
         </div>
       </div>
@@ -75,7 +74,7 @@ export default function AudioRecorderBar({ rec, sending, onSend }) {
       {rec.url && <AudioPlayer src={rec.url} light />}
       <div className="flex gap-2">
         <Button variant="secondary" size="sm" className="flex-1" onClick={rec.redo}>
-          <RotateCcw size={13} /> Gravar de novo
+          <DSIcon name="rotate" size="sm" /> Gravar de novo
         </Button>
         <Button variant="primary" size="sm" icon="send" className="flex-1" loading={sending} onClick={onSend}>
           Enviar

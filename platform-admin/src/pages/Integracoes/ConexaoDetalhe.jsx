@@ -1,10 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Tabs, Badge, Button, CopyButton, DescriptionList, Timeline,
-  EmptyState, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Tabs, Badge, Button, CopyButton, DescriptionList, Timeline, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getConnection, listConnectionLogs, discoverConnection, testConnection,
 } from '../../services/integrations';
@@ -125,9 +121,7 @@ export default function ConexaoDetalhe() {
     return (
       <div className="space-y-6">
         <PageHeader title="Carregando…" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }
@@ -257,7 +251,7 @@ export default function ConexaoDetalhe() {
 
             {carregandoRecursos && recursos === null ? (
               <div className="flex justify-center py-10">
-                <Loader2 size={20} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+                <Spinner size="lg" />
               </div>
             ) : !recursos?.length ? (
               <EmptyState
@@ -305,7 +299,7 @@ export default function ConexaoDetalhe() {
           <div style={{ padding: 20 }}>
             {carregandoLogs ? (
               <div className="flex justify-center py-10">
-                <Loader2 size={20} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+                <Spinner size="lg" />
               </div>
             ) : !logs?.length ? (
               <EmptyState

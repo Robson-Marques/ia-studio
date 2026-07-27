@@ -1,6 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
-import { Tabs, Input, Select, Badge, EmptyState, Avatar, DSIcon } from '@studio-ux-ds/react';
+import { Tabs, Input, Select, Badge, EmptyState, Avatar, DSIcon, Spinner } from '@studio-ux-ds/react';
 import { ATTENDANCE_STATUS, CHAT_TABS, formatPhone } from './whatsapp.constants';
 import { statusToTone } from '../../lib/tone';
 
@@ -90,7 +89,7 @@ export default function ChatList({
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading && chats.length === 0 && (
           <div className="flex justify-center py-10">
-            <Loader2 size={18} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+            <Spinner />
           </div>
         )}
 

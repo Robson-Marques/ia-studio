@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Field, Input, Select, TextArea, Button, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Field, Input, Select, TextArea, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import { getKnowledgeBase, addKnowledgeDocument } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -94,9 +91,7 @@ export default function BaseDocumentoEditor() {
     return (
       <div className="space-y-6">
         <PageHeader title="Carregando…" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }

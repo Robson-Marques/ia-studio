@@ -1,9 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Tabs, DataTable, Badge, Button, Modal, ConfirmDialog, Field,
-  Input, Select, PhoneInput, Pagination, CopyButton, EmptyState, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Tabs, DataTable, Badge, Button, Modal, ConfirmDialog, Field, Input, Select, PhoneInput, Pagination, CopyButton, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import { listUsers, createUser, updateUser, inactivateUser, activateUser } from '../services/users';
 import { listInvites, createInvite, revokeInvite } from '../services/invites';
 import { listProfiles } from '../services/profiles';
@@ -186,9 +182,7 @@ function AbaPessoas({ profiles }) {
       </div>
 
       {loading && !items.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState
@@ -456,9 +450,7 @@ function AbaConvites({ profiles }) {
       </div>
 
       {loading && !items.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState

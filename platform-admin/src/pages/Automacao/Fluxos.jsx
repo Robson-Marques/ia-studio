@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
 import { listWorkflows, archiveWorkflow, deleteWorkflow } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -164,9 +161,7 @@ export default function Fluxos() {
       />
 
       {loading && !items.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState

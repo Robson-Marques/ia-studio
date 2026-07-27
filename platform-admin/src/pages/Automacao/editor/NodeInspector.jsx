@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { Drawer, Field, Input, Button, useToast } from '@studio-ux-ds/react';
+import { Drawer, Field, Input, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   NodeFields, useNodeFieldRefs, initJsonDrafts, applyJsonDrafts, firstMissingRequired,
 } from './NodeFields';
@@ -77,7 +76,7 @@ export default function NodeInspector({ open, node, definition, onClose, onSave 
 
         {loadingRefs && (
           <div className="flex justify-center py-2">
-            <Loader2 size={16} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+            <Spinner />
           </div>
         )}
 

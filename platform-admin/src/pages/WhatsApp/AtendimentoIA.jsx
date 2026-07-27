@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, EmptyState, Badge, Button, Switch, ConfirmDialog, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, EmptyState, Badge, Button, Switch, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { listWorkflows, publishWorkflow, unpublishWorkflow } from '../../services/automation';
 
@@ -76,9 +73,7 @@ export default function AtendimentoIA() {
     return (
       <div className="space-y-6">
         <PageHeader title="Atendimento por IA" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }
@@ -121,7 +116,7 @@ export default function AtendimentoIA() {
               </div>
 
               <div className="shrink-0 flex items-center gap-2">
-                {saving && <Loader2 size={14} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />}
+                {saving && <Spinner size="sm" />}
                 <Switch
                   checked={ligado}
                   aria-label={ligado ? 'Desligar o atendimento por IA' : 'Ligar o atendimento por IA'}

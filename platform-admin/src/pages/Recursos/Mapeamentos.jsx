@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, DataTable, Badge, Button, ConfirmDialog, EmptyState, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, DataTable, Badge, Button, ConfirmDialog, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getResourceCatalog, listMappings, updateMapping, deleteMapping,
 } from '../../services/resource';
@@ -189,9 +186,7 @@ export default function Mapeamentos() {
       />
 
       {loading && !items.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState

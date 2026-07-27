@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Badge, Button, ConfirmDialog, DescriptionList, Timeline,
-  EmptyState, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Badge, Button, ConfirmDialog, DescriptionList, Timeline, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import { getExecution, retryExecution, cancelExecution } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { EXECUTION_STATUS, TRIGGER_TYPE_LABEL, formatDateTime } from './automation.constants';
@@ -79,9 +75,7 @@ export default function ExecucaoDetalhe() {
     return (
       <div className="space-y-6">
         <PageHeader title="Carregando…" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }

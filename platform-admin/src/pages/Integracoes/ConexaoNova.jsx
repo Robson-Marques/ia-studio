@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Stepper, Field, Input, Select, Button, Badge, EmptyState, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Stepper, Field, Input, Select, Button, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMarketplace, createConnection } from '../../services/integrations';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
@@ -226,7 +223,7 @@ export default function ConexaoNova() {
         <div style={{ padding: 20, maxWidth: 720 }} className="space-y-4">
           {carregandoProviders ? (
             <div className="flex justify-center py-10">
-              <Loader2 size={20} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+              <Spinner size="lg" />
             </div>
           ) : passo === 0 ? (
             <>

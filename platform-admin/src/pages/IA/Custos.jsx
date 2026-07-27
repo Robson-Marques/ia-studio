@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Tabs, StatCard, Card, DataTable, EmptyState, Badge, DSIcon,
-  FormGrid, Field, Input, Select, NumericInput, Button, Checkbox, Modal,
-  useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Tabs, StatCard, Card, DataTable, EmptyState, Badge, DSIcon, FormGrid, Field, Input, Select, NumericInput, Button, Checkbox, Modal, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getCostsSummary, listBudgets, createBudget, updateBudget, simulateCost,
 } from '../../services/ai';
@@ -90,9 +85,7 @@ function SummaryTab() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : (
         <>
           {/* Matiz por assunto, igual ao Painel e ao console (DS v1.2.29):
@@ -170,9 +163,7 @@ function BudgetsTab() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState icon="file" title="Nenhum orçamento" description="Crie um orçamento para controlar o gasto mensal com IA." />

@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Tabs, Card, DataTable, EmptyState, Badge,
-  Modal, Field, Input, Select, Checkbox, Button, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, Field, Input, Select, Checkbox, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   listTools,
   listMcpServers, createMcpServer, syncMcpServer, getMcpServerTools,
@@ -128,9 +124,7 @@ function CatalogTab() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState
@@ -263,9 +257,7 @@ function McpTab() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState

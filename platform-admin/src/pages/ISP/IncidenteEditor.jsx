@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, ConfirmDialog,
-  FormGrid, Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, ConfirmDialog, FormGrid, Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getIncident, createIncident, updateIncident,
   resolveAffected, listTargets, updateTargets,
@@ -180,9 +176,7 @@ export default function IncidenteEditor() {
     return (
       <div className="space-y-6">
         <PageHeader title="Carregando…" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }
@@ -555,7 +549,7 @@ function AfetadosTab({ incidentId, incident, canWrite, canDispatch, onChanged })
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 size={20} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+          <Spinner size="lg" />
         </div>
       ) : !targets.length ? (
         <Card>

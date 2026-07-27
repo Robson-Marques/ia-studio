@@ -1,10 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, FormGrid, Field, Input, Select, NumericInput, TextArea,
-  Button, Checkbox, Badge, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, FormGrid, Field, Input, Select, NumericInput, TextArea, Button, Checkbox, Badge, useToast, Spinner } from '@studio-ux-ds/react';
 import { listTools, createTool, updateTool } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -164,9 +160,7 @@ export default function FerramentaEditor() {
     return (
       <div className="space-y-6">
         <PageHeader title="Carregando…" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }

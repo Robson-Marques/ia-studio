@@ -7,11 +7,7 @@ import {
   Handle, Position, addEdge, applyNodeChanges, applyEdgeChanges, useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ChevronDown, Layers, Loader2, Plus, SlidersHorizontal } from 'lucide-react';
-import {
-  PageHeader, Badge, Button, IconButton, SegmentedControl, Modal, ConfirmDialog,
-  Field, Input, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Badge, Button, IconButton, SegmentedControl, Modal, ConfirmDialog, Field, Input, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
 import {
   getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions,
   exportWorkflow, publishWorkflow, unpublishWorkflow,
@@ -171,7 +167,11 @@ function normalizeTrigger(raw) {
 }
 
 // Trilho do painel recolhido — clique para abrir de volta.
-function CollapsedRail({ side, icon: Icon, label, onExpand }) {
+// `icon` é o NOME do glifo no catálogo do DS (string), não um componente. Passar
+// componente obrigava o consumidor a importar ícone de outra biblioteca só pra
+// ter algo pra passar — e foi por aí que duas famílias de desenho entraram no
+// canvas (corrigido na adoção do DS v1.2.41).
+function CollapsedRail({ side, icon, label, onExpand }) {
   return (
     <button
       type="button"
@@ -186,7 +186,7 @@ function CollapsedRail({ side, icon: Icon, label, onExpand }) {
         border: 'none', font: 'inherit',
       }}
     >
-      <Icon size={15} />
+      <DSIcon name={icon} size="sm" />
       <span style={{ writingMode: 'vertical-rl', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.08em' }}>
         {label}
       </span>
@@ -463,9 +463,7 @@ function FluxoCanvasInner() {
     return (
       <div className="space-y-6">
         <PageHeader title="Carregando…" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }
@@ -562,7 +560,7 @@ function FluxoCanvasInner() {
                       }}
                     >
                       <span>{cat}</span>
-                      <ChevronDown size={13} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                      <DSIcon name="chevron-down" size="sm" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
                     </button>
                     {open && (
                       <div style={{ paddingTop: 4, paddingBottom: 4 }}>
@@ -580,7 +578,7 @@ function FluxoCanvasInner() {
                               color: 'var(--su-text-secondary)', cursor: 'pointer', font: 'inherit',
                             }}
                           >
-                            <Plus size={11} className="shrink-0" />
+                            <DSIcon name="plus" size="sm" className="shrink-0" />
                             <span className="truncate">{def.label || def.type}</span>
                           </button>
                         ))}
@@ -592,7 +590,7 @@ function FluxoCanvasInner() {
             </div>
           </div>
         ) : (
-          <CollapsedRail side="left" icon={Layers} label="Passos" onExpand={() => setPaletteOpen(true)} />
+          <CollapsedRail side="left" icon="layers" label="Passos" onExpand={() => setPaletteOpen(true)} />
         ))}
 
         {/* Canvas */}
@@ -698,7 +696,7 @@ function FluxoCanvasInner() {
             </div>
           </div>
         ) : (
-          <CollapsedRail side="right" icon={SlidersHorizontal} label="Propriedades" onExpand={() => setInspectorOpen(true)} />
+          <CollapsedRail side="right" icon="sliders" label="Propriedades" onExpand={() => setInspectorOpen(true)} />
         )}
       </div>
 

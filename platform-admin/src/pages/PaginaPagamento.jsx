@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import { Card, Badge, Button, Banner, CopyButton, DSIcon, useToast } from '@studio-ux-ds/react';
+import { Card, Badge, Button, Banner, CopyButton, DSIcon, useToast, Spinner } from '@studio-ux-ds/react';
 import { getPublicPayment } from '../services/isp';
 
 // Rota PÚBLICA `/pagar/:token` — 2ª via de boleto sem login. Migrada pro DS na
@@ -108,9 +107,7 @@ export default function PaginaPagamento() {
         </div>
 
         {loading && (
-          <div className="flex justify-center py-16">
-            <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-          </div>
+          <Spinner size="lg" center />
         )}
 
         {!loading && erro && (

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { Modal, EmptyState, Timeline, Button, useToast } from '@studio-ux-ds/react';
+import { Modal, EmptyState, Timeline, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import { getChatTimeline } from '../../services/whatsapp';
 import { formatDateTime } from '../../lib/format';
 
@@ -44,7 +43,7 @@ export default function TimelineModal({ open, chat, onClose }) {
     >
       {loading && (
         <div className="flex justify-center py-8">
-          <Loader2 size={18} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+          <Spinner />
         </div>
       )}
 

@@ -66,16 +66,15 @@ armadilhas). Resumo para re-ancorar:
   (20 `.legacy` + 13), nenhum import quebrado. O `--ap-*` vive só no `index.css` (`--ap-accent` herda
   `--su-action`). O dropdown do sino **não volta** (decidido por ação: `NotificationsBell.jsx` foi
   excluído; o conteúdo está no git se um dia quiser).
-- **Resta de infra:** o `.npmrc` do `platform-admin` está gravado **com BOM** — o npm pode ignorar a
-  linha do `registry` e devolver 404 nos pacotes `@studio-ux-ds` num install limpo. Funciona hoje por
-  tolerância. Reescrever sem BOM é ação manual (caminho protegido para o assistente).
+- **Infra: o `.npmrc` já está sem BOM** (conferido em 2026-07-27 — o arquivo começa em `@studio`, sem
+  `EF BB BF`). Era o único resto de infra da frente; está fechado.
 - **A conexão tem rota própria** (v0.10.11): `/integracoes/conexoes/:id`, `/:id/editar` e `/nova`
   (que aceita `?provider=<chave>`, é assim que o Marketplace manda para lá). O `?open=<id>` da
   v0.10.10 sobrevive só como encaminhamento. "Descobrir recursos" é **aba** da conexão, não modal.
 - **Os mapas de estado de Integrações declaram `tone` direto**, sem `lib/tone.js`. É o caminho de
   saída da ponte: cada família que migrar deve fazer o mesmo. A ponte engole papel desconhecido no
   `|| 'neutral'` — foi assim que "credencial vencida" ficou cinza por meses.
-- **DS consumido: `^1.2.40`.** A migração rendeu 31 releases do próprio Studio UX — a regra é
+- **DS consumido: `^1.2.41`.** A migração rendeu 32 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
 - **Auditoria do conjunto (v0.10.20/v0.10.21), cobrada pelo Robson.** Migrar tela por tela deixou de
   fora o que atravessa todas: **ícones** (30 itens, 7 glifos próprios — o mapa `LUCIDE_TO_DS` foi
@@ -83,6 +82,17 @@ armadilhas). Resumo para re-ancorar:
   no login, faísca no favicon; hoje é o glifo `spark` do DS, mesmo path do favicon), **o logout** (agora
   passa por `ConfirmDialog`) e **os estados globais** (404 e sem-permissão têm tela; antes
   redirecionavam calados pra raiz).
+- **UMA SÓ BIBLIOTECA DE ÍCONES** (v0.10.22): o `lucide-react` saiu do `package.json` e nenhum dos
+  113 arquivos importa ícone de fora. As duas causas eram do DS e foram resolvidas lá primeiro
+  (v1.2.41: `Spinner` com `size`/`center` + 10 glifos de mídia/gravação). **Ícone é NOME, nunca
+  componente** — `icon="layers"`, não `icon={Layers}`; guardar componente era o que obrigava o canvas
+  e o seletor de anexo a manter a outra biblioteca viva, e foi onde o sweep quase deixou dois
+  identificadores órfãos (tela em branco no clique, sem erro de build).
+- **LACUNA MEDIDA E AINDA ABERTA** (auditoria de 2026-07-27):
+  1. **6 dos 9 moldes de tela não existem em React** (`dashboard`, `detail`, `form`, `search`,
+     `settings`, `wizard`) e temos telas em todas essas classes: **18 detalhe/editor em rota**, 16
+     formulários, 1 wizard (`ConexaoNova`), 3 dashboards. Cada uma foi arranjada à mão — é a mesma
+     lacuna que o login tinha, ainda não disparada porque ninguém comparou lado a lado.
 - **As telas de acesso e de aviso instanciam MOLDES do DS** (v0.10.21): `AuthScreen` no login e no
   aceite de convite, `MessageScreen` no 404 e no sem-permissão. As quatro nasceram escritas à mão
   porque os moldes existiam só como HTML no gerador — **especificação sem materialização na camada do

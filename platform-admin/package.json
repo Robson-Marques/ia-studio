@@ -9,14 +9,13 @@
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
-    "@studio-ux-ds/tokens": "^1.2.40",
-    "@studio-ux-ds/components": "^1.2.40",
-    "@studio-ux-ds/icons": "^1.2.40",
-    "@studio-ux-ds/react": "^1.2.40",
+    "@studio-ux-ds/tokens": "^1.2.41",
+    "@studio-ux-ds/components": "^1.2.41",
+    "@studio-ux-ds/icons": "^1.2.41",
+    "@studio-ux-ds/react": "^1.2.41",
     "@xyflow/react": "^12.3.5",
     "axios": "^1.7.7",
     "clsx": "^2.1.0",
-    "lucide-react": "^0.383.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0"

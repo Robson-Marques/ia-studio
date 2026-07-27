@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { PageHeader, StatCard, Card, Badge, DSIcon, useToast } from '@studio-ux-ds/react';
+import { PageHeader, StatCard, Card, Badge, DSIcon, useToast, Spinner } from '@studio-ux-ds/react';
 import { getLicense } from '../services/account';
 import { useAuth } from '../context/AuthContext';
 import { formatNumber, formatLimit, formatDate } from '../lib/format';
@@ -49,7 +48,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        <Spinner size="lg" />
       </div>
     );
   }

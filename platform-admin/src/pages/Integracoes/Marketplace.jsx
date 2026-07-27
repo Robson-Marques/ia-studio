@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Input, Select, Badge, Button, EmptyState, ConfirmDialog, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Input, Select, Badge, Button, EmptyState, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMarketplace, installProvider, uninstallProvider } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { CATEGORY_LABELS, categoryLabel } from './integration.constants';
@@ -123,9 +120,7 @@ export default function Marketplace() {
       />
 
       {loading && !items.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !filtrados.length ? (
         <Card>
           <EmptyState

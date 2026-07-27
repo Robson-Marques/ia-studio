@@ -1,9 +1,10 @@
 // Player de áudio customizado pra mensagens de WhatsApp — barra de progresso
 // + tempo. Resolve a duração via AudioContext porque o <audio> devolve
 // Infinity/NaN pra blobs do MediaRecorder.
-// Portado do Aquapark (idêntico — só depende de lucide + APIs nativas).
+// Portado do Aquapark. Os glifos de tocar/pausar vêm do DS (v1.2.41) — antes
+// vinham de outra biblioteca, com traço e grade diferentes dos do resto da tela.
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { DSIcon } from '@studio-ux-ds/react';
 
 async function resolveAudioDuration(src) {
   try {
@@ -164,8 +165,8 @@ export default function AudioPlayer({ src, light = false }) {
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
       <button onClick={togglePlay} className={btnCls} type="button">
         {playing
-          ? <Pause size={13} className="shrink-0" />
-          : <Play  size={13} className="shrink-0 ml-0.5" />}
+          ? <DSIcon name="pause" size="sm" className="shrink-0" />
+          : <DSIcon name="play" size="sm" className="shrink-0 ml-0.5" />}
       </button>
       <div className={trackCls} onClick={seek}>
         <div className={fillCls} style={{ width: `${progress}%` }} />

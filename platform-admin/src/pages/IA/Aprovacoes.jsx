@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Button, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import { listApprovals, listApprovalPolicies } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -86,9 +83,7 @@ function QueueTab() {
   return (
     <div className="space-y-4">
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState icon="check-circle" title="Nada pendente" description="Nenhuma ação aguardando aprovação." />
@@ -165,9 +160,7 @@ function PoliciesTab() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState icon="lock" title="Nenhuma política" description="Crie políticas para exigir aprovação em ações sensíveis." />

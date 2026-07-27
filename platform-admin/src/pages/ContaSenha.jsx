@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 import { PageHeader, Card, Field, Input, Button, useToast } from '@studio-ux-ds/react';
 import { useAuth } from '../context/AuthContext';
 
@@ -77,8 +76,11 @@ export default function ContaSenha() {
             <Button variant="secondary" type="button" onClick={() => navigate('/minha-conta')} disabled={saving}>
               Cancelar
             </Button>
-            <Button variant="primary" type="submit" disabled={saving}>
-              {saving && <Loader2 size={14} className="animate-spin" style={{ marginRight: 6 }} />}
+            {/* `loading` do DS (v1.2.13) monta o spinner na escala e na cor do
+                botão, e já desabilita + marca `aria-busy`. Aqui havia um spinner
+                montado à mão com margem cravada — o anti-padrão que a prop
+                existe pra eliminar. */}
+            <Button variant="primary" type="submit" loading={saving}>
               Salvar nova senha
             </Button>
           </div>

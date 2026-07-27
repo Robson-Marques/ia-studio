@@ -1,9 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Badge, ProgressBar, CopyButton, CheckGroup, Checkbox,
-  DSIcon, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Badge, ProgressBar, CopyButton, CheckGroup, Checkbox, DSIcon, useToast, Spinner } from '@studio-ux-ds/react';
 import { getLicense } from '../services/account';
 import { formatNumber, formatLimit, formatDate } from '../lib/format';
 
@@ -84,9 +80,7 @@ export default function MinhaConta() {
     return (
       <div className="space-y-6">
         <PageHeader title="Minha conta" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }

@@ -1,8 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Clock, Mic } from 'lucide-react';
-import {
-  Modal, ConfirmDialog, Field, Input, Select, Button, IconButton, useToast,
-} from '@studio-ux-ds/react';
+import { Modal, ConfirmDialog, Field, Input, Select, Button, IconButton, useToast, DSIcon } from '@studio-ux-ds/react';
 import { sendChatMessage, uploadChatMedia, sendTyping } from '../../services/whatsapp';
 import { useAudioRecorder } from './composer/useAudioRecorder';
 import AudioRecorderBar from './composer/AudioRecorderBar';
@@ -200,7 +197,7 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
             background: 'var(--su-warning-bg)', color: 'var(--su-warning-fg)',
           }}
         >
-          <Clock size={13} className="shrink-0" />
+          <DSIcon name="clock" size="sm" className="shrink-0" />
           <span style={{ flex: 1 }}>
             {windowState === 'none'
               ? 'Primeiro contato: a Meta só deixa iniciar conversa com um template aprovado.'
@@ -262,7 +259,7 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
               opacity: (expired || sending) ? 0.5 : 1,
             }}
           >
-            {text.trim() ? <DSSend sending={sending} /> : <Mic size={16} />}
+            {text.trim() ? <DSSend sending={sending} /> : <DSIcon name="mic" size="sm" />}
           </button>
         </div>
       )}

@@ -1,9 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Field, Input, Select, Button, DataTable, DescriptionList,
-  Modal, CopyButton, EmptyState, FormGrid, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Field, Input, Select, Button, DataTable, DescriptionList, Modal, CopyButton, EmptyState, FormGrid, useToast, Spinner } from '@studio-ux-ds/react';
 import { getResourceCatalog, exploreResource } from '../../services/resource';
 import { listConnections } from '../../services/integrations';
 
@@ -119,7 +115,7 @@ export default function Explorer() {
         <div style={{ padding: 20 }}>
           {loadingMeta ? (
             <div className="flex justify-center py-6">
-              <Loader2 size={20} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+              <Spinner size="lg" />
             </div>
           ) : (
             // Linha de busca no `FormGrid`: alinha os campos pelo TOPO. O grid
@@ -160,9 +156,7 @@ export default function Explorer() {
       </Card>
 
       {searching ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !result ? (
         <Card>
           <EmptyState

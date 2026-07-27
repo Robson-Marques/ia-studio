@@ -1,9 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, Tabs, FormGrid, Field, Input, TextArea, Select, NumericInput, Button,
-  Banner, CopyButton, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, Tabs, FormGrid, Field, Input, TextArea, Select, NumericInput, Button, Banner, CopyButton, useToast, Spinner } from '@studio-ux-ds/react';
 import { listConnections } from '../../services/integrations';
 import { listTools } from '../../services/ai';
 import { runExecute, runSql, runHttp, runAi, runTool } from '../../services/devtools';
@@ -82,7 +78,7 @@ function Resposta({ loading, result, error }) {
       >
         {loading ? (
           <div className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--su-text-muted)' }}>
-            <Loader2 size={14} className="animate-spin" /> Executando…
+            <Spinner size="sm" /> Executando…
           </div>
         ) : error ? (
           <pre style={{

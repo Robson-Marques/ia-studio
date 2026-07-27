@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, FileText, Image as ImageIcon, Music, Plus } from 'lucide-react';
-import { Button, IconButton, Input } from '@studio-ux-ds/react';
+import { Button, IconButton, Input, DSIcon } from '@studio-ux-ds/react';
 import AudioPlayer from '../AudioPlayer';
 
 // Anexo do composer (v0.10.9): o botão “+”, o menu com Galeria/Câmera/Documento,
@@ -40,8 +39,8 @@ function FilePreview({ file, onRemove }) {
         {isImg && previewUrl
           ? <img src={previewUrl} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} />
           : isAud
-            ? <Music size={18} className="shrink-0" style={{ color: 'var(--su-text-muted)' }} />
-            : <FileText size={18} className="shrink-0" style={{ color: 'var(--su-text-muted)' }} />}
+            ? <DSIcon name="music" size="md" className="shrink-0" style={{ color: 'var(--su-text-muted)' }} />
+            : <DSIcon name="file-text" size="md" className="shrink-0" style={{ color: 'var(--su-text-muted)' }} />}
         <span className="flex-1 truncate" style={{ maxWidth: 220, color: 'var(--su-text-primary)' }}>{file.name}</span>
         <IconButton icon="close" aria-label="Tirar este arquivo" title="Tirar" onClick={onRemove} />
       </div>
@@ -64,10 +63,13 @@ export function AttachButton({ disabled, title, onPick }) {
     e.target.value = '';
   }
 
+  // `icon` é o NOME do glifo no catálogo do DS, não um componente importado.
+  // Guardar componente aqui era o que obrigava este arquivo a manter uma segunda
+  // biblioteca de ícones viva (DS v1.2.41 passou a cobrir mídia/gravação).
   const OPCOES = [
-    { icon: ImageIcon, label: 'Galeria', ref: galleryRef },
-    { icon: Camera, label: 'Câmera', ref: cameraRef },
-    { icon: FileText, label: 'Arquivo', ref: docRef },
+    { icon: 'image', label: 'Galeria', ref: galleryRef },
+    { icon: 'camera', label: 'Câmera', ref: cameraRef },
+    { icon: 'file-text', label: 'Arquivo', ref: docRef },
   ];
 
   return (
@@ -96,7 +98,7 @@ export function AttachButton({ disabled, title, onPick }) {
               boxShadow: 'var(--su-elevation-overlay)',
             }}
           >
-            {OPCOES.map(({ icon: Icon, label, ref }) => (
+            {OPCOES.map(({ icon, label, ref }) => (
               <button
                 key={label}
                 type="button"
@@ -108,7 +110,7 @@ export function AttachButton({ disabled, title, onPick }) {
                   className="flex items-center justify-center"
                   style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--su-action-tint)', color: 'var(--su-action)' }}
                 >
-                  <Icon size={18} />
+                  <DSIcon name={icon} size="md" />
                 </span>
                 <span style={{ fontSize: 10, color: 'var(--su-text-muted)' }}>{label}</span>
               </button>

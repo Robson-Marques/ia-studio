@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   listConnections, changeConnectionState, testConnection, getMarketplace,
 } from '../../services/integrations';
@@ -247,9 +244,7 @@ export default function Conexoes() {
       />
 
       {loading && !items.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState

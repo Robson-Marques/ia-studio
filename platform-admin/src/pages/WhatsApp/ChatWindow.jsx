@@ -1,10 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Check, CheckCheck, Clock, Download, Loader2, AlertTriangle,
-} from 'lucide-react';
-import {
-  Badge, Button, IconButton, Avatar, ConfirmDialog, useToast,
-} from '@studio-ux-ds/react';
+import { Badge, Button, IconButton, Avatar, ConfirmDialog, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia, unlinkCustomer,
@@ -29,11 +24,11 @@ import { statusToTone } from '../../lib/tone';
 
 // Tiques de status — sempre sobre balão claro, por isso a cor é fixa.
 function StatusTicks({ status }) {
-  if (status === 'read') return <CheckCheck size={14} style={{ color: '#53bdeb' }} />;
-  if (status === 'delivered') return <CheckCheck size={14} style={{ color: '#8696a0' }} />;
-  if (status === 'sent') return <Check size={14} style={{ color: '#8696a0' }} />;
-  if (status === 'failed') return <AlertTriangle size={13} style={{ color: '#dc2626' }} />;
-  return <Clock size={13} style={{ color: '#8696a0' }} />;
+  if (status === 'read') return <DSIcon name="check-double" size="sm" style={{ color: '#53bdeb' }} />;
+  if (status === 'delivered') return <DSIcon name="check-double" size="sm" style={{ color: '#8696a0' }} />;
+  if (status === 'sent') return <DSIcon name="check" size="sm" style={{ color: '#8696a0' }} />;
+  if (status === 'failed') return <DSIcon name="alert-triangle" size="sm" style={{ color: '#dc2626' }} />;
+  return <DSIcon name="clock" size="sm" style={{ color: '#8696a0' }} />;
 }
 
 // Mídia (recebida ou enviada): baixa da Meta sob demanda via proxy do backend.
@@ -75,7 +70,7 @@ function ChatMedia({ chatId, message }) {
         className="inline-flex items-center gap-1.5"
         style={{ fontSize: 12, color: '#027eb5', minHeight: 32, background: 'none', border: 0, padding: 0, font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
       >
-        {loading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+        {loading ? <Spinner size="sm" /> : <DSIcon name="download" size="sm" />}
         Carregar {NOME_TIPO[message.type] || 'arquivo'}
       </button>
     );
@@ -100,7 +95,7 @@ function ChatMedia({ chatId, message }) {
       className="inline-flex items-center gap-1.5"
       style={{ fontSize: 12, color: '#027eb5', textDecoration: 'underline' }}
     >
-      <Download size={13} /> {media.filename || 'Baixar arquivo'}
+      <DSIcon name="download" size="sm" /> {media.filename || 'Baixar arquivo'}
     </a>
   );
 }

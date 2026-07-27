@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, DataTable, EmptyState, Badge, Field, Input, Button, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, DataTable, EmptyState, Badge, Field, Input, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMemoryProfile, listMemoryEntries } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MEMORY_SCOPES, formatDateTime } from './ia.constants';
@@ -86,9 +83,7 @@ export default function MemoriaEntradas() {
     return (
       <div className="space-y-6">
         <PageHeader title="Carregando…" />
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       </div>
     );
   }
@@ -137,7 +132,7 @@ export default function MemoriaEntradas() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 size={20} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+          <Spinner size="lg" />
         </div>
       ) : !entries.length ? (
         <Card>

@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, DataTable, EmptyState, Badge, Pagination, Button, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, DataTable, EmptyState, Badge, Pagination, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import { getNotificationsLog } from '../../services/automation';
 import { NOTIFICATION_STATUS, NOTIFICATION_CHANNEL, formatDateTime } from './automation.constants';
 import { statusToTone } from '../../lib/tone';
@@ -74,9 +71,7 @@ export default function Notificacoes() {
       />
 
       {loading && !items.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState

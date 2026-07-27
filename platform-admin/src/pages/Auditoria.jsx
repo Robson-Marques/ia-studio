@@ -1,9 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import {
-  PageHeader, Card, FormGrid, Field, Input, Button, DataTable, Badge, Modal,
-  DescriptionList, CopyButton, Pagination, EmptyState, useToast,
-} from '@studio-ux-ds/react';
+import { PageHeader, Card, FormGrid, Field, Input, Button, DataTable, Badge, Modal, DescriptionList, CopyButton, Pagination, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import { listAudit } from '../services/audit';
 import { formatDateTime } from '../lib/format';
 
@@ -122,9 +118,7 @@ export default function Auditoria({
       </Card>
 
       {loading && !items.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
-        </div>
+        <Spinner size="lg" center />
       ) : !items.length ? (
         <Card>
           <EmptyState
