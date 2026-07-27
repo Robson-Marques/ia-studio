@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Activity, CheckCircle2, Compass, Copy, Loader2, Pause, Pencil, Play, Plug, Plus,
   ScrollText, Wrench, XCircle,
@@ -28,6 +29,7 @@ export default function Conexoes() {
   const toast = useToast();
   const { can } = usePermissions();
   const { workspaces } = useWorkspace();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(null); // id em teste
@@ -61,6 +63,20 @@ export default function Conexoes() {
       .then(({ items }) => setProviderNames(Object.fromEntries((items || []).map((p) => [p.key, p.name]))))
       .catch(() => {});
   }, []);
+
+  // Deep-link `?open=<id>`: abre direto o detalhe daquela conexão (v0.10.10).
+  // Existe porque a tela de Números do WhatsApp manda o operador "abrir a conexão
+  // deste número" — e cair na LISTA obrigava a procurar de novo o que ele já
+  // tinha escolhido. O parâmetro sai da URL depois de usado, para o F5 não
+  // reabrir o modal.
+  useEffect(() => {
+    const alvo = searchParams.get('open');
+    if (!alvo || !items.length) return;
+    const c = items.find((x) => x.id === alvo);
+    if (c) setDetail(c);
+    else toast.error('Conexão não encontrada — ela pode ter sido removida.');
+    setSearchParams({}, { replace: true });
+  }, [searchParams, items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Nome amigável do conector; fallback prettifica a chave (ixc → Ixc, whatsapp-meta → Whatsapp Meta).
   const providerName = (key) =>

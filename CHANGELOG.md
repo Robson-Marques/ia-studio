@@ -1,5 +1,21 @@
 # Changelog — IA Studio
 
+## v0.10.10 - 2026-07-25 (Clicar num número abre a conexão dele, não a lista)
+
+Sem `db push`. Só frontend. Sem bump do DS (segue `^1.2.31`).
+
+### Corrigido
+
+- **Clicar num número levava para a lista de Conexões**, obrigando a procurar de novo o que já tinha sido escolhido. A linha prometia "abrir este número" e entregava "abrir a tela onde ele está em algum lugar".
+  - Agora vai direto: `/integracoes/conexoes?open=<id>`. Deu para fazer porque o **id do número é o id da própria conexão** — o backend deriva a lista das conexões `whatsapp-meta` (`WhatsappNumbersController.list` mapeia cada `Connection`), coisa que eu não tinha conferido quando escrevi a navegação.
+  - A tela de Conexões (ainda no padrão antigo — migra na próxima família) passou a aceitar `?open=<id>`: abre o detalhe daquela conexão e limpa o parâmetro da URL, para o F5 não reabrir o modal. Quando Integrações for migrada, o contrato se mantém — igual ao `?open=` das Execuções.
+
+### O que dá pra verificar agora
+
+1. **WhatsApp → Números**: clicar na linha abre o **detalhe daquela conexão** já aberto, não a lista.
+2. Recarregar a página depois disso: o modal **não** reabre (o parâmetro sai da URL).
+3. Um id que não existe mais → toast dizendo que a conexão não foi encontrada, em vez de tela parada.
+
 ## v0.10.9 - 2026-07-25 (Família WhatsApp inteira no DS — 11 telas, com o chat)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.31`**.

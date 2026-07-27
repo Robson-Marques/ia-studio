@@ -21,8 +21,11 @@ import { statusToTone } from '../../lib/tone';
 //  · **Sincronizar saiu do card e foi pra barra de lote** — e aceita vários de
 //    uma vez, o que antes exigia um clique por número. Só aparece quando toda a
 //    seleção está ativa: sincronizar conexão desativada devolve erro da Meta.
-//  · **A linha leva para a conexão** em Integrações, que é onde ela se gerencia —
-//    esta tela é o painel de saúde, não o cadastro.
+//  · **A linha abre a conexão DAQUELE número** em Integrações — que é onde ela se
+//    gerencia; esta tela é o painel de saúde, não o cadastro. O `id` do número é o
+//    id da própria conexão (o backend deriva a lista das conexões `whatsapp-meta`),
+//    então o deep-link `?open=<id>` é direto. Na v0.10.9 a linha caía na LISTA de
+//    conexões, obrigando a procurar de novo o que já tinha sido escolhido.
 //  · O erro de sincronização fica **na célula da situação**, visível: informação
 //    essencial não vive em tooltip (regra do DS).
 
@@ -168,13 +171,13 @@ export default function Numeros() {
       ) : (
         <>
           <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num número para abrir a conexão dele em Integrações — é lá que se troca credencial e se desliga.
+            Clique num número para abrir a conexão dele — é lá que se troca a credencial e se desliga.
           </p>
           <DataTable
             columns={columns}
             rows={items}
             getRowId={(n) => n.id}
-            onRowClick={() => navigate('/integracoes/conexoes')}
+            onRowClick={(n) => navigate(`/integracoes/conexoes?open=${n.id}`)}
             getRowLabel={(n) => `Abrir a conexão de ${n.name}`}
             bulkActions={bulkActions}
           />
