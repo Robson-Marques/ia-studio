@@ -48,7 +48,7 @@
   "Copiar código PIX" do IXC (recon: F12→Network no botão, ou doc da API). Por ora o PIX vem pela
   página da Efí (botão do boleto). **Não é bloqueio.**
 
-### 🎨 Adoção do Studio UX — onde está (2026-07-26)
+### 🎨 Adoção do Studio UX — onde está (2026-07-27)
 
 Frente de UI em curso, **paralela e independente** do backend/assistente acima. Estado completo em
 [`docs/adocao-studio-ux.md`](adocao-studio-ux.md) (documento vivo, com a tabela de regras do DS e as
@@ -59,7 +59,9 @@ armadilhas). Resumo para re-ancorar:
   (A: v0.9.99 · B: v0.10.2 · C: v0.10.4), **WhatsApp INTEIRA** (v0.10.9 — 11 arquivos) e
   **Integrações INTEIRA** (v0.10.11 — 6 arquivos viraram 9), **Recursos** e
   **Desenvolvedor** (v0.10.13) e **as 8 últimas** (v0.10.16 — pessoas, perfis, workspaces,
-  auditoria, minha conta + login, aceitar convite e página de pagamento).
+  auditoria, minha conta + login, aceitar convite e página de pagamento) — mais a **auditoria do
+  conjunto** (v0.10.20: ícones, marca, logout, 404/sem-permissão) e as **telas de acesso vindas do
+  molde** (v0.10.21).
 - **A FRENTE ESTÁ FECHADA.** Todas as telas no DS, `components/ui/` **excluída**, 33 órfãos removidos
   (20 `.legacy` + 13), nenhum import quebrado. O `--ap-*` vive só no `index.css` (`--ap-accent` herda
   `--su-action`). O dropdown do sino **não volta** (decidido por ação: `NotificationsBell.jsx` foi
@@ -73,8 +75,19 @@ armadilhas). Resumo para re-ancorar:
 - **Os mapas de estado de Integrações declaram `tone` direto**, sem `lib/tone.js`. É o caminho de
   saída da ponte: cada família que migrar deve fazer o mesmo. A ponte engole papel desconhecido no
   `|| 'neutral'` — foi assim que "credencial vencida" ficou cinza por meses.
-- **DS consumido: `^1.2.38`.** A migração rendeu 29 releases do próprio Studio UX — a regra é
+- **DS consumido: `^1.2.40`.** A migração rendeu 31 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
+- **Auditoria do conjunto (v0.10.20/v0.10.21), cobrada pelo Robson.** Migrar tela por tela deixou de
+  fora o que atravessa todas: **ícones** (30 itens, 7 glifos próprios — o mapa `LUCIDE_TO_DS` foi
+  eliminado, hoje 38 glifos em 40 itens), **a marca** (eram três representações — ponto no menu, raio
+  no login, faísca no favicon; hoje é o glifo `spark` do DS, mesmo path do favicon), **o logout** (agora
+  passa por `ConfirmDialog`) e **os estados globais** (404 e sem-permissão têm tela; antes
+  redirecionavam calados pra raiz).
+- **As telas de acesso e de aviso instanciam MOLDES do DS** (v0.10.21): `AuthScreen` no login e no
+  aceite de convite, `MessageScreen` no 404 e no sem-permissão. As quatro nasceram escritas à mão
+  porque os moldes existiam só como HTML no gerador — **especificação sem materialização na camada do
+  consumidor não é adotada**. Antes de escrever tela de classe recorrente, ler a tabela de moldes em
+  `STUDIO_UX_TEMPLATES` §Estado da implementação (só `list`, `login` e `empty` estão em React).
 - **Tela de trabalho contínuo usa `fullBleed`** do AppShell (v1.2.31) e `flex: 1` — **nunca**
   `calc(100dvh - Xrem)`. A lista de rotas full-bleed vive no `Layout.jsx` (`FULL_BLEED_PATHS`).
 - **A conversa do WhatsApp tem cores fixas de propósito** (convenção do aplicativo). No escuro ela

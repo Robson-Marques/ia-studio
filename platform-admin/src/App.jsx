@@ -179,12 +179,13 @@ export default function App() {
                 <Route path="/desenvolvedor/console" element={<PermissionRoute perm="devtools.use"><ConsoleDev /></PermissionRoute>} />
                 <Route path="/desenvolvedor/api-keys" element={<PermissionRoute perm="developer.apikeys.read"><ApiKeys /></PermissionRoute>} />
                 <Route path="/studio-ux-demo" element={<StudioUxDemo />} />
-              </Route>
 
-              {/* Catch-all */}
-              {/* Endereço que não existe: mostra o aviso DENTRO da casca (mantém
-                  menu e caminho de volta) em vez de redirecionar calado pra raiz. */}
-              <Route path="*" element={<Aviso motivo="nao-encontrado" />} />
+                {/* Catch-all DENTRO da casca autenticada, de propósito: quem
+                    digitou errado continua vendo menu e caminho de volta, e quem
+                    não está logado cai no login (o ProtectedRoute acima resolve)
+                    em vez de ver um 404 que não diz nada a um estranho. */}
+                <Route path="*" element={<Aviso motivo="nao-encontrado" />} />
+              </Route>
             </Routes>
           </BrowserRouter>
         </WorkspaceProvider>

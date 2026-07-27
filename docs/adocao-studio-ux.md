@@ -6,7 +6,7 @@
 > governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
 
-## Estado atual — legado visual extinto (2026-07-26, v0.10.17 / DS ^1.2.38)
+## Estado atual — legado visual extinto (2026-07-27, v0.10.21 / DS ^1.2.40)
 
 O `platform-admin` opera com a **casca AppShell do Studio UX** e o **Dashboard**
 migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
@@ -21,6 +21,14 @@ Conexões, Cofre + as três rotas que nasceram dos modais), **Recursos** e
 **Desenvolvedor** (v0.10.13) e **as 8 últimas telas** (v0.10.16: pessoas, perfis
 — com editor em rota —, workspaces, auditoria, minha conta, mais as três públicas:
 login, aceitar convite e página de pagamento).
+
+**As telas de acesso e de aviso instanciam moldes do DS** (v0.10.21 / DS ^1.2.40):
+login e aceitar convite usam `AuthScreen` (o molde `login`), 404 e sem-permissão
+usam `MessageScreen` (o molde `empty` de tela inteira). Na v0.10.16/v0.10.20 essas
+quatro nasceram escritas à mão — os moldes existiam especificados e materializados
+em HTML, mas **não em React**, e nada me levou até eles. Antes de escrever qualquer
+tela de classe recorrente, consultar a tabela de moldes materializados em
+`STUDIO_UX_TEMPLATES` §Estado da implementação.
 
 **Não resta tela nem componente no padrão antigo.** A pasta `components/ui/`
 ficou sem consumidor na v0.10.17, quando o `PhoneInput` do DS ganhou o seletor de
@@ -41,7 +49,7 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
 | Item | Descrição |
 |---|---|
-| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/icons`, `@studio-ux-ds/react` (`^1.2.38`) — o `icons` é **peerDependency** do `react` e passou a ser declarado na v0.10.18 |
+| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/icons`, `@studio-ux-ds/react` (`^1.2.40`) — o `icons` é **peerDependency** do `react` e passou a ser declarado na v0.10.18 |
 | `.npmrc` | Aponta `@studio-ux-ds` para GitHub Packages, token via `NODE_AUTH_TOKEN`. ⚠️ **está com BOM** — reescrever sem (ver débito 1) |
 | `main.jsx` | Importa `tokens.css` + `components.css`, chama `configureTheme({ namespace: 'ia-studio' })` + `applyTheme()`, envolve o app com `<ToastProvider>` do DS |
 | `ThemeContext.jsx` | Wrapper fino do mecanismo de tema do DS. Fonte única = DS (chaves namespaçadas `ia-studio_su_*`); espelha `.dark` no `<html>` para compatibilidade com telas Tailwind com `dark:`; `MutationObserver` sincroniza estado quando o AppShell/Customize trocam o tema |
@@ -55,7 +63,8 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 - **CSS.** Não há mais coexistência: tudo em `--su-*`. O `--ap-*` sobreviveu apenas no `index.css`, onde `--ap-accent` herda `--su-action` (compatibilidade do Tailwind).
 - **Toast.** Fonte única: `<ToastProvider>` do DS montado no `main.jsx`. Todos os 55 callsites do painel consomem `useToast()` diretamente. `lib/toast.js` e `UIToastContainer.jsx` foram esvaziados (marcados para remoção) — passo 5 concluído em 2026-07-24.
 - **Tema.** O DS é a fonte única. `ThemeContext` reflete o estado do DS + espelha `.dark` no HTML. Telas com `dark:` do Tailwind continuam funcionando.
-- **Ícones.** O menu usa `DSIcon` via mapa `LUCIDE_TO_DS` no `Layout.jsx` — a lista do menu passa a **chave do mapa** (`KeyRound`), não o nome do glifo do DS; trocar por engano faz o ícone virar "?". Dentro das páginas, `lucide-react` sobrou só para o `Loader2` do carregamento inicial.
+- **Ícones.** O mapa `LUCIDE_TO_DS` foi **eliminado** na v0.10.20: cada item do menu declara o glifo do DS direto (`icon: 'coin'`). O mapa traduzia "por proximidade semântica" e, sem vocabulário de navegação no catálogo, colapsava 30 itens em 7 glifos — sem nunca cair no `|| 'help'`, porque havia sempre um glifo "mais ou menos". Hoje: **38 glifos distintos em 40 itens**, as duas repetições deliberadas. Dentro das páginas, `lucide-react` sobrou só para o `Loader2` do carregamento inicial.
+- **Moldes de tela.** `ListScreen` (listas), `AuthScreen` (login e aceitar convite) e `MessageScreen` (404 e sem-permissão) são os três moldes do DS materializados em React e já instanciados aqui. Os outros seis existem só como HTML no gerador — se uma tela nossa cair numa dessas classes, o pedido é ao DS, não uma versão à mão.
 
 ## ADR — decisões da fase 2
 
@@ -141,6 +150,7 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 | v1.2.27 | **`StatCard` novo**: ícone à esquerda + degradê tonal; o `tone` pinta o entorno e **nunca o número**; `sub` para legenda neutra (o `delta` é a variação, e só ela leva cor). **Gradiente tonal e discreto passou a ser permitido** no DS (régua em `VISUAL_DNA` §6.4) |
 | v1.2.26 | Glifos `power` e `zap` — o vocabulário de **operação** (ligar/desligar, gatilho), que faltava porque a curadoria de ícones nasceu vestindo tela de cadastro |
 | v1.2.25 | **Accent também em canais RGB** (`--su-action-rgb`) — é o que permite o Tailwind do consumidor usar a cor do tema com opacidade, em vez de cravar hex. **`Breadcrumb` com `onNavigate`** (via `AppShell.onBreadcrumbNavigate`): item sem `href` não navega, `href` sem `onNavigate` recarrega a SPA — em app de página única os dois são obrigatórios |
+| v1.2.40 | **`AuthScreen` (+ `AuthLink`) e `MessageScreen`** — os moldes `login` e `empty`-de-tela-inteira em React. Existiam especificados em `STUDIO_UX_TEMPLATES` §2 e materializados no gerador HTML, mas **não na camada que este painel consome**, então eu escrevi as quatro telas à mão. **Especificação sem materialização na camada do consumidor não é adotada** — ela só existe para quem já sabe que existe. A tabela de moldes materializados em React agora é explícita na §Estado da implementação, e consultá-la é passo obrigatório |
 | v1.2.35 | **`FormGrid`** — o arranjo de um formulário (colunas por `auto-fill`, sem media query; `columns` é **teto**) + `Field wide` para o campo de texto longo. Alinha pelo **TOPO**: campo com dica é mais alto, e alinhar pela base empurra o controle de quem tem dica para cima. Numa linha de busca, a dica vira `placeholder` e o botão fica **dentro** do campo. Nasceu de 20 grids à mão em 12 arquivos e 16 larguras máximas diferentes |
 | v1.2.34 | **Nome de ícone dentro do próprio DS é verificado no gate de publicação.** O `DSIcon` degrada de propósito (nome inválido → "?" + aviso no console), o que protege o consumidor mas **inverte quem descobre o erro**: o aviso sai no console de quem usa, e o build de quem publica passa limpo. Foram 4 nomes inexistentes de uma vez — `circle-check`/`alert-triangle` no `Banner` e `adjustments`/`menu-2` (o hambúrguer do mobile!) no `AppShell`. Consumidor pode errar e ser avisado; o DS não pode errar o próprio vocabulário |
 | v1.2.33 | **`Tabs` avisa quando um item vem sem `id`** — item é `{ id, label }`; `value` é a prop da aba ATIVA. Sem `id` nenhuma aba casa, o `onChange` devolve `undefined` e o conteúdo some ao clicar. Prop morta **dentro de um array de dados**, que a assinatura do componente não protege |
@@ -160,6 +170,7 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 - **Cor traduzida por um mapa "de/para" engole o que não conhece.** A ponte `lib/tone.js` converte o `variant` legado em `tone`, com `|| 'neutral'` no fim. `TOKEN_EXPIRED` era `'orange'`, que não está no mapa — resultado: o estado mais urgente da tela de Conexões (credencial vencida) era o único cinza, e ninguém percebeu porque cinza é uma cor plausível. Ao migrar uma família, **faça o mapa dela declarar `tone` direto** em vez de passar pela ponte: aí não existe "papel desconhecido" para engolir.
 - **Um `catch` que chama `toast` sem `useToast()` no arquivo troca o erro por outro erro.** Dois casos vivos foram encontrados na família Integrações (`Marketplace.load` e o modal de rotação do Cofre): o `ReferenceError: toast is not defined` só acontece quando a chamada falha, que é exatamente quando ninguém está com o console aberto. Ao migrar, confira se **todo** componente do arquivo — inclusive os auxiliares no fim — tem o hook, e não só o componente principal.
 - **`Switch` do DS não tem rótulo, e o `onChange` dele entrega o BOOLEANO, não o evento.** Escrever `onChange={(e) => patch({ x: e.target.checked })}` num `Switch` lança exceção ao clicar (`e.target` é `undefined`). Mas antes disso: campo de formulário que só vale ao salvar é **`Checkbox variant="card"`** com `label` + `meta` (padrão da v1.2.20), não `Switch` — `Switch` é para alternância de efeito imediato.
+- **Antes de escrever uma tela de classe recorrente (acesso, aviso, lista, detalhe, formulário, busca, assistente de passos), confira a tabela de moldes** em `STUDIO_UX_TEMPLATES` §Estado da implementação. Só 3 dos 9 estão em React; os outros 6 existem como HTML no gerador — e "existe em HTML" foi exatamente o que não me impediu de escrever login, aceitar convite, 404 e sem-permissão do zero. **Componente que falta você percebe por erro; molde que falta você não percebe por nada** — a tela sai plausível.
 - **Antes de improvisar um estado ou variante**, pergunte: *"a spec já prevê isso e o adapter não expõe?"* Nos 8 casos desta adoção a resposta foi sim — e em 3 deles a spec estava certa desde a v1.0.0 (inclusive o anti-padrão "breadcrumb que não navega", que estava escrito e acontecendo).
 | 6 | Multi-tenant branding via Customize (accent/tema por organização) | Quando o backend expuser as preferências por org |
 | 7 | ~~Aposentar `Header.jsx` + `NotificationsBell.jsx`~~ ✅ **excluídos** (2026-07-26), junto dos 13 órfãos. Com isso o item 8 foi decidido por ação: o dropdown do sino **não volta** por enquanto — o conteúdo dele vive só no histórico do git | — |

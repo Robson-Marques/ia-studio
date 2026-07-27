@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Card, Field, Input, Button, DSIcon, useToast } from '@studio-ux-ds/react';
+import { AuthScreen, Field, Input, Button, DSIcon, useToast } from '@studio-ux-ds/react';
 import { acceptInvite } from '../services/invites';
 
-// Rota PÚBLICA `/convite/:token` — a pessoa convidada cria nome e senha aqui.
-// Migrada pro DS na v0.10.16.
+// Aceitar convite — o mesmo molde de acesso do login (`AuthScreen`), **sem o
+// painel de marca**: aqui não há o que argumentar. Quem chega já foi convidado e
+// só precisa escolher uma senha; o painel com "bem-vindo de volta" e três
+// destaques seria conversa de venda no meio de um passo obrigatório.
 //
-// Segunda tela que um estranho vê (a primeira é o login), e a única em que
-// alguém de fora escreve no sistema. Mesma casca do login: fora do AppShell,
-// centralizada, `Card` + `Field` + `Input` + `Button block` do DS.
+// Sem painel, o molde centra o formulário na tela inteira e traz a marca acima
+// dele — que continua sendo o único elemento dizendo onde a pessoa está.
 export default function AcceptInvite() {
   const toast = useToast();
   const { token } = useParams();
@@ -38,52 +39,37 @@ export default function AcceptInvite() {
   }
 
   return (
-    <div
-      className="flex items-center justify-center p-4"
-      style={{ minHeight: '100dvh', background: 'var(--su-surface-base)' }}
+    <AuthScreen
+      brand={{ name: 'IA Studio', logo: <DSIcon name="spark" size="sm" /> }}
+      title="Criar o seu acesso"
+      subtitle="Você foi convidado. Escolha uma senha para entrar."
     >
-      <div style={{ width: '100%', maxWidth: 380 }}>
-        <Card>
-          <div style={{ padding: 32 }}>
-            <div className="flex flex-col items-center" style={{ marginBottom: 24 }}>
-              <span style={{ color: 'var(--su-action)', marginBottom: 8 }}>
-                <DSIcon name="spark" size="lg" />
-              </span>
-              <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--su-text-primary)' }}>IA Studio</h1>
-              <p style={{ fontSize: 13, margin: '4px 0 0', textAlign: 'center', color: 'var(--su-text-muted)' }}>
-                Você foi convidado. Escolha uma senha para entrar.
-              </p>
-            </div>
-
-            <form onSubmit={aceitar} className="space-y-4">
-              <Field label="Seu nome">
-                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" autoFocus />
-              </Field>
-              <Field label="Senha" hint="Pelo menos 8 caracteres.">
-                <Input
-                  type="password"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                />
-              </Field>
-              <Field label="Repita a senha">
-                <Input
-                  type="password"
-                  value={confirmacao}
-                  onChange={(e) => setConfirmacao(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                />
-              </Field>
-              <Button type="submit" variant="primary" loading={salvando} block>
-                Criar meu acesso
-              </Button>
-            </form>
-          </div>
-        </Card>
-      </div>
-    </div>
+      <form onSubmit={aceitar} className="space-y-4">
+        <Field label="Seu nome">
+          <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" autoFocus />
+        </Field>
+        <Field label="Senha" hint="Pelo menos 8 caracteres.">
+          <Input
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="new-password"
+          />
+        </Field>
+        <Field label="Repita a senha">
+          <Input
+            type="password"
+            value={confirmacao}
+            onChange={(e) => setConfirmacao(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="new-password"
+          />
+        </Field>
+        <Button type="submit" variant="primary" size="lg" loading={salvando} block>
+          Criar meu acesso
+        </Button>
+      </form>
+    </AuthScreen>
   );
 }

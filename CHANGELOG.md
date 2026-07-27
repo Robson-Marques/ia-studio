@@ -1,5 +1,36 @@
 # Changelog — IA Studio
 
+## v0.10.21 - 2026-07-27 (As telas de acesso passam a instanciar o molde do DS)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.39` → **`^1.2.40`** (`AuthScreen` + `MessageScreen`).
+
+Sua pergunta: *"tela de login continua diferente da criada no Studio UX... essa parte que não entendo: tela de login, logout, 404 e etc não foram criadas os padrões em Studio UX?"*
+
+**Foram.** O `STUDIO_UX_TEMPLATES` §2 especifica **9 moldes de tela** desde a era de geração, e `examples/login.html` é a referência viva do de acesso. O que não existia era a **materialização em React** — só o molde `list` tinha componente (`ListScreen`). Como este painel só consome React, os outros oito eram invisíveis na prática, e na entrega anterior eu escrevi as três telas à mão. Não foi decisão de desenho; foi eu não ter inventariado os moldes antes de escrever.
+
+### Corrigido — Login
+
+Agora instancia `AuthScreen`. O que a tela ganhou por vir do molde, e não da minha mão:
+
+- **Painel de marca à esquerda** (só a partir de 900px — em tela estreita o formulário ocupa a tela inteira), com "Bem-vindo de volta", o que o produto faz e três destaques.
+- **"Esqueci a senha?"** — que **não promete um e-mail que não existe**: ainda não há fluxo de recuperação, então o link explica que quem administra a organização redefine a senha em Pessoas.
+- **"Manter conectado neste dispositivo"** e botão de largura cheia (`size="lg" block`).
+- **Sem "entrar com Google/Microsoft"**, como você apontou: o exemplo tem o divisor de SSO porque é um exemplo genérico; aqui a autenticação é por e-mail e senha da organização. O molde não obriga — aquilo é conteúdo, isto é arranjo.
+
+### Corrigido — Aceitar convite
+
+Mesmo molde, **sem o painel de marca**. Quem chega ali já foi convidado e só precisa escolher uma senha; painel de argumento no meio de um passo obrigatório é conversa de venda. Sem painel, o molde centra o formulário — o `AuthScreen` só renderiza o painel quando há conteúdo para ele.
+
+### Corrigido — 404 e sem permissão
+
+As duas telas de aviso (criadas na v0.10.20 à mão com `Card` + `EmptyState`) passam a instanciar `MessageScreen`, o molde `empty` de tela inteira. Mesmo comportamento, agora vindo do DS — e a regra que ele carrega ("nenhum desses casos redireciona em silêncio") deixa de morar só neste repositório.
+
+Também movi o catch-all de rota para **dentro da casca autenticada**: o comentário dizia que o aviso aparecia com menu e caminho de volta, mas a rota estava fora do `Layout` — aparecia nua, e quem não estava logado via um 404 em vez de cair no login.
+
+### Lição
+
+**Especificação sem materialização na camada que o consumidor usa não é adotada.** É a mesma família dos props mortos e dos glifos repetidos: o DS tinha a resposta, nada me levou até ela, e o desvio passou porque o resultado era plausível. A tabela de moldes materializados agora existe em `STUDIO_UX_TEMPLATES` §Estado da implementação, e consultá-la é passo obrigatório antes de escrever tela de classe recorrente.
+
 ## v0.10.20 - 2026-07-26 (Ícones, marca e os três estados que faltavam)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.38` → **`^1.2.39`** (26 glifos de navegação + a regra "um conceito de menu, um glifo").

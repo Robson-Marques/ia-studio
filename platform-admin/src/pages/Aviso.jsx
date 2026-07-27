@@ -1,19 +1,19 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Card, Button, EmptyState, DSIcon } from '@studio-ux-ds/react';
+import { MessageScreen, Button, DSIcon } from '@studio-ux-ds/react';
 
-// Aviso — as duas telas que faltavam: **endereço que não existe** e **acesso que
-// você não tem**. Criadas na v0.10.20.
+// Aviso — instancia o **molde `empty` de tela inteira** do DS (`MessageScreen`,
+// v1.2.40) nos dois casos que faltavam: **endereço que não existe** e **acesso
+// que você não tem**.
 //
-// Antes, os dois casos davam `<Navigate to="/" replace />`: a pessoa digitava um
-// endereço errado, ou clicava num link que um colega com mais acesso mandou, e
-// **caía no Dashboard sem explicação**. Não havia erro nenhum na tela — o que é
-// pior que um erro, porque quem clicou conclui que o sistema travou ou que o
-// clique não pegou.
+// Antes os dois davam `<Navigate to="/" replace />`: a pessoa digitava errado, ou
+// clicava num link que um colega com mais acesso mandou, e caía no Dashboard sem
+// explicação nenhuma. Não havia erro na tela — o que é pior que um erro, porque
+// quem clicou conclui que o sistema travou.
 //
-// Um componente, dois motivos: o desenho é o mesmo (dizer o que aconteceu e
-// oferecer a saída), e o que muda é o texto. Separar em dois arquivos daria dois
-// lugares para divergir.
+// Um componente, dois motivos: o arranjo é o mesmo (dizer o que aconteceu e
+// oferecer a saída) e só o texto muda. Dois arquivos dariam dois lugares para
+// divergir.
 export default function Aviso({ motivo = 'nao-encontrado' }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -31,31 +31,24 @@ export default function Aviso({ motivo = 'nao-encontrado' }) {
     };
 
   return (
-    <div className="space-y-6">
-      {/* Marca discreta: estas telas podem ser o primeiro contato de alguém que
-          chegou por um link — vale saber onde está. */}
-      <div className="flex items-center gap-2" style={{ color: 'var(--su-text-muted)' }}>
-        <DSIcon name="spark" size="sm" />
-        <span style={{ fontSize: 13 }}>IA Studio</span>
-      </div>
-
-      <Card>
-        <EmptyState
-          icon={conteudo.icon}
-          title={conteudo.title}
-          description={conteudo.description}
-          action={
-            <div className="flex gap-2 flex-wrap justify-center">
-              <Button variant="secondary" icon="arrow-left" onClick={() => navigate(-1)}>
-                Voltar
-              </Button>
-              <Button variant="primary" icon="home" onClick={() => navigate('/')}>
-                Ir para o início
-              </Button>
-            </div>
-          }
-        />
-      </Card>
-    </div>
+    <MessageScreen
+      icon={conteudo.icon}
+      title={conteudo.title}
+      description={conteudo.description}
+      // A marca acima do card: estas telas podem ser o primeiro contato de alguém
+      // que chegou por um link — vale saber onde está.
+      above={(
+        <div className="flex items-center gap-2" style={{ color: 'var(--su-text-muted)' }}>
+          <DSIcon name="spark" size="sm" />
+          <span style={{ fontSize: 13 }}>IA Studio</span>
+        </div>
+      )}
+      action={(
+        <div className="flex gap-2 flex-wrap justify-center">
+          <Button variant="secondary" icon="arrow-left" onClick={() => navigate(-1)}>Voltar</Button>
+          <Button variant="primary" icon="home" onClick={() => navigate('/')}>Ir para o início</Button>
+        </div>
+      )}
+    />
   );
 }
