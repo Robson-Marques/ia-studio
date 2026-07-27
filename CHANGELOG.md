@@ -1,8 +1,23 @@
 # Changelog — IA Studio
 
+## v0.10.12 - 2026-07-26 (As abas da conexão apagavam a tela)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.32` → **`^1.2.33`** (o `Tabs` passou a avisar).
+
+### Corrigido
+
+- **Clicar em qualquer aba da conexão esvaziava o conteúdo** — Recursos, Histórico e também Dados. Os itens do `Tabs` foram declarados como `{ value, label }`, mas o `Tabs` do DS identifica o item por **`id`**; `value` é a prop da aba ATIVA. Sem `id`, nenhuma aba casa com a ativa e o `onChange` devolve `undefined`, então nenhum bloco de conteúdo renderiza — **sem erro no console**.
+  - É a **prop morta** de novo, e desta vez dentro do array de dados, onde a assinatura do componente não protege. As outras 11 telas com `Tabs` foram conferidas uma a uma: todas usam `id`.
+  - O conserto de fundo foi no DS (**v1.2.33**): o `Tabs` agora avisa no console quando um item vem sem `id`, em vez de apagar a tela em silêncio.
+
+### O que dá pra verificar agora
+
+1. **Integrações → Conexões → abrir uma conexão**: as três abas trocam o conteúdo. **Dados** (identificador com copiar + configuração), **Recursos** (consulta ao vivo, com "Consultar de novo") e **Histórico de chamadas**.
+2. Voltar para **Dados** depois de visitar as outras: o conteúdo volta (antes não voltava).
+
 ## v0.10.11 - 2026-07-26 (Família Integrações no DS — a conexão virou tela, não modal)
 
-Sem `db push`. Só frontend. Bump do DS: `^1.2.31` → **`^1.2.33`** (`CopyButton` + glifo `copy` na v1.2.32; aviso do `Tabs` na v1.2.33).
+Sem `db push`. Só frontend. Bump do DS: `^1.2.31` → **`^1.2.32`** (`CopyButton` + glifo `copy`).
 
 ### Mudado
 
@@ -17,7 +32,6 @@ Sem `db push`. Só frontend. Bump do DS: `^1.2.31` → **`^1.2.33`** (`CopyButto
 
 - **`TOKEN_EXPIRED` era o único estado que saía cinza.** O mapa declarava `variant: 'orange'`, e `orange` **não existe** na ponte de cores (`lib/tone.js`) — caía no `|| 'neutral'`. Ou seja: exatamente o estado que precisa gritar (a credencial venceu, a integração parou) era o mais discreto da tela. Agora é `warning`, e "papel desconhecido" deixou de ser possível.
 - **Dois `toast` indefinidos** — `Marketplace.load()` e o modal de rotação do Cofre chamavam `toast.error(...)` sem que o arquivo tivesse `useToast()`. No caminho de erro, o `catch` estourava `ReferenceError: toast is not defined`: **o tratamento do erro era o erro**. Só aparecia quando a chamada falhava, que é justamente quando ninguém está olhando o console.
-- **As abas da conexão esvaziavam a tela ao serem clicadas** (achado por você antes de subir). Declarei os itens como `{ value, label }`, mas o `Tabs` do DS identifica o item por **`id`** — `value` é a prop da aba ATIVA. Sem `id`, nenhuma aba casa com a ativa e o `onChange` devolve `undefined`: o conteúdo some inteiro, sem erro no console. É a **prop morta** pela enésima vez, agora dentro do array de itens. O DS v1.2.33 passou a avisar quando falta `id` — e as outras 11 telas com `Tabs` foram conferidas: todas usam `id`.
 - **Editar conexão era um modal que não podia fechar por clique fora** — e o legado já desligava o `dismissable` por isso. Um formulário que precisa se defender do próprio contêiner está dizendo que não é modal: virou rota.
 
 ### O que dá pra verificar agora (sem depender de dado real)
