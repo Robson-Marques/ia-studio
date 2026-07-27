@@ -1,22 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { Terminal, Loader2, Play, Database, Globe, Sparkles, Wrench, AlertTriangle } from 'lucide-react';
-import Tabs from '../../components/ui/Tabs';
-import { FormField, TextInput, Textarea, Select, NumberInput } from '../../components/ui/FormField';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, Tabs, Field, Input, TextArea, Select, NumericInput, Button,
+  Banner, CopyButton, useToast,
+} from '@studio-ux-ds/react';
 import { listConnections } from '../../services/integrations';
 import { listTools } from '../../services/ai';
-import { useToast } from '@studio-ux-ds/react';
 import { runExecute, runSql, runHttp, runAi, runTool } from '../../services/devtools';
 
+// Desenvolvedor/Console — bancada para bater na integração e na IA sem sair do
+// painel. Migrada pro DS na v0.10.13.
+//
+// As cinco abas são o mesmo desenho: formulário à esquerda, resposta à direita.
+// Não virou rota por aba de propósito — a aba aqui não é um registro, é o canal
+// que se está testando, e o estado de cada uma é rascunho da sessão.
+//
+// O `id` de cada aba é obrigatório: sem ele o `Tabs` do DS nunca marca a ativa e
+// o conteúdo desaparece ao clicar (foi o que aconteceu na v0.10.11, ver DS
+// v1.2.33). O legado usava a prop `active` do `Tabs` LOCAL, que é outra coisa.
+
 const PAGE_TABS = [
-  { id: 'execute', label: 'Execute', Icon: Play },
-  { id: 'sql',     label: 'SQL',     Icon: Database },
-  { id: 'http',    label: 'HTTP',    Icon: Globe },
-  { id: 'ai',      label: 'IA',      Icon: Sparkles },
-  { id: 'tool',    label: 'Tool',    Icon: Wrench },
+  { id: 'execute', label: 'Operação', icon: 'play' },
+  { id: 'sql',     label: 'SQL',      icon: 'dashboard' },
+  { id: 'http',    label: 'HTTP',     icon: 'external-link' },
+  { id: 'ai',      label: 'IA',       icon: 'zap' },
+  { id: 'tool',    label: 'Ferramenta', icon: 'settings' },
 ];
 
-// Desenvolvedor → Console (Postman interno): abas Execute / SQL / HTTP / IA / Tool.
-// Cada aba tem um form + área de resposta JSON + loading. SQL avisa read-only.
 export default function Console() {
   const toast = useToast();
   const [tab, setTab] = useState('execute');
@@ -36,75 +46,89 @@ export default function Console() {
         toast.error(err.message);
       }
     })();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Console do Desenvolvedor</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Depure integrações e IA sem sair do painel. Cada execução é auditada; nada de negócio é persistido aqui.
-        </p>
-      </div>
-      <Tabs items={PAGE_TABS} active={tab} onChange={setTab} />
-      {tab === 'execute' && <ExecuteTab connections={connections} />}
-      {tab === 'sql'     && <SqlTab connections={connections} />}
-      {tab === 'http'    && <HttpTab connections={connections} />}
-      {tab === 'ai'      && <AiTab connections={connections} />}
-      {tab === 'tool'    && <ToolTab connections={connections} tools={tools} />}
+    <div className="space-y-6">
+      <PageHeader
+        title="Bancada de testes"
+        subtitle="Chame uma operação, uma consulta ou a IA direto daqui para ver o que volta. Toda execução fica registrada; nada de negócio é criado."
+      />
+      <Tabs items={PAGE_TABS} value={tab} onChange={setTab} />
+      {tab === 'execute' && <AbaOperacao connections={connections} />}
+      {tab === 'sql'     && <AbaSql connections={connections} />}
+      {tab === 'http'    && <AbaHttp connections={connections} />}
+      {tab === 'ai'      && <AbaIa connections={connections} />}
+      {tab === 'tool'    && <AbaFerramenta connections={connections} tools={tools} />}
     </div>
   );
 }
 
-// ─── Área de resposta reutilizável ───────────────────────────
+// ─── Peças compartilhadas ────────────────────────────────────
 
-function ResultArea({ loading, result, error }) {
+function Resposta({ loading, result, error }) {
+  const texto = result === undefined ? '' : (typeof result === 'string' ? result : JSON.stringify(result, null, 2));
   return (
-    <div>
-      <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--ap-text-2)' }}>Resposta</p>
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>O que voltou</p>
+        {texto && <CopyButton value={texto} label="Copiar" />}
+      </div>
       <div
-        className="rounded-lg px-3 py-2 min-h-[160px] max-h-[420px] overflow-auto"
-        style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border-sub)' }}
+        style={{
+          border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12,
+          minHeight: 180, maxHeight: 440, overflow: 'auto',
+        }}
       >
         {loading ? (
-          <div className="flex items-center gap-2 text-xs py-4" style={{ color: 'var(--ap-text-4)' }}>
+          <div className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--su-text-muted)' }}>
             <Loader2 size={14} className="animate-spin" /> Executando…
           </div>
         ) : error ? (
-          <pre className="text-xs whitespace-pre-wrap break-words text-red-500">{error}</pre>
+          <pre style={{
+            fontFamily: 'var(--su-font-mono, monospace)', fontSize: 11, margin: 0,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--su-danger-fg)',
+          }}>
+            {error}
+          </pre>
         ) : result !== undefined ? (
-          <pre className="text-xs whitespace-pre-wrap break-words" style={{ color: 'var(--ap-text-3)' }}>
-            {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
+          <pre style={{
+            fontFamily: 'var(--su-font-mono, monospace)', fontSize: 11, margin: 0,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--su-text-secondary)',
+          }}>
+            {texto}
           </pre>
         ) : (
-          <p className="text-xs py-4" style={{ color: 'var(--ap-text-5)' }}>Execute para ver o resultado.</p>
+          <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }}>Execute para ver o resultado.</p>
         )}
       </div>
     </div>
   );
 }
 
-function ConnectionSelect({ value, onChange, connections, filter, required, hint }) {
-  const list = filter ? connections.filter(filter) : connections;
+function CampoConexao({ value, onChange, connections, required, hint }) {
   return (
-    <FormField label="Conexão" required={required} hint={hint}>
+    <Field label="Conexão" required={required} hint={hint}>
       <Select value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Selecione…</option>
-        {list.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.provider_key}</option>)}
+        {connections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </Select>
-    </FormField>
+    </Field>
   );
 }
 
-function RunButton({ loading, onClick, label = 'Executar' }) {
+// Casca comum das cinco abas: formulário à esquerda, resposta à direita.
+function Bancada({ children, loading, result, error }) {
   return (
-    <button className="btn-primary disabled:opacity-60" disabled={loading} onClick={onClick}>
-      {loading ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} {label}
-    </button>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Card><div style={{ padding: 20 }} className="space-y-4">{children}</div></Card>
+      <Card><div style={{ padding: 20 }}><Resposta loading={loading} result={result} error={error} /></div></Card>
+    </div>
   );
 }
 
-// Hook local minimalista para o estado de execução de cada aba.
+// Estado de execução de uma aba. O erro aparece nos DOIS lugares de propósito: o
+// toast avisa que acabou, e o painel guarda o texto inteiro para ser lido e copiado.
 function useRun() {
   const toast = useToast();
   const [loading, setLoading] = useState(false);
@@ -113,8 +137,7 @@ function useRun() {
   async function run(fn) {
     setLoading(true); setError(''); setResult(undefined);
     try {
-      const data = await fn();
-      setResult(data);
+      setResult(await fn());
     } catch (err) {
       setError(err.message);
       toast.error(err.message);
@@ -125,98 +148,115 @@ function useRun() {
   return { loading, result, error, run };
 }
 
-// ─── Execute ─────────────────────────────────────────────────
+// ─── Operação do conector ────────────────────────────────────
 
-function ExecuteTab({ connections }) {
+function AbaOperacao({ connections }) {
   const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ connection_id: '', operation: '', params: '' });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
 
-  function submit() {
-    if (!form.connection_id) { toast.error('Selecione a conexão.'); return; }
+  function enviar() {
+    if (!form.connection_id) { toast.error('Escolha a conexão.'); return; }
     if (!form.operation.trim()) { toast.error('Informe a operação.'); return; }
     let params;
     if (form.params.trim()) {
-      try { params = JSON.parse(form.params); } catch { toast.error('Params: JSON inválido.'); return; }
+      try { params = JSON.parse(form.params); } catch { toast.error('Os parâmetros não são um JSON válido.'); return; }
     }
     run(() => runExecute({ connection_id: form.connection_id, operation: form.operation.trim(), params }));
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="card p-4 space-y-3">
-        <ConnectionSelect connections={connections} value={form.connection_id} onChange={(v) => patch({ connection_id: v })} required />
-        <FormField label="Operação" required hint="Operação do IProvider.execute (ex.: cliente.dados).">
-          <TextInput value={form.operation} onChange={(e) => patch({ operation: e.target.value })} placeholder="cliente.dados" />
-        </FormField>
-        <FormField label="Params (JSON)">
-          <Textarea rows={6} className="font-mono text-xs" value={form.params} onChange={(e) => patch({ params: e.target.value })} placeholder='{ "login": "teste" }' />
-        </FormField>
-        <RunButton loading={loading} onClick={submit} />
-      </div>
-      <div className="card p-4"><ResultArea loading={loading} result={result} error={error} /></div>
-    </div>
+    <Bancada loading={loading} result={result} error={error}>
+      <CampoConexao connections={connections} value={form.connection_id} onChange={(v) => patch({ connection_id: v })} required />
+      <Field label="Operação" required hint='O nome que o conector expõe. Ex.: "cliente.dados".'>
+        <Input
+          value={form.operation}
+          onChange={(e) => patch({ operation: e.target.value })}
+          placeholder="cliente.dados"
+          style={{ fontFamily: 'var(--su-font-mono, monospace)' }}
+        />
+      </Field>
+      <Field label="Parâmetros" hint="Em JSON. Vazio manda a operação sem argumento.">
+        <TextArea
+          rows={6}
+          style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+          value={form.params}
+          onChange={(e) => patch({ params: e.target.value })}
+          placeholder='{ "login": "teste" }'
+        />
+      </Field>
+      <Button variant="primary" icon="play" loading={loading} onClick={enviar}>Executar</Button>
+    </Bancada>
   );
 }
 
 // ─── SQL ─────────────────────────────────────────────────────
 
-function SqlTab({ connections }) {
+function AbaSql({ connections }) {
   const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ connection_id: '', sql: '' });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
 
-  function submit() {
-    if (!form.connection_id) { toast.error('Selecione a conexão.'); return; }
-    if (!form.sql.trim()) { toast.error('Informe o SQL.'); return; }
+  function enviar() {
+    if (!form.connection_id) { toast.error('Escolha a conexão.'); return; }
+    if (!form.sql.trim()) { toast.error('Escreva a consulta.'); return; }
     run(() => runSql({ connection_id: form.connection_id, sql: form.sql }));
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="card p-4 space-y-3">
-        <div
-          className="flex items-start gap-2 rounded-lg px-3 py-2 text-[11px]"
-          style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border-sub)', color: 'var(--ap-text-3)' }}
-        >
-          <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-          <span>Somente leitura por padrão. Consultas de escrita são bloqueadas pelo backend.</span>
-        </div>
-        <ConnectionSelect connections={connections} value={form.connection_id} onChange={(v) => patch({ connection_id: v })} required hint="Conexão do tipo banco de dados." />
-        <FormField label="SQL" required>
-          <Textarea rows={7} className="font-mono text-xs" value={form.sql} onChange={(e) => patch({ sql: e.target.value })} placeholder="SELECT * FROM clientes LIMIT 10" />
-        </FormField>
-        <RunButton loading={loading} onClick={submit} label="Executar consulta" />
-      </div>
-      <div className="card p-4"><ResultArea loading={loading} result={result} error={error} /></div>
-    </div>
+    <Bancada loading={loading} result={result} error={error}>
+      <Banner tone="warning">
+        Somente consulta. Comando que grava, altera ou apaga é recusado pelo servidor — não dá para estragar dado daqui.
+      </Banner>
+      <CampoConexao
+        connections={connections}
+        value={form.connection_id}
+        onChange={(v) => patch({ connection_id: v })}
+        required
+        hint="Precisa ser uma conexão de banco de dados."
+      />
+      <Field label="Consulta" required>
+        <TextArea
+          rows={7}
+          style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+          value={form.sql}
+          onChange={(e) => patch({ sql: e.target.value })}
+          placeholder="SELECT * FROM clientes LIMIT 10"
+        />
+      </Field>
+      <Button variant="primary" icon="play" loading={loading} onClick={enviar}>Consultar</Button>
+    </Bancada>
   );
 }
 
 // ─── HTTP ────────────────────────────────────────────────────
 
-const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const METODOS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
-function HttpTab({ connections }) {
+function AbaHttp({ connections }) {
   const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ method: 'GET', url: '', connection_id: '', headers: '', body: '' });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
 
-  function submit() {
-    if (!form.url.trim()) { toast.error('Informe a URL.'); return; }
-    // headers no formato { chave: valor } → [{ key, value }] esperado pelo backend.
+  function enviar() {
+    if (!form.url.trim()) { toast.error('Informe o endereço.'); return; }
     let headers;
     if (form.headers.trim()) {
       try {
         const obj = JSON.parse(form.headers);
         headers = Object.entries(obj).map(([key, value]) => ({ key, value: String(value) }));
-      } catch { toast.error('Headers: JSON inválido (use { "Authorization": "Bearer ..." }).'); return; }
+      } catch {
+        toast.error('Os cabeçalhos não são um JSON válido. Use { "Authorization": "Bearer …" }.');
+        return;
+      }
     }
     let body;
     if (form.body.trim()) {
+      // Texto que não é JSON vai como texto — é útil testar endpoint que espera
+      // form-urlencoded ou XML, e recusar aqui só atrapalharia.
       try { body = JSON.parse(form.body); } catch { body = form.body; }
     }
     run(() => runHttp({
@@ -229,44 +269,56 @@ function HttpTab({ connections }) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="card p-4 space-y-3">
-        <div className="grid grid-cols-[110px_1fr] gap-2 items-end">
-          <FormField label="Método">
-            <Select value={form.method} onChange={(e) => patch({ method: e.target.value })}>
-              {HTTP_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </Select>
-          </FormField>
-          <FormField label="URL" required>
-            <TextInput value={form.url} onChange={(e) => patch({ url: e.target.value })} placeholder="https://api.exemplo.com/v1/recurso" />
-          </FormField>
-        </div>
-        <ConnectionSelect connections={connections} value={form.connection_id} onChange={(v) => patch({ connection_id: v })} hint="Opcional — usa a autenticação da conexão." />
-        <FormField label="Headers (JSON — opcional)">
-          <Textarea rows={3} className="font-mono text-xs" value={form.headers} onChange={(e) => patch({ headers: e.target.value })} placeholder='{ "Authorization": "Bearer ..." }' />
-        </FormField>
-        <FormField label="Body (JSON ou texto — opcional)">
-          <Textarea rows={4} className="font-mono text-xs" value={form.body} onChange={(e) => patch({ body: e.target.value })} />
-        </FormField>
-        <RunButton loading={loading} onClick={submit} label="Enviar requisição" />
+    <Bancada loading={loading} result={result} error={error}>
+      <div className="grid grid-cols-[120px_1fr] gap-2 items-end">
+        <Field label="Método">
+          <Select value={form.method} onChange={(e) => patch({ method: e.target.value })}>
+            {METODOS.map((m) => <option key={m} value={m}>{m}</option>)}
+          </Select>
+        </Field>
+        <Field label="Endereço" required>
+          <Input value={form.url} onChange={(e) => patch({ url: e.target.value })} placeholder="https://api.exemplo.com/v1/recurso" />
+        </Field>
       </div>
-      <div className="card p-4"><ResultArea loading={loading} result={result} error={error} /></div>
-    </div>
+      <CampoConexao
+        connections={connections}
+        value={form.connection_id}
+        onChange={(v) => patch({ connection_id: v })}
+        hint="Opcional — escolha uma conexão para reaproveitar a autenticação dela."
+      />
+      <Field label="Cabeçalhos" hint='Opcional, em JSON. Ex.: { "Authorization": "Bearer …" }'>
+        <TextArea
+          rows={3}
+          style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+          value={form.headers}
+          onChange={(e) => patch({ headers: e.target.value })}
+        />
+      </Field>
+      <Field label="Corpo" hint="Opcional. Aceita JSON ou texto puro.">
+        <TextArea
+          rows={4}
+          style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+          value={form.body}
+          onChange={(e) => patch({ body: e.target.value })}
+        />
+      </Field>
+      <Button variant="primary" icon="send" loading={loading} onClick={enviar}>Enviar</Button>
+    </Bancada>
   );
 }
 
 // ─── IA ──────────────────────────────────────────────────────
 
-function AiTab({ connections }) {
+function AbaIa({ connections }) {
   const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ connection_id: '', model: '', prompt: '', system: '', temperature: null, max_tokens: null });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
 
-  function submit() {
-    if (!form.connection_id) { toast.error('Selecione a conexão de IA.'); return; }
+  function enviar() {
+    if (!form.connection_id) { toast.error('Escolha a conexão de IA.'); return; }
     if (!form.model.trim()) { toast.error('Informe o modelo.'); return; }
-    if (!form.prompt.trim()) { toast.error('Informe o prompt.'); return; }
+    if (!form.prompt.trim()) { toast.error('Escreva o que pedir à IA.'); return; }
     run(() => runAi({
       connection_id: form.connection_id,
       model: form.model.trim(),
@@ -278,71 +330,84 @@ function AiTab({ connections }) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="card p-4 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <ConnectionSelect connections={connections} value={form.connection_id} onChange={(v) => patch({ connection_id: v })} required hint="Conexão de provedor de IA." />
-          <FormField label="Modelo" required>
-            <TextInput value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
-          </FormField>
-        </div>
-        <FormField label="System (opcional)">
-          <Textarea rows={2} value={form.system} onChange={(e) => patch({ system: e.target.value })} placeholder="Você é um assistente…" />
-        </FormField>
-        <FormField label="Prompt" required>
-          <Textarea rows={5} value={form.prompt} onChange={(e) => patch({ prompt: e.target.value })} />
-        </FormField>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Temperature (0–2)">
-            <NumberInput value={form.temperature} onChange={(v) => patch({ temperature: v })} min={0} max={2} step="0.1" allowEmpty placeholder="ex.: 0.7" />
-          </FormField>
-          <FormField label="Max tokens">
-            <NumberInput value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })} min={1} max={8000} step={1} allowEmpty placeholder="ex.: 1000" />
-          </FormField>
-        </div>
-        <RunButton loading={loading} onClick={submit} label="Chamar IA" />
+    <Bancada loading={loading} result={result} error={error}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CampoConexao
+          connections={connections}
+          value={form.connection_id}
+          onChange={(v) => patch({ connection_id: v })}
+          required
+          hint="Uma conexão de provedor de IA."
+        />
+        <Field label="Modelo" required>
+          <Input value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
+        </Field>
       </div>
-      <div className="card p-4"><ResultArea loading={loading} result={result} error={error} /></div>
-    </div>
+      <Field label="Instrução de fundo" hint="Opcional — o papel que a IA deve assumir antes de responder.">
+        <TextArea rows={2} value={form.system} onChange={(e) => patch({ system: e.target.value })} placeholder="Você é um assistente…" />
+      </Field>
+      <Field label="Pedido" required>
+        <TextArea rows={5} value={form.prompt} onChange={(e) => patch({ prompt: e.target.value })} />
+      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Criatividade" hint="0 a 2. Vazio usa o padrão do modelo.">
+          <NumericInput fullWidth value={form.temperature} onChange={(v) => patch({ temperature: v })} min={0} max={2} step={0.1} allowEmpty placeholder="0,7" />
+        </Field>
+        <Field label="Tamanho máximo da resposta" hint="Em tokens. Vazio usa o padrão.">
+          <NumericInput fullWidth value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })} min={1} max={8000} step={1} allowEmpty placeholder="1000" />
+        </Field>
+      </div>
+      <Button variant="primary" icon="zap" loading={loading} onClick={enviar}>Perguntar à IA</Button>
+    </Bancada>
   );
 }
 
-// ─── Tool ────────────────────────────────────────────────────
+// ─── Ferramenta ──────────────────────────────────────────────
 
-function ToolTab({ connections, tools }) {
+function AbaFerramenta({ connections, tools }) {
   const toast = useToast();
   const { loading, result, error, run } = useRun();
   const [form, setForm] = useState({ tool_key: '', input: '{\n  \n}', connection_id: '' });
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
 
-  function submit() {
-    if (!form.tool_key.trim()) { toast.error('Informe a tool_key.'); return; }
+  function enviar() {
+    if (!form.tool_key.trim()) { toast.error('Escolha a ferramenta.'); return; }
     let input;
-    try { input = JSON.parse(form.input); } catch { toast.error('Input: JSON inválido.'); return; }
-    if (typeof input !== 'object' || input === null || Array.isArray(input)) { toast.error('Input deve ser um objeto JSON.'); return; }
+    try { input = JSON.parse(form.input); } catch { toast.error('A entrada não é um JSON válido.'); return; }
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+      toast.error('A entrada tem que ser um objeto JSON — { } com os campos dentro.');
+      return;
+    }
     run(() => runTool({ tool_key: form.tool_key.trim(), input, connection_id: form.connection_id || undefined }));
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="card p-4 space-y-3">
-        <FormField label="Ferramenta (tool_key)" required>
-          {tools.length ? (
-            <Select value={form.tool_key} onChange={(e) => patch({ tool_key: e.target.value })}>
-              <option value="">Selecione…</option>
-              {tools.map((t) => <option key={t.id || t.key} value={t.key}>{t.name} ({t.key})</option>)}
-            </Select>
-          ) : (
-            <TextInput value={form.tool_key} onChange={(e) => patch({ tool_key: e.target.value })} placeholder="consultar_estoque" />
-          )}
-        </FormField>
-        <ConnectionSelect connections={connections} value={form.connection_id} onChange={(v) => patch({ connection_id: v })} hint="Opcional — algumas tools operam sobre uma conexão." />
-        <FormField label="Input (JSON)" required>
-          <Textarea rows={6} className="font-mono text-xs" value={form.input} onChange={(e) => patch({ input: e.target.value })} />
-        </FormField>
-        <RunButton loading={loading} onClick={submit} label="Rodar ferramenta" />
-      </div>
-      <div className="card p-4"><ResultArea loading={loading} result={result} error={error} /></div>
-    </div>
+    <Bancada loading={loading} result={result} error={error}>
+      <Field label="Ferramenta" required hint={tools.length ? undefined : 'Nenhuma ferramenta cadastrada — escreva a chave dela à mão.'}>
+        {tools.length ? (
+          <Select value={form.tool_key} onChange={(e) => patch({ tool_key: e.target.value })}>
+            <option value="">Selecione…</option>
+            {tools.map((t) => <option key={t.id || t.key} value={t.key}>{t.name}</option>)}
+          </Select>
+        ) : (
+          <Input value={form.tool_key} onChange={(e) => patch({ tool_key: e.target.value })} placeholder="consultar_estoque" />
+        )}
+      </Field>
+      <CampoConexao
+        connections={connections}
+        value={form.connection_id}
+        onChange={(v) => patch({ connection_id: v })}
+        hint="Opcional — algumas ferramentas trabalham sobre uma conexão específica."
+      />
+      <Field label="Entrada" required hint="Em JSON, no formato que a ferramenta declara.">
+        <TextArea
+          rows={6}
+          style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+          value={form.input}
+          onChange={(e) => patch({ input: e.target.value })}
+        />
+      </Field>
+      <Button variant="primary" icon="play" loading={loading} onClick={enviar}>Rodar a ferramenta</Button>
+    </Bancada>
   );
 }

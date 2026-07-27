@@ -57,16 +57,17 @@ armadilhas). Resumo para re-ancorar:
 - **Casca `AppShell` + Dashboard** no DS desde a v0.9.80; toast global do DS desde a v0.9.84.
 - **Famílias migradas:** IA Studio (v0.9.84→v0.9.91), ISP (v0.9.92), **Automação INTEIRA**
   (A: v0.9.99 · B: v0.10.2 · C: v0.10.4), **WhatsApp INTEIRA** (v0.10.9 — 11 arquivos) e
-  **Integrações INTEIRA** (v0.10.11 — 6 arquivos viraram 9).
-- **Faltam:** Configurações (5), Recursos (2), Desenvolvedor (2) — todas
-  lista+form, sem layout especial.
+  **Integrações INTEIRA** (v0.10.11 — 6 arquivos viraram 9), **Recursos** e
+  **Desenvolvedor** (v0.10.13).
+- **Falta só Configurações (5 telas)** — é a família que mexe em coisa ligada
+  (integração, flag, ACL), então fica para o fim de propósito.
 - **A conexão tem rota própria** (v0.10.11): `/integracoes/conexoes/:id`, `/:id/editar` e `/nova`
   (que aceita `?provider=<chave>`, é assim que o Marketplace manda para lá). O `?open=<id>` da
   v0.10.10 sobrevive só como encaminhamento. "Descobrir recursos" é **aba** da conexão, não modal.
 - **Os mapas de estado de Integrações declaram `tone` direto**, sem `lib/tone.js`. É o caminho de
   saída da ponte: cada família que migrar deve fazer o mesmo. A ponte engole papel desconhecido no
   `|| 'neutral'` — foi assim que "credencial vencida" ficou cinza por meses.
-- **DS consumido: `^1.2.33`.** A migração já rendeu 24 releases do próprio Studio UX — a regra é
+- **DS consumido: `^1.2.34`.** A migração já rendeu 25 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
 - **Tela de trabalho contínuo usa `fullBleed`** do AppShell (v1.2.31) e `flex: 1` — **nunca**
   `calc(100dvh - Xrem)`. A lista de rotas full-bleed vive no `Layout.jsx` (`FULL_BLEED_PATHS`).
@@ -91,6 +92,10 @@ armadilhas). Resumo para re-ancorar:
   Variante pior: prop repassada pro DOM — `<Checkbox>rótulo</Checkbox>` mandava `children` pro
   `<input>` e derrubava a página inteira (tela branca em `/automacao/calendarios/novo`, DS v1.2.23).
   **Tela branca em rota nova = prop no lugar errado; abra o console antes de investigar API.**
+- **Quatro `toast` sem `useToast()` foram achados e consertados** (v0.10.11 e v0.10.13): o `catch`
+  estourava `ReferenceError` em vez de mostrar o erro. Um verificador passou em toda a `src` e não
+  sobrou nenhum — se aparecer de novo, é código novo. Confira **todo** componente do arquivo, não só
+  o principal: os quatro estavam em auxiliares no fim do arquivo.
 - **Dívida técnica do produto agora tem casa própria:** [`docs/divida-tecnica.md`](divida-tecnica.md)
   (DT-001…DT-004). Critério do Robson (2026-07-25): **o que não é responsabilidade do DS sai do doc
   de adoção e vive na dívida técnica do IA Studio.** Abertos hoje: ajuda de variáveis no editor de

@@ -1,28 +1,45 @@
 import React, { useEffect, useState } from 'react';
-import { KeyRound, Loader2, Plus, Ban, Copy, Check, ShieldAlert } from 'lucide-react';
-import Modal from '../../components/ui/Modal';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import EmptyState from '../../components/ui/EmptyState';
-import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
-import { FormField, TextInput } from '../../components/ui/FormField';
-import { useToast } from '@studio-ux-ds/react';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, DataTable, Badge, Button, Modal, Field, Input, ConfirmDialog,
+  Banner, CopyButton, EmptyState, useToast,
+} from '@studio-ux-ds/react';
 import { listApiKeys, createApiKey, revokeApiKey } from '../../services/developer';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 
-// Desenvolvedor → API Keys: lista metadados (nunca a chave), criação exibe a
-// chave em claro UMA vez (com aviso + copiar) e revogação com os 5 patrasques.
+// Desenvolvedor/Chaves de API — autenticam quem chama a API da plataforma de
+// fora. Migrada pro DS na v0.10.13.
+//
+// A chave em claro existe por **um instante**: aparece uma vez, na criação, e
+// depois só o prefixo e o hash ficam guardados. Toda a composição desta tela gira
+// em torno disso — o aviso, o botão de copiar e o fecho que só oferece "já copiei".
+//
+// Decisões de composição:
+//
+//  · **A linha não abre nada** (deliberado): não há nada sobre uma chave que não
+//    esteja nas seis colunas. Revogar é a única ação, e vive na barra de lote.
+//  · **Criar continua em Modal** e cabe na regra: três campos curtos, nada a
+//    redigir. **Mostrar a chave também** — é leitura, e leitura de uma coisa só.
+//  · **Revogar aceita várias** de uma vez, mas só as que ainda valem: oferecer
+//    revogar o que já está revogado é prometer o que vai falhar.
+//
+// **Bug consertado junto:** os dois modais chamavam `toast.*` sem que o arquivo
+// tivesse `useToast()` neles — o `catch` estourava `ReferenceError` em vez de
+// mostrar o erro, e a validação do nome derrubava a tela em vez de avisar. Mesma
+// família dos dois casos achados em Integrações.
+
 export default function ApiKeys() {
   const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newKey, setNewKey] = useState(null); // { key, plaintext }
-  const [confirmRevoke, setConfirmRevoke] = useState(null);
-  const [revoking, setRevoking] = useState(false);
+  const [criando, setCriando] = useState(false);
+  const [chaveNova, setChaveNova] = useState(null); // { key, plaintext }
+  const [revogar, setRevogar] = useState(null);     // { ids, clear }
+  const [revogando, setRevogando] = useState(false);
 
-  const canManage = can('developer.apikeys.manage');
+  const podeGerenciar = can('developer.apikeys.manage');
 
   async function load() {
     setLoading(true);
@@ -36,277 +53,229 @@ export default function ApiKeys() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function keyStatus(k) {
-    if (k.revoked_at) return { variant: 'red', label: 'Revogada' };
-    if (k.expires_at && new Date(k.expires_at).getTime() < Date.now()) return { variant: 'yellow', label: 'Expirada' };
-    return { variant: 'green', label: 'Ativa' };
+  function situacao(k) {
+    if (k.revoked_at) return { label: 'revogada', tone: 'danger' };
+    if (k.expires_at && new Date(k.expires_at).getTime() < Date.now()) return { label: 'vencida', tone: 'warning' };
+    return { label: 'em uso', tone: 'success' };
   }
 
-  async function handleRevoke() {
-    if (!confirmRevoke) return;
-    setRevoking(true);
-    try {
-      await revokeApiKey(confirmRevoke.id);
-      toast.success('Chave revogada.');
-      setConfirmRevoke(null);
-      await load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setRevoking(false);
+  async function confirmarRevogacao() {
+    if (!revogar) return;
+    const { ids, clear } = revogar;
+    setRevogando(true);
+    let ok = 0;
+    const falhas = [];
+    for (const id of ids) {
+      try { await revokeApiKey(id); ok += 1; }
+      catch (err) { falhas.push(err.message); }
     }
+    setRevogando(false);
+    setRevogar(null);
+    clear?.();
+    if (ok) toast.success(ok === 1 ? 'Chave revogada.' : `${ok} chaves revogadas.`);
+    if (falhas.length) toast.error(`${falhas.length} não deram: ${falhas[0]}`);
+    load();
   }
+
+  const nova = podeGerenciar && (
+    <Button variant="primary" icon="plus" onClick={() => setCriando(true)}>Nova chave</Button>
+  );
+
+  const columns = [
+    { key: 'name', header: 'Chave', render: (k) => (
+      <div className="min-w-0">
+        <p style={{ fontWeight: 500, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">{k.name}</p>
+        <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)', fontFamily: 'var(--su-font-mono, monospace)' }}>
+          ias_{k.prefix}_…
+        </p>
+      </div>
+    ) },
+    { key: 'scopes', header: 'Pode fazer', render: (k) => (
+      (k.scopes || []).length
+        ? <div className="flex gap-1 flex-wrap">{k.scopes.map((s) => <Badge key={s} tone="info">{s}</Badge>)}</div>
+        : <span style={{ color: 'var(--su-text-muted)' }}>tudo o que a API permite</span>
+    ) },
+    { key: 'status', header: 'Situação', render: (k) => {
+      const s = situacao(k);
+      return <Badge tone={s.tone}>{s.label}</Badge>;
+    } },
+    { key: 'last', header: 'Último uso', render: (k) => (k.last_used_at ? formatDateTime(k.last_used_at) : 'nunca usada') },
+    { key: 'exp', header: 'Vence em', render: (k) => (k.expires_at ? formatDateTime(k.expires_at) : 'não vence') },
+  ];
+
+  // Só as que ainda valem: revogar o que já foi revogado não faz nada.
+  const bulkActions = (ids, clear) => {
+    if (!podeGerenciar) return null;
+    const sel = items.filter((k) => ids.includes(k.id));
+    if (!sel.length || !sel.every((k) => !k.revoked_at)) return null;
+    return (
+      <Button
+        variant="ghost"
+        icon="trash"
+        title="A chave para de autenticar na hora, e não volta"
+        onClick={() => setRevogar({ ids, clear })}
+      >
+        Revogar
+      </Button>
+    );
+  };
+
+  const varias = (revogar?.ids.length || 0) > 1;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Chaves de API</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-            Autenticam chamadas à API pública. A chave em claro é exibida uma única vez na criação — depois só os metadados.
-          </p>
-        </div>
-        {canManage && (
-          <button className="btn-primary" onClick={() => setCreateOpen(true)}>
-            <Plus size={15} /> Nova chave
-          </button>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
-      ) : !items.length ? (
-        <div className="card">
-          <EmptyState icon={KeyRound} title="Nenhuma chave de API" description="Crie uma chave para autenticar integrações com a API pública." />
-        </div>
-      ) : (
-        <>
-          {/* Desktop */}
-          <div className="card p-0 overflow-hidden hidden md:block">
-            <Table>
-              <Thead>
-                <Th>Nome</Th>
-                <Th>Prefixo</Th>
-                <Th>Escopos</Th>
-                <Th>Status</Th>
-                <Th>Último uso</Th>
-                <Th>Expira em</Th>
-                <Th className="text-right">Ações</Th>
-              </Thead>
-              <Tbody>
-                {items.map((k) => {
-                  const st = keyStatus(k);
-                  return (
-                    <Tr key={k.id}>
-                      <Td><span className="font-medium" style={{ color: 'var(--ap-text-1)' }}>{k.name}</span></Td>
-                      <Td><span className="font-mono text-xs" style={{ color: 'var(--ap-text-3)' }}>ias_{k.prefix}_…</span></Td>
-                      <Td>
-                        <div className="flex gap-1 flex-wrap">
-                          {(k.scopes || []).length
-                            ? k.scopes.map((s) => <Badge key={s} variant="blue">{s}</Badge>)
-                            : <span className="text-xs" style={{ color: 'var(--ap-text-5)' }}>—</span>}
-                        </div>
-                      </Td>
-                      <Td><Badge variant={st.variant}>{st.label}</Badge></Td>
-                      <Td><span className="text-xs" style={{ color: 'var(--ap-text-4)' }}>{k.last_used_at ? formatDateTime(k.last_used_at) : 'nunca'}</span></Td>
-                      <Td><span className="text-xs" style={{ color: 'var(--ap-text-4)' }}>{k.expires_at ? formatDateTime(k.expires_at) : 'não expira'}</span></Td>
-                      <Td className="text-right">
-                        {canManage && !k.revoked_at && (
-                          <button className="btn-ghost p-1.5" title="Revogar chave" onClick={() => setConfirmRevoke(k)}>
-                            <Ban size={14} className="text-red-500" />
-                          </button>
-                        )}
-                      </Td>
-                    </Tr>
-                  );
-                })}
-              </Tbody>
-            </Table>
-          </div>
-
-          {/* Mobile */}
-          <div className="space-y-2 md:hidden">
-            {items.map((k) => {
-              const st = keyStatus(k);
-              return (
-                <div key={k.id} className="card p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>{k.name}</p>
-                      <p className="text-[11px] font-mono" style={{ color: 'var(--ap-text-5)' }}>ias_{k.prefix}_…</p>
-                    </div>
-                    <Badge variant={st.variant}>{st.label}</Badge>
-                  </div>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--ap-text-4)' }}>
-                    Último uso: {k.last_used_at ? formatDateTime(k.last_used_at) : 'nunca'} · Expira: {k.expires_at ? formatDateTime(k.expires_at) : 'não expira'}
-                  </p>
-                  {canManage && !k.revoked_at && (
-                    <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--ap-border-sub)' }}>
-                      <button className="btn-ghost p-2" onClick={() => setConfirmRevoke(k)}>
-                        <Ban size={16} className="text-red-500" /> <span className="text-xs">Revogar</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      <CreateApiKeyModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={(res) => { setCreateOpen(false); setNewKey(res); load(); }}
+    <div className="space-y-6">
+      <PageHeader
+        title="Chaves de API"
+        subtitle="Autenticam quem chama a API da plataforma de fora. A chave aparece uma única vez, na criação — depois guardamos só o prefixo e um resumo criptográfico."
+        actions={nova}
       />
 
-      <NewKeyModal newKey={newKey} onClose={() => setNewKey(null)} />
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
+      ) : !items.length ? (
+        <Card>
+          <EmptyState
+            icon="lock"
+            title="Nenhuma chave"
+            description="Crie uma chave para um sistema de fora chamar a API da plataforma em nome da sua organização."
+            action={nova}
+          />
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={items}
+          getRowId={(k) => k.id}
+          bulkActions={bulkActions}
+        />
+      )}
 
-      {/* Revogar — 5 patrasques: ConfirmDialog + disclaimer + tooltip + loading + permission gate */}
+      <CriarChave
+        open={criando}
+        onClose={() => setCriando(false)}
+        onCreated={(res) => { setCriando(false); setChaveNova(res); load(); }}
+      />
+
+      <MostrarChave chaveNova={chaveNova} onClose={() => setChaveNova(null)} />
+
       <ConfirmDialog
-        open={Boolean(confirmRevoke)}
+        open={Boolean(revogar)}
         danger
-        loading={revoking}
+        loading={revogando}
         title="Revogar chave de API"
-        message={confirmRevoke
-          ? `Revogar a chave "${confirmRevoke.name}" (ias_${confirmRevoke.prefix}_…)? Toda integração que a utiliza deixará de autenticar imediatamente. A revogação é permanente — a chave nunca volta a funcionar.`
-          : ''}
+        message={
+          varias
+            ? `Revogar as ${revogar.ids.length} chaves selecionadas? Toda integração que usa qualquer uma delas para de autenticar imediatamente. A revogação é permanente — elas nunca voltam a funcionar.`
+            : 'Revogar esta chave? Toda integração que a usa para de autenticar imediatamente. A revogação é permanente — a chave nunca volta a funcionar. Se a ideia é trocar a chave, crie a nova ANTES de revogar a antiga.'
+        }
         confirmLabel="Revogar"
-        onClose={() => setConfirmRevoke(null)}
-        onConfirm={handleRevoke}
+        onClose={() => setRevogar(null)}
+        onConfirm={confirmarRevogacao}
       />
     </div>
   );
 }
 
-// Criação da chave — nome, escopos (CSV), expiração opcional.
-function CreateApiKeyModal({ open, onClose, onCreated }) {
+// Criação — três campos curtos, nada a redigir: cabe no Modal.
+function CriarChave({ open, onClose, onCreated }) {
+  const toast = useToast();
   const [form, setForm] = useState({ name: '', scopes: '', expires_at: '' });
-  const [saving, setSaving] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => { if (open) setForm({ name: '', scopes: '', expires_at: '' }); }, [open]);
 
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
 
-  async function handleSave() {
-    if (form.name.trim().length < 2) { toast.error('Informe um nome (mín. 2 caracteres).'); return; }
+  async function salvar() {
+    if (form.name.trim().length < 2) { toast.error('Dê um nome com pelo menos 2 letras.'); return; }
     const scopes = form.scopes.split(',').map((s) => s.trim()).filter(Boolean);
     let expiresAt;
     if (form.expires_at) {
       const d = new Date(form.expires_at);
-      if (Number.isNaN(d.getTime())) { toast.error('Data de expiração inválida.'); return; }
+      if (Number.isNaN(d.getTime())) { toast.error('A data de vencimento não é válida.'); return; }
       expiresAt = d.toISOString();
     }
-    setSaving(true);
+    setSalvando(true);
     try {
       const res = await createApiKey({
         name: form.name.trim(),
         scopes: scopes.length ? scopes : undefined,
         expires_at: expiresAt,
       });
-      toast.success('Chave criada. Copie-a agora.');
       onCreated(res);
     } catch (err) {
       toast.error(err.message);
     } finally {
-      setSaving(false);
+      setSalvando(false);
     }
   }
 
   return (
     <Modal
       open={open}
-      onClose={saving ? undefined : onClose}
+      onClose={salvando ? undefined : onClose}
       title="Nova chave de API"
-      size="md"
-      dismissable={!saving}
       footer={
         <>
-          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 size={14} className="animate-spin" />} Criar chave
-          </button>
+          <Button variant="secondary" disabled={salvando} onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" loading={salvando} onClick={salvar}>Criar</Button>
         </>
       }
     >
-      <div className="space-y-3">
-        <FormField label="Nome" required hint="Identifica a chave na listagem (ex.: Integração ERP).">
-          <TextInput value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Integração ERP" />
-        </FormField>
-        <FormField label="Escopos" hint="Separados por vírgula (ex.: public.read, public.write). Vazio = sem escopo explícito.">
-          <TextInput value={form.scopes} onChange={(e) => patch({ scopes: e.target.value })} placeholder="public.read, public.write" />
-        </FormField>
-        <FormField label="Expira em" hint="Opcional. Vazio = não expira.">
-          <TextInput type="date" value={form.expires_at} onChange={(e) => patch({ expires_at: e.target.value })} />
-        </FormField>
+      <div className="space-y-4">
+        <Field label="Nome" required hint="Para você reconhecer depois quem usa esta chave. Ex.: Integração do ERP.">
+          <Input value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Integração do ERP" autoFocus />
+        </Field>
+        <Field label="Pode fazer" hint="Separado por vírgula. Vazio = sem restrição explícita. Ex.: public.read, public.write">
+          <Input value={form.scopes} onChange={(e) => patch({ scopes: e.target.value })} placeholder="public.read, public.write" />
+        </Field>
+        <Field label="Vence em" hint="Opcional. Vazio = não vence.">
+          <Input type="date" value={form.expires_at} onChange={(e) => patch({ expires_at: e.target.value })} />
+        </Field>
       </div>
     </Modal>
   );
 }
 
-// Exibe a chave em claro UMA vez com aviso + botão copiar.
-function NewKeyModal({ newKey, onClose }) {
-  const [copied, setCopied] = useState(false);
-  const plaintext = newKey?.plaintext || '';
-
-  useEffect(() => { if (newKey) setCopied(false); }, [newKey]);
-
-  async function copy() {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(plaintext);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = plaintext;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      setCopied(true);
-      toast.success('Chave copiada.');
-    } catch {
-      toast.error('Não foi possível copiar. Selecione e copie manualmente.');
-    }
-  }
+// A chave em claro, uma única vez. Não fecha por clique fora nem por Esc: fechar
+// sem copiar significa criar outra chave, e o descuido custa um passo inteiro.
+function MostrarChave({ chaveNova, onClose }) {
+  const toast = useToast();
+  const plaintext = chaveNova?.plaintext || '';
 
   return (
     <Modal
-      open={Boolean(newKey)}
-      onClose={onClose}
+      open={Boolean(chaveNova)}
+      onClose={undefined}
       title="Chave criada"
-      size="md"
-      dismissable={false}
-      footer={<button className="btn-primary" onClick={onClose}>Já copiei — fechar</button>}
+      footer={<Button variant="primary" onClick={onClose}>Já copiei — fechar</Button>}
     >
-      <div className="space-y-3">
-        <div
-          className="flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs"
-          style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border)', color: 'var(--ap-text-2)' }}
-        >
-          <ShieldAlert size={16} className="text-amber-500 shrink-0 mt-0.5" />
-          <span><strong>Copie agora — a chave não será exibida de novo.</strong> Guarde-a em local seguro; só armazenamos o prefixo e um hash.</span>
-        </div>
-        <FormField label={newKey?.key?.name ? `Chave "${newKey.key.name}"` : 'Chave em claro'}>
-          <div className="flex items-stretch gap-2">
-            <input
+      <div className="space-y-4">
+        <Banner tone="warning">
+          <strong>Copie agora.</strong> Esta chave não vai aparecer de novo — guardamos só o prefixo e um resumo
+          criptográfico dela. Se perder, o caminho é criar outra e revogar esta.
+        </Banner>
+        <Field label={chaveNova?.key?.name ? `Chave “${chaveNova.key.name}”` : 'A chave'}>
+          <div className="flex items-center gap-2">
+            <Input
               readOnly
               value={plaintext}
               onFocus={(e) => e.target.select()}
-              className="input font-mono text-xs flex-1"
+              style={{ flex: 1, fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
             />
-            <button
-              type="button"
-              className="btn-secondary shrink-0"
-              onClick={copy}
-              title="Copiar a chave"
-            >
-              {copied ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />} {copied ? 'Copiado' : 'Copiar'}
-            </button>
+            <CopyButton
+              value={plaintext}
+              label="Copiar"
+              variant="secondary"
+              size="md"
+              onCopied={(ok) => { if (!ok) toast.error('Não deu para copiar — selecione o texto e copie à mão ANTES de fechar.'); }}
+            />
           </div>
-        </FormField>
+        </Field>
       </div>
     </Modal>
   );

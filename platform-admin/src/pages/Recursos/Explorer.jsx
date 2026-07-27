@@ -1,15 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Loader2, Compass, Eye } from 'lucide-react';
-import Modal from '../../components/ui/Modal';
-import EmptyState from '../../components/ui/EmptyState';
-import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../../components/ui/Table';
-import { FormField, TextInput, Select } from '../../components/ui/FormField';
-import { useToast } from '@studio-ux-ds/react';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, Field, Input, Select, Button, DataTable, DescriptionList,
+  Modal, CopyButton, EmptyState, useToast,
+} from '@studio-ux-ds/react';
 import { getResourceCatalog, exploreResource } from '../../services/resource';
 import { listConnections } from '../../services/integrations';
 
-// Recursos → Explorer (read-only): seleciona conexão + tipo canônico + busca →
-// tabela de registros canônicos + detalhe em Modal. Não persiste nada.
+// Recursos/Explorer — consulta de leitura sobre uma conexão, no formato canônico
+// da plataforma. Migrada pro DS na v0.10.13.
+//
+// Decisões de composição:
+//
+//  · **A linha abre o registro, e o detalhe é Modal — não rota.** Parece exceção
+//    à regra dos três containers, mas não é: o registro **não existe na
+//    plataforma**. É o que a conexão respondeu agora, nesta busca; não tem id
+//    nosso, não sobrevive ao recarregar a página e por isso não pode ter URL. É
+//    leitura de campo curto + o JSON bruto → Modal é o container certo.
+//  · **Zero botão na linha.** O legado tinha uma coluna "Ações" com um olhinho
+//    que fazia exatamente o que o clique na linha já fazia — a mesma ação duas
+//    vezes, competindo pelo mesmo clique.
+//  · **Tabela desktop + cartões mobile saíram.** O `DataTable` do DS já resolve
+//    as duas formas; manter as duas à mão era garantir que divergissem.
+
 export default function Explorer() {
   const toast = useToast();
   const [catalog, setCatalog] = useState([]);
@@ -21,7 +34,7 @@ export default function Explorer() {
   const [query, setQuery] = useState('');
 
   const [searching, setSearching] = useState(false);
-  const [result, setResult] = useState(null); // { records, count, source_operation, ... }
+  const [result, setResult] = useState(null);
   const [detail, setDetail] = useState(null);
 
   useEffect(() => {
@@ -40,15 +53,15 @@ export default function Explorer() {
         setLoadingMeta(false);
       }
     })();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeLabel = useMemo(() => {
     const map = new Map(catalog.map((t) => [t.type, t.label]));
     return (type) => map.get(type) || type;
   }, [catalog]);
 
-  // Colunas exibidas: os campos canônicos do tipo (limitados para caber).
-  const columns = useMemo(() => {
+  // Campos do tipo escolhido: os canônicos + os das extensões verticais.
+  const campos = useMemo(() => {
     const def = catalog.find((t) => t.type === resourceType);
     if (!def) return [];
     const base = (def.fields || []).map((f) => ({ key: f.key, label: f.label }));
@@ -56,9 +69,9 @@ export default function Explorer() {
     return [...base, ...ext];
   }, [catalog, resourceType]);
 
-  async function handleSearch() {
-    if (!connectionId) { toast.error('Selecione a conexão.'); return; }
-    if (!resourceType) { toast.error('Selecione o tipo de recurso.'); return; }
+  async function buscar() {
+    if (!connectionId) { toast.error('Escolha a conexão.'); return; }
+    if (!resourceType) { toast.error('Escolha o tipo de recurso.'); return; }
     setSearching(true);
     setResult(null);
     try {
@@ -68,7 +81,7 @@ export default function Explorer() {
         query: query.trim() || undefined,
       });
       setResult(res);
-      if (res?.empty) toast.info('Nenhum registro encontrado para a busca.');
+      if (res?.empty) toast.info('A busca não trouxe nenhum registro.');
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -76,132 +89,129 @@ export default function Explorer() {
     }
   }
 
-  const records = result?.records || [];
-  // Colunas visíveis na tabela: no máximo 6 para não estourar.
-  const tableCols = columns.slice(0, 6);
+  const registros = result?.records || [];
+  // No máximo 6 colunas: além disso a tabela deixa de ser legível e o detalhe
+  // resolve melhor (é ele que mostra o registro inteiro).
+  const colunasVisiveis = campos.slice(0, 6);
 
-  function cell(value) {
-    if (value === null || value === undefined || value === '') return '—';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
+  function celula(valor) {
+    if (valor === null || valor === undefined || valor === '') return '—';
+    if (typeof valor === 'object') return JSON.stringify(valor);
+    return String(valor);
   }
 
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Explorer de Recursos</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Consulta somente leitura: escolha a conexão e o tipo canônico, busque e inspecione os registros. Nada é gravado.
-        </p>
-      </div>
+  const columns = colunasVisiveis.map((c) => ({
+    key: c.key,
+    header: c.label,
+    render: (rec) => (
+      <span style={{ fontSize: 12, color: 'var(--su-text-secondary)' }}>{celula(rec[c.key])}</span>
+    ),
+  }));
 
-      <div className="card p-4">
-        {loadingMeta ? (
-          <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.5fr_auto] gap-3 items-end">
-            <FormField label="Conexão" required>
-              <Select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}>
-                <option value="">Selecione…</option>
-                {connections.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.provider_key}</option>)}
-              </Select>
-            </FormField>
-            <FormField label="Tipo de recurso" required>
-              <Select value={resourceType} onChange={(e) => setResourceType(e.target.value)}>
-                <option value="">Selecione…</option>
-                {catalog.map((t) => <option key={t.type} value={t.type}>{t.label} ({t.type})</option>)}
-              </Select>
-            </FormField>
-            <FormField label="Busca">
-              <TextInput
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-                placeholder="Termo livre (opcional)"
-              />
-            </FormField>
-            <button className="btn-primary disabled:opacity-60" disabled={searching} onClick={handleSearch}>
-              {searching ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />} Buscar
-            </button>
-          </div>
-        )}
-      </div>
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Explorador de recursos"
+        subtitle="Consulta de leitura: escolha a conexão e o tipo de recurso para ver os dados já traduzidos para o formato da plataforma. Nada é gravado."
+      />
+
+      <Card>
+        <div style={{ padding: 20 }}>
+          {loadingMeta ? (
+            <div className="flex justify-center py-6">
+              <Loader2 size={20} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.5fr_auto] gap-3 items-end">
+              <Field label="Conexão" required>
+                <Select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}>
+                  <option value="">Selecione…</option>
+                  {connections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </Field>
+              <Field label="Tipo de recurso" required>
+                <Select value={resourceType} onChange={(e) => setResourceType(e.target.value)}>
+                  <option value="">Selecione…</option>
+                  {catalog.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
+                </Select>
+              </Field>
+              <Field label="Busca" hint="Opcional — termo livre, do jeito que o sistema do outro lado entende.">
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') buscar(); }}
+                  placeholder="nome, documento, código…"
+                />
+              </Field>
+              <Button variant="primary" icon="search" loading={searching} onClick={buscar}>
+                Buscar
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {searching ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
       ) : !result ? (
-        <div className="card">
-          <EmptyState icon={Compass} title="Comece uma busca" description="Selecione uma conexão e um tipo de recurso para explorar os dados em formato canônico." />
-        </div>
-      ) : !records.length ? (
-        <div className="card">
-          <EmptyState icon={Search} title="Nenhum registro" description={`Nenhum resultado para ${typeLabel(result.resource_type)} (operação ${result.source_operation}).`} />
-        </div>
+        <Card>
+          <EmptyState
+            icon="search"
+            title="Faça uma busca"
+            description="Escolha a conexão e o tipo de recurso acima. O que vier aparece no formato canônico, do mesmo jeito que os fluxos e os assistentes veem."
+          />
+        </Card>
+      ) : !registros.length ? (
+        <Card>
+          <EmptyState
+            icon="search"
+            title="Nenhum registro"
+            description={`Nada encontrado para ${typeLabel(result.resource_type)}. A conexão respondeu — a busca é que não casou com nada.`}
+          />
+        </Card>
       ) : (
         <>
-          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-            {result.count} registro(s) · operação <span className="font-mono">{result.source_operation}</span>
+          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+            {registros.length === 1 ? '1 registro' : `${result.count} registros`} · clique numa linha para ver o registro inteiro
           </p>
-
-          {/* Desktop */}
-          <div className="card p-0 overflow-hidden hidden md:block">
-            <Table>
-              <Thead>
-                {tableCols.map((c) => <Th key={c.key}>{c.label}</Th>)}
-                <Th className="text-right">Ações</Th>
-              </Thead>
-              <Tbody>
-                {records.map((rec, i) => (
-                  <Tr key={rec.id || i} onClick={() => setDetail(rec)}>
-                    {tableCols.map((c) => (
-                      <Td key={c.key}><span className="text-xs" style={{ color: 'var(--ap-text-2)' }}>{cell(rec[c.key])}</span></Td>
-                    ))}
-                    <Td className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <button className="btn-ghost p-1.5" title="Ver detalhe" onClick={() => setDetail(rec)}>
-                        <Eye size={14} className="text-brand" />
-                      </button>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </div>
-
-          {/* Mobile */}
-          <div className="space-y-2 md:hidden">
-            {records.map((rec, i) => (
-              <button key={rec.id || i} className="card p-3 w-full text-left" onClick={() => setDetail(rec)}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>
-                    {cell(rec[tableCols[0]?.key]) || `#${i + 1}`}
-                  </span>
-                  <Eye size={15} className="text-brand shrink-0" />
-                </div>
-                {tableCols.slice(1, 4).map((c) => (
-                  <p key={c.key} className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--ap-text-4)' }}>
-                    <span style={{ color: 'var(--ap-text-5)' }}>{c.label}:</span> {cell(rec[c.key])}
-                  </p>
-                ))}
-              </button>
-            ))}
-          </div>
+          <DataTable
+            columns={columns}
+            rows={registros}
+            getRowId={(rec, i) => rec.id || `linha-${i}`}
+            onRowClick={(rec) => setDetail(rec)}
+            getRowLabel={() => 'Ver este registro por inteiro'}
+          />
         </>
       )}
 
-      <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title="Detalhe do recurso" size="lg">
+      {/* Leitura de um registro que não existe na plataforma — sem id nosso, sem
+          URL possível. Modal é o container correto aqui. */}
+      <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title="Registro" size="lg">
         {detail && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            {(columns.length ? columns : Object.keys(detail).map((k) => ({ key: k, label: k }))).map((c) => (
-              <div key={c.key}>
-                <p className="text-[11px] font-medium" style={{ color: 'var(--ap-text-4)' }}>{c.label} <span className="font-mono">({c.key})</span></p>
-                <p className="mt-0.5 break-words" style={{ color: 'var(--ap-text-2)' }}>{cell(detail[c.key])}</p>
+          <div className="space-y-4">
+            <DescriptionList
+              items={(campos.length ? campos : Object.keys(detail).map((k) => ({ key: k, label: k })))
+                .map((c) => ({ key: c.label, value: celula(detail[c.key]) }))}
+            />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+                  Como a plataforma vê este registro
+                </p>
+                <CopyButton
+                  value={JSON.stringify(detail, null, 2)}
+                  label="Copiar"
+                  onCopied={(ok) => { if (!ok) toast.error('Não deu para copiar — selecione e copie à mão.'); }}
+                />
               </div>
-            ))}
-            <div className="md:col-span-2">
-              <p className="text-[11px] font-medium mb-1" style={{ color: 'var(--ap-text-4)' }}>Registro canônico (JSON)</p>
               <pre
-                className="text-xs rounded-lg px-3 py-2 overflow-x-auto"
-                style={{ backgroundColor: 'var(--ap-surface-2)', border: '1px solid var(--ap-border-sub)', color: 'var(--ap-text-3)' }}
+                style={{
+                  fontFamily: 'var(--su-font-mono, monospace)', fontSize: 11, margin: 0,
+                  border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12,
+                  maxHeight: 320, overflow: 'auto', color: 'var(--su-text-secondary)',
+                }}
               >
                 {JSON.stringify(detail, null, 2)}
               </pre>

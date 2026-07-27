@@ -210,6 +210,8 @@ const BREADCRUMB_PATTERNS = [
   [/^\/ia\/conhecimento\/nova$/,                   'IA Studio / Conhecimento / Nova base'],
   [/^\/ia\/conhecimento\/[^/]+\/documentos\/novo$/,'IA Studio / Conhecimento / Novo documento'],
   [/^\/ia\/conhecimento\/[^/]+$/,                  'IA Studio / Conhecimento / Base'],
+  [/^\/recursos\/mapeamentos\/novo$/,              'Recursos / Mapeamentos / Novo'],
+  [/^\/recursos\/mapeamentos\/[^/]+$/,             'Recursos / Mapeamentos / Editar'],
   [/^\/integracoes\/conexoes\/nova$/,              'Integrações / Conexões / Nova'],
   [/^\/integracoes\/conexoes\/[^/]+\/editar$/,     'Integrações / Conexões / Editar'],
   [/^\/integracoes\/conexoes\/[^/]+$/,             'Integrações / Conexões / Detalhe'],

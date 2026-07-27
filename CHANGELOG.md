@@ -1,5 +1,42 @@
 # Changelog — IA Studio
 
+## v0.10.13 - 2026-07-26 (Recursos + Desenvolvedor no DS — as duas últimas famílias)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.33` → **`^1.2.34`** (quatro ícones do próprio DS apontavam para nomes inexistentes).
+
+**Com isso, o `platform-admin` inteiro está no Studio UX** — só Configurações (5 telas) fica para o fim, por ser a que mexe em coisa ligada.
+
+### Mudado
+
+- **Explorador de recursos** — a coluna "Ações" com um olhinho saiu: ele fazia exatamente o que o clique na linha já fazia. A tabela desktop e os cartões mobile escritos à mão também saíram (o `DataTable` do DS resolve os dois, e manter os dois era garantir que divergissem). O JSON do registro ganhou botão de copiar.
+- **Mapeamentos** — o editor virou **rota** (`/recursos/mapeamentos/novo` e `/:id`). Era um Modal `xl` com dois campos de texto longo, a sugestão da IA e o editor de campos: o editor rolava dentro de um contêiner que já rolava. A linha abre o mapeamento; ativar/desativar/excluir vão para a barra de lote, e a transição só aparece quando **toda** a seleção a aceita.
+- **Bancada de testes** (era "Console do Desenvolvedor") — as cinco abas passaram a usar o `Tabs` do DS com `id` (ver a correção da v0.10.12), o aviso de "SQL é somente leitura" virou `Banner`, e a resposta ganhou botão de copiar. O legado usava a prop `active` do `Tabs` **local**, que é outra coisa.
+- **Chaves de API** — revogar aceita várias de uma vez, mas só as que ainda valem. A tela da chave em claro ganhou `Banner` de aviso + `CopyButton`, e **deixou de fechar por clique fora**: fechar sem copiar significa criar outra chave.
+- **Linguagem**: "Explorer de Recursos" → **Explorador de recursos**; "Console do Desenvolvedor" → **Bancada de testes**; "Tipo canônico" → **Traduz para**; "Operação de origem" continua, mas com "De onde vem" na tabela; "Escopos" → **Pode fazer**; "Expira em" → **Vence em**; `Params (JSON)` → **Parâmetros**; "Temperature" → **Criatividade**; "Max tokens" → **Tamanho máximo da resposta**.
+
+### Corrigido
+
+- **Mais dois `toast` indefinidos**, agora nas Chaves de API: os dois modais (criar e mostrar a chave) chamavam `toast.error`/`toast.success` sem ter o hook — no caminho de erro estourava `ReferenceError` em vez de mostrar a falha, e a validação do nome derrubava a tela em vez de avisar. Com estes, são **quatro** achados na mesma varredura; passei um verificador em toda a `src` e não sobrou nenhum.
+- **Quatro ícones errados no próprio DS** (v1.2.34): `Banner` pedia `circle-check` e `alert-triangle`, `AppShell` pedia `adjustments` e **`menu-2` no hambúrguer do mobile** — nomes que não existem, então desenhavam "?" na tela. O gate de publicação do DS passou a conferir isso.
+
+### O que dá pra verificar agora (sem depender de dado real)
+
+1. **Recursos → Mapeamentos**: a linha abre o editor em `/recursos/mapeamentos/<id>`; o botão "Novo mapeamento" abre `/recursos/mapeamentos/novo`.
+2. **Barra de lote dos mapeamentos**: selecione um inativo → aparece *Ativar* (não *Desativar*); selecione um ativo e um inativo → só sobra *Excluir*, e *Editar* desaparece (é um por vez).
+3. **Editor**: sem escolher o tipo, a lista de campos mostra um aviso azul explicando o que falta; com o tipo escolhido e nenhum campo, o aviso fica **amarelo com o triângulo** (era um "?" antes da v1.2.34).
+4. **Bancada de testes**: as cinco abas trocam o conteúdo (Operação, SQL, HTTP, IA, Ferramenta); a aba SQL mostra o aviso amarelo de somente-consulta.
+5. **Chaves de API → Nova chave**: salvar sem nome dá **toast**, não tela branca (era o `ReferenceError`); a tela da chave só fecha pelo botão "Já copiei".
+6. **Explorador**: sem busca, o vazio explica o que fazer; a linha abre o registro com o JSON e o botão de copiar.
+7. **Hambúrguer no celular** (375 px): agora é um traço triplo, não um "?".
+8. Tema escuro em todas.
+
+### O que só dá pra conferir com o sistema em uso
+
+- **Preencher com IA** no mapeamento — precisa de conexão ativa que responda à operação informada; o resultado preenche a lista e diz se veio da IA ou de semelhança de nome.
+- **As cinco abas da bancada** — cada uma bate de verdade no sistema do outro lado.
+- **Revogar chave** — só se confirma quando a integração que usava a chave para de autenticar.
+- **Explorador** — depende de mapeamento ativo para o tipo escolhido, senão não há o que traduzir.
+
 ## v0.10.12 - 2026-07-26 (As abas da conexão apagavam a tela)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.32` → **`^1.2.33`** (o `Tabs` passou a avisar).
