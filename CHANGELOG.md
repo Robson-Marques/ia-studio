@@ -1,5 +1,37 @@
 # Changelog — IA Studio
 
+## v0.10.18 - 2026-07-26 (O menu passou a dizer o mesmo que a tela)
+
+Sem `db push`. Só frontend. Sem bump do DS (segue `^1.2.38`).
+
+### Corrigido
+
+Renomeei os títulos das telas nas frentes anteriores e **não renomeei o menu**. Quem procurava "Pessoas e convites" via "Usuários e Convites" na barra lateral e tinha que traduzir de cabeça — foi exatamente a dúvida que você levantou ao tentar achar o campo de telefone. O nome do item de menu, o caminho no topo e o título da página passaram a ser a mesma informação:
+
+| Onde clicar agora | Dizia antes |
+|---|---|
+| Configurações → **Pessoas e convites** | Usuários e Convites |
+| Configurações → **Perfis de acesso** | Perfis de Acesso |
+| Configurações → **Workspaces e ambientes** | Workspaces e Ambientes |
+| Configurações → **Minha conta** | Minha Conta |
+| Recursos → **Explorador** | Explorer |
+| Desenvolvedor → **Bancada de testes** | Console |
+| Desenvolvedor → **Chaves de API** | API Keys |
+| Integrações → **Cofre de segredos** | Cofre de Segredos |
+
+O caminho no topo acompanhou, inclusive nas rotas novas de perfil (`Configurações / Perfis de acesso / Novo`).
+
+### O que dá pra verificar agora
+
+1. **Barra lateral → Configurações**: os quatro itens com os nomes novos; clicar em cada um leva à tela de título idêntico.
+2. **Recursos → Explorador** e **Desenvolvedor → Bancada de testes / Chaves de API**: mesma coisa.
+3. **Ícones do menu intactos** — a lista usa as chaves do mapa interno (`KeyRound`), não o nome do glifo do DS; trocar isso por engano faria o ícone virar "?" (erro que cometi e conferi antes de fechar).
+
+### Lição
+
+Renomear é uma mudança em **dois lugares**, não em um: o título da tela e o caminho para chegar nela. Trocar só o título produz o pior tipo de confusão — a pessoa sabe o nome da coisa e não acha o caminho, e nada no sistema parece quebrado.
+
+
 ## v0.10.17 - 2026-07-26 (Fim do legado visual — a pasta `components/ui` morreu)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.37` → **`^1.2.38`** (`PhoneInput` com seletor de país de verdade).
