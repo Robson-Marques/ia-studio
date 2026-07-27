@@ -40,9 +40,18 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
+        // Não existe mais um pedaço só de ícones: eles vêm do catálogo do DS,
+        // que chega como fonte JSX dentro do `@studio-ux-ds/react` — Vite trata
+        // como código do app, não como dependência estável para separar.
+        //
+        // O `vendor-icons: ['lucide-react']` que morava aqui **derrubou o build
+        // da v0.10.22**: `manualChunks` nomeia um módulo de ENTRADA, então tirar
+        // a dependência do `package.json` sem tirar esta linha faz o Rollup
+        // abortar com "Could not resolve entry module". A lição: ao remover uma
+        // dependência, varrer também a CONFIGURAÇÃO DE BUILD — `src/` e
+        // `package.json` limpos não bastam.
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-icons': ['lucide-react'],
           'vendor-http': ['axios'],
         },
       },

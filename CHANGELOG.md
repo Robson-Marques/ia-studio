@@ -1,5 +1,25 @@
 # Changelog — IA Studio
 
+## v0.10.23 - 2026-07-27 (Correção: o build da v0.10.22 parou no `vite.config.js`)
+
+Sem `db push`. Só frontend. Mesmo DS (`^1.2.41`).
+
+A v0.10.22 **falhou na etapa `ADMIN_BUILD`** e o painel manteve a versão anterior (fail-safe funcionando):
+
+```
+Could not resolve entry module "lucide-react".
+```
+
+### Causa
+
+O `vite.config.js` tinha `manualChunks: { 'vendor-icons': ['lucide-react'] }`. **`manualChunks` nomeia um módulo de ENTRADA** — tirar a dependência do `package.json` sem tirar essa linha faz o Rollup abortar. Foi corrigido junto do README, que ainda listava `lucide-react` na pilha.
+
+### A lição, que é minha
+
+Eu varri `src/` (113 arquivos), varri o `package.json`, verifiquei parse, ícone, import órfão — **e não olhei a configuração de build.** A checagem que eu mesmo escrevi ("nenhum arquivo importa de fora") era verdadeira e insuficiente: `manualChunks` não é um `import`, é uma lista de nomes em JSON-ish dentro de um `.js`, invisível para qualquer busca por `import ... from`.
+
+Regra que fica: **remover uma dependência é três lugares, não dois** — o código, o `package.json` e **tudo que a nomeia por string** (`vite.config.js` `manualChunks`/`optimizeDeps`, README, Dockerfile, script de build). O `grep` certo não é pelo `import`; é pelo **nome do pacote**, no repositório inteiro, ignorando só `node_modules` e `dist`. Foi assim que achei os dois pontos agora — e o mesmo `grep` mostrou que o `platform-console` **continua com a dependência de propósito** (não foi migrado ao DS), então o `vendor-icons` dele está correto e fica.
+
 ## v0.10.22 - 2026-07-27 (Fim da segunda biblioteca de ícones — 62 arquivos)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.40` → **`^1.2.41`** (10 glifos de mídia/gravação + `Spinner` com `size`/`center`).

@@ -82,8 +82,12 @@ armadilhas). Resumo para re-ancorar:
   no login, faísca no favicon; hoje é o glifo `spark` do DS, mesmo path do favicon), **o logout** (agora
   passa por `ConfirmDialog`) e **os estados globais** (404 e sem-permissão têm tela; antes
   redirecionavam calados pra raiz).
-- **UMA SÓ BIBLIOTECA DE ÍCONES** (v0.10.22): o `lucide-react` saiu do `package.json` e nenhum dos
-  113 arquivos importa ícone de fora. As duas causas eram do DS e foram resolvidas lá primeiro
+- **UMA SÓ BIBLIOTECA DE ÍCONES** (v0.10.22, com o build corrigido na **v0.10.23**): o `lucide-react`
+  saiu do `package.json` e nenhum dos 113 arquivos importa ícone de fora. **Remover dependência é três
+  lugares:** código, `package.json` e **tudo que a nomeia por string** — o `manualChunks` do
+  `vite.config.js` ficou para trás e derrubou o `ADMIN_BUILD` da v0.10.22 (`Could not resolve entry
+  module`). O `grep` certo é pelo **nome do pacote no repo inteiro**, não por `import … from`. O
+  `platform-console` mantém a dependência de propósito (não foi migrado ao DS). As duas causas eram do DS e foram resolvidas lá primeiro
   (v1.2.41: `Spinner` com `size`/`center` + 10 glifos de mídia/gravação). **Ícone é NOME, nunca
   componente** — `icon="layers"`, não `icon={Layers}`; guardar componente era o que obrigava o canvas
   e o seletor de anexo a manter a outra biblioteca viva, e foi onde o sweep quase deixou dois

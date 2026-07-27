@@ -11,8 +11,10 @@ workspaces/ambientes, auditoria e a própria conta/licença.
 ## Stack
 
 - React 18 + Vite 5
-- Tailwind 3 (dark/light via CSS vars `--ap-*`)
-- react-router-dom 6 · axios · lucide-react · clsx
+- **Studio UX** — `@studio-ux-ds/{tokens,components,icons,react}` (casca, componentes, moldes de tela,
+  tema e **os ícones**; não há segunda biblioteca de ícones desde a v0.10.22)
+- Tailwind 3 (as cores herdam os tokens `--su-*` do DS)
+- react-router-dom 6 · axios · clsx · @xyflow/react (canvas de fluxo)
 
 ## Como rodar
 
