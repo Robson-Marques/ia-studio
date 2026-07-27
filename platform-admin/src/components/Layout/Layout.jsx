@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { AppShell, Badge } from '@studio-ux-ds/react';
+import { AppShell, Badge, DSIcon, ConfirmDialog } from '@studio-ux-ds/react';
 import { useAuth } from '../../context/AuthContext';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -35,122 +35,101 @@ import { getNotificationsInbox } from '../../services/automation';
 //   * Multi-tenant branding não existe hoje na plataforma — quando existir, o
 //     Customize/AppShell aceitará accent/tema por organização.
 
-// Mapa de ícones: lucide-react → nomes DSIcon (Studio UX curados).
-// Escolha por proximidade semântica; o DSIcon tem ALIASES próprios pra alguns.
-const LUCIDE_TO_DS = {
-  LayoutDashboard: 'dashboard',
-  BrainCircuit: 'settings',
-  Bot: 'user',
-  BookOpen: 'file',
-  Brain: 'settings',
-  Wrench: 'settings',
-  ShieldCheck: 'lock',
-  DollarSign: 'file',
-  Network: 'settings',
-  Radio: 'bell',
-  Workflow: 'settings',
-  GitBranch: 'chart-bar',
-  CalendarClock: 'calendar',
-  Activity: 'chart-bar',
-  FileText: 'file',
-  Zap: 'check',
-  Bell: 'bell',
-  MessageCircle: 'message',
-  ListOrdered: 'menu',
-  Phone: 'phone',
-  Plug: 'settings',
-  Blocks: 'file',
-  KeyRound: 'lock',
-  Database: 'file',
-  Boxes: 'file',
-  Compass: 'search',
-  Terminal: 'file',
-  Code: 'file',
-  Settings: 'settings',
-  Users: 'users',
-  ScrollText: 'file',
-  CreditCard: 'file',
-};
 
-// Estrutura do menu — idêntica ao legado, mas apenas com o nome do ícone (string).
-// Cada nível é `{ label, iconKey, path?, perm?, children? }`. `perm` string ou array (OR).
+// Estrutura do menu. Cada item declara **o glifo do DS direto** (`icon`), não um
+// nome de outra biblioteca traduzido por um mapa.
+//
+// O mapa `LUCIDE_TO_DS` que existia aqui era a causa do menu inteiro parecer
+// igual: ele traduzia "por proximidade semântica" e, como o catálogo não tinha
+// vocabulário de navegação, quase tudo caía em `file` ou `settings` — 12 e 9
+// itens com o mesmo desenho, de 30. Indireção que degrada em silêncio é pior que
+// nenhuma: ninguém escreveu "use uma folha de papel para Custos", o mapa decidiu.
+//
+// **Regra: um conceito de menu, um glifo.** As duas repetições que sobraram são
+// deliberadas — `bot` em Assistentes e Atendimento por IA (é o mesmo assistente,
+// visto de dois lugares) e `file` nos dois Templates (é o mesmo tipo de coisa).
+// Qualquer outra repetição significa glifo faltando no DS, e o lugar de resolver
+// é lá (o catálogo ganhou 26 na v1.2.39 por causa deste menu).
+//
+// Cada nível é `{ label, icon, path?, perm?, children? }`. `perm` string ou array (OR).
 const NAV = [
-  { label: 'Dashboard', iconKey: 'LayoutDashboard', path: '/' },
+  { label: 'Dashboard', icon: 'dashboard', path: '/' },
   {
-    label: 'IA Studio', iconKey: 'BrainCircuit',
+    label: 'IA Studio', icon: 'spark',
     children: [
-      { label: 'Assistentes',   iconKey: 'Bot',        path: '/ia/agentes',      perm: 'ai.agents.read' },
-      { label: 'Conhecimento',  iconKey: 'BookOpen',   path: '/ia/conhecimento', perm: 'ai.knowledge.read' },
-      { label: 'Memória',       iconKey: 'Brain',      path: '/ia/memoria',      perm: 'ai.memory.read' },
-      { label: 'Habilidades',   iconKey: 'Wrench',     path: '/ia/ferramentas',  perm: 'ai.tools.read' },
-      { label: 'Pendências',    iconKey: 'ShieldCheck', path: '/ia/aprovacoes',   perm: 'ai.approvals.read' },
-      { label: 'Custos',        iconKey: 'DollarSign', path: '/ia/custos',       perm: 'ai.costs.read' },
+      { label: 'Assistentes',   icon: 'bot',          path: '/ia/agentes',      perm: 'ai.agents.read' },
+      { label: 'Conhecimento',  icon: 'book',         path: '/ia/conhecimento', perm: 'ai.knowledge.read' },
+      { label: 'Memória',       icon: 'brain',        path: '/ia/memoria',      perm: 'ai.memory.read' },
+      { label: 'Habilidades',   icon: 'tool',         path: '/ia/ferramentas',  perm: 'ai.tools.read' },
+      { label: 'Pendências',    icon: 'check-circle', path: '/ia/aprovacoes',   perm: 'ai.approvals.read' },
+      { label: 'Custos',        icon: 'coin',         path: '/ia/custos',       perm: 'ai.costs.read' },
     ],
   },
   {
-    label: 'ISP (Provedores)', iconKey: 'Network',
+    label: 'ISP (Provedores)', icon: 'network',
     children: [
-      { label: 'Incidentes', iconKey: 'Radio', path: '/isp/incidentes', perm: 'isp.incidents.read' },
-      { label: 'Abertura de chamado', iconKey: 'Wrench', path: '/isp/abertura-chamado', perm: 'isp.incidents.read' },
+      { label: 'Incidentes',          icon: 'radio',  path: '/isp/incidentes',       perm: 'isp.incidents.read' },
+      { label: 'Abertura de chamado', icon: 'ticket', path: '/isp/abertura-chamado', perm: 'isp.incidents.read' },
     ],
   },
   {
-    label: 'Automação', iconKey: 'Workflow',
+    label: 'Automação', icon: 'workflow',
     children: [
-      { label: 'Fluxos',        iconKey: 'GitBranch',     path: '/automacao/fluxos',        perm: 'automation.workflows.read' },
-      { label: 'Agendamentos',  iconKey: 'CalendarClock', path: '/automacao/agendamentos',  perm: 'automation.workflows.read' },
-      { label: 'Execuções',     iconKey: 'Activity',      path: '/automacao/execucoes',     perm: 'automation.executions.read' },
-      { label: 'Templates',     iconKey: 'FileText',      path: '/automacao/templates',     perm: 'automation.templates.read' },
-      { label: 'Eventos',       iconKey: 'Zap',           path: '/automacao/eventos',       perm: 'automation.events.read' },
-      { label: 'Notificações',  iconKey: 'Bell',          path: '/automacao/notificacoes',  perm: 'automation.notifications.read' },
+      { label: 'Fluxos',        icon: 'git-branch', path: '/automacao/fluxos',        perm: 'automation.workflows.read' },
+      { label: 'Agendamentos',  icon: 'calendar',   path: '/automacao/agendamentos',  perm: 'automation.workflows.read' },
+      { label: 'Execuções',     icon: 'activity',   path: '/automacao/execucoes',     perm: 'automation.executions.read' },
+      { label: 'Templates',     icon: 'file',       path: '/automacao/templates',     perm: 'automation.templates.read' },
+      { label: 'Eventos',       icon: 'zap',        path: '/automacao/eventos',       perm: 'automation.events.read' },
+      { label: 'Notificações',  icon: 'bell',       path: '/automacao/notificacoes',  perm: 'automation.notifications.read' },
     ],
   },
   {
-    label: 'WhatsApp', iconKey: 'MessageCircle',
+    label: 'WhatsApp', icon: 'message',
     children: [
       {
-        label: 'Conversas', iconKey: 'MessageCircle', path: '/whatsapp/conversas',
+        label: 'Conversas', icon: 'messages', path: '/whatsapp/conversas',
         perm: ['comm.whatsapp.view.assigned', 'comm.whatsapp.view.unassigned', 'comm.whatsapp.view.team', 'comm.whatsapp.view.all'],
       },
-      { label: 'Atendimento por IA', iconKey: 'Bot',       path: '/whatsapp/atendimento-ia', perm: 'automation.workflows.read' },
-      { label: 'Templates',       iconKey: 'FileText',    path: '/whatsapp/templates', perm: 'comm.whatsapp.templates.read' },
-      { label: 'Equipes e Filas', iconKey: 'ListOrdered', path: '/whatsapp/equipes',   perm: 'comm.whatsapp.teams.read' },
-      { label: 'Números',         iconKey: 'Phone',       path: '/whatsapp/numeros',   perm: 'comm.whatsapp.numbers.read' },
+      { label: 'Atendimento por IA', icon: 'bot',   path: '/whatsapp/atendimento-ia', perm: 'automation.workflows.read' },
+      { label: 'Templates',       icon: 'file',    path: '/whatsapp/templates', perm: 'comm.whatsapp.templates.read' },
+      { label: 'Equipes e Filas', icon: 'list',    path: '/whatsapp/equipes',   perm: 'comm.whatsapp.teams.read' },
+      { label: 'Números',         icon: 'phone',   path: '/whatsapp/numeros',   perm: 'comm.whatsapp.numbers.read' },
     ],
   },
   {
-    label: 'Integrações', iconKey: 'Plug',
+    label: 'Integrações', icon: 'grid',
     children: [
-      { label: 'Marketplace',       iconKey: 'Blocks',  path: '/integracoes/marketplace', perm: 'integrations.marketplace.read' },
-      { label: 'Conexões',          iconKey: 'Plug',    path: '/integracoes/conexoes',    perm: 'integrations.connections.read' },
-      { label: 'Cofre de segredos', iconKey: 'KeyRound', path: '/integracoes/segredos',   perm: 'integrations.secrets.read' },
+      { label: 'Marketplace',       icon: 'store', path: '/integracoes/marketplace', perm: 'integrations.marketplace.read' },
+      { label: 'Conexões',          icon: 'plug',  path: '/integracoes/conexoes',    perm: 'integrations.connections.read' },
+      { label: 'Cofre de segredos', icon: 'lock',  path: '/integracoes/segredos',    perm: 'integrations.secrets.read' },
     ],
   },
   {
-    label: 'Recursos', iconKey: 'Database',
+    label: 'Recursos', icon: 'database',
     children: [
-      { label: 'Mapeamentos', iconKey: 'Boxes',   path: '/recursos/mapeamentos', perm: 'resource.mappings.read' },
-      { label: 'Explorador',  iconKey: 'Compass', path: '/recursos/explorer',    perm: 'resource.explore.read' },
+      { label: 'Mapeamentos', icon: 'layers',  path: '/recursos/mapeamentos', perm: 'resource.mappings.read' },
+      { label: 'Explorador',  icon: 'compass', path: '/recursos/explorer',    perm: 'resource.explore.read' },
     ],
   },
   {
-    label: 'Desenvolvedor', iconKey: 'Terminal',
+    label: 'Desenvolvedor', icon: 'terminal',
     children: [
-      { label: 'Bancada de testes', iconKey: 'Code', path: '/desenvolvedor/console', perm: 'devtools.use' },
-      { label: 'Chaves de API',     iconKey: 'KeyRound', path: '/desenvolvedor/api-keys', perm: 'developer.apikeys.read' },
+      { label: 'Bancada de testes', icon: 'code', path: '/desenvolvedor/console',  perm: 'devtools.use' },
+      { label: 'Chaves de API',     icon: 'key',  path: '/desenvolvedor/api-keys', perm: 'developer.apikeys.read' },
     ],
   },
   {
-    label: 'Configurações', iconKey: 'Settings',
+    label: 'Configurações', icon: 'settings',
     children: [
-      { label: 'Pessoas e convites',      iconKey: 'Users',       path: '/usuarios',    perm: 'core.users.read' },
-      { label: 'Perfis de acesso',        iconKey: 'ShieldCheck', path: '/perfis',      perm: 'core.profiles.read' },
-      { label: 'Workspaces e ambientes',  iconKey: 'Boxes',       path: '/workspaces',  perm: 'core.workspaces.read' },
-      { label: 'Auditoria',               iconKey: 'ScrollText',  path: '/auditoria',   perm: 'core.audit.read' },
-      { label: 'Minha conta',             iconKey: 'CreditCard',  path: '/minha-conta' },
+      { label: 'Pessoas e convites',      icon: 'users',       path: '/usuarios',    perm: 'core.users.read' },
+      { label: 'Perfis de acesso',        icon: 'shield',      path: '/perfis',      perm: 'core.profiles.read' },
+      { label: 'Workspaces e ambientes',  icon: 'boxes',       path: '/workspaces',  perm: 'core.workspaces.read' },
+      { label: 'Auditoria',               icon: 'history',     path: '/auditoria',   perm: 'core.audit.read' },
+      { label: 'Minha conta',             icon: 'credit-card', path: '/minha-conta' },
     ],
   },
 ];
+
 
 // Mapa estático de breadcrumbs — reflete o legado; nova rota adiciona entrada aqui.
 const BREADCRUMBS = {
@@ -318,6 +297,7 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [confirmarSaida, setConfirmarSaida] = useState(false);
   const { can } = usePermissions();
   const { workspaces, workspace, environment, selectWorkspace, selectEnvironment } = useWorkspace();
   const unread = useNotificationsUnread();
@@ -346,7 +326,7 @@ export default function Layout() {
         if (!item.children) {
           if (!canAny(item.perm)) return null;
           return {
-            icon: LUCIDE_TO_DS[item.iconKey] || 'help',
+            icon: item.icon,
             label: item.label,
             href: item.path,
             active: item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path),
@@ -356,7 +336,7 @@ export default function Layout() {
         const children = item.children
           .filter((c) => canAny(c.perm))
           .map((c) => ({
-            icon: LUCIDE_TO_DS[c.iconKey] || 'help',
+            icon: c.icon,
             label: c.label,
             href: c.path,
             active: location.pathname.startsWith(c.path),
@@ -365,7 +345,7 @@ export default function Layout() {
         if (!children.length) return null;
         return {
           group: item.label,
-          icon: LUCIDE_TO_DS[item.iconKey] || 'help',
+          icon: item.icon,
           items: children,
         };
       })
@@ -492,10 +472,21 @@ export default function Layout() {
     { icon: 'lock', label: 'Trocar senha', onClick: () => navigate('/conta/senha') },
   ];
 
+  // A marca é o **mesmo símbolo do favicon** (a faísca de 4 pontas), agora como
+  // glifo do DS (`spark`, v1.2.39) — então ela herda o accent do tema em vez de
+  // carregar um hex. Até aqui havia TRÊS representações diferentes do produto: um
+  // `·` (ponto tipográfico) aqui, um raio no login e a faísca no favicon. Marca é
+  // uma coisa, em um lugar: quem mudar, muda nos três.
   const brand = (
     <div className="flex items-center gap-2.5">
-      <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center shrink-0">
-        <span className="text-brand text-lg font-bold" aria-hidden>·</span>
+      <div
+        className="flex items-center justify-center shrink-0"
+        style={{
+          width: 32, height: 32, borderRadius: 8,
+          background: 'var(--su-action-tint)', color: 'var(--su-action)',
+        }}
+      >
+        <DSIcon name="spark" />
       </div>
       <div className="min-w-0">
         <p className="text-sm font-bold leading-tight truncate" style={{ color: 'var(--su-text-primary)' }}>IA Studio</p>
@@ -527,11 +518,24 @@ export default function Layout() {
         onNotifications={() => navigate('/automacao/notificacoes')}
         notifications={unread}
         customize
-        onLogout={logout}
+        onLogout={() => setConfirmarSaida(true)}
       >
         <Outlet />
       </AppShell>
       {workspaceMenu}
+
+      {/* Sair encerra a sessão de verdade — e vivia num item de menu que fecha no
+          clique, ao lado de "Minha conta" e "Trocar senha". Um clique errado
+          derrubava a sessão de quem estava no meio de um cadastro. Confirmar é o
+          mínimo (é a mesma régua das outras ações que perdem trabalho). */}
+      <ConfirmDialog
+        open={confirmarSaida}
+        title="Sair do sistema"
+        message="Você vai precisar entrar de novo com e-mail e senha. Se estava preenchendo alguma coisa, o que não foi salvo se perde."
+        confirmLabel="Sair"
+        onClose={() => setConfirmarSaida(false)}
+        onConfirm={logout}
+      />
     </>
   );
 }

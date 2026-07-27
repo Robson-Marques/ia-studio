@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
+import Aviso from '../pages/Aviso';
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated, checking } = useAuth();
@@ -18,12 +19,18 @@ export default function ProtectedRoute({ children }) {
   return children;
 }
 
-// Gate de rota por permissao. Sem a perm → volta pra raiz (item da sidebar
-// tambem some; isto e so o cinto de seguranca do deep-link).
-// `perm` aceita string OU array (logica OR — ex.: abas do WhatsApp).
+// Gate de rota por permissão. O item da sidebar já some para quem não tem a
+// perm; isto é o cinto de segurança do link direto — alguém colando um endereço
+// que um colega com mais acesso mandou.
+//
+// **Antes redirecionava calado para a raiz** (`<Navigate to="/" />`): a pessoa
+// clicava no link e caía no Dashboard sem nenhuma explicação, o que parece
+// sistema travado. Agora diz o que aconteceu e o que fazer.
+//
+// `perm` aceita string OU array (lógica OR — ex.: as abas do WhatsApp).
 export function PermissionRoute({ perm, children }) {
   const { can } = usePermissions();
   const perms = Array.isArray(perm) ? perm : perm ? [perm] : [];
-  if (perms.length > 0 && !perms.some((p) => can(p))) return <Navigate to="/" replace />;
+  if (perms.length > 0 && !perms.some((p) => can(p))) return <Aviso motivo="sem-permissao" />;
   return children;
 }

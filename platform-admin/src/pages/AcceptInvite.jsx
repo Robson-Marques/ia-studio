@@ -47,7 +47,7 @@ export default function AcceptInvite() {
           <div style={{ padding: 32 }}>
             <div className="flex flex-col items-center" style={{ marginBottom: 24 }}>
               <span style={{ color: 'var(--su-action)', marginBottom: 8 }}>
-                <DSIcon name="zap" size="lg" />
+                <DSIcon name="spark" size="lg" />
               </span>
               <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--su-text-primary)' }}>IA Studio</h1>
               <p style={{ fontSize: 13, margin: '4px 0 0', textAlign: 'center', color: 'var(--su-text-muted)' }}>

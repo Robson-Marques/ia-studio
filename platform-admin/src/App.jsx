@@ -69,6 +69,7 @@ import Explorer from './pages/Recursos/Explorer';
 import ConsoleDev from './pages/Desenvolvedor/Console';
 import ApiKeys from './pages/Desenvolvedor/ApiKeys';
 import StudioUxDemo from './pages/StudioUxDemo';
+import Aviso from './pages/Aviso';
 
 const WHATSAPP_VIEW_PERMS = [
   'comm.whatsapp.view.assigned',
@@ -181,7 +182,9 @@ export default function App() {
               </Route>
 
               {/* Catch-all */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* Endereço que não existe: mostra o aviso DENTRO da casca (mantém
+                  menu e caminho de volta) em vez de redirecionar calado pra raiz. */}
+              <Route path="*" element={<Aviso motivo="nao-encontrado" />} />
             </Routes>
           </BrowserRouter>
         </WorkspaceProvider>

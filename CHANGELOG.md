@@ -1,5 +1,49 @@
 # Changelog — IA Studio
 
+## v0.10.20 - 2026-07-26 (Ícones, marca e os três estados que faltavam)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.38` → **`^1.2.39`** (26 glifos de navegação + a regra "um conceito de menu, um glifo").
+
+Esta entrada nasce de uma cobrança justa sua: eu migrei tela por tela e **nunca auditei o conjunto**. Ícone, marca e os estados globais nunca passaram por critério nenhum.
+
+### Corrigido — ícones do menu
+
+O menu tinha **30 itens e 7 ícones próprios**. A medição:
+
+| Glifo | Itens que compartilhavam |
+|---|---|
+| `file` | **12** — Conhecimento, Custos, Templates (×2), Marketplace, Recursos, Mapeamentos, Desenvolvedor, Bancada, Workspaces, Auditoria, Minha conta |
+| `settings` | **9** — IA Studio, Memória, Habilidades, ISP, Abertura de chamado, Automação, Integrações, Conexões, Configurações |
+| `lock` | 4 · `bell` 2 (Incidentes **e** Notificações) · `chart-bar` 2 · `message` 2 · `user` 2 |
+
+- **A causa era o mapa `LUCIDE_TO_DS`** neste arquivo: ele traduzia nome do lucide → glifo do DS "por proximidade semântica" e, como o catálogo não tinha vocabulário de navegação, quase tudo caía em `file` ou `settings`. O `|| 'help'` do fim nunca era alcançado — havia sempre um glifo "mais ou menos". **Indireção que degrada em silêncio é pior que nenhuma.**
+- **O mapa foi eliminado.** Cada item do menu declara o glifo do DS direto (`icon: 'coin'`), e o catálogo ganhou os 26 que faltavam (DS v1.2.39).
+- **Resultado: 38 glifos distintos em 40 itens.** As duas repetições restantes são deliberadas — `bot` em Assistentes e Atendimento por IA (é o mesmo assistente visto de dois lugares) e `file` nos dois Templates.
+
+### Corrigido — a marca
+
+Havia **três representações diferentes** do IA Studio: um `·` (ponto tipográfico) no menu, um raio no login e a faísca de 4 pontas no favicon. Agora é **uma**: a do favicon virou o glifo `spark` do DS — com o **mesmo path**, não um desenho parecido — e é usada no menu, no login e no aceite de convite, herdando o accent do tema. O favicon manteve cor fixa (não tem tema) mas passou ao accent padrão do DS.
+
+### Adicionado — os três estados que não tinham tela
+
+- **Sair agora pede confirmação.** Era um item de menu ao lado de "Minha conta" que encerrava a sessão no clique; um clique errado derrubava quem estava no meio de um cadastro.
+- **Endereço que não existe** tem tela (`Aviso`): diz qual endereço falhou e oferece voltar ou ir ao início. Antes redirecionava calado para o Dashboard — a pessoa digitava errado e concluía que o sistema travou.
+- **Sem permissão** tem tela: explica que o endereço existe mas o perfil não inclui aquela parte, e o que fazer (pedir a permissão). Antes também redirecionava em silêncio — quem recebia um link de um colega com mais acesso clicava e "nada acontecia".
+
+### O que dá pra verificar agora
+
+1. **Barra lateral**: cada item com um ícone diferente e coerente — Custos é uma moeda, Incidentes é transmissão, Fluxos é ramificação, Habilidades é chave inglesa, Bancada é terminal.
+2. **A marca no topo do menu** é a faísca do favicon, na cor do accent (troque o accent em Personalizar e ela acompanha).
+3. **Login e aceite de convite** com a mesma faísca — não mais um raio.
+4. **Menu de conta → Sair**: aparece a confirmação; cancelar mantém a sessão.
+5. **Digite um endereço inexistente** (ex.: `/nao-existe`): tela explicando, dentro da casca, com Voltar e Ir para o início.
+6. **Abra uma rota sem ter a permissão** (ex.: `/auditoria` num perfil sem `core.audit.read`): tela dizendo que falta acesso, não um redirecionamento mudo.
+
+### Lição
+
+Migrar tela a tela não audita o conjunto. Ícone, marca, 404, sem-permissão e logout **não pertencem a nenhuma família** — e foi exatamente por isso que ficaram de fora: minha unidade de trabalho era a família, e nada me obrigou a olhar o que atravessa todas elas. O que faltou foi um passo de fecho com critério medível (glifos distintos ÷ itens; quantas representações da marca; quais estados globais têm tela), não mais uma passada de migração.
+
+
 ## v0.10.19 - 2026-07-26 (Fecho da frente: dependência declarada e débito revisado)
 
 Sem `db push`. Só `package.json` e documentação. Sem bump do DS (segue `^1.2.38`).
