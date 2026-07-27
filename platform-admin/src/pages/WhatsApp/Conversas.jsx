@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { MessageCircle } from 'lucide-react';
-import EmptyState from '../../components/ui/EmptyState';
-import { useToast } from '@studio-ux-ds/react';
+import { Button, EmptyState, useToast } from '@studio-ux-ds/react';
 import { useAuth } from '../../context/AuthContext';
 import {
   getChat, getChatCounts, getChatWindow, getWhatsappScope, listChats, listMessages,
@@ -112,13 +110,21 @@ export default function Conversas() {
 
   return (
     <div
-      className="flex h-[calc(100dvh-8.5rem)] min-h-[420px] rounded-xl overflow-hidden"
-      style={{ backgroundColor: 'var(--ap-surface)', border: '1px solid var(--ap-border)' }}
+      className="flex overflow-hidden"
+      style={{
+        // `flex: 1` em vez de `100dvh - 8.5rem`: a rota é full-bleed no AppShell
+        // (DS v1.2.31), então a região de conteúdo já é um container flex com a
+        // altura certa. O cálculo à mão errava sempre que a barra de cima mudava
+        // de altura — e errava diferente no celular.
+        flex: 1,
+        minHeight: 0,
+        background: 'var(--su-surface-overlay)',
+      }}
     >
-      {/* Lista (esconde no mobile quando ha conversa aberta) */}
+      {/* No celular, a lista dá lugar à conversa aberta. */}
       <div
         className={`${selected ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 lg:w-96 shrink-0 min-h-0`}
-        style={{ borderRight: '1px solid var(--ap-border)' }}
+        style={{ borderRight: '1px solid var(--su-border-default)' }}
       >
         <ChatList
           scope={scope}
@@ -136,15 +142,15 @@ export default function Conversas() {
       <div className={`${selected ? 'flex' : 'hidden md:flex'} flex-col flex-1 min-w-0 min-h-0`}>
         {selected ? (
           <>
-            {/* Voltar (mobile) */}
-            <button
-              type="button"
-              className="md:hidden text-left text-xs px-3 py-2"
-              style={{ color: 'var(--ap-text-3)', borderBottom: '1px solid var(--ap-border)', minHeight: 40 }}
-              onClick={() => setSelected(null)}
+            {/* Voltar — só no celular, onde a lista some para dar lugar à conversa. */}
+            <div
+              className="md:hidden"
+              style={{ borderBottom: '1px solid var(--su-border-default)', padding: '4px 8px' }}
             >
-              ← Voltar pra lista
-            </button>
+              <Button variant="ghost" size="sm" icon="arrow-left" onClick={() => setSelected(null)}>
+                Todas as conversas
+              </Button>
+            </div>
             <ChatWindow
               chat={selected}
               messages={messages}
@@ -161,9 +167,9 @@ export default function Conversas() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <EmptyState
-              icon={MessageCircle}
-              title="Selecione uma conversa"
-              description="Escolha uma conversa na lista ao lado para atender."
+              icon="message"
+              title="Escolha uma conversa"
+              description="Clique numa conversa da lista ao lado para começar a atender."
             />
           </div>
         )}

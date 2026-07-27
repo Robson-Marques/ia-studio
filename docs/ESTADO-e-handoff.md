@@ -55,12 +55,19 @@ Frente de UI em curso, **paralela e independente** do backend/assistente acima. 
 armadilhas). Resumo para re-ancorar:
 
 - **Casca `AppShell` + Dashboard** no DS desde a v0.9.80; toast global do DS desde a v0.9.84.
-- **Famílias migradas:** IA Studio (v0.9.84→v0.9.91), ISP (v0.9.92) e **Automação INTEIRA**
-  (A: v0.9.99 · B: v0.10.2 · C: v0.10.4 — o canvas).
-- **Faltam:** Configurações, Integrações, WhatsApp (chat full-bleed — frente própria), Recursos,
-  Desenvolvedor.
-- **DS consumido: `^1.2.26`.** A migração já rendeu 17 releases do próprio Studio UX — a regra é
+- **Famílias migradas:** IA Studio (v0.9.84→v0.9.91), ISP (v0.9.92), **Automação INTEIRA**
+  (A: v0.9.99 · B: v0.10.2 · C: v0.10.4) e **WhatsApp INTEIRA** (v0.10.9 — 11 arquivos).
+- **Faltam:** Configurações (5), Integrações (6), Recursos (2), Desenvolvedor (2) — todas
+  lista+form, sem layout especial.
+- **DS consumido: `^1.2.31`.** A migração já rendeu 22 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
+- **Tela de trabalho contínuo usa `fullBleed`** do AppShell (v1.2.31) e `flex: 1` — **nunca**
+  `calc(100dvh - Xrem)`. A lista de rotas full-bleed vive no `Layout.jsx` (`FULL_BLEED_PATHS`).
+- **A conversa do WhatsApp tem cores fixas de propósito** (convenção do aplicativo). No escuro ela
+  fica clara — decisão pendente em `docs/divida-tecnica.md` (`DT-005`). Não "conserte" achando que é
+  sobra do padrão antigo.
+- **Campos do composer de WhatsApp** vivem em `pages/WhatsApp/composer/` (gravador de áudio, barra de
+  gravação, anexo). Coisa nova de composer entra ali, não no `MessageComposer`.
 - **Uma cor de ação no painel todo** (v0.10.3): `--ap-accent` e a cor `brand` do Tailwind herdam
   `--su-action`. Não cravar hex de cor de ação em lugar nenhum — trocar o accent tem que mudar
   tela migrada e não-migrada junto.

@@ -21,7 +21,10 @@ import Conexoes from './pages/Integracoes/Conexoes';
 import Segredos from './pages/Integracoes/Segredos';
 import Conversas from './pages/WhatsApp/Conversas';
 import Templates from './pages/WhatsApp/Templates';
+import TemplateNovo from './pages/WhatsApp/TemplateNovo';
 import EquipesFilas from './pages/WhatsApp/EquipesFilas';
+import EquipeEditor from './pages/WhatsApp/EquipeEditor';
+import FilaEditor from './pages/WhatsApp/FilaEditor';
 import Numeros from './pages/WhatsApp/Numeros';
 import AtendimentoIA from './pages/WhatsApp/AtendimentoIA';
 import Fluxos from './pages/Automacao/Fluxos';
@@ -101,7 +104,13 @@ export default function App() {
                 <Route path="/integracoes/segredos" element={<PermissionRoute perm="integrations.secrets.read"><Segredos /></PermissionRoute>} />
                 <Route path="/whatsapp/conversas" element={<PermissionRoute perm={WHATSAPP_VIEW_PERMS}><Conversas /></PermissionRoute>} />
                 <Route path="/whatsapp/templates" element={<PermissionRoute perm="comm.whatsapp.templates.read"><Templates /></PermissionRoute>} />
+                <Route path="/whatsapp/templates/novo" element={<PermissionRoute perm="comm.whatsapp.templates.manage"><TemplateNovo /></PermissionRoute>} />
                 <Route path="/whatsapp/equipes" element={<PermissionRoute perm="comm.whatsapp.teams.read"><EquipesFilas /></PermissionRoute>} />
+                {/* `nova` antes de `:id` — senão a rota dinâmica casa primeiro. */}
+                <Route path="/whatsapp/equipes/nova" element={<PermissionRoute perm="comm.whatsapp.teams.manage"><EquipeEditor /></PermissionRoute>} />
+                <Route path="/whatsapp/equipes/:id" element={<PermissionRoute perm="comm.whatsapp.teams.read"><EquipeEditor /></PermissionRoute>} />
+                <Route path="/whatsapp/filas/nova" element={<PermissionRoute perm="comm.whatsapp.queues.manage"><FilaEditor /></PermissionRoute>} />
+                <Route path="/whatsapp/filas/:id" element={<PermissionRoute perm="comm.whatsapp.queues.read"><FilaEditor /></PermissionRoute>} />
                 <Route path="/whatsapp/numeros" element={<PermissionRoute perm="comm.whatsapp.numbers.read"><Numeros /></PermissionRoute>} />
                 <Route path="/whatsapp/atendimento-ia" element={<PermissionRoute perm="automation.workflows.read"><AtendimentoIA /></PermissionRoute>} />
                 <Route path="/automacao/fluxos" element={<PermissionRoute perm="automation.workflows.read"><Fluxos /></PermissionRoute>} />

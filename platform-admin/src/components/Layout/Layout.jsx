@@ -210,6 +210,11 @@ const BREADCRUMB_PATTERNS = [
   [/^\/ia\/conhecimento\/nova$/,                   'IA Studio / Conhecimento / Nova base'],
   [/^\/ia\/conhecimento\/[^/]+\/documentos\/novo$/,'IA Studio / Conhecimento / Novo documento'],
   [/^\/ia\/conhecimento\/[^/]+$/,                  'IA Studio / Conhecimento / Base'],
+  [/^\/whatsapp\/templates\/novo$/,                'WhatsApp / Templates / Novo'],
+  [/^\/whatsapp\/equipes\/nova$/,                  'WhatsApp / Equipes e Filas / Nova equipe'],
+  [/^\/whatsapp\/equipes\/[^/]+$/,                 'WhatsApp / Equipes e Filas / Equipe'],
+  [/^\/whatsapp\/filas\/nova$/,                    'WhatsApp / Equipes e Filas / Nova fila'],
+  [/^\/whatsapp\/filas\/[^/]+$/,                   'WhatsApp / Equipes e Filas / Fila'],
   [/^\/automacao\/fluxos\/novo$/,                  'Automação / Fluxos / Novo'],
   [/^\/automacao\/fluxos\/importar$/,              'Automação / Fluxos / Importar'],
   [/^\/automacao\/fluxos\/[^/]+\/lista$/,          'Automação / Fluxos / Passos'],
@@ -244,6 +249,13 @@ function resolveCrumb(pathname) {
  *
  * O último item nunca é link: é a página onde já se está.
  */
+// Rotas que recebem a área de conteúdo inteira (sem padding, sem rolagem de
+// página). Lista curta e deliberada: o padrão é a tela viver com o espaçamento da
+// casca, e a exceção precisa de motivo — rolagem interna própria em mais de uma
+// coluna. Hoje só a conversa do WhatsApp; o canvas de fluxo é candidato, mas ele
+// já resolve a altura por conta e entra em outra frente.
+const FULL_BLEED_PATHS = ['/whatsapp/conversas'];
+
 function buildBreadcrumb(pathname) {
   const labels = resolveCrumb(pathname).split(' / ');
   const segs = pathname.split('/').filter(Boolean);
@@ -495,6 +507,12 @@ export default function Layout() {
         // Breadcrumb do DS usa <a href> de verdade, de propósito — ctrl+clique
         // abre em outra aba). Aqui o clique simples vira navegação do router.
         onBreadcrumbNavigate={(href) => navigate(href)}
+        // Telas de trabalho contínuo recebem a área de conteúdo inteira, sem
+        // espaçamento e sem rolagem de página: a conversa tem rolagem própria em
+        // duas colunas e precisa da altura toda. Antes disso a tela calculava
+        // `100dvh - 8.5rem` à mão — número que erra sempre que a barra de cima
+        // muda de altura, e erra diferente no mobile.
+        fullBleed={FULL_BLEED_PATHS.some((p) => location.pathname.startsWith(p))}
         topbarContext={topbarContext}
         user={userForShell}
         userMenuItems={userMenuItems}

@@ -117,6 +117,24 @@ funciona.
 
 ---
 
+### DT-005 🟡 A conversa do WhatsApp fica clara no tema escuro
+
+- **Módulo:** `platform-admin` → `pages/WhatsApp/ChatWindow.jsx`
+- **Risco:** UX / conforto visual
+- **Esforço:** 1–2h (imitar o WhatsApp escuro) ou ~30min (tematizar o balão)
+- **Dono:** Robson · **Sprint-alvo:** `backlog`
+- **Nasceu em:** 2026-07-25 (migração da família WhatsApp, v0.10.9)
+
+A área da conversa usa as cores do WhatsApp cravadas — balão `#d9fdd3` à direita, branco à esquerda, fundo `#efeae2`, tique `#53bdeb` — e isso é **deliberado**: é a convenção que o atendente vê no aplicativo o dia inteiro, e tematizar faria a mesma mensagem ter cor diferente aqui e lá. Tudo em volta (cabeçalho, ações, situação, composer) já é do tema.
+
+O efeito colateral é que, no tema escuro, o painel fica escuro e a conversa continua clara. Três saídas, e a escolha é de produto:
+
+1. **Imitar o WhatsApp escuro** — usar a paleta escura do próprio aplicativo (fundo `#0b141a`, balão enviado `#005c4b`, recebido `#202c33`). Mantém a convenção nos dois temas; é o que o WhatsApp Web faz.
+2. **Tematizar o balão** — enviado no accent tonalizado, recebido na superfície. Coerência total com o painel, perda da convenção.
+3. **Deixar como está** — aceitar a área clara como "a janela do WhatsApp dentro do painel".
+
+Recomendação: (1) — resolve o desconforto sem abrir mão do reconhecimento.
+
 ## Resolvidos
 
 | ID | Item | Resolvido em |

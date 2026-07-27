@@ -1,33 +1,45 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Bot, Loader2, MessageCircle, ExternalLink, ShieldCheck } from 'lucide-react';
-import EmptyState from '../../components/ui/EmptyState';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { useToast } from '@studio-ux-ds/react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, EmptyState, Badge, Button, Switch, ConfirmDialog, useToast,
+} from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { listWorkflows, publishWorkflow, unpublishWorkflow } from '../../services/automation';
 
 // Tag estável que o seed coloca no fluxo de exemplo (isp-example.repository.ts).
 const AUTOREPLY_TAG = 'ia-whatsapp';
 
-// Atendimento por IA no WhatsApp — casca amigável do fluxo "IA responde no
-// WhatsApp". Ligar = publicar o fluxo; desligar = despublicar (volta a DRAFT).
-// O fluxo em si (gatilho → condição → assistente → enviar) fica no canvas.
+// WhatsApp/AtendimentoIA — a casca amigável do fluxo "A IA responde no WhatsApp".
+// Ligar = publicar o fluxo; desligar = despublicar. Migrada pro DS na v0.10.9.
+//
+// Decisões de composição:
+//
+//  · **O interruptor era um `<button role="switch">` desenhado à mão** — pílula de
+//    52×30px com `translateX` calculado e `var(--ap-accent, #6366f1)` cravado.
+//    Agora é o `Switch` do DS: mesmo gesto, sem 20 linhas de estilo, e acompanha
+//    o accent e o tema.
+//  · **Desligar passou a pedir confirmação.** Ligar já pedia; desligar rodava
+//    direto no clique — e é a ação que **para o atendimento automático** de um
+//    canal em produção. Os 5 patrasques valem nos dois sentidos (era a mesma
+//    assimetria que corrigi no fluxo, na v0.10.4).
+//  · O estado ("ligado/desligado") virou `Badge`, não texto com verde cravado.
+
 export default function AtendimentoIA() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { can } = usePermissions();
   const [workflow, setWorkflow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [confirmOn, setConfirmOn] = useState(false);
+  const [confirm, setConfirm] = useState(null); // 'on' | 'off'
 
   async function load() {
     setLoading(true);
     try {
       const items = await listWorkflows();
       const list = Array.isArray(items) ? items : (items?.items ?? []);
-      const wf = list.find((w) => Array.isArray(w.tags) && w.tags.includes(AUTOREPLY_TAG)) ?? null;
-      setWorkflow(wf);
+      setWorkflow(list.find((w) => Array.isArray(w.tags) && w.tags.includes(AUTOREPLY_TAG)) ?? null);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -35,143 +47,126 @@ export default function AtendimentoIA() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const enabled = workflow?.status === 'PUBLISHED';
+  const ligado = workflow?.status === 'PUBLISHED';
   const canToggle = can('automation.workflows.publish');
 
-  async function turnOn() {
+  async function confirmToggle() {
     if (!workflow) return;
-    setConfirmOn(false);
     setSaving(true);
     try {
-      await publishWorkflow(workflow.id, workflow.current_version || 1);
-      toast.success('Pronto. A IA vai responder no WhatsApp quando ninguém estiver atendendo.');
+      if (confirm === 'on') {
+        await publishWorkflow(workflow.id, workflow.current_version || 1);
+        toast.success('Pronto. A IA vai responder no WhatsApp quando ninguém estiver atendendo.');
+      } else {
+        await unpublishWorkflow(workflow.id);
+        toast.success('Desligado. A IA não responde mais sozinha no WhatsApp.');
+      }
+      setConfirm(null);
       await load();
     } catch (err) {
       toast.error(err.message);
     } finally {
       setSaving(false);
     }
-  }
-
-  async function turnOff() {
-    if (!workflow) return;
-    setSaving(true);
-    try {
-      await unpublishWorkflow(workflow.id);
-      toast.success('Desligado. A IA não vai mais responder sozinha no WhatsApp.');
-      await load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function onToggleClick() {
-    if (!canToggle) return;
-    if (enabled) turnOff();
-    else setConfirmOn(true);
   }
 
   if (loading) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} />
+      <div className="space-y-6">
+        <PageHeader title="Atendimento por IA" />
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--ap-text-1)' }}>
-          <Bot size={20} /> Atendimento por IA
-        </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Deixe o assistente responder as mensagens do WhatsApp automaticamente.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Atendimento por IA"
+        subtitle="Deixe o assistente responder as mensagens do WhatsApp quando não houver ninguém na conversa."
+      />
 
       {!workflow ? (
-        <EmptyState
-          icon={Bot}
-          title="Nenhum atendimento por IA configurado ainda"
-          description="O fluxo de exemplo é criado automaticamente quando esta organização tem um provedor de internet (ISP) conectado e um assistente de IA. Conecte um provedor em Integrações para começar."
-        />
+        <Card>
+          <EmptyState
+            icon="message"
+            title="Ainda não há atendimento por IA nesta organização"
+            description="O fluxo de exemplo é criado sozinho quando existe um provedor de internet conectado e um assistente de IA. Conecte um provedor em Integrações para começar."
+            action={
+              <Button variant="secondary" icon="external-link" onClick={() => navigate('/integracoes/conexoes')}>
+                Ir para Integrações
+              </Button>
+            }
+          />
+        </Card>
       ) : (
-        <div className="rounded-lg p-5" style={{ border: '1px solid var(--ap-border)', backgroundColor: 'var(--ap-surface)' }}>
-          {/* Linha principal: descrição + interruptor */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold" style={{ color: 'var(--ap-text-1)' }}>
-                A IA responde no WhatsApp
-              </p>
-              <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--ap-text-3)' }}>
-                Quando um cliente manda mensagem e <strong>ninguém da equipe está atendendo</strong> aquela conversa,
-                o assistente responde sozinho. Se um atendente humano estiver conduzindo, a IA fica quieta.
-              </p>
+        <Card>
+          <div style={{ padding: 20 }} className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+                    A IA responde no WhatsApp
+                  </p>
+                  <Badge tone={ligado ? 'success' : 'neutral'}>{ligado ? 'ligado' : 'desligado'}</Badge>
+                </div>
+                <p style={{ fontSize: 13, margin: 0, lineHeight: 1.5, color: 'var(--su-text-secondary)' }}>
+                  Quando um cliente manda mensagem e <strong>ninguém da equipe está atendendo</strong> aquela conversa,
+                  o assistente responde sozinho. Se um atendente humano estiver conduzindo, a IA fica quieta.
+                </p>
+              </div>
+
+              <div className="shrink-0 flex items-center gap-2">
+                {saving && <Loader2 size={14} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />}
+                <Switch
+                  checked={ligado}
+                  aria-label={ligado ? 'Desligar o atendimento por IA' : 'Ligar o atendimento por IA'}
+                  onChange={() => {
+                    if (!canToggle) {
+                      toast.error('Você não tem permissão para ligar ou desligar isto.');
+                      return;
+                    }
+                    setConfirm(ligado ? 'off' : 'on');
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Interruptor-pílula */}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled}
-              onClick={onToggleClick}
-              disabled={!canToggle || saving}
-              title={
-                !canToggle
-                  ? 'Você não tem permissão para ligar/desligar (Publicar fluxos).'
-                  : enabled ? 'Desligar o atendimento por IA' : 'Ligar o atendimento por IA'
-              }
-              className="relative shrink-0 inline-flex items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                width: 52, height: 30,
-                backgroundColor: enabled ? 'var(--ap-accent, #6366f1)' : 'var(--ap-border)',
-              }}
-            >
-              <span
-                className="inline-block rounded-full bg-white transition-transform"
-                style={{ width: 24, height: 24, transform: `translateX(${enabled ? 25 : 3}px)` }}
-              />
-              {saving && (
-                <Loader2 size={14} className="animate-spin absolute -right-6" style={{ color: 'var(--ap-text-4)' }} />
-              )}
-            </button>
+            <div style={{ paddingTop: 16, borderTop: '1px solid var(--su-border-subtle)' }} className="space-y-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                icon="external-link"
+                onClick={() => navigate(`/automacao/fluxos/${workflow.id}`)}
+              >
+                Ver o fluxo “{workflow.name}”
+              </Button>
+              <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>
+                O fluxo mostra o passo a passo: mensagem recebida → confere se há alguém atendendo → assistente responde.
+              </p>
+            </div>
           </div>
-
-          {/* Estado atual */}
-          <div className="mt-4 flex items-center gap-2 text-xs" style={{ color: enabled ? '#10b981' : 'var(--ap-text-4)' }}>
-            {enabled ? <ShieldCheck size={14} /> : <MessageCircle size={14} />}
-            {enabled ? 'Ligado — a IA está atendendo no WhatsApp.' : 'Desligado — nenhuma resposta automática.'}
-          </div>
-
-          {/* Link pro fluxo no canvas (quem quiser ver/editar a lógica) */}
-          <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--ap-border-sub, var(--ap-border))' }}>
-            <Link
-              to={`/automacao/fluxos/${workflow.id}`}
-              className="text-xs inline-flex items-center gap-1.5 hover:underline"
-              style={{ color: 'var(--ap-accent, #6366f1)' }}
-            >
-              <ExternalLink size={13} /> Ver e editar o fluxo "{workflow.name}"
-            </Link>
-            <p className="text-[11px] mt-1" style={{ color: 'var(--ap-text-4)' }}>
-              O fluxo mostra o passo a passo: mensagem recebida → confere se há humano atendendo → assistente responde.
-            </p>
-          </div>
-        </div>
+        </Card>
       )}
 
+      {/* 5 patrasques nos DOIS sentidos — desligar também para um canal em uso. */}
       <ConfirmDialog
-        open={confirmOn}
-        title="Ligar o atendimento por IA?"
-        message="A partir de agora, quando um cliente escrever no WhatsApp e ninguém estiver atendendo aquela conversa, o assistente vai responder sozinho. Você pode desligar a qualquer momento aqui."
-        confirmLabel="Ligar"
+        open={!!confirm}
+        danger={confirm === 'off'}
         loading={saving}
-        onClose={() => setConfirmOn(false)}
-        onConfirm={turnOn}
+        title={confirm === 'off' ? 'Desligar o atendimento por IA' : 'Ligar o atendimento por IA'}
+        message={
+          confirm === 'off'
+            ? 'Desligar? As mensagens que chegarem sem ninguém atendendo ficam sem resposta até alguém abrir a conversa. Você pode ligar de novo a qualquer momento.'
+            : 'A partir de agora, quando um cliente escrever no WhatsApp e ninguém estiver atendendo aquela conversa, o assistente responde sozinho. Você pode desligar a qualquer momento aqui.'
+        }
+        confirmLabel={confirm === 'off' ? 'Desligar' : 'Ligar'}
+        onClose={() => setConfirm(null)}
+        onConfirm={confirmToggle}
       />
     </div>
   );

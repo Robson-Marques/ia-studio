@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Check, CheckCheck, Clock, Download, History, Loader2, LockOpen,
-  UserCheck, UserMinus, XCircle, ArrowRightLeft, AlertTriangle,
+  Check, CheckCheck, Clock, Download, Loader2, AlertTriangle,
 } from 'lucide-react';
-import { Badge } from '../../components/ui/Table';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { useToast } from '@studio-ux-ds/react';
+import {
+  Badge, Button, IconButton, Avatar, ConfirmDialog, useToast,
+} from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia, unlinkCustomer,
@@ -13,9 +12,22 @@ import {
 import { ATTENDANCE_STATUS, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
 import AudioPlayer from './AudioPlayer';
+import { statusToTone } from '../../lib/tone';
 
-// Ticks estilo WhatsApp (sempre sobre balão claro): cinza p/ enviado/entregue,
-// azul p/ lido, vermelho p/ falha.
+// WhatsApp/ChatWindow — a conversa aberta. Migrada pro DS na v0.10.9.
+//
+// **As cores da CONVERSA ficaram fixas, de propósito** — balão verde à direita,
+// branco à esquerda, fundo bege, tique azul de "lido". Não é sobra do padrão
+// antigo: é a convenção do WhatsApp, e o atendente passa o dia olhando o aplicativo
+// de verdade. Tematizar o balão faria a mesma mensagem ter cor diferente aqui e
+// lá, e o ganho seria só coerência interna.
+// O que FOI tematizado é tudo em volta — cabeçalho, ações, situação, avatar —,
+// que é interface do painel, não do WhatsApp.
+// Consequência conhecida: no tema escuro a área da conversa continua clara. Está
+// registrado na dívida técnica para o Robson decidir (imitar o WhatsApp escuro ou
+// tematizar o balão).
+
+// Tiques de status — sempre sobre balão claro, por isso a cor é fixa.
 function StatusTicks({ status }) {
   if (status === 'read') return <CheckCheck size={14} style={{ color: '#53bdeb' }} />;
   if (status === 'delivered') return <CheckCheck size={14} style={{ color: '#8696a0' }} />;
@@ -24,9 +36,7 @@ function StatusTicks({ status }) {
   return <Clock size={13} style={{ color: '#8696a0' }} />;
 }
 
-// Mídia (inbound ou outbound): baixa da Meta sob demanda (proxy base64 do
-// backend). Serve tanto pra mídia recebida quanto pra mídia enviada por upload
-// do aparelho (persistida com media_id) — o download por media_id é direção-agnóstico.
+// Mídia (recebida ou enviada): baixa da Meta sob demanda via proxy do backend.
 function ChatMedia({ chatId, message }) {
   const toast = useToast();
   const media = message.media || {};
@@ -47,45 +57,54 @@ function ChatMedia({ chatId, message }) {
     }
   }
 
-  // Mídia que o próprio atendente enviou: carrega sozinha (a bolha já é dele).
-  // Inbound continua sob demanda (evita baixar tudo ao abrir a conversa).
+  // O que o próprio atendente enviou carrega sozinho; o que chegou fica sob
+  // demanda, para não baixar tudo ao abrir a conversa.
   useEffect(() => {
     if (outgoing && !data && media.media_id) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [media.media_id]);
 
+  const NOME_TIPO = { image: 'imagem', audio: 'áudio', video: 'vídeo' };
+
   if (!data) {
     return (
-      <button type="button" onClick={load} disabled={loading}
-        className="inline-flex items-center gap-1.5 text-xs underline disabled:opacity-60"
-        style={{ color: '#027eb5', minHeight: 32 }}>
+      <button
+        type="button"
+        onClick={load}
+        disabled={loading}
+        className="inline-flex items-center gap-1.5"
+        style={{ fontSize: 12, color: '#027eb5', minHeight: 32, background: 'none', border: 0, padding: 0, font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
+      >
         {loading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-        Carregar {message.type === 'image' ? 'imagem' : message.type === 'audio' ? 'áudio' : message.type === 'video' ? 'vídeo' : 'arquivo'}
+        Carregar {NOME_TIPO[message.type] || 'arquivo'}
       </button>
     );
   }
+
   const mime = data.mime || media.mime_type || '';
   if (message.type === 'image' || mime.startsWith('image/')) {
-    return <img src={data.src} alt="Imagem" className="rounded-lg max-w-full max-h-64" />;
+    return <img src={data.src} alt="Imagem recebida na conversa" className="rounded-lg max-w-full max-h-64" />;
   }
   if (message.type === 'audio' || mime.startsWith('audio/')) {
-    // Player custom (portado do Aquapark) — resolve duração de blob/opus da Meta,
-    // que o <audio> nativo não consegue. `light` = variante pra balão claro.
-    return <AudioPlayer src={data.src} light={true} />;
+    // Player próprio: resolve a duração de opus/blob da Meta, que o <audio>
+    // nativo não consegue. `light` = variante para balão claro.
+    return <AudioPlayer src={data.src} light />;
   }
   if (message.type === 'video' || mime.startsWith('video/')) {
     return <video controls src={data.src} className="rounded-lg max-w-full max-h-64" />;
   }
   return (
-    <a href={data.src} download={media.filename || 'arquivo'} className="inline-flex items-center gap-1.5 text-xs underline" style={{ color: '#027eb5' }}>
+    <a
+      href={data.src}
+      download={media.filename || 'arquivo'}
+      className="inline-flex items-center gap-1.5"
+      style={{ fontSize: 12, color: '#027eb5', textDecoration: 'underline' }}
+    >
       <Download size={13} /> {media.filename || 'Baixar arquivo'}
     </a>
   );
 }
 
-// Balão estilo WhatsApp oficial: enviado = verde (#d9fdd3) à direita,
-// recebido = branco à esquerda, texto escuro, sombra leve. Cores fixas
-// (independem do tema do painel) — igual ao Aquapark.
 function Bubble({ chatId, message }) {
   const outgoing = message.direction === 'OUTGOING';
   return (
@@ -99,27 +118,34 @@ function Bubble({ chatId, message }) {
         }}
       >
         {(message.media && (message.media.media_id || message.media.url)) && (
-          // Com media_id (upload real ou inbound): player/imagem via download por
-          // base64. Sem media_id mas com url (outbound legado por link): só o link.
           message.media.media_id
             ? <ChatMedia chatId={chatId} message={message} />
-            : (message.media.url && <a className="text-xs underline break-all" href={message.media.url} target="_blank" rel="noreferrer" style={{ color: '#027eb5' }}>{message.media.url}</a>)
+            : (message.media.url && (
+              <a
+                href={message.media.url}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all"
+                style={{ fontSize: 12, color: '#027eb5', textDecoration: 'underline' }}
+              >
+                {message.media.url}
+              </a>
+            ))
         )}
         {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
-        <div className="flex items-center gap-1 justify-end text-[10px]" style={{ color: '#667781' }}>
+        <div className="flex items-center gap-1 justify-end" style={{ fontSize: 10, color: '#667781' }}>
           {message.type === 'template' && <span>(modelo)</span>}
           <span>{new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           {outgoing && <StatusTicks status={message.status} />}
         </div>
         {message.status === 'failed' && message.error_detail && (
-          <p className="text-[10px]" style={{ color: '#dc2626' }}>{message.error_detail}</p>
+          <p style={{ fontSize: 10, margin: 0, color: '#dc2626' }}>{message.error_detail}</p>
         )}
       </div>
     </div>
   );
 }
 
-// Janela da conversa: header com ações de atendimento + bolhas + composer.
 export default function ChatWindow({
   chat, messages, windowInfo, templates, scope, meId,
   onRefresh, onOpenTransfer, onOpenTimeline, onSent,
@@ -139,6 +165,7 @@ export default function ChatWindow({
   const st = ATTENDANCE_STATUS[chat.attendance_status] || ATTENDANCE_STATUS.OPEN;
   const isMine = chat.current_handler_type === 'USER' && chat.current_handler_id === meId;
   const closed = chat.attendance_status === 'CLOSED';
+  const nome = chat.contact_name || formatPhone(chat.phone);
 
   async function run(fn, okMsg) {
     setActing(true);
@@ -155,31 +182,33 @@ export default function ChatWindow({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--ap-border)' }}>
-        {/* Avatar estilo WhatsApp: bolinha verde com a inicial do contato. */}
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
-          {(chat.contact_name || chat.phone || '?').slice(0, 1).toUpperCase()}
-        </div>
+      <div
+        className="flex items-center gap-2 flex-wrap"
+        style={{ padding: 'var(--su-space-2) var(--su-space-3)', borderBottom: '1px solid var(--su-border-default)' }}
+      >
+        <Avatar initials={(nome || '?').slice(0, 1).toUpperCase()} size="sm" alt="" />
+
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold truncate" style={{ color: 'var(--ap-text-1)' }}>
-            {chat.contact_name || formatPhone(chat.phone)}
+          <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">
+            {nome}
           </p>
-          <p className="text-[11px]" style={{ color: 'var(--ap-text-4)' }}>
+          <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>
             {formatPhone(chat.phone)}
-            {chat.current_handler_name ? ` — atendido por ${chat.current_handler_name}` : ' — sem atendente'}
+            {chat.current_handler_name ? ` · atendido por ${chat.current_handler_name}` : ' · ninguém atendendo'}
           </p>
           {chat.linked_customer_name && (
-            <p className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--ap-accent, #6366f1)' }}>
-              <span>Cliente: {chat.linked_customer_name}{chat.linked_customer_document ? ` (${chat.linked_customer_document})` : ''}</span>
+            <p style={{ fontSize: 11, margin: 0 }} className="flex flex-wrap items-center gap-1.5">
+              <span style={{ color: 'var(--su-action)' }}>
+                Cliente: {chat.linked_customer_name}
+                {chat.linked_customer_document ? ` (${chat.linked_customer_document})` : ''}
+              </span>
               {can('comm.whatsapp.claim') && (
                 <button
                   type="button"
-                  title="Desvincular este cliente do WhatsApp"
+                  title="Desfazer o vínculo deste WhatsApp com o cadastro do cliente"
                   disabled={acting}
-                  onClick={() => run(() => unlinkCustomer(chat.id), 'Cliente desvinculado.')}
-                  className="hover:underline disabled:opacity-50"
-                  style={{ color: 'var(--ap-text-4)' }}
+                  onClick={() => run(() => unlinkCustomer(chat.id), 'Vínculo desfeito.')}
+                  style={{ background: 'none', border: 0, padding: 0, font: 'inherit', fontSize: 11, color: 'var(--su-text-muted)', textDecoration: 'underline', cursor: 'pointer' }}
                 >
                   desvincular
                 </button>
@@ -187,58 +216,70 @@ export default function ChatWindow({
             </p>
           )}
         </div>
-        <Badge variant={st.variant}>{st.label}</Badge>
+
+        <Badge tone={statusToTone(st.variant)}>{st.label}</Badge>
 
         <div className="flex items-center gap-1">
           {!closed && !isMine && can('comm.whatsapp.claim') && (
-            <button type="button" title="Assumir esta conversa (vira sua)" disabled={acting}
+            <Button
+              variant="secondary" size="sm" icon="user-plus" disabled={acting}
+              title="A conversa passa a ser sua — as respostas saem no seu nome"
               onClick={() => run(() => claimChat(chat.id), 'Conversa assumida.')}
-              className="btn-secondary !px-2.5 inline-flex items-center gap-1 text-xs" style={{ minHeight: 34 }}>
-              <UserCheck size={13} /> Assumir
-            </button>
+            >
+              Assumir
+            </Button>
           )}
           {!closed && isMine && can('comm.whatsapp.claim') && (
-            <button type="button" title="Devolver a conversa pro pool (mantém equipe/fila)" disabled={acting}
-              onClick={() => run(() => releaseChat(chat.id), 'Conversa liberada pro pool.')}
-              className="btn-secondary !px-2.5 inline-flex items-center gap-1 text-xs" style={{ minHeight: 34 }}>
-              <UserMinus size={13} /> Liberar
-            </button>
+            <Button
+              variant="secondary" size="sm" icon="logout" disabled={acting}
+              title="Devolve a conversa para quem estiver disponível (mantém equipe e fila)"
+              onClick={() => run(() => releaseChat(chat.id), 'Conversa devolvida para o grupo.')}
+            >
+              Liberar
+            </Button>
           )}
           {!closed && can('comm.whatsapp.transfer') && (
-            <button type="button" title="Transferir pra outro atendente, fila ou equipe" disabled={acting}
+            <Button
+              variant="secondary" size="sm" icon="arrow-right" disabled={acting}
+              title="Passar para outra pessoa, fila ou equipe"
               onClick={onOpenTransfer}
-              className="btn-secondary !px-2.5 inline-flex items-center gap-1 text-xs" style={{ minHeight: 34 }}>
-              <ArrowRightLeft size={13} /> Transferir
-            </button>
+            >
+              Transferir
+            </Button>
           )}
           {!closed && can('comm.whatsapp.close') && (
-            <button type="button" title="Encerrar o atendimento (a conversa reabre sozinha se o cliente voltar)" disabled={acting}
+            <Button
+              variant="secondary" size="sm" icon="check" disabled={acting}
+              title="Encerra o atendimento. Se o cliente escrever de novo, a conversa reabre sozinha."
               onClick={() => setConfirmClose(true)}
-              className="btn-secondary !px-2.5 inline-flex items-center gap-1 text-xs text-red-400" style={{ minHeight: 34 }}>
-              <XCircle size={13} /> Encerrar
-            </button>
+            >
+              Encerrar
+            </Button>
           )}
           {closed && can('comm.whatsapp.close') && (
-            <button type="button" title="Reabrir o atendimento" disabled={acting}
+            <Button
+              variant="secondary" size="sm" icon="refresh" disabled={acting}
+              title="Voltar a atender esta conversa"
               onClick={() => run(() => reopenChat(chat.id), 'Conversa reaberta.')}
-              className="btn-secondary !px-2.5 inline-flex items-center gap-1 text-xs" style={{ minHeight: 34 }}>
-              <LockOpen size={13} /> Reabrir
-            </button>
+            >
+              Reabrir
+            </Button>
           )}
-          <button type="button" title="Trilha de atendimento (quem assumiu, transferiu, encerrou)"
+          <IconButton
+            icon="history"
+            aria-label="Ver o histórico de atendimento"
+            title="Quem assumiu, transferiu e encerrou esta conversa"
             onClick={onOpenTimeline}
-            className="btn-secondary !px-2.5 inline-flex items-center gap-1 text-xs" style={{ minHeight: 34 }}>
-            <History size={13} />
-          </button>
+          />
         </div>
       </div>
 
-      {/* Mensagens */}
+      {/* Área da conversa — fundo do WhatsApp, mantido de propósito (ver o
+          comentário no topo do arquivo). */}
       <div
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2"
         style={{
-          // Fundo estilo WhatsApp: bege + padrão sutil de pontinhos (igual Aquapark).
           backgroundColor: '#efeae2',
           backgroundImage: 'radial-gradient(rgba(11,20,26,0.045) 1px, transparent 0)',
           backgroundSize: '22px 22px',
@@ -246,11 +287,12 @@ export default function ChatWindow({
       >
         {messages.map((m) => <Bubble key={m.id} chatId={chat.id} message={m} />)}
         {messages.length === 0 && (
-          <p className="text-center text-xs py-8" style={{ color: 'var(--ap-text-4)' }}>Sem mensagens ainda.</p>
+          <p className="text-center py-8" style={{ fontSize: 12, color: '#667781' }}>
+            Nenhuma mensagem nesta conversa ainda.
+          </p>
         )}
       </div>
 
-      {/* Composer */}
       <MessageComposer chat={chat} windowInfo={windowInfo} templates={templates} scope={scope} onSent={onSent} />
 
       <ConfirmDialog
@@ -258,7 +300,7 @@ export default function ChatWindow({
         danger
         loading={acting}
         title="Encerrar conversa"
-        message="Encerrar o atendimento desta conversa? Ela sai das filas ativas — se o cliente mandar nova mensagem, reabre automaticamente."
+        message="Encerrar o atendimento? A conversa sai das listas ativas. Se o cliente mandar mensagem de novo, ela reabre sozinha e volta para o grupo."
         confirmLabel="Encerrar"
         onClose={() => setConfirmClose(false)}
         onConfirm={() => run(() => closeChat(chat.id), 'Conversa encerrada.').then(() => setConfirmClose(false))}

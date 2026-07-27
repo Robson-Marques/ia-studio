@@ -16,11 +16,15 @@ export const TEMPLATE_STATUS = {
   DISABLED: { label: 'Desativado', variant: 'gray' },
 };
 
+// Qualidade do número na Meta. Declara `variant` como os outros mapas daqui —
+// quem traduz para o papel do DS é `statusToTone` (v0.10.9). Antes cravava
+// `color: '#22c55e'` e afins: hex fixo, que no tema escuro perdia contraste e não
+// acompanhava a troca de tema.
 export const QUALITY = {
-  GREEN:  { label: 'Alta',   color: '#22c55e' },
-  YELLOW: { label: 'Média',  color: '#eab308' },
-  RED:    { label: 'Baixa',  color: '#ef4444' },
-  UNKNOWN: { label: 'Desconhecida', color: 'var(--ap-text-4)' },
+  GREEN:   { label: 'Alta',         variant: 'green' },
+  YELLOW:  { label: 'Média',        variant: 'yellow' },
+  RED:     { label: 'Baixa',        variant: 'red' },
+  UNKNOWN: { label: 'Desconhecida', variant: 'gray' },
 };
 
 export const MESSAGING_LIMIT_LABEL = {

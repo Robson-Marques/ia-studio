@@ -1,13 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Loader2, Phone, RefreshCw, Signal, Star } from 'lucide-react';
-import EmptyState from '../../components/ui/EmptyState';
-import { Badge } from '../../components/ui/Table';
-import { useToast } from '@studio-ux-ds/react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, DataTable, EmptyState, Badge, Button, useToast,
+} from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import { listNumbers, syncNumber } from '../../services/whatsapp';
 import { MESSAGING_LIMIT_LABEL, QUALITY, formatPhone } from './whatsapp.constants';
+import { statusToTone } from '../../lib/tone';
+
+// WhatsApp/Números — as conexões com a Meta: situação, qualidade, limite de
+// conversas e sincronização. Migrada pro DS na v0.10.9.
+//
+// Decisões de composição:
+//
+//  · **Grade de cards → tabela.** Eram 9 campos empilhados num card por número;
+//    numa tabela os mesmos números ficam comparáveis lado a lado, que é o que se
+//    quer num painel de conexões ("qual está com qualidade baixa?").
+//  · **Sincronizar saiu do card e foi pra barra de lote** — e aceita vários de
+//    uma vez, o que antes exigia um clique por número. Só aparece quando toda a
+//    seleção está ativa: sincronizar conexão desativada devolve erro da Meta.
+//  · **A linha leva para a conexão** em Integrações, que é onde ela se gerencia —
+//    esta tela é o painel de saúde, não o cadastro.
+//  · O erro de sincronização fica **na célula da situação**, visível: informação
+//    essencial não vive em tooltip (regra do DS).
 
 const STATUS_LABEL = {
   ACTIVE: { label: 'Ativa', variant: 'green' },
@@ -20,14 +37,13 @@ const STATUS_LABEL = {
   PENDING_AUTH: { label: 'Aguardando autenticação', variant: 'yellow' },
 };
 
-// Números WhatsApp — painel das conexões whatsapp-meta: qualidade, limite,
-// status, health e sync. Nova conexão = Connection Wizard (Integrações).
 export default function Numeros() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -40,113 +56,129 @@ export default function Numeros() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleSync(n) {
-    setSyncing(n.id);
-    try {
-      await syncNumber(n.id);
-      toast.success('Número sincronizado com a Meta.');
-      await load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSyncing(null);
+  async function handleSync(ids, clear) {
+    setSyncing(true);
+    let ok = 0;
+    const falhas = [];
+    for (const id of ids) {
+      try { await syncNumber(id); ok += 1; }
+      catch (err) { falhas.push(err.message); }
     }
+    setSyncing(false);
+    clear();
+    if (ok) toast.success(ok === 1 ? 'Número sincronizado com a Meta.' : `${ok} números sincronizados com a Meta.`);
+    if (falhas.length) toast.error(`Não deu pra sincronizar ${falhas.length}: ${falhas[0]}`);
+    load();
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold flex-1" style={{ color: 'var(--ap-text-1)' }}>Números WhatsApp</h2>
-        {can('integrations.connections.write') && (
-          <Link to="/integracoes/conexoes" className="btn-primary inline-flex items-center gap-1.5">
-            <Phone size={14} /> Conectar número (wizard)
-          </Link>
-        )}
+  const conectar = can('integrations.connections.write') && (
+    <Button
+      variant="primary"
+      icon="plus"
+      title="O cadastro de um número novo é feito pela conexão, em Integrações"
+      onClick={() => navigate('/integracoes/conexoes')}
+    >
+      Conectar número
+    </Button>
+  );
+
+  const columns = [
+    { key: 'name', header: 'Número', render: (n) => (
+      <div className="min-w-0">
+        <p style={{ fontWeight: 500, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">{n.name}</p>
+        <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }} className="truncate">
+          {n.phone ? formatPhone(n.phone) : 'número ainda não sincronizado'}
+          {n.display_name ? ` · ${n.display_name}` : ''}
+        </p>
       </div>
-
-      {loading ? (
-        <div className="py-10 text-center"><Loader2 size={18} className="animate-spin inline" /></div>
-      ) : items.length === 0 ? (
-        <EmptyState
-          icon={Phone}
-          title="Nenhum número conectado"
-          description="Conecte um número pela conexão 'WhatsApp (Meta Cloud API)' em Integrações → Conexões (modo manual até a aprovação do App Meta pro Embedded Signup)."
-        />
-      ) : (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {items.map((n) => {
-            const st = STATUS_LABEL[n.status] || STATUS_LABEL.PENDING_AUTH;
-            const q = QUALITY[n.quality_rating] || QUALITY.UNKNOWN;
-            return (
-              <div key={n.id} className="rounded-xl p-4 space-y-3"
-                style={{ backgroundColor: 'var(--ap-surface)', border: '1px solid var(--ap-border)' }}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--ap-text-1)' }}>{n.name}</p>
-                    <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-                      {n.display_name || '—'} · {n.phone ? formatPhone(n.phone) : 'número não sincronizado'}
-                    </p>
-                  </div>
-                  <Badge variant={st.variant}>{st.label}</Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <Star size={13} style={{ color: q.color }} />
-                    <span style={{ color: 'var(--ap-text-2)' }}>Qualidade: <b style={{ color: q.color }}>{q.label}</b></span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Signal size={13} style={{ color: 'var(--ap-text-4)' }} />
-                    <span style={{ color: 'var(--ap-text-2)' }}>
-                      {MESSAGING_LIMIT_LABEL[n.messaging_limit] || 'Limite desconhecido'}
-                    </span>
-                  </div>
-                  <div style={{ color: 'var(--ap-text-3)' }}>Templates: {n.templates_count ?? 0}</div>
-                  <div style={{ color: 'var(--ap-text-3)' }}>
-                    Health: {n.last_health_ok === null || n.last_health_ok === undefined ? '—' : n.last_health_ok ? 'OK' : 'Falhou'}
-                  </div>
-                  <div className="col-span-2" style={{ color: 'var(--ap-text-4)' }}>
-                    Última sync: {n.last_sync_at ? formatDateTime(n.last_sync_at) : 'nunca'} (automática a cada 10 min)
-                  </div>
-                  {(n.department || n.is_default || (n.tags || []).length > 0) && (
-                    <div className="col-span-2 flex flex-wrap gap-1">
-                      {n.is_default && <Badge variant="blue">Padrão</Badge>}
-                      {n.department && <Badge variant="gray">{n.department}</Badge>}
-                      {(n.tags || []).map((t) => <Badge key={t} variant="gray">{t}</Badge>)}
-                    </div>
-                  )}
-                  {n.last_sync_error && (
-                    <p className="col-span-2 text-red-400">{n.last_sync_error}</p>
-                  )}
-                  {n.status_detail && !n.last_sync_error && (
-                    <p className="col-span-2" style={{ color: 'var(--ap-text-4)' }}>{n.status_detail}</p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    title="Consulta a Meta agora (status, qualidade, limite, templates)"
-                    className="btn-secondary inline-flex items-center gap-1.5 text-xs disabled:opacity-50"
-                    style={{ minHeight: 36 }}
-                    disabled={syncing === n.id || n.status !== 'ACTIVE'}
-                    onClick={() => handleSync(n)}
-                  >
-                    {syncing === n.id ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                    Sincronizar agora
-                  </button>
-                  {can('integrations.connections.read') && (
-                    <Link to="/integracoes/conexoes" className="text-xs underline" style={{ color: 'var(--ap-text-3)' }}>
-                      Gerenciar conexão
-                    </Link>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+    ) },
+    { key: 'status', header: 'Situação', render: (n) => {
+      const st = STATUS_LABEL[n.status] || STATUS_LABEL.PENDING_AUTH;
+      return (
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-1">
+            <Badge tone={statusToTone(st.variant)}>{st.label}</Badge>
+            {n.is_default && <Badge tone="info">padrão</Badge>}
+          </div>
+          {n.last_sync_error && (
+            <p style={{ fontSize: 11, margin: 0, color: 'var(--su-danger-fg)' }}>{n.last_sync_error}</p>
+          )}
+          {!n.last_sync_error && n.status_detail && (
+            <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>{n.status_detail}</p>
+          )}
         </div>
+      );
+    } },
+    { key: 'quality', header: 'Qualidade', render: (n) => {
+      const q = QUALITY[n.quality_rating] || QUALITY.UNKNOWN;
+      return <Badge tone={statusToTone(q.variant)}>{q.label}</Badge>;
+    } },
+    { key: 'limit', header: 'Pode enviar', render: (n) => MESSAGING_LIMIT_LABEL[n.messaging_limit] || 'não informado pela Meta' },
+    { key: 'templates', header: 'Templates', align: 'right', render: (n) => n.templates_count ?? 0 },
+    { key: 'health', header: 'Última checagem', render: (n) => {
+      if (n.last_health_ok === null || n.last_health_ok === undefined) return '—';
+      return n.last_health_ok
+        ? <Badge tone="success">respondeu</Badge>
+        : <Badge tone="danger">não respondeu</Badge>;
+    } },
+    { key: 'sync', header: 'Sincronizado', render: (n) => (n.last_sync_at ? formatDateTime(n.last_sync_at) : 'nunca') },
+  ];
+
+  // Só oferece sincronizar quando TODA a seleção está ativa — a Meta recusa
+  // conexão desativada, e a interface deixa de propor o que não se pode fazer.
+  const bulkActions = (ids, clear) => {
+    const selecionados = items.filter((n) => ids.includes(n.id));
+    if (!selecionados.every((n) => n.status === 'ACTIVE')) return null;
+    return (
+      <Button
+        variant="ghost"
+        icon="refresh"
+        loading={syncing}
+        title="Pergunta à Meta agora: situação, qualidade, limite e templates"
+        onClick={() => handleSync(ids, clear)}
+      >
+        Sincronizar agora
+      </Button>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Números"
+        subtitle="Os números de WhatsApp conectados à Meta. A sincronização automática roda a cada 10 minutos."
+        actions={conectar}
+      />
+
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
+      ) : !items.length ? (
+        <Card>
+          <EmptyState
+            icon="phone"
+            title="Nenhum número conectado"
+            description="Conecte um número pela conexão “WhatsApp (Meta Cloud API)”, em Integrações → Conexões. Enquanto a Meta não aprovar o cadastro rápido, a conexão é feita informando as credenciais."
+            action={conectar}
+          />
+        </Card>
+      ) : (
+        <>
+          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+            Clique num número para abrir a conexão dele em Integrações — é lá que se troca credencial e se desliga.
+          </p>
+          <DataTable
+            columns={columns}
+            rows={items}
+            getRowId={(n) => n.id}
+            onRowClick={() => navigate('/integracoes/conexoes')}
+            getRowLabel={(n) => `Abrir a conexão de ${n.name}`}
+            bulkActions={bulkActions}
+          />
+        </>
       )}
     </div>
   );

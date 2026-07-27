@@ -1,5 +1,52 @@
 # Changelog — IA Studio
 
+## v0.10.9 - 2026-07-25 (Família WhatsApp inteira no DS — 11 telas, com o chat)
+
+Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.31`**.
+
+> Feita **numa frente só**, a seu pedido. Executada em ordem segura (DS → 4 telas de configuração → contact center), com verificação arquivo por arquivo. O rollback é `git checkout v0.10.8`.
+
+### A tela de conversas ocupa a área inteira
+
+O chat calculava a própria altura: `100dvh - 8.5rem` — onde 8,5rem é a soma da barra de cima com o padding da casca. Número que erra sempre que a barra muda de altura, e erra diferente no celular. O **DS ganhou `fullBleed`** (v1.2.31): a região de conteúdo vem sem espaçamento e sem rolagem própria, e a tela ocupa a altura toda por `flex: 1`. A lista de rotas full-bleed vive no `Layout.jsx`, deliberadamente curta — hoje só `/whatsapp/conversas`.
+
+### Configuração (4 telas)
+
+- **Números** — a grade de cards virou tabela: os números ficam comparáveis lado a lado, que é o que se quer num painel de saúde ("qual está com qualidade baixa?"). **Sincronizar** saiu do card e foi pra barra de lote, aceitando vários de uma vez; só aparece quando toda a seleção está ativa (a Meta recusa conexão desativada). O erro de sincronização aparece **na tabela**, não em tooltip. A qualidade deixou de ser `#22c55e`/`#eab308`/`#ef4444` cravados.
+- **Templates** — criar virou rota (`/whatsapp/templates/novo`): o corpo é TextArea, e o formulário ganhou espaço para exemplos das variáveis e até 3 botões. A lista **não** tem linha clicável nem seleção, de propósito: template publicado na Meta não se edita, e não há exclusão na API — oferecer clique prometeria uma tela que não existe. O motivo da recusa da Meta aparece embaixo do nome. Tipo e idioma agora em português ("Utilidade", "Divulgação", "Código de acesso").
+- **Equipes e Filas** — as **três ações por linha** da equipe (lápis, pessoas, lixeira) saíram; a linha abre o editor em rota, que reúne dados **e** membros — os membros eram um terceiro modal aberto por um ícone. Desativar/reativar foi pra barra de lote, e a ação **muda de rótulo conforme a seleção**: "Desativar" se tudo está ativo, "Reativar" se tudo está inativo, **nenhuma** se a seleção mistura os dois (aí não existe ação única correta). O sininho de "alerta de incidente" era um botão cujo significado só existia no `title`; virou um `Switch` com rótulo escrito.
+- **Atendimento por IA** — o interruptor era uma pílula desenhada à mão (52×30px, `translateX` calculado, índigo cravado); virou `Switch` do DS. E **desligar passou a pedir confirmação**: ligar já pedia, desligar rodava direto no clique — e é a ação que para o atendimento automático de um canal em produção.
+
+### Contact center (7 arquivos)
+
+- **O composer foi partido por responsabilidade** — eram 640 linhas com sete grupos de estado independentes:
+  - `composer/useAudioRecorder.js` — gravar, pausar, escutar, descartar (o cleanup do microfone e do blob vive junto de quem os cria);
+  - `composer/AudioRecorderBar.jsx` — o desenho da gravação e da prévia;
+  - `composer/AttachPicker.jsx` — botão “+”, menu, inputs de arquivo e prévia do anexo;
+  - `MessageComposer.jsx` — texto, envio, janela de 24h, template e takeover.
+- **Lista e cabeçalho da conversa** — avatar com degradê verde cravado virou `Avatar` do DS; a bolinha de não lidas e a contagem por aba viraram `Badge`; `input`/`select` crus viraram os do DS. As 6 ações do cabeçalho (assumir, liberar, transferir, encerrar, reabrir, histórico) viraram `Button`/`IconButton`, com os textos na língua de quem atende ("Devolveu para o grupo", não "liberada pro pool").
+- **Histórico do atendimento** — a lista com bolinha feita à mão virou o `Timeline` do DS.
+- **Transferir** — segue Modal (campos curtos), agora dizendo o que cada destino faz: para uma pessoa a conversa passa a ser dela; para fila ou equipe volta a ficar sem dono. Avisa quando não há destino cadastrado.
+
+### O que ficou fixo de propósito
+
+As **cores da conversa** — balão verde à direita, branco à esquerda, fundo bege, tique azul de "lido" — e o **verde do botão de enviar**. Não é sobra do padrão antigo: é a convenção do WhatsApp, e o atendente passa o dia no aplicativo de verdade. Tematizar faria a mesma mensagem ter cor diferente aqui e lá. Tudo em volta (cabeçalho, ações, situação, avatar) é interface do painel e foi tematizado.
+
+**Consequência conhecida:** no tema escuro a área da conversa continua clara. Registrado como `DT-005` na dívida técnica — a decisão (imitar o WhatsApp escuro ou tematizar o balão) é sua.
+
+### O que dá pra verificar agora
+
+1. **WhatsApp → Conversas**: a tela ocupa a área inteira, sem moldura e sem faixa sobrando embaixo. Redimensione a janela: a altura acompanha (era aqui que o cálculo de 8,5rem errava).
+2. **Números**: tabela em vez de cards; marcar dois números ativos mostra **Sincronizar agora**; marcar um desativado junto faz a ação desaparecer.
+3. **Equipes**: clicar numa equipe abre a rota com dados **e** pessoas na mesma tela. Marcar uma ativa e uma inativa juntas → nenhuma ação de lote aparece.
+4. **Atendimento por IA**: desligar agora pergunta antes, e o texto diz o que acontece com as mensagens que chegarem.
+5. **Templates → Novo template**: rota própria; digite `{{1}}` no corpo e o campo de exemplos aparece exigindo um por variável.
+6. **Claro/escuro** em todas as 11 — exceto a área da conversa, pelo motivo acima.
+
+### O que só dá pra verificar com conversa real
+
+Assumir, liberar, transferir, encerrar e reabrir; o takeover ("assumir ao responder"); enviar texto, anexo e áudio; o aviso da janela de 24h e o envio por template; o "digitando…" no aparelho do cliente; e o histórico do atendimento.
+
 ## v0.10.8 - 2026-07-25 (Degradê do card igual ao do console — os valores, não a impressão)
 
 Sem `db push`. Só frontend. Bump `@studio-ux-ds/*` para **`^1.2.30`**.
