@@ -1,5 +1,30 @@
 # Changelog — IA Studio
 
+## v0.10.17 - 2026-07-26 (Fim do legado visual — a pasta `components/ui` morreu)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.37` → **`^1.2.38`** (`PhoneInput` com seletor de país de verdade).
+
+**Não sobrou nada do padrão antigo no código vivo.** A pendência que restava era o telefone; ela caiu, e com ela a pasta inteira.
+
+### Mudado
+
+- **O `PhoneInput` agora é o do DS** (v1.2.38), com seletor de país, busca, máscara por país e teto de dígitos — era a única razão para manter `components/ui`. O do DS era só a casca até aqui; ganhou o seletor de verdade, então o local perdeu a razão de existir.
+- **`components/ui/` ficou sem nenhum consumidor** — os 8 arquivos (Modal, Table, Tabs, FormField, ConfirmDialog, EmptyState, StatCard, PhoneInput) só são referenciados pelos 4 órfãos que já estavam marcados para exclusão.
+- **`Layout.jsx` passou a usar o `Badge` do DS** e o mapa de ambiente declara **`tone`** direto (produção/homologação/desenvolvimento), fechando o último uso de `ui/Table` em código vivo.
+- **Últimos `--ap-*` do código vivo traduzidos** para os tokens do DS: `Layout.jsx` (seletor de workspace e marca), `ProtectedRoute.jsx` e `Dashboard.jsx`. Sobraram duas menções em **comentário** (histórico do que foi consertado) — texto, não estilo.
+
+### Pendência sua (comando no fim)
+
+- **13 arquivos órfãos** para excluir: os 8 de `components/ui/`, `components/Layout/Header.jsx`, `Sidebar.jsx`, `NotificationsBell.jsx` e os dois modais de assistente (`pages/IA/editor/AgentEditorModal.jsx`, `AgentExecuteModal.jsx`). Nenhum é importado por código vivo — conferido arquivo por arquivo.
+  - Junto vai a decisão do **dropdown do sino**: o `NotificationsBell.jsx` era a referência viva para trazê-lo de volta num `Drawer`. Excluindo, o caminho é o histórico do git — resgatável, mas com atrito. Se você quer o dropdown, é frente própria e o arquivo fica; se não quer, ele cai com os outros.
+
+### O que dá pra verificar agora
+
+1. **Pessoas → Nova pessoa → WhatsApp para avisos**: o seletor de país abre, busca por nome/DDI/código funciona, e trocar de Brasil para um país de menos dígitos corta o excedente.
+2. **Barra de cima**: o selo de ambiente (Produção/Homologação/Desenvolvimento) continua colorido, agora pelo papel semântico.
+3. **Seletor de workspace** e o **Dashboard**: mesma aparência, agora sobre tokens do DS — vale conferir no claro e no escuro, porque foi tradução de variável.
+
+
 ## v0.10.16 - 2026-07-26 (A última família — e o painel inteiro no Studio UX)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.36` → **`^1.2.37`** (`Checkbox indeterminate`, `ProgressBar tone`, `Button block`, glifos `history` e `upload`).

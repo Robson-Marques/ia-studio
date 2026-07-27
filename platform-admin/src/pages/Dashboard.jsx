@@ -49,7 +49,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} />
+        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
       </div>
     );
   }
@@ -115,15 +115,15 @@ export default function Dashboard() {
         <div style={{ padding: 20 }}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ap-text-4)' }}>
+              <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--su-text-muted)' }}>
                 Plano atual
               </p>
-              <p className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>{planName}</p>
+              <p className="text-lg font-bold" style={{ color: 'var(--su-text-primary)' }}>{planName}</p>
             </div>
             <Badge tone={statusInfo.status}>{statusInfo.label}</Badge>
           </div>
           {trialOrExpiryText && (
-            <p className="text-xs mt-3" style={{ color: 'var(--ap-text-4)' }}>{trialOrExpiryText}</p>
+            <p className="text-xs mt-3" style={{ color: 'var(--su-text-muted)' }}>{trialOrExpiryText}</p>
           )}
         </div>
       </Card>

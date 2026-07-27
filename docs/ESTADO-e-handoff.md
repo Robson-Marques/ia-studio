@@ -60,16 +60,17 @@ armadilhas). Resumo para re-ancorar:
   **Integrações INTEIRA** (v0.10.11 — 6 arquivos viraram 9), **Recursos** e
   **Desenvolvedor** (v0.10.13) e **as 8 últimas** (v0.10.16 — pessoas, perfis, workspaces,
   auditoria, minha conta + login, aceitar convite e página de pagamento).
-- **NÃO FALTA TELA.** O painel inteiro está no DS. O `--ap-*` sobrevive só no `index.css`
-  (`--ap-accent` herda `--su-action`) e no `components/ui/PhoneInput.jsx` — mantido porque o
-  `PhoneInput` do DS é só a casca, sem o seletor de país que o CLAUDE.md exige. Lacuna do DS.
+- **NÃO FALTA TELA NEM COMPONENTE.** A pasta `components/ui/` ficou sem consumidor na v0.10.17,
+  quando o `PhoneInput` do DS ganhou seletor de país (DS v1.2.38). O `--ap-*` vive só no `index.css`
+  (`--ap-accent` herda `--su-action`). **13 arquivos órfãos** esperam o `Remove-Item` — os 8 de
+  `components/ui/`, `Header/Sidebar/NotificationsBell` e os 2 modais de assistente.
 - **A conexão tem rota própria** (v0.10.11): `/integracoes/conexoes/:id`, `/:id/editar` e `/nova`
   (que aceita `?provider=<chave>`, é assim que o Marketplace manda para lá). O `?open=<id>` da
   v0.10.10 sobrevive só como encaminhamento. "Descobrir recursos" é **aba** da conexão, não modal.
 - **Os mapas de estado de Integrações declaram `tone` direto**, sem `lib/tone.js`. É o caminho de
   saída da ponte: cada família que migrar deve fazer o mesmo. A ponte engole papel desconhecido no
   `|| 'neutral'` — foi assim que "credencial vencida" ficou cinza por meses.
-- **DS consumido: `^1.2.37`.** A migração rendeu 28 releases do próprio Studio UX — a regra é
+- **DS consumido: `^1.2.38`.** A migração rendeu 29 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
 - **Tela de trabalho contínuo usa `fullBleed`** do AppShell (v1.2.31) e `flex: 1` — **nunca**
   `calc(100dvh - Xrem)`. A lista de rotas full-bleed vive no `Layout.jsx` (`FULL_BLEED_PATHS`).

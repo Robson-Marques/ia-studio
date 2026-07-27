@@ -10,7 +10,7 @@ export default function ProtectedRoute({ children }) {
   if (checking) {
     return (
       <div className="flex items-center justify-center h-[100dvh]">
-        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} />
+        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
       </div>
     );
   }

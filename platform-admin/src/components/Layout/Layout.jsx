@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { AppShell } from '@studio-ux-ds/react';
+import { AppShell, Badge } from '@studio-ux-ds/react';
 import { useAuth } from '../../context/AuthContext';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { usePermissions } from '../../hooks/usePermissions';
-import { Badge } from '../ui/Table';
 import { getNotificationsInbox } from '../../services/automation';
 
 // Layout — casca principal do painel do cliente. Adota o AppShell do Studio UX
@@ -279,10 +278,12 @@ function buildBreadcrumb(pathname) {
   });
 }
 
+// `tone` direto (papel semântico do DS), não nome de cor: é o mesmo caminho de
+// saída da ponte `lib/tone.js` que as telas já seguem.
 const ENV_BADGE = {
-  PRODUCTION:  { label: 'Produção',        variant: 'green' },
-  STAGING:     { label: 'Homologação',     variant: 'yellow' },
-  DEVELOPMENT: { label: 'Desenvolvimento', variant: 'blue' },
+  PRODUCTION:  { label: 'Produção',        tone: 'success' },
+  STAGING:     { label: 'Homologação',     tone: 'warning' },
+  DEVELOPMENT: { label: 'Desenvolvimento', tone: 'info' },
 };
 
 // Hook — contador de notificações não-lidas. Polling 30s (mesma frequência do
@@ -399,7 +400,7 @@ export default function Layout() {
   const breadcrumb = buildBreadcrumb(location.pathname);
 
   const envInfo = environment
-    ? (ENV_BADGE[environment.kind] || { label: environment.name || environment.kind, variant: 'gray' })
+    ? (ENV_BADGE[environment.kind] || { label: environment.name || environment.kind, tone: 'neutral' })
     : null;
 
   // Workspace picker + badge de ambiente — vive no topbarContext do AppShell.
@@ -409,13 +410,13 @@ export default function Layout() {
       ref={wsButtonRef}
       onClick={toggleWsMenu}
       className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors min-h-[36px]"
-      style={{ border: '1px solid var(--ap-border)', color: 'var(--ap-text-2)', backgroundColor: 'var(--ap-surface-2)' }}
+      style={{ border: '1px solid var(--su-border-default)', color: 'var(--su-text-secondary)', backgroundColor: 'var(--su-surface-sunken)' }}
       title="Selecionar workspace"
     >
       <span className="max-w-[140px] md:max-w-[200px] truncate font-medium">
         {workspace?.name || 'Workspace'}
       </span>
-      {envInfo && <Badge variant={envInfo.variant}>{envInfo.label}</Badge>}
+      {envInfo && <Badge tone={envInfo.tone}>{envInfo.label}</Badge>}
     </button>
   ) : null;
 
@@ -430,11 +431,11 @@ export default function Layout() {
         top: wsMenuPos.top,
         left: wsMenuPos.left,
         zIndex: 1000,
-        backgroundColor: 'var(--ap-surface)',
-        border: '1px solid var(--ap-border)',
+        backgroundColor: 'var(--su-surface-raised)',
+        border: '1px solid var(--su-border-default)',
       }}
     >
-      <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ap-text-5)' }}>
+      <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--su-text-muted)' }}>
         Workspaces
       </p>
       <div className="max-h-72 overflow-y-auto pb-2">
@@ -444,8 +445,8 @@ export default function Layout() {
               onClick={() => { selectWorkspace(w.id); setWsOpen(false); }}
               className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2"
               style={{
-                color: w.id === workspace?.id ? 'var(--ap-accent)' : 'var(--ap-text-2)',
-                backgroundColor: w.id === workspace?.id ? 'var(--ap-surface-3)' : 'transparent',
+                color: w.id === workspace?.id ? 'var(--su-action)' : 'var(--su-text-secondary)',
+                backgroundColor: w.id === workspace?.id ? 'var(--su-surface-sunken)' : 'transparent',
               }}
             >
               <span className="flex-1 truncate font-medium">{w.name}</span>
@@ -461,9 +462,9 @@ export default function Layout() {
                       onClick={() => { selectEnvironment(e.id); setWsOpen(false); }}
                       className="text-[11px] px-2 py-1 rounded-md transition-colors"
                       style={{
-                        border: '1px solid var(--ap-border)',
-                        backgroundColor: on ? 'var(--ap-surface-3)' : 'transparent',
-                        color: on ? 'var(--ap-text-1)' : 'var(--ap-text-4)',
+                        border: '1px solid var(--su-border-default)',
+                        backgroundColor: on ? 'var(--su-surface-sunken)' : 'transparent',
+                        color: on ? 'var(--su-text-primary)' : 'var(--su-text-muted)',
                         fontWeight: on ? 600 : 400,
                       }}
                     >
@@ -497,8 +498,8 @@ export default function Layout() {
         <span className="text-brand text-lg font-bold" aria-hidden>·</span>
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-bold leading-tight truncate" style={{ color: 'var(--ap-text-1)' }}>IA Studio</p>
-        <p className="text-[10px] leading-tight" style={{ color: 'var(--ap-text-5)' }}>Painel do Cliente</p>
+        <p className="text-sm font-bold leading-tight truncate" style={{ color: 'var(--su-text-primary)' }}>IA Studio</p>
+        <p className="text-[10px] leading-tight" style={{ color: 'var(--su-text-muted)' }}>Painel do Cliente</p>
       </div>
     </div>
   );

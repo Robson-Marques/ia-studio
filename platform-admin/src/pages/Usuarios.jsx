@@ -2,13 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   PageHeader, Card, Tabs, DataTable, Badge, Button, Modal, ConfirmDialog, Field,
-  Input, Select, Pagination, CopyButton, EmptyState, useToast,
+  Input, Select, PhoneInput, Pagination, CopyButton, EmptyState, useToast,
 } from '@studio-ux-ds/react';
-// O `PhoneInput` do DS é só a CASCA (campo + espaço para bandeira/DDI): a lista de
-// países, a busca e a normalização são do produto, e é isso que o local tem. Usar
-// o do DS aqui perderia o seletor de país que o CLAUDE.md exige. Fica como lacuna
-// conhecida do DS — trocar quando ele ganhar o seletor de verdade.
-import PhoneInput from '../components/ui/PhoneInput';
 import { listUsers, createUser, updateUser, inactivateUser, activateUser } from '../services/users';
 import { listInvites, createInvite, revokeInvite } from '../services/invites';
 import { listProfiles } from '../services/profiles';

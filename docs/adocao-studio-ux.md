@@ -6,7 +6,7 @@
 > governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
 
-## Estado atual — painel inteiro no DS (2026-07-26, v0.10.16 / DS ^1.2.37)
+## Estado atual — legado visual extinto (2026-07-26, v0.10.17 / DS ^1.2.38)
 
 O `platform-admin` opera com a **casca AppShell do Studio UX** e o **Dashboard**
 migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
@@ -22,11 +22,12 @@ Conexões, Cofre + as três rotas que nasceram dos modais), **Recursos** e
 — com editor em rota —, workspaces, auditoria, minha conta, mais as três públicas:
 login, aceitar convite e página de pagamento).
 
-**Não resta tela no padrão antigo.** O `--ap-*` sobrevive só no `index.css` (onde
-`--ap-accent` herda `--su-action`) e no `components/ui/PhoneInput.jsx`, mantido de
-propósito: o `PhoneInput` do DS é só a casca, sem o seletor de país com
-bandeira/DDI/busca que o CLAUDE.md exige. É a lacuna conhecida do DS nessa parte.
-Desde a v0.10.3 a **cor de ação é única** no painel todo.
+**Não resta tela nem componente no padrão antigo.** A pasta `components/ui/`
+ficou sem consumidor na v0.10.17, quando o `PhoneInput` do DS ganhou o seletor de
+país de verdade (DS v1.2.38) — era a última razão para mantê-la. O `--ap-*` vive
+só no `index.css`, onde `--ap-accent` herda `--su-action` (e duas menções em
+comentário, contando o que foi consertado). Desde a v0.10.3 a **cor de ação é
+única** no painel todo.
 
 **O inspetor tem duas formas, e as duas são legítimas** (DS v1.2.24 + v0.10.4):
 `Drawer` quando não há contexto atrás para preservar (editor em lista, execução
@@ -40,7 +41,7 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
 | Item | Descrição |
 |---|---|
-| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.37`) |
+| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.38`) |
 | `.npmrc` | Aponta `@studio-ux-ds` para GitHub Packages, token via `NODE_AUTH_TOKEN` (ver abaixo) |
 | `main.jsx` | Importa `tokens.css` + `components.css`, chama `configureTheme({ namespace: 'ia-studio' })` + `applyTheme()`, envolve o app com `<ToastProvider>` do DS |
 | `ThemeContext.jsx` | Wrapper fino do mecanismo de tema do DS. Fonte única = DS (chaves namespaçadas `ia-studio_su_*`); espelha `.dark` no `<html>` para compatibilidade com telas Tailwind com `dark:`; `MutationObserver` sincroniza estado quando o AppShell/Customize trocam o tema |
@@ -165,7 +166,7 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 | 8 | Regressão do dropdown do sino de notificações — hoje o AppShell só oferece um sinal + link direto para `/automacao/notificacoes` (ADR §3). Se você quiser o dropdown de volta, precisa de sub-frente que extraia o conteúdo do `NotificationsBell.jsx` para um `<Drawer>` do DS acionado pelo `onNotifications` | Sub-frente futura, opcional |
 | 9 | ~~`DELETE` de base de conhecimento não existe no backend~~ → **movido para [`docs/divida-tecnica.md`](divida-tecnica.md) como `DT-003`**. Não é do DS: é buraco de backend que a migração só revelou. Critério do Robson em 2026-07-25: *o que não é responsabilidade do DS vive na dívida técnica do IA Studio* | — |
 | 11 | ~~`upgrade.sh` movia o marcador de versão antes de construir~~ ✅ **Resolvido na v0.9.96** (2026-07-25): `revert_checkout()` volta o repo para a versão de origem quando a falha acontece depois do checkout, com duas linhas `[ROLLBACK]` no log; e o script passou a se copiar para `/tmp` antes de tocar no git (o `git checkout` reescrevia o próprio `upgrade.sh` em execução). Registro completo em [`docs/divida-tecnica.md`](divida-tecnica.md) → Resolvidos | — |
-| 12 | **Limpeza dos backups e órfãos da migração — 25 arquivos** (24 do inventário de 2026-07-25 + **`pages/Integracoes/ConnectionWizard.jsx`**, absorvido pelo `ConexaoNova.jsx` na v0.10.11 e hoje sem nenhum importador). Inventário conferido em 2026-07-25 (nenhum deles é importado por código vivo; as únicas menções eram 3 comentários, já corrigidos): **20 `*.legacy.jsx`** (backup de rollback das famílias migradas), **`editor/NodeConfigModal.jsx`** + **`editor/ExecuteModal.jsx`** (substituídos pelo `NodeInspector`/`ExecuteDrawer` na v0.10.2) e **`lib/toast.js`** + **`components/ui/UIToastContainer.jsx`** (esvaziados no sweep do toast — 4 e 5 linhas de nada). O histórico mora no git; `.legacy` ao lado do arquivo vivo é lixo, e o CLAUDE.md proíbe. **O comando PowerShell está pronto e foi entregue ao Robson** — o ambiente do assistente cria e edita arquivo no disco dele, mas não remove. Nota: as 3 telas de log da Automação **não** têm `.legacy.jsx` (foram reescritas no lugar). | `Remove-Item` único — depende só de você considerar as famílias IA + ISP + Automação A/B validadas |
+| 12 | **Limpeza dos órfãos — 13 arquivos** (os 20 `.legacy.jsx` já foram excluídos por você). Restam: os 8 de `components/ui/` (sem consumidor desde a v0.10.17), `components/Layout/{Header,Sidebar,NotificationsBell}.jsx` e `pages/IA/editor/Agent{Editor,Execute}Modal.jsx`. **Inventário anterior — 25 arquivos** (24 do inventário de 2026-07-25 + **`pages/Integracoes/ConnectionWizard.jsx`**, absorvido pelo `ConexaoNova.jsx` na v0.10.11 e hoje sem nenhum importador). Inventário conferido em 2026-07-25 (nenhum deles é importado por código vivo; as únicas menções eram 3 comentários, já corrigidos): **20 `*.legacy.jsx`** (backup de rollback das famílias migradas), **`editor/NodeConfigModal.jsx`** + **`editor/ExecuteModal.jsx`** (substituídos pelo `NodeInspector`/`ExecuteDrawer` na v0.10.2) e **`lib/toast.js`** + **`components/ui/UIToastContainer.jsx`** (esvaziados no sweep do toast — 4 e 5 linhas de nada). O histórico mora no git; `.legacy` ao lado do arquivo vivo é lixo, e o CLAUDE.md proíbe. **O comando PowerShell está pronto e foi entregue ao Robson** — o ambiente do assistente cria e edita arquivo no disco dele, mas não remove. Nota: as 3 telas de log da Automação **não** têm `.legacy.jsx` (foram reescritas no lugar). | `Remove-Item` único — depende só de você considerar as famílias IA + ISP + Automação A/B validadas |
 | 10 | ~~`is_active` no cadastro de servidor MCP é recusado pelo backend~~ → **movido para [`docs/divida-tecnica.md`](divida-tecnica.md) como `DT-004`**. Decisão de produto, não do DS | — |
 
 ## Rollback
