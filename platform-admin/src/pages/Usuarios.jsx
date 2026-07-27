@@ -1,68 +1,82 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
-  Users as UsersIcon, Mail, Plus, Pencil, UserX, UserCheck, Copy, Trash2, Loader2,
-} from 'lucide-react';
-import Tabs from '../components/ui/Tabs';
-import Modal from '../components/ui/Modal';
-import ConfirmDialog from '../components/ui/ConfirmDialog';
-import EmptyState from '../components/ui/EmptyState';
-import { Table, Thead, Th, Tbody, Tr, Td, Badge, Pagination } from '../components/ui/Table';
-import { FormField, TextInput, Select } from '../components/ui/FormField';
+  PageHeader, Card, Tabs, DataTable, Badge, Button, Modal, ConfirmDialog, Field,
+  Input, Select, Pagination, CopyButton, EmptyState, useToast,
+} from '@studio-ux-ds/react';
+// O `PhoneInput` do DS é só a CASCA (campo + espaço para bandeira/DDI): a lista de
+// países, a busca e a normalização são do produto, e é isso que o local tem. Usar
+// o do DS aqui perderia o seletor de país que o CLAUDE.md exige. Fica como lacuna
+// conhecida do DS — trocar quando ele ganhar o seletor de verdade.
 import PhoneInput from '../components/ui/PhoneInput';
-import { useToast } from '@studio-ux-ds/react';
 import { listUsers, createUser, updateUser, inactivateUser, activateUser } from '../services/users';
 import { listInvites, createInvite, revokeInvite } from '../services/invites';
 import { listProfiles } from '../services/profiles';
 import { usePermissions } from '../hooks/usePermissions';
 import { formatDateTime } from '../lib/format';
 
-const TABS = [
-  { id: 'usuarios', label: 'Usuários', Icon: UsersIcon },
-  { id: 'convites', label: 'Convites', Icon: Mail },
+// Usuários e convites — quem entra na organização. Migrada pro DS na v0.10.16.
+//
+// Decisões de composição:
+//
+//  · **Duas abas, uma tela**: pessoa que já entrou e convite que ainda não foi
+//    aceito são o mesmo assunto ("quem tem acesso") em dois estados. As abas usam
+//    `id` (sem ele o `Tabs` do DS não marca a ativa — ver DS v1.2.33).
+//  · **Formulário de usuário e de convite ficam em Modal**: campos curtos, nada a
+//    redigir. Decisão confirmada pelo Robson nesta frente — o convite são três
+//    campos, e a pessoa só existe de verdade quando aceita.
+//  · **Ativar/inativar e revogar vão para a barra de lote**, e só aparecem quando
+//    TODA a seleção aceita a transição: oferecer "reativar" para quem já está
+//    ativo é prometer o que não faz nada.
+//  · **O link do convite usa `CopyButton`** em vez de clipboard à mão — e ele fica
+//    na linha, porque é o único jeito de a pessoa receber o convite (não há envio
+//    automático de e-mail aqui).
+
+const ABAS = [
+  { id: 'usuarios', label: 'Pessoas', icon: 'users' },
+  { id: 'convites', label: 'Convites', icon: 'mail' },
 ];
 
-const PER_PAGE = 10;
+const POR_PAGINA = 10;
 
 export default function Usuarios() {
-  const [tab, setTab] = useState('usuarios');
+  const [aba, setAba] = useState('usuarios');
   const [profiles, setProfiles] = useState([]);
 
   useEffect(() => {
-    let alive = true;
+    let vivo = true;
     listProfiles()
-      .then(({ items }) => { if (alive) setProfiles(items); })
-      .catch(() => { /* dropdown fica vazio; erro reportado nas telas */ });
-    return () => { alive = false; };
+      .then(({ items }) => { if (vivo) setProfiles(items); })
+      .catch(() => { /* o seletor fica vazio; o erro aparece ao salvar */ });
+    return () => { vivo = false; };
   }, []);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Usuários e Convites</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Gerencie quem acessa a organização e convide novas pessoas.
-        </p>
-      </div>
-      <div className="card px-5 pt-4 pb-5">
-        <Tabs items={TABS} active={tab} onChange={setTab} />
-        {tab === 'usuarios' ? <UsersTab profiles={profiles} /> : <InvitesTab profiles={profiles} />}
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Pessoas e convites"
+        subtitle="Quem tem acesso à organização, e quem foi convidado e ainda não entrou."
+      />
+      <Tabs items={ABAS} value={aba} onChange={setAba} />
+      {aba === 'usuarios' ? <AbaPessoas profiles={profiles} /> : <AbaConvites profiles={profiles} />}
     </div>
   );
 }
 
-/* ───────────────────────── Usuários ───────────────────────── */
+/* ───────────────────────── Pessoas ───────────────────────── */
 
-function UsersTab({ profiles }) {
+function AbaPessoas({ profiles }) {
   const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [confirm, setConfirm] = useState(null); // { user, action: 'inactivate'|'activate' }
-  const [acting, setActing] = useState(false);
+  const [form, setForm] = useState(null); // { editing? }
+  const [acao, setAcao] = useState(null); // { tipo: 'inativar'|'reativar', ids, clear }
+  const [agindo, setAgindo] = useState(false);
+
+  const podeEscrever = can('core.users.write');
+  const podeInativar = can('core.users.inactivate');
 
   async function load() {
     setLoading(true);
@@ -76,202 +90,199 @@ function UsersTab({ profiles }) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const paged = useMemo(
-    () => items.slice((page - 1) * PER_PAGE, page * PER_PAGE),
+  const pagina = useMemo(
+    () => items.slice((page - 1) * POR_PAGINA, page * POR_PAGINA),
     [items, page],
   );
 
-  async function handleConfirm() {
-    if (!confirm) return;
-    setActing(true);
-    try {
-      if (confirm.action === 'inactivate') {
-        await inactivateUser(confirm.user.id);
-        toast.success('Usuário inativado.');
-      } else {
-        await activateUser(confirm.user.id);
-        toast.success('Usuário reativado.');
-      }
-      setConfirm(null);
-      await load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setActing(false);
-    }
-  }
-
-  const profileName = (u) =>
+  const perfilDe = (u) =>
     u.profile?.name || u.profile_name || profiles.find((p) => p.id === u.profile_id)?.name || '—';
 
-  const isActive = (u) => u.is_active !== false && u.status !== 'INACTIVE';
+  const ativo = (u) => u.is_active !== false && u.status !== 'INACTIVE';
+
+  async function confirmar() {
+    if (!acao) return;
+    const { tipo, ids, clear } = acao;
+    setAgindo(true);
+    let ok = 0;
+    const falhas = [];
+    for (const id of ids) {
+      try {
+        if (tipo === 'inativar') await inactivateUser(id);
+        else await activateUser(id);
+        ok += 1;
+      } catch (err) {
+        falhas.push(err.message);
+      }
+    }
+    setAgindo(false);
+    setAcao(null);
+    clear?.();
+    if (ok) {
+      const verbo = tipo === 'inativar' ? 'sem acesso' : 'com acesso de volta';
+      toast.success(ok === 1 ? `Pessoa ficou ${verbo}.` : `${ok} pessoas ficaram ${verbo}.`);
+    }
+    if (falhas.length) toast.error(`${falhas.length} não deram: ${falhas[0]}`);
+    load();
+  }
+
+  const columns = [
+    { key: 'name', header: 'Pessoa', render: (u) => (
+      <div className="min-w-0">
+        <p style={{ fontWeight: 500, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">
+          {u.name || '—'}
+        </p>
+        <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }} className="truncate">{u.email}</p>
+      </div>
+    ) },
+    { key: 'profile', header: 'Perfil de acesso', render: (u) => perfilDe(u) },
+    { key: 'status', header: 'Situação', render: (u) => (
+      ativo(u) ? <Badge tone="success">com acesso</Badge> : <Badge tone="neutral">sem acesso</Badge>
+    ) },
+    { key: 'last', header: 'Última entrada', render: (u) => (u.last_login_at ? formatDateTime(u.last_login_at) : 'nunca entrou') },
+  ];
+
+  const bulkActions = (ids, clear) => {
+    const sel = items.filter((u) => ids.includes(u.id));
+    if (!sel.length) return null;
+    const uma = sel.length === 1 ? sel[0] : null;
+    return (
+      <>
+        {podeEscrever && uma && (
+          <Button variant="ghost" icon="edit" onClick={() => setForm({ editing: uma })}>Editar</Button>
+        )}
+        {podeInativar && sel.every((u) => ativo(u)) && (
+          <Button
+            variant="ghost"
+            icon="power"
+            title="Bloqueia a entrada na hora — dá para liberar de novo depois"
+            onClick={() => setAcao({ tipo: 'inativar', ids, clear })}
+          >
+            Tirar o acesso
+          </Button>
+        )}
+        {podeInativar && sel.every((u) => !ativo(u)) && (
+          <Button
+            variant="ghost"
+            icon="play"
+            title="Libera a entrada na hora"
+            onClick={() => setAcao({ tipo: 'reativar', ids, clear })}
+          >
+            Devolver o acesso
+          </Button>
+        )}
+      </>
+    );
+  };
+
+  const varias = (acao?.ids.length || 0) > 1;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>{items.length} usuário(s)</p>
-        {can('core.users.write') && (
-          <button className="btn-primary" onClick={() => { setEditing(null); setFormOpen(true); }}>
-            <Plus size={15} /> Novo usuário
-          </button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+          {items.length === 1 ? '1 pessoa' : `${items.length} pessoas`}
+        </p>
+        {podeEscrever && (
+          <Button variant="primary" icon="plus" onClick={() => setForm({})}>Nova pessoa</Button>
         )}
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
       ) : !items.length ? (
-        <EmptyState
-          icon={UsersIcon}
-          title="Nenhum usuário"
-          description="Crie um usuário ou envie um convite pela aba Convites."
-        />
+        <Card>
+          <EmptyState
+            icon="users"
+            title="Ninguém além de você"
+            description="Cadastre uma pessoa com senha inicial, ou mande um convite pela aba ao lado para ela mesma criar a senha."
+          />
+        </Card>
       ) : (
         <>
-          {/* Desktop */}
-          <div className="hidden md:block">
-            <Table>
-              <Thead>
-                <Th>Nome</Th><Th>E-mail</Th><Th>Perfil</Th><Th>Status</Th><Th>Último login</Th><Th className="text-right">Ações</Th>
-              </Thead>
-              <Tbody>
-                {paged.map((u) => (
-                  <Tr key={u.id}>
-                    <Td className="font-medium">{u.name || '—'}</Td>
-                    <Td>{u.email}</Td>
-                    <Td>{profileName(u)}</Td>
-                    <Td>
-                      <Badge variant={isActive(u) ? 'green' : 'gray'}>
-                        {isActive(u) ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </Td>
-                    <Td>{formatDateTime(u.last_login_at)}</Td>
-                    <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        {can('core.users.write') && (
-                          <button
-                            className="btn-ghost p-1.5"
-                            title="Editar usuário"
-                            onClick={() => { setEditing(u); setFormOpen(true); }}
-                          >
-                            <Pencil size={15} className="text-brand" />
-                          </button>
-                        )}
-                        {can('core.users.inactivate') && (isActive(u) ? (
-                          <button
-                            className="btn-ghost p-1.5"
-                            title="Inativar usuário (bloqueia o acesso; pode ser revertido)"
-                            onClick={() => setConfirm({ user: u, action: 'inactivate' })}
-                          >
-                            <UserX size={15} className="text-red-500" />
-                          </button>
-                        ) : (
-                          <button
-                            className="btn-ghost p-1.5"
-                            title="Reativar usuário (restaura o acesso)"
-                            onClick={() => setConfirm({ user: u, action: 'activate' })}
-                          >
-                            <UserCheck size={15} className="text-emerald-500" />
-                          </button>
-                        ))}
-                      </div>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-            <Pagination page={page} total={items.length} perPage={PER_PAGE} onPage={setPage} />
-          </div>
-
-          {/* Mobile */}
-          <div className="md:hidden divide-y" style={{ borderColor: 'var(--ap-border)' }}>
-            {paged.map((u) => (
-              <div key={u.id} className="py-3 flex items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--ap-text-1)' }}>{u.name || '—'}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--ap-text-4)' }}>{u.email}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <Badge variant={isActive(u) ? 'green' : 'gray'}>{isActive(u) ? 'Ativo' : 'Inativo'}</Badge>
-                    <span className="text-[11px]" style={{ color: 'var(--ap-text-5)' }}>{profileName(u)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {can('core.users.write') && (
-                    <button className="btn-ghost p-2.5" onClick={() => { setEditing(u); setFormOpen(true); }} aria-label="Editar">
-                      <Pencil size={16} className="text-brand" />
-                    </button>
-                  )}
-                  {can('core.users.inactivate') && (
-                    <button
-                      className="btn-ghost p-2.5"
-                      onClick={() => setConfirm({ user: u, action: isActive(u) ? 'inactivate' : 'activate' })}
-                      aria-label={isActive(u) ? 'Inativar' : 'Reativar'}
-                    >
-                      {isActive(u)
-                        ? <UserX size={16} className="text-red-500" />
-                        : <UserCheck size={16} className="text-emerald-500" />}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            <Pagination page={page} total={items.length} perPage={PER_PAGE} onPage={setPage} />
-          </div>
+          <DataTable
+            columns={columns}
+            rows={pagina}
+            getRowId={(u) => u.id}
+            bulkActions={bulkActions}
+          />
+          <Pagination
+            page={page}
+            perPage={POR_PAGINA}
+            total={items.length}
+            itemLabel={['pessoa', 'pessoas']}
+            onPage={setPage}
+          />
         </>
       )}
 
-      <UserFormModal
-        open={formOpen}
-        editing={editing}
+      <FormPessoa
+        open={Boolean(form)}
+        editing={form?.editing}
         profiles={profiles}
-        onClose={() => setFormOpen(false)}
-        onSaved={() => { setFormOpen(false); load(); }}
+        onClose={() => setForm(null)}
+        onSaved={() => { setForm(null); load(); }}
       />
 
       <ConfirmDialog
-        open={Boolean(confirm)}
-        danger={confirm?.action === 'inactivate'}
-        loading={acting}
-        title={confirm?.action === 'inactivate' ? 'Inativar usuário' : 'Reativar usuário'}
-        message={confirm?.action === 'inactivate'
-          ? `Inativar "${confirm?.user?.name || confirm?.user?.email}"? O acesso é bloqueado imediatamente; pode ser revertido depois.`
-          : `Reativar "${confirm?.user?.name || confirm?.user?.email}"? O acesso volta a funcionar imediatamente.`}
-        confirmLabel={confirm?.action === 'inactivate' ? 'Inativar' : 'Reativar'}
-        onClose={() => !acting && setConfirm(null)}
-        onConfirm={handleConfirm}
+        open={Boolean(acao)}
+        danger={acao?.tipo === 'inativar'}
+        loading={agindo}
+        title={acao?.tipo === 'inativar' ? 'Tirar o acesso' : 'Devolver o acesso'}
+        message={
+          acao?.tipo === 'inativar'
+            ? `${varias ? 'Estas pessoas' : 'Esta pessoa'} para de entrar no sistema imediatamente. O cadastro fica, e o acesso pode ser devolvido depois — nada é apagado.`
+            : `${varias ? 'Estas pessoas voltam' : 'Esta pessoa volta'} a entrar no sistema imediatamente, com o mesmo perfil de antes.`
+        }
+        confirmLabel={acao?.tipo === 'inativar' ? 'Tirar o acesso' : 'Devolver'}
+        onClose={() => !agindo && setAcao(null)}
+        onConfirm={confirmar}
       />
     </div>
   );
 }
 
-function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
+function FormPessoa({ open, editing, profiles, onClose, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState({ name: '', email: '', profile_id: '', password: '', whatsapp_phone: '' });
-  const [saving, setSaving] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setForm(editing
-      ? { name: editing.name || '', email: editing.email || '', profile_id: editing.profile_id || editing.profile?.id || '', password: '', whatsapp_phone: editing.whatsapp_phone || '' }
+      ? {
+        name: editing.name || '',
+        email: editing.email || '',
+        profile_id: editing.profile_id || editing.profile?.id || '',
+        password: '',
+        whatsapp_phone: editing.whatsapp_phone || '',
+      }
       : { name: '', email: '', profile_id: '', password: '', whatsapp_phone: '' });
   }, [open, editing]);
 
-  function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
+  const set = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }));
 
-  async function handleSave() {
-    if (!form.name.trim()) { toast.error('Nome obrigatório.'); return; }
-    if (!editing && !form.email.trim()) { toast.error('E-mail obrigatório.'); return; }
-    if (!form.profile_id) { toast.error('Selecione um perfil.'); return; }
+  async function salvar() {
+    if (!form.name.trim()) { toast.error('Informe o nome.'); return; }
+    if (!editing && !form.email.trim()) { toast.error('Informe o e-mail.'); return; }
+    if (!form.profile_id) { toast.error('Escolha o perfil de acesso.'); return; }
     if (!editing && (!form.password || form.password.length < 8)) {
-      toast.error('A senha inicial deve ter pelo menos 8 caracteres.');
+      toast.error('A senha inicial precisa de pelo menos 8 caracteres.');
       return;
     }
-    setSaving(true);
+    setSalvando(true);
     try {
       if (editing) {
-        await updateUser(editing.id, { name: form.name.trim(), profile_id: form.profile_id, whatsapp_phone: form.whatsapp_phone || null });
-        toast.success('Usuário atualizado.');
+        await updateUser(editing.id, {
+          name: form.name.trim(),
+          profile_id: form.profile_id,
+          whatsapp_phone: form.whatsapp_phone || null,
+        });
+        toast.success('Dados salvos.');
       } else {
         await createUser({
           name: form.name.trim(),
@@ -280,63 +291,63 @@ function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
           password: form.password,
           ...(form.whatsapp_phone ? { whatsapp_phone: form.whatsapp_phone } : {}),
         });
-        toast.success('Usuário criado.');
+        toast.success('Pessoa cadastrada. Passe a senha inicial para ela.');
       }
       onSaved();
     } catch (err) {
       toast.error(err.message);
     } finally {
-      setSaving(false);
+      setSalvando(false);
     }
   }
 
   return (
     <Modal
       open={open}
-      onClose={saving ? undefined : onClose}
-      dismissable={!saving}
-      title={editing ? 'Editar usuário' : 'Novo usuário'}
-      size="md"
+      onClose={salvando ? undefined : onClose}
+      title={editing ? 'Editar pessoa' : 'Nova pessoa'}
       footer={
         <>
-          <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 size={14} className="animate-spin" />} Salvar
-          </button>
+          <Button variant="secondary" disabled={salvando} onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" loading={salvando} onClick={salvar}>Salvar</Button>
         </>
       }
     >
-      <div className="space-y-3">
-        {editing && (
-          <p className="text-xs rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--ap-surface-3)', color: 'var(--ap-text-4)' }}>
-            O e-mail não pode ser alterado após a criação.
-          </p>
-        )}
-        <FormField label="Nome" required>
-          <TextInput value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Nome completo" />
-        </FormField>
-        <FormField label="E-mail" required>
-          <TextInput
+      <div className="space-y-4">
+        <Field label="Nome" required>
+          <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Nome completo" autoFocus />
+        </Field>
+        <Field
+          label="E-mail"
+          required
+          hint={editing ? 'Não muda depois do cadastro — é com ele que a pessoa entra.' : 'É com ele que a pessoa entra no sistema.'}
+        >
+          <Input
             type="email"
             value={form.email}
             onChange={(e) => set('email', e.target.value)}
             placeholder="pessoa@empresa.com"
             disabled={Boolean(editing)}
           />
-        </FormField>
-        <FormField label="Perfil de acesso" required>
+        </Field>
+        <Field label="Perfil de acesso" required hint="Define o que ela pode fazer aqui dentro.">
           <Select value={form.profile_id} onChange={(e) => set('profile_id', e.target.value)}>
             <option value="">Selecione…</option>
             {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
-        </FormField>
-        <FormField label="WhatsApp para notificações" hint="Usado para alertas internos (ex.: incidente de rede). Deixe vazio se não recebe.">
+        </Field>
+        <Field label="WhatsApp para avisos" hint="Só para alerta interno (ex.: incidente de rede). Deixe vazio se ela não recebe.">
           <PhoneInput value={form.whatsapp_phone} onChange={(v) => set('whatsapp_phone', v)} />
-        </FormField>
+        </Field>
         {!editing && (
-          <FormField label="Senha inicial" required hint="Mínimo de 8 caracteres. O usuário pode trocar depois.">
-            <TextInput type="password" value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" />
-          </FormField>
+          <Field label="Senha inicial" required hint="Pelo menos 8 caracteres. Ela pode trocar depois, em Minha conta.">
+            <Input
+              type="password"
+              value={form.password}
+              onChange={(e) => set('password', e.target.value)}
+              autoComplete="new-password"
+            />
+          </Field>
         )}
       </div>
     </Modal>
@@ -345,14 +356,16 @@ function UserFormModal({ open, editing, profiles, onClose, onSaved }) {
 
 /* ───────────────────────── Convites ───────────────────────── */
 
-function InvitesTab({ profiles }) {
+function AbaConvites({ profiles }) {
   const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formOpen, setFormOpen] = useState(false);
-  const [revoking, setRevoking] = useState(null);
-  const [acting, setActing] = useState(false);
+  const [criando, setCriando] = useState(false);
+  const [revogar, setRevogar] = useState(null); // { ids, clear }
+  const [agindo, setAgindo] = useState(false);
+
+  const podeConvidar = can('core.invites.write');
 
   async function load() {
     setLoading(true);
@@ -366,241 +379,204 @@ function InvitesTab({ profiles }) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function inviteLink(inv) {
-    const token = inv.token || inv.invite_token || inv.id;
-    return `${window.location.origin}/convite/${token}`;
-  }
+  const linkDoConvite = (inv) => `${window.location.origin}/convite/${inv.token || inv.invite_token || inv.id}`;
 
-  async function copyLink(inv) {
-    try {
-      await navigator.clipboard.writeText(inviteLink(inv));
-      toast.success('Link do convite copiado.');
-    } catch {
-      toast.error('Não foi possível copiar o link.');
-    }
-  }
-
-  async function handleRevoke() {
-    if (!revoking) return;
-    setActing(true);
-    try {
-      await revokeInvite(revoking.id);
-      toast.success('Convite revogado.');
-      setRevoking(null);
-      await load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setActing(false);
-    }
-  }
-
-  const profileName = (inv) =>
+  const perfilDe = (inv) =>
     inv.profile?.name || inv.profile_name || profiles.find((p) => p.id === inv.profile_id)?.name || '—';
 
-  const statusBadge = (inv) => {
-    const s = inv.status || (inv.accepted_at ? 'ACCEPTED' : 'PENDING');
-    if (s === 'ACCEPTED') return <Badge variant="green">Aceito</Badge>;
-    if (s === 'REVOKED')  return <Badge variant="gray">Revogado</Badge>;
-    if (s === 'EXPIRED')  return <Badge variant="red">Expirado</Badge>;
-    return <Badge variant="yellow">Pendente</Badge>;
+  const situacao = (inv) => inv.status || (inv.accepted_at ? 'ACCEPTED' : 'PENDING');
+  const pendente = (inv) => situacao(inv) === 'PENDING';
+
+  const badge = (inv) => {
+    const s = situacao(inv);
+    if (s === 'ACCEPTED') return <Badge tone="success">aceito</Badge>;
+    if (s === 'REVOKED') return <Badge tone="neutral">cancelado</Badge>;
+    if (s === 'EXPIRED') return <Badge tone="danger">venceu</Badge>;
+    return <Badge tone="warning">esperando</Badge>;
   };
 
-  const isPending = (inv) => {
-    const s = inv.status || (inv.accepted_at ? 'ACCEPTED' : 'PENDING');
-    return s === 'PENDING';
+  async function confirmarRevogacao() {
+    if (!revogar) return;
+    const { ids, clear } = revogar;
+    setAgindo(true);
+    let ok = 0;
+    const falhas = [];
+    for (const id of ids) {
+      try { await revokeInvite(id); ok += 1; }
+      catch (err) { falhas.push(err.message); }
+    }
+    setAgindo(false);
+    setRevogar(null);
+    clear?.();
+    if (ok) toast.success(ok === 1 ? 'Convite cancelado.' : `${ok} convites cancelados.`);
+    if (falhas.length) toast.error(`${falhas.length} não deram: ${falhas[0]}`);
+    load();
+  }
+
+  const columns = [
+    { key: 'email', header: 'Convidado', render: (inv) => (
+      <span style={{ fontWeight: 500, color: 'var(--su-text-primary)' }}>{inv.email}</span>
+    ) },
+    { key: 'profile', header: 'Vai entrar como', render: (inv) => perfilDe(inv) },
+    { key: 'status', header: 'Situação', render: (inv) => badge(inv) },
+    { key: 'created', header: 'Convidado em', render: (inv) => formatDateTime(inv.created_at) },
+    // O link fica na linha porque é o único caminho para a pessoa receber o
+    // convite — o sistema não dispara e-mail por conta.
+    { key: 'link', header: 'Link', align: 'right', render: (inv) => (
+      pendente(inv)
+        ? <CopyButton value={linkDoConvite(inv)} title="Copiar o link deste convite" />
+        : <span style={{ color: 'var(--su-text-muted)' }}>—</span>
+    ) },
+  ];
+
+  const bulkActions = (ids, clear) => {
+    if (!podeConvidar) return null;
+    const sel = items.filter((inv) => ids.includes(inv.id));
+    if (!sel.length || !sel.every(pendente)) return null;
+    return (
+      <Button
+        variant="ghost"
+        icon="trash"
+        title="O link para de funcionar na hora"
+        onClick={() => setRevogar({ ids, clear })}
+      >
+        Cancelar convite
+      </Button>
+    );
   };
+
+  const varios = (revogar?.ids.length || 0) > 1;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>{items.length} convite(s)</p>
-        {can('core.invites.write') && (
-          <button className="btn-primary" onClick={() => setFormOpen(true)}>
-            <Plus size={15} /> Novo convite
-          </button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+          {items.length === 1 ? '1 convite' : `${items.length} convites`}
+        </p>
+        {podeConvidar && (
+          <Button variant="primary" icon="plus" onClick={() => setCriando(true)}>Novo convite</Button>
         )}
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
       ) : !items.length ? (
-        <EmptyState
-          icon={Mail}
-          title="Nenhum convite"
-          description="Convide alguém informando e-mail e perfil de acesso."
-        />
+        <Card>
+          <EmptyState
+            icon="mail"
+            title="Nenhum convite"
+            description="No convite você escolhe o e-mail e o perfil; a pessoa cria a própria senha ao aceitar. O link tem que ser enviado por você — o sistema não manda e-mail sozinho."
+          />
+        </Card>
       ) : (
-        <>
-          {/* Desktop */}
-          <div className="hidden md:block">
-            <Table>
-              <Thead>
-                <Th>E-mail</Th><Th>Perfil</Th><Th>Status</Th><Th>Criado em</Th><Th className="text-right">Ações</Th>
-              </Thead>
-              <Tbody>
-                {items.map((inv) => (
-                  <Tr key={inv.id}>
-                    <Td className="font-medium">{inv.email}</Td>
-                    <Td>{profileName(inv)}</Td>
-                    <Td>{statusBadge(inv)}</Td>
-                    <Td>{formatDateTime(inv.created_at)}</Td>
-                    <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        {isPending(inv) && (
-                          <button className="btn-ghost p-1.5" title="Copiar link do convite" onClick={() => copyLink(inv)}>
-                            <Copy size={15} className="text-brand" />
-                          </button>
-                        )}
-                        {can('core.invites.write') && isPending(inv) && (
-                          <button
-                            className="btn-ghost p-1.5"
-                            title="Revogar convite (o link deixa de funcionar)"
-                            onClick={() => setRevoking(inv)}
-                          >
-                            <Trash2 size={15} className="text-red-500" />
-                          </button>
-                        )}
-                      </div>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </div>
-
-          {/* Mobile */}
-          <div className="md:hidden divide-y" style={{ borderColor: 'var(--ap-border)' }}>
-            {items.map((inv) => (
-              <div key={inv.id} className="py-3 flex items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--ap-text-1)' }}>{inv.email}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    {statusBadge(inv)}
-                    <span className="text-[11px]" style={{ color: 'var(--ap-text-5)' }}>{profileName(inv)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {isPending(inv) && (
-                    <button className="btn-ghost p-2.5" onClick={() => copyLink(inv)} aria-label="Copiar link">
-                      <Copy size={16} className="text-brand" />
-                    </button>
-                  )}
-                  {can('core.invites.write') && isPending(inv) && (
-                    <button className="btn-ghost p-2.5" onClick={() => setRevoking(inv)} aria-label="Revogar">
-                      <Trash2 size={16} className="text-red-500" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <DataTable
+          columns={columns}
+          rows={items}
+          getRowId={(inv) => inv.id}
+          bulkActions={bulkActions}
+        />
       )}
 
-      <InviteFormModal
-        open={formOpen}
+      <FormConvite
+        open={criando}
         profiles={profiles}
-        onClose={() => setFormOpen(false)}
+        onClose={() => setCriando(false)}
         onSaved={() => load()}
       />
 
       <ConfirmDialog
-        open={Boolean(revoking)}
+        open={Boolean(revogar)}
         danger
-        loading={acting}
-        title="Revogar convite"
-        message={`Revogar o convite para "${revoking?.email}"? O link deixa de funcionar imediatamente.`}
-        confirmLabel="Revogar"
-        onClose={() => !acting && setRevoking(null)}
-        onConfirm={handleRevoke}
+        loading={agindo}
+        title="Cancelar convite"
+        message={
+          varios
+            ? `Cancelar os ${revogar.ids.length} convites selecionados? Os links param de funcionar na hora — se a pessoa tentar usar, não entra.`
+            : 'Cancelar este convite? O link para de funcionar na hora — se a pessoa tentar usar, não entra. Dá para convidar de novo depois.'
+        }
+        confirmLabel="Cancelar convite"
+        onClose={() => !agindo && setRevogar(null)}
+        onConfirm={confirmarRevogacao}
       />
     </div>
   );
 }
 
-function InviteFormModal({ open, profiles, onClose, onSaved }) {
+function FormConvite({ open, profiles, onClose, onSaved }) {
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [profileId, setProfileId] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [createdLink, setCreatedLink] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [link, setLink] = useState('');
 
   useEffect(() => {
-    if (open) { setEmail(''); setProfileId(''); setCreatedLink(''); }
+    if (open) { setEmail(''); setProfileId(''); setLink(''); }
   }, [open]);
 
-  async function handleSave() {
+  async function salvar() {
     if (!email.trim()) { toast.error('Informe o e-mail.'); return; }
-    if (!profileId) { toast.error('Selecione um perfil.'); return; }
-    setSaving(true);
+    if (!profileId) { toast.error('Escolha o perfil de acesso.'); return; }
+    setSalvando(true);
     try {
       const inv = await createInvite({ email: email.trim(), profile_id: profileId });
       const token = inv?.token || inv?.invite_token || inv?.id;
-      setCreatedLink(`${window.location.origin}/convite/${token}`);
-      toast.success('Convite criado. Copie o link e envie para a pessoa.');
+      setLink(`${window.location.origin}/convite/${token}`);
       onSaved();
     } catch (err) {
       toast.error(err.message);
     } finally {
-      setSaving(false);
-    }
-  }
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(createdLink);
-      toast.success('Link copiado.');
-    } catch {
-      toast.error('Não foi possível copiar o link.');
+      setSalvando(false);
     }
   }
 
   return (
     <Modal
       open={open}
-      onClose={saving ? undefined : onClose}
-      dismissable={!saving}
+      onClose={salvando ? undefined : onClose}
       title="Novo convite"
-      size="md"
       footer={
-        createdLink ? (
-          <button className="btn-primary" onClick={onClose}>Concluir</button>
+        link ? (
+          <Button variant="primary" onClick={onClose}>Pronto</Button>
         ) : (
           <>
-            <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
-            <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 size={14} className="animate-spin" />} Criar convite
-            </button>
+            <Button variant="secondary" disabled={salvando} onClick={onClose}>Cancelar</Button>
+            <Button variant="primary" loading={salvando} onClick={salvar}>Criar convite</Button>
           </>
         )
       }
     >
-      {createdLink ? (
+      {link ? (
         <div className="space-y-3">
-          <p className="text-sm" style={{ color: 'var(--ap-text-2)' }}>
-            Convite criado. Envie este link para a pessoa concluir o cadastro:
+          <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
+            Convite criado. <strong>Envie este link para a pessoa</strong> — o sistema não manda e-mail sozinho, e sem o
+            link ela não tem como entrar.
           </p>
           <div className="flex items-center gap-2">
-            <TextInput value={createdLink} readOnly onFocus={(e) => e.target.select()} />
-            <button className="btn-secondary shrink-0" onClick={copy} title="Copiar link">
-              <Copy size={15} />
-            </button>
+            <Input value={link} readOnly onFocus={(e) => e.target.select()} style={{ flex: 1, fontSize: 12 }} />
+            <CopyButton
+              value={link}
+              label="Copiar"
+              variant="secondary"
+              size="md"
+              onCopied={(ok) => { if (!ok) toast.error('Não deu para copiar — selecione e copie à mão antes de fechar.'); }}
+            />
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          <FormField label="E-mail" required>
-            <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pessoa@empresa.com" autoFocus />
-          </FormField>
-          <FormField label="Perfil de acesso" required>
+        <div className="space-y-4">
+          <Field label="E-mail" required hint="É com este e-mail que a pessoa vai entrar.">
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pessoa@empresa.com" autoFocus />
+          </Field>
+          <Field label="Vai entrar como" required hint="O perfil define o que ela pode fazer.">
             <Select value={profileId} onChange={(e) => setProfileId(e.target.value)}>
               <option value="">Selecione…</option>
               {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
-          </FormField>
+          </Field>
         </div>
       )}
     </Modal>

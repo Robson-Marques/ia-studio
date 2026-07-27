@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import ContaSenha from './pages/ContaSenha';
 import Usuarios from './pages/Usuarios';
 import PerfisAcesso from './pages/PerfisAcesso';
+import PerfilEditor from './pages/PerfilEditor';
 import Workspaces from './pages/Workspaces';
 import Auditoria from './pages/Auditoria';
 import MinhaConta from './pages/MinhaConta';
@@ -99,6 +100,9 @@ export default function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/usuarios" element={<PermissionRoute perm="core.users.read"><Usuarios /></PermissionRoute>} />
                 <Route path="/perfis" element={<PermissionRoute perm="core.profiles.read"><PerfisAcesso /></PermissionRoute>} />
+                {/* `novo` antes de `:id` — senão a rota dinâmica trata "novo" como um id. */}
+                <Route path="/perfis/novo" element={<PermissionRoute perm="core.profiles.write"><PerfilEditor /></PermissionRoute>} />
+                <Route path="/perfis/:id" element={<PermissionRoute perm="core.profiles.read"><PerfilEditor /></PermissionRoute>} />
                 <Route path="/workspaces" element={<PermissionRoute perm="core.workspaces.read"><Workspaces /></PermissionRoute>} />
                 <Route path="/auditoria" element={<PermissionRoute perm="core.audit.read"><Auditoria /></PermissionRoute>} />
                 <Route path="/minha-conta" element={<MinhaConta />} />

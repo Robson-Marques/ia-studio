@@ -1,36 +1,43 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldCheck, Plus, Pencil, Trash2, Loader2, Lock } from 'lucide-react';
-import Modal from '../components/ui/Modal';
-import ConfirmDialog from '../components/ui/ConfirmDialog';
-import EmptyState from '../components/ui/EmptyState';
-import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../components/ui/Table';
-import { FormField, TextInput, Textarea } from '../components/ui/FormField';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import {
-  listProfiles, createProfile, updateProfile, deleteProfile, getPermissionsCatalog,
-} from '../services/profiles';
+  PageHeader, Card, DataTable, Badge, Button, ConfirmDialog, EmptyState, useToast,
+} from '@studio-ux-ds/react';
+import { listProfiles, deleteProfile } from '../services/profiles';
 import { usePermissions } from '../hooks/usePermissions';
-import { useToast } from '@studio-ux-ds/react';
+
+// Perfis de acesso — os conjuntos de permissão que se atribuem às pessoas.
+// Migrada pro DS na v0.10.16.
+//
+// Decisões de composição:
+//
+//  · **O editor virou rota** (`/perfis/novo` e `/perfis/:id`). Era um Modal `lg`
+//    com o catálogo INTEIRO de permissões dentro — dezenas de opções em grupos,
+//    com rolagem dentro da rolagem. Compor um perfil é trabalho, não confirmação.
+//  · **A linha abre o perfil**, inclusive os de sistema: eles abrem em leitura
+//    (é útil ver o que o "Administrador" pode antes de copiar a ideia num perfil
+//    próprio). O legado sinalizava isso com um cadeado no lugar do lápis, o que
+//    fazia a mesma coluna significar duas coisas.
+//  · **Excluir na barra de lote**, e só para perfis personalizados: perfil de
+//    sistema não se apaga, então oferecer a ação seria prometer o que falha.
 
 export default function PerfisAcesso() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
-  const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [deleting, setDeleting] = useState(null);
-  const [acting, setActing] = useState(false);
+  const [excluir, setExcluir] = useState(null); // { ids, clear }
+  const [excluindo, setExcluindo] = useState(false);
+
+  const podeEscrever = can('core.profiles.write');
 
   async function load() {
     setLoading(true);
     try {
-      const [{ items: list }, cat] = await Promise.all([
-        listProfiles(),
-        getPermissionsCatalog(),
-      ]);
+      const { items: list } = await listProfiles();
       setItems(list);
-      setCatalog(cat);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -38,289 +45,121 @@ export default function PerfisAcesso() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isSystem = (p) => Boolean(p.is_system || p.system);
+  const deSistema = (p) => Boolean(p.is_system || p.system);
 
-  async function handleDelete() {
-    if (!deleting) return;
-    setActing(true);
-    try {
-      await deleteProfile(deleting.id);
-      toast.success('Perfil excluído.');
-      setDeleting(null);
-      await load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setActing(false);
+  async function confirmarExclusao() {
+    if (!excluir) return;
+    const { ids, clear } = excluir;
+    setExcluindo(true);
+    let ok = 0;
+    const falhas = [];
+    for (const id of ids) {
+      try { await deleteProfile(id); ok += 1; }
+      catch (err) { falhas.push(err.message); }
     }
+    setExcluindo(false);
+    setExcluir(null);
+    clear?.();
+    if (ok) toast.success(ok === 1 ? 'Perfil excluído.' : `${ok} perfis excluídos.`);
+    if (falhas.length) toast.error(`${falhas.length} não deram: ${falhas[0]}`);
+    load();
   }
 
+  const novo = podeEscrever && (
+    <Button variant="primary" icon="plus" onClick={() => navigate('/perfis/novo')}>Novo perfil</Button>
+  );
+
+  const columns = [
+    { key: 'name', header: 'Perfil', render: (p) => (
+      <div className="min-w-0">
+        <p style={{ fontWeight: 500, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">{p.name}</p>
+        {p.description && (
+          <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }} className="truncate">{p.description}</p>
+        )}
+      </div>
+    ) },
+    { key: 'perms', header: 'Permissões', align: 'right', render: (p) => (
+      Array.isArray(p.permissions) ? p.permissions.length : '—'
+    ) },
+    { key: 'kind', header: 'Origem', render: (p) => (
+      deSistema(p)
+        ? <Badge tone="info">da plataforma</Badge>
+        : <Badge tone="neutral">criado aqui</Badge>
+    ) },
+  ];
+
+  // Perfil de sistema não se apaga — a plataforma o mantém.
+  const bulkActions = (ids, clear) => {
+    if (!podeEscrever) return null;
+    const sel = items.filter((p) => ids.includes(p.id));
+    if (!sel.length || sel.some(deSistema)) return null;
+    return (
+      <Button
+        variant="ghost"
+        icon="trash"
+        title="Apaga o perfil — quem estiver nele precisa ser movido antes"
+        onClick={() => setExcluir({ ids, clear })}
+      >
+        Excluir
+      </Button>
+    );
+  };
+
+  const varios = (excluir?.ids.length || 0) > 1;
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Perfis de Acesso</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-            Perfis agrupam permissões. Perfis de sistema não podem ser editados.
-          </p>
-        </div>
-        {can('core.profiles.write') && (
-          <button className="btn-primary" onClick={() => { setEditing(null); setFormOpen(true); }}>
-            <Plus size={15} /> Novo perfil
-          </button>
-        )}
-      </div>
-
-      <div className="card overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
-        ) : !items.length ? (
-          <EmptyState icon={ShieldCheck} title="Nenhum perfil" description="Crie um perfil para atribuir permissões aos usuários." />
-        ) : (
-          <>
-            {/* Desktop */}
-            <div className="hidden md:block">
-              <Table>
-                <Thead>
-                  <Th>Nome</Th><Th>Descrição</Th><Th>Permissões</Th><Th>Tipo</Th><Th className="text-right">Ações</Th>
-                </Thead>
-                <Tbody>
-                  {items.map((p) => (
-                    <Tr key={p.id}>
-                      <Td className="font-medium">{p.name}</Td>
-                      <Td>{p.description || '—'}</Td>
-                      <Td>{Array.isArray(p.permissions) ? p.permissions.length : '—'}</Td>
-                      <Td>
-                        {isSystem(p)
-                          ? <Badge variant="blue">Sistema</Badge>
-                          : <Badge variant="gray">Personalizado</Badge>}
-                      </Td>
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            className="btn-ghost p-1.5"
-                            title={isSystem(p) ? 'Visualizar permissões (perfil de sistema, somente leitura)' : 'Editar perfil'}
-                            onClick={() => { setEditing(p); setFormOpen(true); }}
-                          >
-                            {isSystem(p) ? <Lock size={15} style={{ color: 'var(--ap-text-4)' }} /> : <Pencil size={15} className="text-brand" />}
-                          </button>
-                          {can('core.profiles.write') && !isSystem(p) && (
-                            <button
-                              className="btn-ghost p-1.5"
-                              title="Excluir perfil (usuários vinculados precisam ser movidos antes)"
-                              onClick={() => setDeleting(p)}
-                            >
-                              <Trash2 size={15} className="text-red-500" />
-                            </button>
-                          )}
-                        </div>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </div>
-
-            {/* Mobile */}
-            <div className="md:hidden divide-y px-4" style={{ borderColor: 'var(--ap-border)' }}>
-              {items.map((p) => (
-                <div key={p.id} className="py-3 flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--ap-text-1)' }}>{p.name}</p>
-                    <p className="text-xs truncate" style={{ color: 'var(--ap-text-4)' }}>{p.description || '—'}</p>
-                    <div className="mt-1.5">
-                      {isSystem(p) ? <Badge variant="blue">Sistema</Badge> : <Badge variant="gray">Personalizado</Badge>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button className="btn-ghost p-2.5" onClick={() => { setEditing(p); setFormOpen(true); }} aria-label="Editar">
-                      {isSystem(p) ? <Lock size={16} style={{ color: 'var(--ap-text-4)' }} /> : <Pencil size={16} className="text-brand" />}
-                    </button>
-                    {can('core.profiles.write') && !isSystem(p) && (
-                      <button className="btn-ghost p-2.5" onClick={() => setDeleting(p)} aria-label="Excluir">
-                        <Trash2 size={16} className="text-red-500" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      <ProfileFormModal
-        open={formOpen}
-        editing={editing}
-        catalog={catalog}
-        readOnly={editing ? isSystem(editing) : false}
-        onClose={() => setFormOpen(false)}
-        onSaved={() => { setFormOpen(false); load(); }}
+    <div className="space-y-6">
+      <PageHeader
+        title="Perfis de acesso"
+        subtitle="Cada perfil é um conjunto de permissões. Os que vêm da plataforma podem ser consultados, mas não alterados."
+        actions={novo}
       />
+
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
+      ) : !items.length ? (
+        <Card>
+          <EmptyState
+            icon="lock"
+            title="Nenhum perfil"
+            description="Crie um perfil para poder dar acesso a alguém — ninguém entra no sistema sem estar em um."
+            action={novo}
+          />
+        </Card>
+      ) : (
+        <>
+          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+            Clique num perfil para ver ou mudar o que ele libera.
+          </p>
+          <DataTable
+            columns={columns}
+            rows={items}
+            getRowId={(p) => p.id}
+            onRowClick={(p) => navigate(`/perfis/${p.id}`)}
+            getRowLabel={(p) => `Abrir o perfil ${p.name}`}
+            bulkActions={bulkActions}
+          />
+        </>
+      )}
 
       <ConfirmDialog
-        open={Boolean(deleting)}
+        open={Boolean(excluir)}
         danger
-        loading={acting}
+        loading={excluindo}
         title="Excluir perfil"
-        message={`Excluir o perfil "${deleting?.name}"? Esta ação não pode ser desfeita.`}
+        message={
+          varios
+            ? `Excluir os ${excluir.ids.length} perfis selecionados? Isso não tem como desfazer, e quem estiver em qualquer um deles precisa ser movido para outro perfil primeiro — senão a exclusão falha.`
+            : 'Excluir este perfil? Isso não tem como desfazer, e quem estiver nele precisa ser movido para outro perfil primeiro — senão a exclusão falha.'
+        }
         confirmLabel="Excluir"
-        onClose={() => !acting && setDeleting(null)}
-        onConfirm={handleDelete}
+        onClose={() => !excluindo && setExcluir(null)}
+        onConfirm={confirmarExclusao}
       />
     </div>
-  );
-}
-
-function ProfileFormModal({ open, editing, catalog, readOnly, onClose, onSaved }) {
-  const toast = useToast();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [selected, setSelected] = useState(() => new Set());
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setName(editing?.name || '');
-    setDescription(editing?.description || '');
-    setSelected(new Set(Array.isArray(editing?.permissions) ? editing.permissions : []));
-  }, [open, editing]);
-
-  const totalSelected = selected.size;
-
-  function togglePerm(key) {
-    if (readOnly) return;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  // Master checkbox por grupo: marca/desmarca todas as perms do grupo.
-  function toggleGroup(group) {
-    if (readOnly) return;
-    const keys = group.permissions.map((p) => p.key);
-    const allOn = keys.every((k) => selected.has(k));
-    setSelected((prev) => {
-      const next = new Set(prev);
-      keys.forEach((k) => { if (allOn) next.delete(k); else next.add(k); });
-      return next;
-    });
-  }
-
-  async function handleSave() {
-    if (!name.trim()) { toast.error('Nome obrigatório.'); return; }
-    if (!selected.size) { toast.error('Selecione pelo menos uma permissão.'); return; }
-    setSaving(true);
-    try {
-      const body = { name: name.trim(), description: description.trim(), permissions: Array.from(selected) };
-      if (editing) {
-        await updateProfile(editing.id, body);
-        toast.success('Perfil atualizado.');
-      } else {
-        await createProfile(body);
-        toast.success('Perfil criado.');
-      }
-      onSaved();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={saving ? undefined : onClose}
-      dismissable={!saving}
-      title={readOnly ? `Perfil "${editing?.name}" (somente leitura)` : (editing ? 'Editar perfil' : 'Novo perfil')}
-      size="lg"
-      footer={
-        readOnly ? (
-          <button className="btn-secondary" onClick={onClose}>Fechar</button>
-        ) : (
-          <>
-            <button className="btn-secondary disabled:opacity-60" onClick={onClose} disabled={saving}>Cancelar</button>
-            <button className="btn-primary disabled:opacity-60" onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 size={14} className="animate-spin" />} Salvar
-            </button>
-          </>
-        )
-      }
-    >
-      <div className="space-y-4">
-        {readOnly && (
-          <p className="text-xs rounded-lg px-3 py-2 flex items-center gap-2" style={{ backgroundColor: 'var(--ap-surface-3)', color: 'var(--ap-text-4)' }}>
-            <Lock size={13} /> Perfil de sistema — as permissões são mantidas pela plataforma e não podem ser alteradas.
-          </p>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField label="Nome" required>
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} disabled={readOnly} />
-          </FormField>
-          <FormField label="Descrição">
-            <TextInput value={description} onChange={(e) => setDescription(e.target.value)} disabled={readOnly} />
-          </FormField>
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--ap-text-4)' }}>
-            Permissões ({totalSelected} selecionada(s))
-          </p>
-          {!catalog.length ? (
-            <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>Catálogo de permissões indisponível.</p>
-          ) : (
-            <div className="space-y-3">
-              {catalog.map((group) => {
-                const keys = group.permissions.map((p) => p.key);
-                const onCount = keys.filter((k) => selected.has(k)).length;
-                const allOn = onCount === keys.length && keys.length > 0;
-                const someOn = onCount > 0 && !allOn;
-                return (
-                  <div key={group.id} className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--ap-border)' }}>
-                    <label
-                      className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer select-none"
-                      style={{ backgroundColor: 'var(--ap-surface-2)' }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={allOn}
-                        ref={(el) => { if (el) el.indeterminate = someOn; }}
-                        onChange={() => toggleGroup(group)}
-                        disabled={readOnly}
-                        className="accent-[var(--ap-accent)] w-4 h-4"
-                      />
-                      <span className="text-sm font-semibold flex-1" style={{ color: 'var(--ap-text-1)' }}>{group.label}</span>
-                      <span className="text-[11px]" style={{ color: 'var(--ap-text-5)' }}>{onCount}/{keys.length}</span>
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 px-3 py-2">
-                      {group.permissions.map((perm) => (
-                        <label key={perm.key} className="flex items-center gap-2.5 py-1.5 cursor-pointer select-none min-h-[36px]">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(perm.key)}
-                            onChange={() => togglePerm(perm.key)}
-                            disabled={readOnly}
-                            className="accent-[var(--ap-accent)] w-4 h-4 shrink-0"
-                          />
-                          <span className="text-sm truncate" style={{ color: 'var(--ap-text-2)' }} title={perm.label}>
-                            {perm.label}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </Modal>
   );
 }

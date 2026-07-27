@@ -1,43 +1,63 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, KeyRound, Copy, Loader2, CheckCircle2, XCircle } from 'lucide-react';
-import { useToast } from '@studio-ux-ds/react';
-import { Badge } from '../components/ui/Table';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, Badge, ProgressBar, CopyButton, CheckGroup, Checkbox,
+  DSIcon, useToast,
+} from '@studio-ux-ds/react';
 import { getLicense } from '../services/account';
 import { formatNumber, formatLimit, formatDate } from '../lib/format';
 
-const STATUS_BADGE = {
-  TRIAL:      { label: 'Trial',     variant: 'blue' },
-  ACTIVE:     { label: 'Ativa',     variant: 'green' },
-  RESTRICTED: { label: 'Restrita',  variant: 'yellow' },
-  SUSPENDED:  { label: 'Suspensa',  variant: 'red' },
-  EXPIRED:    { label: 'Expirada',  variant: 'red' },
-  CANCELLED:  { label: 'Cancelada', variant: 'gray' },
+// Minha conta — plano, licença e quanto da cota já foi usado. Migrada pro DS na
+// v0.10.16.
+//
+// Decisões de composição:
+//
+//  · **A barra de consumo usa o `ProgressBar` do DS com `tone`** (DS v1.2.37). O
+//    legado desenhava a barra à mão e escolhia a cor com hex cravado (`#f59e0b` a
+//    partir de 70%, `#ef4444` a partir de 90%) — cor fora do tema, que não
+//    acompanha claro/escuro nem o accent escolhido pelo usuário.
+//  · **Cota sem limite não tem barra.** O legado desenhava 4% em cinza para
+//    representar "ilimitado", o que é uma barra que mente: 4% de nada. Sem teto,
+//    o que informa é o número usado — a barra só existe quando há limite para
+//    comparar.
+//  · **Os recursos do plano usam `CheckGroup` + `Checkbox` desabilitado**, não
+//    ícones de ✓/✗ à mão: é uma lista de "tem/não tem", e caixa marcada é o sinal
+//    que o usuário já reconhece. Desabilitado porque é leitura — quem muda o
+//    plano é o comercial, não esta tela.
+
+const SITUACAO = {
+  TRIAL:      { label: 'em teste',   tone: 'info' },
+  ACTIVE:     { label: 'ativa',      tone: 'success' },
+  RESTRICTED: { label: 'restrita',   tone: 'warning' },
+  SUSPENDED:  { label: 'suspensa',   tone: 'danger' },
+  EXPIRED:    { label: 'vencida',    tone: 'danger' },
+  CANCELLED:  { label: 'cancelada',  tone: 'neutral' },
 };
 
-const METRIC_LABELS = {
-  users:            'Usuários',
+const MEDIDAS = {
+  users:            'Pessoas com acesso',
   workspaces:       'Workspaces',
-  agents:           'Agentes',
+  agents:           'Assistentes',
   flows:            'Fluxos',
-  executions:       'Execuções (mês)',
-  tokens:           'Tokens (mês)',
-  whatsapp_numbers: 'Números WhatsApp',
+  executions:       'Execuções no mês',
+  tokens:           'Tokens no mês',
+  whatsapp_numbers: 'Números de WhatsApp',
   google_accounts:  'Contas Google',
   connections:      'Conexões',
 };
 
-const FEATURE_LABELS = {
+const RECURSOS = {
   whatsapp:    'WhatsApp',
   email:       'E-mail',
   automation:  'Automação',
   studio:      'Studio',
   mcp:         'MCP',
   marketplace: 'Marketplace',
-  api:         'API Pública',
-  white_label: 'White Label',
-  rag:         'RAG (Bases de conhecimento)',
+  api:         'API pública',
+  white_label: 'Marca própria',
+  rag:         'Bases de conhecimento',
   voice:       'Voz',
-  analytics:   'Analytics',
+  analytics:   'Relatórios',
 };
 
 export default function MinhaConta() {
@@ -46,163 +66,155 @@ export default function MinhaConta() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let alive = true;
+    let vivo = true;
     (async () => {
       try {
         const data = await getLicense();
-        if (alive) setLicense(data?.license || data);
+        if (vivo) setLicense(data?.license || data);
       } catch (err) {
         toast.error(err.message);
       } finally {
-        if (alive) setLoading(false);
+        if (vivo) setLoading(false);
       }
     })();
-    return () => { alive = false; };
-  }, []);
-
-  async function copyKey() {
-    try {
-      await navigator.clipboard.writeText(license?.key || license?.license_key || '');
-      toast.success('Chave copiada.');
-    } catch {
-      toast.error('Não foi possível copiar a chave.');
-    }
-  }
+    return () => { vivo = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} />
+      <div className="space-y-6">
+        <PageHeader title="Minha conta" />
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
       </div>
     );
   }
 
-  const statusInfo = STATUS_BADGE[license?.status] || { label: license?.status || '—', variant: 'gray' };
-  const planName = license?.plan?.name || license?.plan_name || license?.plan || '—';
-  const key = license?.key || license?.license_key || '';
-  const limits = license?.limits || {};
-  const usage  = license?.usage  || {};
-  const features = license?.features || license?.plan?.features || [];
-  const enabledFeatures = Array.isArray(features)
-    ? features
-    : Object.entries(features).filter(([, v]) => v).map(([k]) => k);
+  const situacao = SITUACAO[license?.status] || { label: license?.status || '—', tone: 'neutral' };
+  const plano = license?.plan?.name || license?.plan_name || license?.plan || '—';
+  const chave = license?.key || license?.license_key || '';
+  const limites = license?.limits || {};
+  const uso = license?.usage || {};
+  const recursos = license?.features || license?.plan?.features || [];
+  const ligados = Array.isArray(recursos)
+    ? recursos
+    : Object.entries(recursos).filter(([, v]) => v).map(([k]) => k);
 
-  // Metricas: uniao das chaves de limits + usage, na ordem conhecida.
-  const metricKeys = Object.keys(METRIC_LABELS)
-    .filter((k) => k in limits || k in usage);
+  const medidas = Object.keys(MEDIDAS).filter((k) => k in limites || k in uso);
+
+  const validade = license?.status === 'TRIAL' && license?.trial_ends_at
+    ? `O período de teste termina em ${formatDate(license.trial_ends_at)}.`
+    : license?.expires_at
+      ? `Vale até ${formatDate(license.expires_at)}.`
+      : null;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>Minha Conta</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-          Plano, licença e consumo da organização.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Minha conta" subtitle="O plano da organização, o que ele libera e quanto já foi usado." />
 
-      {/* Plano + licenca */}
-      <div className="card p-5 space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-brand/10 text-brand">
-            <CreditCard size={20} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ap-text-4)' }}>Plano atual</p>
-            <p className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>{planName}</p>
-          </div>
-          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-        </div>
-
-        {(license?.trial_ends_at || license?.expires_at) && (
-          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-            {license?.status === 'TRIAL' && license?.trial_ends_at
-              ? `Trial termina em ${formatDate(license.trial_ends_at)}.`
-              : license?.expires_at
-                ? `Válida até ${formatDate(license.expires_at)}.`
-                : null}
-          </p>
-        )}
-
-        {key && (
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--ap-text-5)' }}>
-              Chave da licença
-            </p>
-            <div className="flex items-center gap-2">
-              <div
-                className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg font-mono text-xs truncate"
-                style={{ backgroundColor: 'var(--ap-surface-3)', border: '1px solid var(--ap-border)', color: 'var(--ap-text-2)' }}
-              >
-                <KeyRound size={13} className="shrink-0" style={{ color: 'var(--ap-text-4)' }} />
-                <span className="truncate">{key}</span>
-              </div>
-              <button className="btn-secondary shrink-0" onClick={copyKey} title="Copiar chave">
-                <Copy size={15} />
-              </button>
+      <Card>
+        <div style={{ padding: 20 }} className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span style={{ color: 'var(--su-action)' }}><DSIcon name="user" size="lg" /></span>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }}>Plano</p>
+              <p style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--su-text-primary)' }}>{plano}</p>
             </div>
+            <Badge tone={situacao.tone}>{situacao.label}</Badge>
           </div>
-        )}
-      </div>
 
-      {/* Consumo */}
-      <div className="card p-5">
-        <p className="text-sm font-bold mb-4" style={{ color: 'var(--ap-text-1)' }}>Consumo</p>
-        {!metricKeys.length ? (
-          <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>Sem métricas disponíveis.</p>
-        ) : (
-          <div className="space-y-4">
-            {metricKeys.map((k) => {
-              const used = usage[k] ?? 0;
-              const limit = limits[k];
-              const unlimited = limit == null;
-              const pct = unlimited ? 0 : Math.min(100, (used / (limit || 1)) * 100);
-              const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : 'var(--ap-accent)';
-              return (
-                <div key={k}>
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-medium" style={{ color: 'var(--ap-text-2)' }}>{METRIC_LABELS[k]}</p>
-                    <p className="text-xs" style={{ color: 'var(--ap-text-4)' }}>
-                      {formatNumber(used)} / {formatLimit(limit)}
-                    </p>
-                  </div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--ap-surface-3)' }}>
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: unlimited ? '4%' : `${pct}%`, backgroundColor: unlimited ? 'var(--ap-text-5)' : barColor }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+          {validade && (
+            <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>{validade}</p>
+          )}
 
-      {/* Recursos habilitados */}
-      <div className="card p-5">
-        <p className="text-sm font-bold mb-4" style={{ color: 'var(--ap-text-1)' }}>Recursos do plano</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {Object.entries(FEATURE_LABELS).map(([k, label]) => {
-            const on = enabledFeatures.includes(k);
-            return (
-              <div
-                key={k}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
-                style={{
-                  backgroundColor: 'var(--ap-surface-2)',
-                  border: '1px solid var(--ap-border-sub)',
-                  color: on ? 'var(--ap-text-1)' : 'var(--ap-text-5)',
-                }}
-              >
-                {on
-                  ? <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
-                  : <XCircle size={15} className="shrink-0" style={{ color: 'var(--ap-text-5)' }} />}
-                <span className="truncate">{label}</span>
+          {chave && (
+            <div className="space-y-1.5">
+              <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+                Chave da licença
+              </p>
+              <div className="flex items-center gap-2">
+                <code
+                  style={{
+                    flex: 1, minWidth: 0, fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12,
+                    border: '1px solid var(--su-border-default)', borderRadius: 8, padding: '8px 12px',
+                    color: 'var(--su-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {chave}
+                </code>
+                <CopyButton
+                  value={chave}
+                  label="Copiar"
+                  variant="secondary"
+                  size="md"
+                  onCopied={(ok) => { if (!ok) toast.error('Não deu para copiar — selecione e copie à mão.'); }}
+                />
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
+
+      <Card>
+        <div style={{ padding: 20 }} className="space-y-4">
+          <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+            Quanto já foi usado
+          </h2>
+          {!medidas.length ? (
+            <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-muted)' }}>
+              O plano não declara medida de consumo.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {medidas.map((k) => {
+                const usado = uso[k] ?? 0;
+                const limite = limites[k];
+                const semLimite = limite == null;
+                const pct = semLimite ? 0 : Math.min(100, (usado / (limite || 1)) * 100);
+                // O papel da cor é o aviso: perto do teto muda de tom.
+                const tone = pct >= 90 ? 'danger' : pct >= 70 ? 'warning' : undefined;
+                return (
+                  <div key={k} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>{MEDIDAS[k]}</p>
+                      <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-muted)' }}>
+                        {semLimite
+                          ? `${formatNumber(usado)} · sem limite`
+                          : `${formatNumber(usado)} de ${formatLimit(limite)}`}
+                      </p>
+                    </div>
+                    {/* Sem teto não há barra: barra sem limite não compara nada. */}
+                    {!semLimite && <ProgressBar value={pct} tone={tone} label={MEDIDAS[k]} />}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <div style={{ padding: 20 }} className="space-y-3">
+          <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+            O que este plano libera
+          </h2>
+          <CheckGroup columns={3} role="group">
+            {Object.entries(RECURSOS).map(([k, label]) => (
+              <Checkbox
+                key={k}
+                variant="card"
+                label={label}
+                checked={ligados.includes(k)}
+                disabled
+                readOnly
+                meta={ligados.includes(k) ? 'incluído' : 'fora do plano'}
+              />
+            ))}
+          </CheckGroup>
+        </div>
+      </Card>
     </div>
   );
 }

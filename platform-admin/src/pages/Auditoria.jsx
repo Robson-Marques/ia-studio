@@ -1,32 +1,52 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollText, Loader2, ChevronDown, ChevronRight, Search } from 'lucide-react';
-import { useToast } from '@studio-ux-ds/react';
-import EmptyState from '../components/ui/EmptyState';
-import { Table, Thead, Th, Tbody, Td, Badge, Pagination } from '../components/ui/Table';
-import { TextInput } from '../components/ui/FormField';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import {
+  PageHeader, Card, FormGrid, Field, Input, Button, DataTable, Badge, Modal,
+  DescriptionList, CopyButton, Pagination, EmptyState, useToast,
+} from '@studio-ux-ds/react';
 import { listAudit } from '../services/audit';
 import { formatDateTime } from '../lib/format';
 
-const PER_PAGE = 20;
+const POR_PAGINA = 20;
 
-// Tela de auditoria da organização. Filtros: ação, entidade, período.
-// Expandir a linha mostra old/new value em JSON formatado.
-export default function Auditoria({ fetcher = listAudit, title = 'Auditoria', subtitle = 'Trilha de ações administrativas da organização.' }) {
+// Auditoria — a trilha de quem fez o quê na organização. Migrada pro DS na v0.10.16.
+//
+// Decisões de composição:
+//
+//  · **A linha expansível virou Modal de leitura.** O legado abria a linha e
+//    mostrava os dois JSONs (antes/depois) dentro da tabela, o que exigia um
+//    `<tr>` extra montado à mão — e o `DataTable` do DS não tem (nem deveria ter)
+//    linha que abre para dentro: numa tabela paginada, a linha aberta empurra as
+//    de baixo e o olho perde o lugar. Como Modal, é leitura de um registro
+//    imutável, com os dois JSONs lado a lado e botão de copiar.
+//  · **Modal e não rota**, apesar de o registro ter id: ninguém manda link de
+//    linha de auditoria, e a lista já tem o objeto inteiro em mão — abrir rota
+//    obrigaria a buscar de novo um dado que já está aqui.
+//  · **Filtro com o botão junto**: o "Filtrar" fica ao lado do último campo, pela
+//    mesma razão do Explorador (botão como item do grid precisaria de coluna
+//    própria e desalinharia a linha).
+//
+// A tela aceita `fetcher`/`title`/`subtitle` porque nasceu para ser reaproveitada
+// com outra fonte de log — o contrato foi preservado.
+export default function Auditoria({
+  fetcher = listAudit,
+  title = 'Auditoria',
+  subtitle = 'Quem fez o quê na organização, com o antes e o depois de cada mudança.',
+}) {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [expanded, setExpanded] = useState(null);
-  const [filters, setFilters] = useState({ action: '', entity: '', from: '', to: '' });
+  const [detalhe, setDetalhe] = useState(null);
+  const [filtros, setFiltros] = useState({ action: '', entity: '', from: '', to: '' });
 
-  const load = useCallback(async (p = 1, f = filters) => {
+  const load = useCallback(async (p = 1, f = filtros) => {
     setLoading(true);
-    setExpanded(null);
     try {
       const { items: list, total: t } = await fetcher({
         action: f.action, entity: f.entity, from: f.from, to: f.to,
-        page: p, per_page: PER_PAGE,
+        page: p, per_page: POR_PAGINA,
       });
       setItems(list);
       setTotal(t);
@@ -37,13 +57,13 @@ export default function Auditoria({ fetcher = listAudit, title = 'Auditoria', su
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetcher, filters]);
+  }, [fetcher, filtros]);
 
   useEffect(() => { load(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function set(field, value) { setFilters((f) => ({ ...f, [field]: value })); }
+  const set = (campo, valor) => setFiltros((f) => ({ ...f, [campo]: valor }));
 
-  function fmtJson(v) {
+  function comoJson(v) {
     if (v == null) return '—';
     try {
       return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v, null, 2);
@@ -52,137 +72,141 @@ export default function Auditoria({ fetcher = listAudit, title = 'Auditoria', su
     }
   }
 
-  const actorName = (log) => log.actor_name || log.actor?.name || log.actor_email || log.actor?.email || log.user_name || '—';
-  const oldVal = (log) => log.old_value ?? log.old ?? log.before ?? null;
-  const newVal = (log) => log.new_value ?? log.new ?? log.after ?? null;
+  // O backend já mudou o nome desses campos mais de uma vez; a lista de
+  // alternativas é proposital, para a tela não parar de mostrar o ator quando
+  // isso acontecer de novo.
+  const ator = (log) => log.actor_name || log.actor?.name || log.actor_email || log.actor?.email || log.user_name || '—';
+  const antes = (log) => log.old_value ?? log.old ?? log.before ?? null;
+  const depois = (log) => log.new_value ?? log.new ?? log.after ?? null;
+
+  const columns = [
+    { key: 'when', header: 'Quando', render: (log) => formatDateTime(log.created_at) },
+    { key: 'who', header: 'Quem', render: (log) => ator(log) },
+    { key: 'what', header: 'O que fez', render: (log) => (
+      <span style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}>{log.action}</span>
+    ) },
+    { key: 'entity', header: 'Onde', render: (log) => log.entity_type || log.entity || '—' },
+    { key: 'status', header: 'Resultado', render: (log) => (
+      log.status === 'FAILURE'
+        ? <Badge tone="danger">não passou</Badge>
+        : <Badge tone="success">ok</Badge>
+    ) },
+  ];
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold" style={{ color: 'var(--ap-text-1)' }}>{title}</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--ap-text-4)' }}>{subtitle}</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title={title} subtitle={subtitle} />
 
-      {/* Filtros */}
-      <div className="card p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <TextInput placeholder="Filtrar por ação" value={filters.action} onChange={(e) => set('action', e.target.value)} />
-          <TextInput placeholder="Filtrar por item afetado" value={filters.entity} onChange={(e) => set('entity', e.target.value)} />
-          <TextInput type="date" value={filters.from} onChange={(e) => set('from', e.target.value)} title="Data inicial" />
-          <TextInput type="date" value={filters.to} onChange={(e) => set('to', e.target.value)} title="Data final" />
-          <button className="btn-primary justify-center" onClick={() => load(1)} disabled={loading}>
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />} Filtrar
-          </button>
+      <Card>
+        <div style={{ padding: 20 }}>
+          <FormGrid columns="auto">
+            <Field label="Ação">
+              <Input placeholder="ex.: sale.cancel" value={filtros.action} onChange={(e) => set('action', e.target.value)} />
+            </Field>
+            <Field label="Item afetado">
+              <Input placeholder="ex.: Connection" value={filtros.entity} onChange={(e) => set('entity', e.target.value)} />
+            </Field>
+            <Field label="De">
+              <Input type="date" value={filtros.from} onChange={(e) => set('from', e.target.value)} />
+            </Field>
+            <Field label="Até">
+              <div className="flex items-center gap-2">
+                <Input type="date" value={filtros.to} onChange={(e) => set('to', e.target.value)} style={{ flex: 1 }} />
+                <Button variant="primary" icon="search" loading={loading} onClick={() => load(1)}>
+                  Filtrar
+                </Button>
+              </div>
+            </Field>
+          </FormGrid>
         </div>
-      </div>
+      </Card>
 
-      <div className="card overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--ap-text-4)' }} /></div>
-        ) : !items.length ? (
-          <EmptyState icon={ScrollText} title="Nenhum registro" description="Ajuste os filtros ou aguarde novas ações." />
-        ) : (
-          <>
-            {/* Desktop */}
-            <div className="hidden md:block">
-              <Table>
-                <Thead>
-                  <Th className="w-8" />
-                  <Th>Data</Th><Th>Ator</Th><Th>Ação</Th><Th>Entidade</Th><Th>Status</Th>
-                </Thead>
-                <Tbody>
-                  {items.map((log) => {
-                    const open = expanded === log.id;
-                    return (
-                      <React.Fragment key={log.id}>
-                        <tr
-                          className="table-row cursor-pointer"
-                          onClick={() => setExpanded(open ? null : log.id)}
-                        >
-                          <Td>{open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</Td>
-                          <Td className="whitespace-nowrap">{formatDateTime(log.created_at)}</Td>
-                          <Td>{actorName(log)}</Td>
-                          <Td><code className="text-xs">{log.action}</code></Td>
-                          <Td>{log.entity_type || log.entity || '—'}</Td>
-                          <Td>
-                            {log.status === 'FAILURE'
-                              ? <Badge variant="red">Falha</Badge>
-                              : <Badge variant="green">Sucesso</Badge>}
-                          </Td>
-                        </tr>
-                        {open && (
-                          <tr>
-                            <td colSpan={6} className="px-4 py-3" style={{ backgroundColor: 'var(--ap-surface-2)' }}>
-                              <ExpandedDetail log={log} oldVal={oldVal(log)} newVal={newVal(log)} fmtJson={fmtJson} />
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </Tbody>
-              </Table>
-              <Pagination page={page} total={total} perPage={PER_PAGE} onPage={(p) => load(p)} />
-            </div>
+      {loading && !items.length ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--su-text-muted)' }} />
+        </div>
+      ) : !items.length ? (
+        <Card>
+          <EmptyState
+            icon="file"
+            title="Nenhum registro"
+            description="Ou os filtros não casaram com nada, ou ainda não houve ação administrativa no período."
+          />
+        </Card>
+      ) : (
+        <>
+          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+            Clique numa linha para ver o antes e o depois da mudança.
+          </p>
+          <DataTable
+            columns={columns}
+            rows={items}
+            getRowId={(log) => log.id}
+            onRowClick={(log) => setDetalhe(log)}
+            getRowLabel={(log) => `Ver o detalhe de ${log.action}`}
+          />
+          <Pagination
+            page={page}
+            perPage={POR_PAGINA}
+            total={total}
+            itemLabel={['registro', 'registros']}
+            onPage={(p) => load(p)}
+          />
+        </>
+      )}
 
-            {/* Mobile */}
-            <div className="md:hidden divide-y px-4" style={{ borderColor: 'var(--ap-border)' }}>
-              {items.map((log) => {
-                const open = expanded === log.id;
-                return (
-                  <div key={log.id} className="py-3">
-                    <button className="w-full text-left flex items-start gap-2" onClick={() => setExpanded(open ? null : log.id)}>
-                      {open ? <ChevronDown size={14} className="mt-0.5 shrink-0" /> : <ChevronRight size={14} className="mt-0.5 shrink-0" />}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--ap-text-1)' }}>
-                          <code className="text-xs">{log.action}</code>
-                        </p>
-                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--ap-text-4)' }}>
-                          {actorName(log)} · {formatDateTime(log.created_at)}
-                        </p>
-                      </div>
-                    </button>
-                    {open && (
-                      <div className="mt-2 pl-6">
-                        <ExpandedDetail log={log} oldVal={oldVal(log)} newVal={newVal(log)} fmtJson={fmtJson} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              <Pagination page={page} total={total} perPage={PER_PAGE} onPage={(p) => load(p)} />
+      <Modal
+        open={Boolean(detalhe)}
+        onClose={() => setDetalhe(null)}
+        title={detalhe ? detalhe.action : ''}
+        size="lg"
+      >
+        {detalhe && (
+          <div className="space-y-4">
+            <DescriptionList
+              items={[
+                { key: 'Quando', value: formatDateTime(detalhe.created_at) },
+                { key: 'Quem', value: ator(detalhe) },
+                { key: 'Onde', value: detalhe.entity_type || detalhe.entity || '—' },
+                ...(detalhe.entity_id ? [{ key: 'Identificador do item', value: (
+                  <span className="inline-flex items-center gap-2 min-w-0">
+                    <code style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 11, wordBreak: 'break-all' }}>
+                      {detalhe.entity_id}
+                    </code>
+                    <CopyButton value={detalhe.entity_id} title="Copiar o identificador" />
+                  </span>
+                ) }] : []),
+                ...(detalhe.ip ? [{ key: 'De onde', value: detalhe.ip }] : []),
+                { key: 'Resultado', value: detalhe.status === 'FAILURE' ? 'não passou' : 'ok' },
+              ]}
+            />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ValorJson titulo="Como estava" valor={comoJson(antes(detalhe))} />
+              <ValorJson titulo="Como ficou" valor={comoJson(depois(detalhe))} />
             </div>
-          </>
+          </div>
         )}
-      </div>
+      </Modal>
     </div>
   );
 }
 
-function ExpandedDetail({ log, oldVal, newVal, fmtJson }) {
+function ValorJson({ titulo, valor }) {
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs" style={{ color: 'var(--ap-text-4)' }}>
-        {log.entity_id && <span>Entidade: <code>{log.entity_id}</code></span>}
-        {log.ip && <span>IP: {log.ip}</span>}
-        {log.organization_name && <span>Organização: {log.organization_name}</span>}
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>{titulo}</p>
+        {valor !== '—' && <CopyButton value={valor} />}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--ap-text-5)' }}>Valor anterior</p>
-          <pre
-            className="text-xs rounded-lg p-3 overflow-x-auto max-h-64"
-            style={{ backgroundColor: 'var(--ap-surface-3)', color: 'var(--ap-text-2)', border: '1px solid var(--ap-border)' }}
-          >{fmtJson(oldVal)}</pre>
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--ap-text-5)' }}>Valor novo</p>
-          <pre
-            className="text-xs rounded-lg p-3 overflow-x-auto max-h-64"
-            style={{ backgroundColor: 'var(--ap-surface-3)', color: 'var(--ap-text-2)', border: '1px solid var(--ap-border)' }}
-          >{fmtJson(newVal)}</pre>
-        </div>
-      </div>
+      <pre
+        style={{
+          fontFamily: 'var(--su-font-mono, monospace)', fontSize: 11, margin: 0,
+          border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12,
+          maxHeight: 260, overflow: 'auto', color: 'var(--su-text-secondary)',
+        }}
+      >
+        {valor}
+      </pre>
     </div>
   );
 }

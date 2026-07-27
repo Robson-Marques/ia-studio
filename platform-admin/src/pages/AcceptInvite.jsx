@@ -1,91 +1,88 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Sparkles, Loader2 } from 'lucide-react';
-import { useToast } from '@studio-ux-ds/react';
+import { Card, Field, Input, Button, DSIcon, useToast } from '@studio-ux-ds/react';
 import { acceptInvite } from '../services/invites';
 
-// Rota PUBLICA /convite/:token — aceite do convite (nome + senha).
+// Rota PÚBLICA `/convite/:token` — a pessoa convidada cria nome e senha aqui.
+// Migrada pro DS na v0.10.16.
+//
+// Segunda tela que um estranho vê (a primeira é o login), e a única em que
+// alguém de fora escreve no sistema. Mesma casca do login: fora do AppShell,
+// centralizada, `Card` + `Field` + `Input` + `Button block` do DS.
 export default function AcceptInvite() {
   const toast = useToast();
   const { token } = useParams();
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [nome, setNome] = useState('');
+  const [senha, setSenha] = useState('');
+  const [confirmacao, setConfirmacao] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
-  async function handleSubmit(e) {
+  async function aceitar(e) {
     e.preventDefault();
-    if (!name.trim()) { toast.error('Informe seu nome.'); return; }
-    if (!password || password.length < 8) { toast.error('A senha deve ter pelo menos 8 caracteres.'); return; }
-    if (password !== confirm) { toast.error('A confirmação não confere com a senha.'); return; }
-    setSaving(true);
+    if (!nome.trim()) { toast.error('Informe seu nome.'); return; }
+    if (!senha || senha.length < 8) { toast.error('A senha precisa de pelo menos 8 caracteres.'); return; }
+    if (senha !== confirmacao) { toast.error('As duas senhas não são iguais.'); return; }
+    setSalvando(true);
     try {
-      await acceptInvite(token, { name: name.trim(), password });
-      toast.success('Convite aceito! Entre com seu e-mail e a senha criada.');
+      await acceptInvite(token, { name: nome.trim(), password: senha });
+      toast.success('Pronto! Agora entre com o seu e-mail e a senha que você criou.');
       navigate('/login', { replace: true });
     } catch (err) {
-      toast.error(err.message || 'Erro ao aceitar o convite');
+      // Convite vencido, cancelado ou já usado cai aqui — a mensagem vem do
+      // servidor porque só ele sabe qual dos três é.
+      toast.error(err.message || 'Não foi possível aceitar este convite.');
     } finally {
-      setSaving(false);
+      setSalvando(false);
     }
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4" style={{ backgroundColor: 'var(--ap-bg-page)' }}>
-      <div className="card w-full max-w-sm p-8">
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-brand/15 flex items-center justify-center mb-3">
-            <Sparkles size={28} className="text-brand" />
-          </div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--ap-text-1)' }}>IA Studio</h1>
-          <p className="text-xs mt-1 text-center" style={{ color: 'var(--ap-text-4)' }}>
-            Você foi convidado. Complete seu cadastro para acessar.
-          </p>
-        </div>
+    <div
+      className="flex items-center justify-center p-4"
+      style={{ minHeight: '100dvh', background: 'var(--su-surface-base)' }}
+    >
+      <div style={{ width: '100%', maxWidth: 380 }}>
+        <Card>
+          <div style={{ padding: 32 }}>
+            <div className="flex flex-col items-center" style={{ marginBottom: 24 }}>
+              <span style={{ color: 'var(--su-action)', marginBottom: 8 }}>
+                <DSIcon name="zap" size="lg" />
+              </span>
+              <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--su-text-primary)' }}>IA Studio</h1>
+              <p style={{ fontSize: 13, margin: '4px 0 0', textAlign: 'center', color: 'var(--su-text-muted)' }}>
+                Você foi convidado. Escolha uma senha para entrar.
+              </p>
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="block text-xs font-medium" style={{ color: 'var(--ap-text-2)' }}>Nome completo</label>
-            <input
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Seu nome"
-              autoFocus
-            />
+            <form onSubmit={aceitar} className="space-y-4">
+              <Field label="Seu nome">
+                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" autoFocus />
+              </Field>
+              <Field label="Senha" hint="Pelo menos 8 caracteres.">
+                <Input
+                  type="password"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+              </Field>
+              <Field label="Repita a senha">
+                <Input
+                  type="password"
+                  value={confirmacao}
+                  onChange={(e) => setConfirmacao(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+              </Field>
+              <Button type="submit" variant="primary" loading={salvando} block>
+                Criar meu acesso
+              </Button>
+            </form>
           </div>
-          <div className="space-y-1">
-            <label className="block text-xs font-medium" style={{ color: 'var(--ap-text-2)' }}>Senha</label>
-            <input
-              type="password"
-              className="input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mínimo de 8 caracteres"
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="block text-xs font-medium" style={{ color: 'var(--ap-text-2)' }}>Confirmar senha</label>
-            <input
-              type="password"
-              className="input"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Repita a senha"
-              autoComplete="new-password"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className="btn-primary w-full justify-center disabled:opacity-60 min-h-[44px]"
-          >
-            {saving && <Loader2 size={16} className="animate-spin" />}
-            Aceitar convite
-          </button>
-        </form>
+        </Card>
       </div>
     </div>
   );

@@ -1,5 +1,46 @@
 # Changelog — IA Studio
 
+## v0.10.16 - 2026-07-26 (A última família — e o painel inteiro no Studio UX)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.36` → **`^1.2.37`** (`Checkbox indeterminate`, `ProgressBar tone`, `Button block`, glifos `history` e `upload`).
+
+**O `platform-admin` está inteiro no Studio UX.** Últimas 8 telas: pessoas, perfis, workspaces, auditoria, minha conta — e as três públicas (login, aceitar convite, página de pagamento).
+
+### Mudado
+
+- **Perfis de acesso: o editor virou rota** (`/perfis/novo` e `/perfis/:id`). Era um Modal com o catálogo INTEIRO de permissões dentro, rolando dentro da rolagem. A caixa "marcar o grupo todo" agora mostra **estado misto** quando só parte do grupo está marcada — antes aparecia vazia com metade ligada, informando o contrário.
+- **Perfil da plataforma abre em leitura**, e a linha é a mesma das outras: dá para ver o que o "Administrador" libera antes de copiar a ideia num perfil próprio. O legado trocava o lápis por um cadeado, fazendo a mesma coluna significar duas coisas.
+- **Auditoria: a linha expansível virou Modal de leitura.** O legado abria a linha e mostrava os dois JSONs dentro da tabela — o que empurra as linhas de baixo e faz o olho perder o lugar. Agora abre com o antes/depois lado a lado e botão de copiar.
+- **Minha conta: a barra de consumo é do DS, com aviso por cor** (amarelo perto do limite, vermelho no limite). Era barra desenhada à mão com hex cravado. **Cota sem limite deixou de ter barra** — o legado desenhava 4% em cinza para dizer "ilimitado", que é uma barra mentindo.
+- **Pessoas e convites**: ativar/inativar e cancelar convite foram para a barra de lote, aceitando vários; o link do convite usa o botão de copiar padronizado, e a tela diz na cara que **o sistema não manda e-mail sozinho** — sem repassar o link, a pessoa não entra.
+- **Workspaces continua em cartões** de propósito: cada workspace CONTÉM seus ambientes, e uma tabela plana perderia o aninhamento.
+- **Login, aceitar convite e página de pagamento** (as três públicas) passaram ao DS. A de pagamento é a mais exposta do sistema — quem abre é o cliente final do provedor, no celular, com pressa: copiar virou ação de primeira classe, com **fallback** de área de transferência. Antes, o `catch` do clipboard era vazio: num celular sem permissão, o botão não fazia nada e não avisava.
+- **Linguagem**: "Usuários e Convites" → **Pessoas e convites**; "Inativar/Reativar" → **Tirar o acesso / Devolver o acesso**; "Perfil de sistema" → **da plataforma**; "Ator/Entidade" (auditoria) → **Quem / Onde**; "Trial" → **em teste**; "2ª via de boleto" → **Seu boleto**; "Vencido há N dias" → **N dias em atraso**.
+
+### Corrigido
+
+- **Cinco ícones inexistentes em telas já migradas** desenhavam "?" havia releases: `history` no canvas, no editor de fluxo, na conversa e na linha do tempo do atendimento; `upload` em Fluxos. Os dois entraram no catálogo do DS (v1.2.37) — `refresh` não é histórico e `download` não é upload.
+
+### O que dá pra verificar agora
+
+1. **Perfis → abrir um perfil**: cai em `/perfis/<id>`; marcar metade de um grupo deixa a caixa do grupo em **estado misto** (um traço, não vazia). Perfil da plataforma abre com aviso azul e tudo desabilitado.
+2. **Auditoria**: clicar numa linha abre o antes/depois; o filtro tem os quatro campos na mesma altura.
+3. **Minha conta**: barra fica amarela acima de 70% e vermelha acima de 90%; cota sem limite mostra só o número, sem barra.
+4. **Pessoas**: selecionar duas ativas → aparece *Tirar o acesso*; uma ativa + uma inativa → nenhuma das duas transições aparece (não serve para as duas).
+5. **Convites**: o botão de copiar o link fica na linha e confirma no próprio botão.
+6. **Login e aceitar convite**: botão de largura total, e o Enter no campo envia.
+7. **`/pagar/<token>`** com token inválido: aviso amarelo com triângulo (não um "?") e a orientação de pedir link novo.
+8. **Sidebar → Configurações**: os quatro itens continuam no mesmo lugar.
+9. Tema escuro e 375 px em todas.
+
+### O que só dá pra conferir com o sistema em uso
+
+- **Página de pagamento com boleto real** — precisa de token válido gerado pelo assistente ISP; sem dado, só o caminho de erro é verificável.
+- **Aceitar convite** — exige um convite criado e ainda válido (o link vence).
+- **Barra de consumo em vermelho** — só quando a organização passar de 90% de alguma cota.
+- **Auditoria com valores antes/depois** — depende de ação administrativa registrada.
+
+
 ## v0.10.15 - 2026-07-26 (O formulário agora usa a largura do card)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.35` → **`^1.2.36`** (o `FormGrid` deixou de limitar a própria largura).

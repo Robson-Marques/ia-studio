@@ -6,7 +6,7 @@
 > governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
 
-## Estado atual — só Configurações fora do DS (2026-07-26, v0.10.15 / DS ^1.2.36)
+## Estado atual — painel inteiro no DS (2026-07-26, v0.10.16 / DS ^1.2.37)
 
 O `platform-admin` opera com a **casca AppShell do Studio UX** e o **Dashboard**
 migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
@@ -18,10 +18,15 @@ inteira** — sub-frentes A (os 3 logs + Agendamentos + Templates), B (Fluxos +
 editor de passos + `editor/*`) e C (o canvas) —, **WhatsApp inteira** (11
 arquivos, com o contact center) e **Integrações inteira** (v0.10.11: Marketplace,
 Conexões, Cofre + as três rotas que nasceram dos modais), **Recursos** e
-**Desenvolvedor** (v0.10.13). Resta **Configurações** (5 telas), que segue com o padrão visual antigo
-(`--ap-*` + Tailwind) dentro do AppShell, num regime de **coexistência
-deliberada** — uma família por sub-frente, com validação humana entre elas. Desde
-a v0.10.3 a **cor de ação é única** no painel todo: o legado herda o accent do DS.
+**Desenvolvedor** (v0.10.13) e **as 8 últimas telas** (v0.10.16: pessoas, perfis
+— com editor em rota —, workspaces, auditoria, minha conta, mais as três públicas:
+login, aceitar convite e página de pagamento).
+
+**Não resta tela no padrão antigo.** O `--ap-*` sobrevive só no `index.css` (onde
+`--ap-accent` herda `--su-action`) e no `components/ui/PhoneInput.jsx`, mantido de
+propósito: o `PhoneInput` do DS é só a casca, sem o seletor de país com
+bandeira/DDI/busca que o CLAUDE.md exige. É a lacuna conhecida do DS nessa parte.
+Desde a v0.10.3 a **cor de ação é única** no painel todo.
 
 **O inspetor tem duas formas, e as duas são legítimas** (DS v1.2.24 + v0.10.4):
 `Drawer` quando não há contexto atrás para preservar (editor em lista, execução
@@ -35,7 +40,7 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
 | Item | Descrição |
 |---|---|
-| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.36`) |
+| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.37`) |
 | `.npmrc` | Aponta `@studio-ux-ds` para GitHub Packages, token via `NODE_AUTH_TOKEN` (ver abaixo) |
 | `main.jsx` | Importa `tokens.css` + `components.css`, chama `configureTheme({ namespace: 'ia-studio' })` + `applyTheme()`, envolve o app com `<ToastProvider>` do DS |
 | `ThemeContext.jsx` | Wrapper fino do mecanismo de tema do DS. Fonte única = DS (chaves namespaçadas `ia-studio_su_*`); espelha `.dark` no `<html>` para compatibilidade com telas Tailwind com `dark:`; `MutationObserver` sincroniza estado quando o AppShell/Customize trocam o tema |
