@@ -6,7 +6,7 @@
 > governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
 
-## Estado atual — só Configurações fora do DS (2026-07-26, v0.10.14 / DS ^1.2.35)
+## Estado atual — só Configurações fora do DS (2026-07-26, v0.10.15 / DS ^1.2.36)
 
 O `platform-admin` opera com a **casca AppShell do Studio UX** e o **Dashboard**
 migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
@@ -35,7 +35,7 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
 | Item | Descrição |
 |---|---|
-| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.35`) |
+| Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/react` (`^1.2.36`) |
 | `.npmrc` | Aponta `@studio-ux-ds` para GitHub Packages, token via `NODE_AUTH_TOKEN` (ver abaixo) |
 | `main.jsx` | Importa `tokens.css` + `components.css`, chama `configureTheme({ namespace: 'ia-studio' })` + `applyTheme()`, envolve o app com `<ToastProvider>` do DS |
 | `ThemeContext.jsx` | Wrapper fino do mecanismo de tema do DS. Fonte única = DS (chaves namespaçadas `ia-studio_su_*`); espelha `.dark` no `<html>` para compatibilidade com telas Tailwind com `dark:`; `MutationObserver` sincroniza estado quando o AppShell/Customize trocam o tema |

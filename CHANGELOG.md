@@ -1,5 +1,23 @@
 # Changelog — IA Studio
 
+## v0.10.15 - 2026-07-26 (O formulário agora usa a largura do card)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.35` → **`^1.2.36`** (o `FormGrid` deixou de limitar a própria largura).
+
+### Corrigido
+
+- **O formulário ficava numa faixa estreita à esquerda de um card largo** — o vazio que a v0.10.14 devia eliminar voltou maior. Causa no DS: o `FormGrid` embutia um teto de 880px "de leitura"; num card de 1580px sobrava metade da tela vazia. Corrigido no DS (v1.2.36): o grid preenche o container.
+- **A linha de busca do Explorador quebrava em 2+1.** O teto de 880px não cabia três colunas com o piso de 320px, então o campo de busca caía sozinho na linha de baixo, estreito. Agora os três ficam na mesma linha.
+- **Os `maxWidth: 880` que sobraram no editor de mapeamento saíram** — eram resíduo do mesmo engano, cravados por mim antes de o `FormGrid` existir.
+- **Editor de mapeamento e Explorador passaram a `columns="auto"`** (quantas couberem) em vez de teto fixo: com teto de 2 num card largo, os três campos curtos deixavam metade da segunda linha vazia.
+
+### O que dá pra verificar agora
+
+1. **Recursos → Mapeamentos → abrir um**: Conexão, Traduz para e Operação de origem na **mesma linha**, ocupando o card; a Anotação atravessa a linha inteira.
+2. **Explorador de recursos**: os três campos numa linha só, com o botão Buscar colado no campo de busca.
+3. **Em 375 px**: uma coluna, como antes.
+
+
 ## v0.10.14 - 2026-07-26 (Formulário em duas colunas — o arranjo virou do DS)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.34` → **`^1.2.35`** (`FormGrid` + `Field wide`).

@@ -213,12 +213,13 @@ export default function MapeamentoEditor() {
       />
 
       <Card>
-        {/* `FormGrid`: duas colunas em tela larga, uma em tela estreita, e a
-            largura de leitura vem do DS — não de um `maxWidth` cravado aqui.
-            A anotação leva `wide` porque é o campo em que se escreve: em meia
-            coluna o texto vira uma faixa estreita e alta. */}
+        {/* `columns="auto"`: quantas colunas couberem no card, uma em tela
+            estreita. Não é `columns={2}` porque o card é largo — com teto de 2 os
+            três campos curtos deixariam metade da segunda linha vazia. A anotação
+            leva `wide` porque é o campo em que se escreve: em fração de linha o
+            texto vira uma faixa estreita e alta. */}
         <div style={{ padding: 20 }}>
-          <FormGrid columns={2}>
+          <FormGrid columns="auto">
             <Field label="Conexão" required hint={isEdit ? 'Não muda depois de criado.' : 'De qual sistema vêm os dados.'}>
               <Select value={form.connection_id} onChange={(e) => patch({ connection_id: e.target.value })} disabled={isEdit}>
                 <option value="">Selecione…</option>
@@ -247,7 +248,7 @@ export default function MapeamentoEditor() {
       </Card>
 
       <Card>
-        <div style={{ padding: 20, maxWidth: 880 }} className="space-y-4">
+        <div style={{ padding: 20 }} className="space-y-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
@@ -275,7 +276,7 @@ export default function MapeamentoEditor() {
       </Card>
 
       <Card>
-        <div style={{ padding: 20, maxWidth: 880 }} className="space-y-3">
+        <div style={{ padding: 20 }} className="space-y-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
@@ -333,7 +334,7 @@ export default function MapeamentoEditor() {
       </Card>
 
       <Card>
-        <div style={{ padding: 20, maxWidth: 880 }}>
+        <div style={{ padding: 20 }}>
           {/* `Checkbox variant="card"`, não `Switch`: é um campo do formulário
               (vale ao salvar), não um interruptor de efeito imediato. E o
               `Switch` do DS não tem rótulo — um interruptor solto não diz o que

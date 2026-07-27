@@ -127,7 +127,7 @@ export default function Explorer() {
             // com dica embaixo ficava mais alto, empurrando o próprio controle e
             // o botão para cima. A dica virou **placeholder** por isso, e o botão
             // ficou dentro do campo de busca, onde alinha sempre.
-            <FormGrid columns={3}>
+            <FormGrid columns="auto">
               <Field label="Conexão" required>
                 <Select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}>
                   <option value="">Selecione…</option>
