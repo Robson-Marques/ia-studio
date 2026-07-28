@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, FormGrid, Field, Input, Select, TextArea, Badge, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, FormGrid, Field, Input, Select, TextArea, Badge, useToast } from '@studio-ux-ds/react';
 import {
   listAutomationTemplates, createAutomationTemplate, updateAutomationTemplate,
 } from '../../services/automation';
@@ -93,36 +93,18 @@ export default function TemplateEditor() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={isEdit ? (name || 'Template') : 'Novo template'}
-        subtitle={`Escreva o texto uma vez e deixe como ${'{{variável}}'} tudo que muda de pessoa pra pessoa.`}
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/automacao/templates')} disabled={saving}>
-              Cancelar
-            </Button>
-            {canWrite && (
-              <Button variant="primary" loading={saving} onClick={handleSave}>
-                Salvar
-              </Button>
-            )}
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-4">
+    <FormScreen
+      back={{ label: 'Voltar para templates', onClick: () => navigate('/automacao/templates') }}
+      title={isEdit ? (name || 'Template') : 'Novo template'}
+      subtitle={`Escreva o texto uma vez e deixe como ${'{{variável}}'} tudo que muda de pessoa pra pessoa.`}
+      loading={loading}
+      saving={saving}
+      canSubmit={canWrite}
+      onSubmit={handleSave}
+      onCancel={() => navigate('/automacao/templates')}
+    >
+      <div className="space-y-4">
           <FormGrid columns={2}>
             <Field label="Nome" required hint="Só pra você achar depois — o cliente não vê.">
               <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canWrite} />
@@ -153,11 +135,10 @@ export default function TemplateEditor() {
           >
             <TextArea rows={12} value={body} onChange={(e) => setBody(e.target.value)} disabled={!canWrite} />
           </Field>
-        </div>
-      </Card>
 
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-2">
+        {/* Derivado do que se acabou de escrever — por isso fica no mesmo cartão,
+            logo abaixo do texto, e não num cartão separado lá embaixo. */}
+        <div className="space-y-2" style={{ borderTop: '1px solid var(--su-border-subtle)', paddingTop: 'var(--su-space-4)' }}>
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
             Variáveis encontradas no texto
           </h2>
@@ -170,7 +151,7 @@ export default function TemplateEditor() {
               : <span className="text-xs" style={{ color: 'var(--su-text-muted)' }}>nenhuma — o texto é igual para todos</span>}
           </div>
         </div>
-      </Card>
-    </div>
+      </div>
+    </FormScreen>
   );
 }

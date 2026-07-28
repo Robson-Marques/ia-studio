@@ -74,7 +74,7 @@ armadilhas). Resumo para re-ancorar:
 - **Os mapas de estado de Integrações declaram `tone` direto**, sem `lib/tone.js`. É o caminho de
   saída da ponte: cada família que migrar deve fazer o mesmo. A ponte engole papel desconhecido no
   `|| 'neutral'` — foi assim que "credencial vencida" ficou cinza por meses.
-- **DS consumido: `^1.2.41`.** A migração rendeu 32 releases do próprio Studio UX — a regra é
+- **DS consumido: `^1.2.47`.** A migração rendeu 38 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
 - **Auditoria do conjunto (v0.10.20/v0.10.21), cobrada pelo Robson.** Migrar tela por tela deixou de
   fora o que atravessa todas: **ícones** (30 itens, 7 glifos próprios — o mapa `LUCIDE_TO_DS` foi
@@ -98,7 +98,18 @@ armadilhas). Resumo para re-ancorar:
   `MessageScreen`. Cada um com spec no Grupo G da `COMPONENT_LIBRARY` e story com os estados reais.
   **Antes de escrever tela de classe recorrente, instanciar o molde** — e ler o "quando NÃO usar",
   que é parte dele (passo a passo para campos independentes PIORA a tela).
-- **ADOÇÃO DOS MOLDES AQUI: frente aberta, ainda não começada.** As telas foram migradas para os
+- **ADOÇÃO DOS MOLDES: família `form` FEITA** (v0.10.24) — 9 editores em rota instanciam `FormScreen`
+  (FilaEditor, EquipeEditor, CalendarioEditor, TemplateEditor, MemoriaPerfilEditor, FerramentaEditor,
+  ConexaoEditar, PerfilEditor, MapeamentoEditor). **O Enter passou a enviar** (nenhum era `<form>`), as
+  ações desceram do cabeçalho para o rodapé do cartão, sem permissão o Salvar não aparece.
+  **Fora de propósito:** `AgenteEditor`, `IncidenteEditor` e `AberturaChamado` (abas + fluxo próprio =
+  `form`+`detail`, exige leitura tela a tela). **Ficam:** `detail` (~5), `dashboard` (3),
+  `wizard` (`ConexaoNova`), `list` (~5 que montam tabela à mão).
+- **CUIDADO AO PÔR ALGO DENTRO DE UM `FormScreen`:** botão sem `type` dentro de `<form>` **envia o
+  formulário**. O DS passou a nascer com `type="button"` (v1.2.47) por causa disso — foi achado na
+  lixeira de "remover membro" do `EquipeEditor`, que salvaria a equipe e navegaria. Diálogo/overlay
+  vive **fora** do `FormScreen` (o Enter dele submeteria o formulário inteiro).
+- **Histórico da adoção (antes da família `form`):** As telas foram migradas para os
   *componentes* do DS, não para os *moldes* — então cada uma tem o seu arranjo, o seu jeito de mostrar
   carregando e a sua decisão sobre onde fica o "voltar". Triagem automática (heurística, **confere
   tela a tela antes de agir**): ~5 de detalhe, ~17 de formulário/editor, 3 de painel, 1 passo a passo

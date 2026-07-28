@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, FormGrid, Field, Input, Select, Badge, Button, IconButton, Switch, EmptyState, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, Card, FormGrid, Field, Input, Select, Badge, Button, IconButton, Switch, EmptyState, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import {
@@ -148,151 +148,142 @@ export default function EquipeEditor() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   const nomeDe = (userId) => users.find((u) => u.id === userId)?.name || userId;
   const membros = team?.members || [];
   const disponiveis = users.filter((u) => !membros.some((m) => m.user_id === u.id));
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <FormScreen
+        back={{ label: 'Voltar para equipes e filas', onClick: () => navigate('/whatsapp/equipes') }}
         title={isEdit ? (name || 'Equipe') : 'Nova equipe'}
         subtitle="Equipe é um grupo de pessoas que atende. Criar equipe não liga distribuição automática — alguém assume a conversa, ou ela é transferida para a fila da equipe."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/whatsapp/equipes')} disabled={saving}>
-              Cancelar
-            </Button>
-            {canManage && (
-              <Button variant="primary" loading={saving} onClick={handleSave}>Salvar</Button>
-            )}
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-4">
-          <FormGrid columns={2}>
-            <Field label="Nome" required>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Suporte" disabled={!canManage} />
-            </Field>
-            <Field label="Para que serve" hint="Aparece na lista, ajuda quem transfere a escolher.">
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canManage} />
-            </Field>
-          </FormGrid>
-
-          {isEdit ? (
-            <Field label="Fila padrão" hint="Para onde vai a conversa quando alguém transfere para esta equipe sem escolher fila.">
-              <Select value={defaultQueueId} onChange={(e) => setDefaultQueueId(e.target.value)} disabled={!canManage}>
-                <option value="">Sem fila padrão</option>
-                {queues.filter((q) => q.is_active).map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
-              </Select>
-            </Field>
-          ) : (
-            <p className="text-xs" style={{ margin: 0, color: 'var(--su-text-muted)' }}>
-              A fila padrão e as pessoas são definidas depois de criar.
-            </p>
-          )}
-        </div>
-      </Card>
-
-      {isEdit && (
+        loading={loading}
+        saving={saving}
+        canSubmit={canManage}
+        onSubmit={handleSave}
+        onCancel={() => navigate('/whatsapp/equipes')}
+        /* `bare`: os dados da equipe e a lista de membros são dois cartões. */
+        bare
+      >
         <Card>
           <div style={{ padding: 20 }} className="space-y-4">
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
-              Quem está nesta equipe
-            </h2>
+            <FormGrid columns={2}>
+              <Field label="Nome" required>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Suporte" disabled={!canManage} />
+              </Field>
+              <Field label="Para que serve" hint="Aparece na lista, ajuda quem transfere a escolher.">
+                <Input value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canManage} />
+              </Field>
+            </FormGrid>
 
-            {canManage && (
-              <div className="flex flex-wrap items-end gap-2">
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <Field label="Adicionar pessoa">
-                    <Select
-                      value={novoMembro.user_id}
-                      onChange={(e) => setNovoMembro((f) => ({ ...f, user_id: e.target.value }))}
-                    >
-                      <option value="">Escolha…</option>
-                      {disponiveis.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </Select>
-                  </Field>
-                </div>
-                <div style={{ width: 180 }}>
-                  <Field label="Como" hint="Supervisor enxerga tudo da equipe.">
-                    <Select
-                      value={novoMembro.role}
-                      onChange={(e) => setNovoMembro((f) => ({ ...f, role: e.target.value }))}
-                    >
-                      <option value="MEMBER">Atende</option>
-                      <option value="SUPERVISOR">Supervisiona</option>
-                    </Select>
-                  </Field>
-                </div>
-                <Button variant="secondary" icon="user-plus" loading={mexendo} onClick={addMembro}>
-                  Adicionar
-                </Button>
-              </div>
-            )}
-
-            {!membros.length ? (
-              <EmptyState
-                icon="users"
-                title="Ninguém nesta equipe ainda"
-                description="Sem pessoas, a equipe não recebe atendimento — a fila dela fica esperando alguém assumir."
-              />
+            {isEdit ? (
+              <Field label="Fila padrão" hint="Para onde vai a conversa quando alguém transfere para esta equipe sem escolher fila.">
+                <Select value={defaultQueueId} onChange={(e) => setDefaultQueueId(e.target.value)} disabled={!canManage}>
+                  <option value="">Sem fila padrão</option>
+                  {queues.filter((q) => q.is_active).map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
+                </Select>
+              </Field>
             ) : (
-              <div style={{ borderTop: '1px solid var(--su-border-subtle)' }}>
-                {membros.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex flex-wrap items-center gap-3"
-                    style={{ padding: '12px 0', borderBottom: '1px solid var(--su-border-subtle)' }}
-                  >
-                    <div className="min-w-0" style={{ flex: 1 }}>
-                      <p style={{ fontSize: 14, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">
-                        {nomeDe(m.user_id)}
-                      </p>
-                      <Badge tone={m.role === 'SUPERVISOR' ? 'info' : 'neutral'}>
-                        {m.role === 'SUPERVISOR' ? 'supervisiona' : 'atende'}
-                      </Badge>
-                    </div>
-
-                    {/* Era um botão com sininho e o significado só no `title`.
-                        Agora é um Switch com rótulo escrito — o estado se lê sem
-                        passar o mouse. */}
-                    <label className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--su-text-secondary)' }}>
-                      <Switch
-                        checked={!!m.receive_incident_alerts}
-                        aria-label={`Avisar ${nomeDe(m.user_id)} sobre incidentes`}
-                        onChange={() => canManage && toggleAlerta(m)}
-                      />
-                      Avisar sobre incidentes
-                    </label>
-
-                    {canManage && (
-                      <IconButton
-                        icon="trash"
-                        aria-label={`Remover ${nomeDe(m.user_id)} da equipe`}
-                        title="Tirar da equipe"
-                        disabled={mexendo}
-                        onClick={() => setRemovendo(m)}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs" style={{ margin: 0, color: 'var(--su-text-muted)' }}>
+                A fila padrão e as pessoas são definidas depois de criar.
+              </p>
             )}
           </div>
         </Card>
-      )}
 
+        {isEdit && (
+          <Card>
+            <div style={{ padding: 20 }} className="space-y-4">
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+                Quem está nesta equipe
+              </h2>
+
+              {canManage && (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <Field label="Adicionar pessoa">
+                      <Select
+                        value={novoMembro.user_id}
+                        onChange={(e) => setNovoMembro((f) => ({ ...f, user_id: e.target.value }))}
+                      >
+                        <option value="">Escolha…</option>
+                        {disponiveis.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      </Select>
+                    </Field>
+                  </div>
+                  <div style={{ width: 180 }}>
+                    <Field label="Como" hint="Supervisor enxerga tudo da equipe.">
+                      <Select
+                        value={novoMembro.role}
+                        onChange={(e) => setNovoMembro((f) => ({ ...f, role: e.target.value }))}
+                      >
+                        <option value="MEMBER">Atende</option>
+                        <option value="SUPERVISOR">Supervisiona</option>
+                      </Select>
+                    </Field>
+                  </div>
+                  <Button variant="secondary" icon="user-plus" loading={mexendo} onClick={addMembro}>
+                    Adicionar
+                  </Button>
+                </div>
+              )}
+
+              {!membros.length ? (
+                <EmptyState
+                  icon="users"
+                  title="Ninguém nesta equipe ainda"
+                  description="Sem pessoas, a equipe não recebe atendimento — a fila dela fica esperando alguém assumir."
+                />
+              ) : (
+                <div style={{ borderTop: '1px solid var(--su-border-subtle)' }}>
+                  {membros.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex flex-wrap items-center gap-3"
+                      style={{ padding: '12px 0', borderBottom: '1px solid var(--su-border-subtle)' }}
+                    >
+                      <div className="min-w-0" style={{ flex: 1 }}>
+                        <p style={{ fontSize: 14, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">
+                          {nomeDe(m.user_id)}
+                        </p>
+                        <Badge tone={m.role === 'SUPERVISOR' ? 'info' : 'neutral'}>
+                          {m.role === 'SUPERVISOR' ? 'supervisiona' : 'atende'}
+                        </Badge>
+                      </div>
+
+                      {/* Era um botão com sininho e o significado só no `title`.
+                          Agora é um Switch com rótulo escrito — o estado se lê sem
+                          passar o mouse. */}
+                      <label className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--su-text-secondary)' }}>
+                        <Switch
+                          checked={!!m.receive_incident_alerts}
+                          aria-label={`Avisar ${nomeDe(m.user_id)} sobre incidentes`}
+                          onChange={() => canManage && toggleAlerta(m)}
+                        />
+                        Avisar sobre incidentes
+                      </label>
+
+                      {canManage && (
+                        <IconButton
+                          icon="trash"
+                          aria-label={`Remover ${nomeDe(m.user_id)} da equipe`}
+                          title="Tirar da equipe"
+                          disabled={mexendo}
+                          onClick={() => setRemovendo(m)}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+      </FormScreen>
+
+      {/* O diálogo de remover membro é overlay — vive FORA do formulário, senão
+          o Enter dele submeteria a equipe inteira. */}
       <ConfirmDialog
         open={!!removendo}
         danger
@@ -303,6 +294,6 @@ export default function EquipeEditor() {
         onClose={() => setRemovendo(null)}
         onConfirm={confirmRemove}
       />
-    </div>
+    </>
   );
 }

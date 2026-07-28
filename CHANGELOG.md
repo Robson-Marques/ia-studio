@@ -1,5 +1,37 @@
 # Changelog — IA Studio
 
+## v0.10.24 - 2026-07-27 (Família `form`: 9 editores passam a instanciar o molde)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.41` → **`^1.2.47`** (os 6 moldes da v1.2.46 + as três peças que esta adoção devolveu ao DS na v1.2.47).
+
+Primeira família a adotar **molde** de tela, e não só componentes. Nove editores em rota:
+
+`WhatsApp/FilaEditor` · `WhatsApp/EquipeEditor` · `Automacao/CalendarioEditor` · `Automacao/TemplateEditor` · `IA/MemoriaPerfilEditor` · `IA/FerramentaEditor` · `Integracoes/ConexaoEditar` · `PerfilEditor` · `Recursos/MapeamentoEditor`
+
+### O que muda na tela
+
+- **O Enter agora envia.** Antes nenhum desses formulários era um `<form>` — eram `<div>` com um botão de `onClick`. Quem preenchia pelo teclado apertava Enter e não acontecia nada. **Ninguém reporta isso**; as pessoas só param de usar o teclado.
+- **As ações saíram do cabeçalho para o rodapé do cartão**, que é onde a leitura do formulário termina. É a mudança visível da entrega — no cabeçalho, num formulário longo, o Salvar fica fora da tela justamente quando você acaba de preencher.
+- **Sem permissão, o Salvar não aparece** (antes ficava escondido em uns, cinza em outros). Botão cinza convida a tentar e depois nega.
+- **Cada tela ganhou um "voltar" garantido**, que não depende de o breadcrumb estar certo.
+- Carregando virou o esqueleto em forma de campos do molde, no lugar do spinner solto + um `PageHeader` escrito "Carregando…".
+
+### O que a adoção devolveu para o DS
+
+Três coisas que só apareceram ao usar o molde de verdade — e as três viraram v1.2.46 **antes** de qualquer improviso aqui:
+
+1. **`Button` nascia sem `type`.** Dentro de um `<form>`, isso é `submit`: a lixeira de "remover membro" do `EquipeEditor` passaria a **salvar a equipe e navegar**. HTML correto, zero aviso. Agora `Button` e `IconButton` nascem `type="button"`.
+2. **`canSubmit`** — a regra "quem não pode não vê" precisava existir no molde.
+3. **`bare`** — formulário cujas seções já são cartões (`PerfilEditor`, com um cartão por grupo de permissão). Continua sendo **um** `<form>`.
+
+### Verificado
+
+Os 113 arquivos parseiam · nenhum import órfão nas 9 telas (dois achados e removidos: `Select` no `FerramentaEditor`, `Button` no `PerfilEditor`) · nenhuma referência solta a `PageHeader`/`Spinner` nas telas migradas · no DS, `FormScreen` com botões auxiliares rende **1 submit em 3 botões**.
+
+### Fora desta leva, de propósito
+
+`IA/AgenteEditor` (998 LOC), `ISP/IncidenteEditor` (636) e `ISP/AberturaChamado` (526) têm abas e fluxo próprio — são `form` + `detail` misturados e merecem leitura tela a tela, não sweep. `ContaSenha` já era `<form>`. `ConexaoNova` é `wizard`.
+
 ## v0.10.23 - 2026-07-27 (Correção: o build da v0.10.22 parou no `vite.config.js`)
 
 Sem `db push`. Só frontend. Mesmo DS (`^1.2.41`).

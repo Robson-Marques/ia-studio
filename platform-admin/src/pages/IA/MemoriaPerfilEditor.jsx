@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, FormGrid, Field, Input, Select, NumericInput, TextArea, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, FormGrid, Field, Input, Select, NumericInput, TextArea, useToast } from '@studio-ux-ds/react';
 import { getMemoryProfile, createMemoryProfile, updateMemoryProfile } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -101,40 +101,18 @@ export default function MemoriaPerfilEditor() {
 
   const cancelTo = isEdit ? `/ia/memoria/${id}` : '/ia/memoria';
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={isEdit ? `Editar "${profileName}"` : 'Novo perfil de memória'}
-        subtitle="Define o que o assistente lembra, por quanto tempo e quantos itens no máximo."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate(cancelTo)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              disabled={!canWrite}
-              loading={saving}
-              icon="check"
-            >
-              {saving ? 'Salvando…' : 'Salvar'}
-            </Button>
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-4">
+    <FormScreen
+      back={{ onClick: () => navigate(cancelTo) }}
+      title={isEdit ? `Editar "${profileName}"` : 'Novo perfil de memória'}
+      subtitle="Define o que o assistente lembra, por quanto tempo e quantos itens no máximo."
+      loading={loading}
+      saving={saving}
+      canSubmit={canWrite}
+      onSubmit={handleSave}
+      onCancel={() => navigate(cancelTo)}
+    >
+      <div className="space-y-4">
           <Field label="Nome">
             <Input
               value={form.name}
@@ -185,8 +163,7 @@ export default function MemoriaPerfilEditor() {
               />
             </Field>
           </FormGrid>
-        </div>
-      </Card>
-    </div>
+      </div>
+    </FormScreen>
   );
 }

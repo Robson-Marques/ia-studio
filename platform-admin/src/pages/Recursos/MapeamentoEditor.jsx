@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, FormGrid, Field, Input, TextArea, Select, Checkbox, Button, IconButton, Banner, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, FormGrid, Field, Input, TextArea, Select, Checkbox, Button, IconButton, Banner, useToast } from '@studio-ux-ds/react';
 import {
   getResourceCatalog, listMappings, createMapping, updateMapping, suggestMapping,
 } from '../../services/resource';
@@ -180,32 +180,17 @@ export default function MapeamentoEditor() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={isEdit ? 'Editar mapeamento' : 'Novo mapeamento'}
-        subtitle="Diga de onde vem cada campo na resposta da conexão."
-        actions={
-          <>
-            <Button variant="secondary" disabled={salvando} onClick={() => navigate('/recursos/mapeamentos')}>
-              Cancelar
-            </Button>
-            <Button variant="primary" icon="save" loading={salvando} onClick={salvar}>
-              Salvar
-            </Button>
-          </>
-        }
-      />
-
+    <FormScreen
+      back={{ label: 'Voltar para mapeamentos', onClick: () => navigate('/recursos/mapeamentos') }}
+      title={isEdit ? 'Editar mapeamento' : 'Novo mapeamento'}
+      subtitle="Diga de onde vem cada campo na resposta da conexão."
+      loading={loading}
+      saving={salvando}
+      onSubmit={salvar}
+      onCancel={() => navigate('/recursos/mapeamentos')}
+      bare
+    >
       <Card>
         {/* `columns="auto"`: quantas colunas couberem no card, uma em tela
             estreita. Não é `columns={2}` porque o card é largo — com teto de 2 os
@@ -342,6 +327,6 @@ export default function MapeamentoEditor() {
           />
         </div>
       </Card>
-    </div>
+    </FormScreen>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, Field, Input, NumericInput, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, Field, Input, NumericInput, useToast } from '@studio-ux-ds/react';
 import { getConnection, getMarketplace, updateConnection } from '../../services/integrations';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
 import { prettifyProviderKey } from './integration.constants';
@@ -97,36 +97,21 @@ export default function ConexaoEditar() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   if (!conexao) return null;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Editar — ${conexao.name}`}
-        subtitle={prettifyProviderKey(conexao.provider_key)}
-        actions={
-          <>
-            <Button variant="secondary" disabled={salvando} onClick={() => navigate(`/integracoes/conexoes/${id}`)}>
-              Cancelar
-            </Button>
-            <Button variant="primary" icon="save" loading={salvando} onClick={handleSave}>
-              Salvar
-            </Button>
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20, maxWidth: 720 }} className="space-y-4">
+    <FormScreen
+      back={{ label: 'Voltar para a conexão', onClick: () => navigate(`/integracoes/conexoes/${id}`) }}
+      title={`Editar — ${conexao.name}`}
+      subtitle={prettifyProviderKey(conexao.provider_key)}
+      loading={loading}
+      saving={salvando}
+      onSubmit={handleSave}
+      onCancel={() => navigate(`/integracoes/conexoes/${id}`)}
+    >
+      {/* Largura de leitura é decisão de quem põe o formulário na tela — o
+          FormGrid/molde distribui, não limita (lição do DS v1.2.36). */}
+      <div style={{ maxWidth: 720 }} className="space-y-4">
           <Field label="Nome da conexão" required hint="É por este nome que ela aparece nas listas e na configuração de fluxos.">
             <Input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus name="conn-nome" autoComplete="off" />
           </Field>
@@ -136,33 +121,30 @@ export default function ConexaoEditar() {
           <Field label="Prioridade" hint="Quando há mais de uma conexão do mesmo conector, a de maior prioridade é usada primeiro.">
             <NumericInput value={prioridade} onChange={setPrioridade} min={0} step={1} />
           </Field>
-        </div>
-      </Card>
 
-      {campos.length > 0 && (
-        <Card>
-          <div style={{ padding: 20, maxWidth: 720 }} className="space-y-4">
-            <div>
-              <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>Credenciais</h2>
-              <p style={{ fontSize: 12, margin: '4px 0 0', color: 'var(--su-text-muted)' }}>
-                Os campos secretos vêm em branco porque o cofre não devolve o que guardou. Deixe em branco para manter o
-                que já está lá; preencha só o que quiser trocar.
-              </p>
-            </div>
-            {campos.map((field) => (
-              <ConnectionField
-                key={field.key}
-                field={field}
-                value={valores[field.key]}
-                onChange={(v) => setValores((prev) => ({ ...prev, [field.key]: v }))}
-                namePrefix={`edit-${conexao.provider_key}`}
-                editing
-              />
-            ))}
-            {schema?.webhookPath && temGeravel && <WebhookUrlBox webhookPath={schema.webhookPath} />}
+        {campos.length > 0 && (
+          <div className="space-y-4" style={{ borderTop: '1px solid var(--su-border-subtle)', paddingTop: 'var(--su-space-5)' }}>
+          <div>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>Credenciais</h2>
+            <p style={{ fontSize: 12, margin: '4px 0 0', color: 'var(--su-text-muted)' }}>
+              Os campos secretos vêm em branco porque o cofre não devolve o que guardou. Deixe em branco para manter o
+              que já está lá; preencha só o que quiser trocar.
+            </p>
           </div>
-        </Card>
-      )}
-    </div>
+          {campos.map((field) => (
+            <ConnectionField
+              key={field.key}
+              field={field}
+              value={valores[field.key]}
+              onChange={(v) => setValores((prev) => ({ ...prev, [field.key]: v }))}
+              namePrefix={`edit-${conexao.provider_key}`}
+              editing
+            />
+          ))}
+          {schema?.webhookPath && temGeravel && <WebhookUrlBox webhookPath={schema.webhookPath} />}
+          </div>
+        )}
+      </div>
+    </FormScreen>
   );
 }

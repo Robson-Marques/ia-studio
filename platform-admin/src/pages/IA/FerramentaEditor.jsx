@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { PageHeader, Card, FormGrid, Field, Input, Select, NumericInput, TextArea, Button, Checkbox, Badge, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, FormGrid, Field, Input, NumericInput, TextArea, Checkbox, Badge, useToast } from '@studio-ux-ds/react';
 import { listTools, createTool, updateTool } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -153,131 +153,110 @@ export default function FerramentaEditor() {
     ? 'Habilidade pronta da plataforma — você pode ligar/desligar, exigir aprovação e ajustar o tempo limite.'
     : 'O que essa habilidade faz e como o assistente deve preencher os parâmetros.';
 
-  // Breadcrumb NÃO vai no PageHeader (o componente do DS não tem essa prop) —
-  // ele vive na TopBar do AppShell, alimentado pelo mapa BREADCRUMBS do Layout.
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
+  // Breadcrumb não é do molde nem do cabeçalho: vive na TopBar do AppShell,
+  // alimentado pelo mapa BREADCRUMBS do Layout. O "voltar" do `FormScreen` é
+  // outra coisa — é a saída garantida da tela, que não depende de o topo estar
+  // certo (item sem `href` é texto; `href` sem `onNavigate` recarrega a SPA).
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        actions={
+    <FormScreen
+      back={{ label: 'Voltar para habilidades', onClick: () => navigate('/ia/ferramentas') }}
+      title={title}
+      subtitle={subtitle}
+      loading={loading}
+      saving={saving}
+      canSubmit={canWrite}
+      onSubmit={handleSave}
+      onCancel={() => navigate('/ia/ferramentas')}
+    >
+      <div className="space-y-4">
+        {isBuiltin && (
+          <Badge tone="info">Habilidade da plataforma — texto e schema não são editáveis</Badge>
+        )}
+
+        {!isBuiltin && (
           <>
-            <Button variant="secondary" onClick={() => navigate('/ia/ferramentas')} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              disabled={!canWrite}
-              loading={saving}
-              icon="check"
-            >
-              {saving ? 'Salvando…' : 'Salvar'}
-            </Button>
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-4">
-          {isBuiltin && (
-            <Badge tone="info">Habilidade da plataforma — texto e schema não são editáveis</Badge>
-          )}
-
-          {!isBuiltin && (
-            <>
-              <FormGrid columns={2}>
-                <Field label="Identificador" hint="Único, sem espaços. Ex.: consultar_estoque">
-                  <Input
-                    value={form.key}
-                    onChange={(e) => patch({ key: e.target.value })}
-                    disabled={isEdit}
-                    placeholder="consultar_estoque"
-                  />
-                </Field>
-                <Field label="Nome">
-                  <Input
-                    value={form.name}
-                    onChange={(e) => patch({ name: e.target.value })}
-                    placeholder="Consultar estoque"
-                  />
-                </Field>
-              </FormGrid>
-
-              <Field label="Categoria">
+            <FormGrid columns={2}>
+              <Field label="Identificador" hint="Único, sem espaços. Ex.: consultar_estoque">
                 <Input
-                  value={form.category}
-                  onChange={(e) => patch({ category: e.target.value })}
-                  placeholder="dados / comunicação / documento…"
+                  value={form.key}
+                  onChange={(e) => patch({ key: e.target.value })}
+                  disabled={isEdit}
+                  placeholder="consultar_estoque"
                 />
               </Field>
-
-              <Field
-                label="Descrição"
-                hint="Explique ao assistente quando usar esta habilidade e o que ela devolve."
-              >
-                <TextArea
-                  rows={4}
-                  value={form.description}
-                  onChange={(e) => patch({ description: e.target.value })}
-                  placeholder="Ex.: Consulta o estoque atual de um produto pelo SKU. Retorna quantidade e localização."
+              <Field label="Nome">
+                <Input
+                  value={form.name}
+                  onChange={(e) => patch({ name: e.target.value })}
+                  placeholder="Consultar estoque"
                 />
               </Field>
+            </FormGrid>
 
-              <Field
-                label="Parâmetros de entrada (JSON Schema)"
-                hint="Descreve os campos que o assistente precisa preencher antes de chamar a habilidade."
-              >
-                <TextArea
-                  rows={10}
-                  value={form.input_schema}
-                  onChange={(e) => patch({ input_schema: e.target.value })}
-                  style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
-                />
-              </Field>
-            </>
-          )}
-
-          <div className="space-y-2">
-            {isEdit && (
-              <Checkbox
-                id="tool-is-active"
-                label="Habilidade ligada"
-                checked={form.is_active}
-                onChange={(e) => patch({ is_active: e.target.checked })}
-              />
-            )}
-            <Checkbox
-              id="tool-requires-approval"
-              label="Exige aprovação humana antes de executar"
-              checked={form.requires_approval}
-              onChange={(e) => patch({ requires_approval: e.target.checked })}
-            />
-          </div>
-
-          <div style={{ maxWidth: 260 }}>
-            <Field label="Tempo limite (ms)" hint="Vazio = padrão (20000). Mínimo 1000.">
-              <NumericInput
-                value={form.timeout_ms === '' ? '' : Number(form.timeout_ms)}
-                onChange={(v) => patch({ timeout_ms: v == null || v === '' ? '' : String(v) })}
-                min={1000}
-                step={500}
-                fullWidth
+            <Field label="Categoria">
+              <Input
+                value={form.category}
+                onChange={(e) => patch({ category: e.target.value })}
+                placeholder="dados / comunicação / documento…"
               />
             </Field>
-          </div>
+
+            <Field
+              label="Descrição"
+              hint="Explique ao assistente quando usar esta habilidade e o que ela devolve."
+            >
+              <TextArea
+                rows={4}
+                value={form.description}
+                onChange={(e) => patch({ description: e.target.value })}
+                placeholder="Ex.: Consulta o estoque atual de um produto pelo SKU. Retorna quantidade e localização."
+              />
+            </Field>
+
+            <Field
+              label="Parâmetros de entrada (JSON Schema)"
+              hint="Descreve os campos que o assistente precisa preencher antes de chamar a habilidade."
+            >
+              <TextArea
+                rows={10}
+                value={form.input_schema}
+                onChange={(e) => patch({ input_schema: e.target.value })}
+                style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+              />
+            </Field>
+          </>
+        )}
+
+        <div className="space-y-2">
+          {isEdit && (
+            <Checkbox
+              id="tool-is-active"
+              label="Habilidade ligada"
+              checked={form.is_active}
+              onChange={(e) => patch({ is_active: e.target.checked })}
+            />
+          )}
+          <Checkbox
+            id="tool-requires-approval"
+            label="Exige aprovação humana antes de executar"
+            checked={form.requires_approval}
+            onChange={(e) => patch({ requires_approval: e.target.checked })}
+          />
         </div>
-      </Card>
-    </div>
+
+        <div style={{ maxWidth: 260 }}>
+          <Field label="Tempo limite (ms)" hint="Vazio = padrão (20000). Mínimo 1000.">
+            <NumericInput
+              value={form.timeout_ms === '' ? '' : Number(form.timeout_ms)}
+              onChange={(v) => patch({ timeout_ms: v == null || v === '' ? '' : String(v) })}
+              min={1000}
+              step={500}
+              fullWidth
+            />
+          </Field>
+        </div>
+      </div>
+    </FormScreen>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, Field, Input, TextArea, CheckGroup, Checkbox, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, Field, Input, TextArea, CheckGroup, Checkbox, useToast } from '@studio-ux-ds/react';
 import { listCalendars, createCalendar, updateCalendar } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { WEEKDAYS } from './automation.constants';
@@ -83,80 +83,61 @@ export default function CalendarioEditor() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   const feriadosCount = holidays.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean).length;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={isEdit ? (name || 'Calendário') : 'Novo calendário'}
-        subtitle="Os agendamentos consultam este calendário antes de disparar: se o dia não é útil ou é feriado, o disparo espera o próximo dia válido."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/automacao/agendamentos')} disabled={saving}>
-              Cancelar
-            </Button>
-            {canManage && (
-              <Button variant="primary" loading={saving} onClick={handleSave}>
-                Salvar
-              </Button>
-            )}
-          </>
-        }
-      />
+    <FormScreen
+      back={{ label: 'Voltar para agendamentos', onClick: () => navigate('/automacao/agendamentos') }}
+      title={isEdit ? (name || 'Calendário') : 'Novo calendário'}
+      subtitle="Os agendamentos consultam este calendário antes de disparar: se o dia não é útil ou é feriado, o disparo espera o próximo dia válido."
+      loading={loading}
+      saving={saving}
+      canSubmit={canManage}
+      onSubmit={handleSave}
+      onCancel={() => navigate('/automacao/agendamentos')}
+    >
+      <div className="space-y-4">
+        <Field label="Nome" required>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex.: Feriados nacionais"
+            disabled={!canManage}
+          />
+        </Field>
 
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-4">
-          <Field label="Nome" required>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: Feriados nacionais"
-              disabled={!canManage}
-            />
-          </Field>
+        <Field label="Dias úteis" required hint="Os dias em que um agendamento pode disparar.">
+          <CheckGroup columns="auto">
+            {WEEKDAYS.map((d) => (
+              <Checkbox
+                key={d.value}
+                label={d.label}
+                checked={workdays.includes(d.value)}
+                onChange={() => toggleWorkday(d.value)}
+                disabled={!canManage}
+              />
+            ))}
+          </CheckGroup>
+        </Field>
 
-          <Field label="Dias úteis" required hint="Os dias em que um agendamento pode disparar.">
-            <CheckGroup columns="auto">
-              {WEEKDAYS.map((d) => (
-                <Checkbox
-                  key={d.value}
-                  label={d.label}
-                  checked={workdays.includes(d.value)}
-                  onChange={() => toggleWorkday(d.value)}
-                  disabled={!canManage}
-                />
-              ))}
-            </CheckGroup>
-          </Field>
+        <Field
+          label="Feriados"
+          hint="Uma data por linha, no formato AAAA-MM-DD. Nesses dias nenhum agendamento dispara."
+        >
+          <TextArea
+            rows={10}
+            value={holidays}
+            onChange={(e) => setHolidays(e.target.value)}
+            placeholder={'2026-12-25\n2027-01-01'}
+            disabled={!canManage}
+            style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+          />
+        </Field>
 
-          <Field
-            label="Feriados"
-            hint="Uma data por linha, no formato AAAA-MM-DD. Nesses dias nenhum agendamento dispara."
-          >
-            <TextArea
-              rows={10}
-              value={holidays}
-              onChange={(e) => setHolidays(e.target.value)}
-              placeholder={'2026-12-25\n2027-01-01'}
-              disabled={!canManage}
-              style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
-            />
-          </Field>
-
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            {feriadosCount === 0 ? 'Nenhum feriado informado.' : feriadosCount === 1 ? '1 feriado informado.' : `${feriadosCount} feriados informados.`}
-          </p>
-        </div>
-      </Card>
-    </div>
+        <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
+          {feriadosCount === 0 ? 'Nenhum feriado informado.' : feriadosCount === 1 ? '1 feriado informado.' : `${feriadosCount} feriados informados.`}
+        </p>
+      </div>
+    </FormScreen>
   );
 }

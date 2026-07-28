@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, FormGrid, Field, Input, Checkbox, CheckGroup, Button, Badge, Banner, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, Card, FormGrid, Field, Input, Checkbox, CheckGroup, Badge, Banner, useToast } from '@studio-ux-ds/react';
 import {
   listProfiles, createProfile, updateProfile, getPermissionsCatalog,
 } from '../services/profiles';
@@ -128,39 +128,26 @@ export default function PerfilEditor() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={isEdit ? (nome || 'Perfil') : 'Novo perfil'}
-        subtitle={`${marcadas.size} de ${total} permissões marcadas`}
-        actions={
-          <>
-            <Button variant="secondary" disabled={salvando} onClick={() => navigate('/perfis')}>
-              {soLeitura ? 'Voltar' : 'Cancelar'}
-            </Button>
-            {!soLeitura && (
-              <Button variant="primary" icon="save" loading={salvando} onClick={salvar}>Salvar</Button>
-            )}
-          </>
-        }
-      />
-
-      {deSistema && (
+    <FormScreen
+      back={{ label: 'Voltar para perfis', onClick: () => navigate('/perfis') }}
+      title={isEdit ? (nome || 'Perfil') : 'Novo perfil'}
+      subtitle={`${marcadas.size} de ${total} permissões marcadas`}
+      loading={loading}
+      saving={salvando}
+      canSubmit={!soLeitura}
+      onSubmit={salvar}
+      onCancel={() => navigate('/perfis')}
+      banner={deSistema ? (
         <Banner tone="info">
           Este perfil é mantido pela plataforma: dá para consultar o que ele libera, mas não para mudar. Se precisa de
           algo parecido com ajustes, crie um perfil próprio.
         </Banner>
-      )}
-
+      ) : null}
+      /* `bare`: cada grupo de permissão já é um cartão. Continua sendo UM
+         formulário — o Salvar submete os grupos todos juntos. */
+      bare
+    >
       <Card>
         <div style={{ padding: 20 }}>
           <FormGrid columns="auto">
@@ -219,6 +206,6 @@ export default function PerfilEditor() {
           );
         })
       )}
-    </div>
+    </FormScreen>
   );
 }
