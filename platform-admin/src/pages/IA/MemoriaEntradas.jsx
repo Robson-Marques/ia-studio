@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Field, Input, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { PageHeader, Card, DataTable, EmptyState, Badge, FormRow, Field, Input, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMemoryProfile, listMemoryEntries } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MEMORY_SCOPES, formatDateTime } from './ia.constants';
@@ -108,25 +108,27 @@ export default function MemoriaEntradas() {
       />
 
       <Card>
-        <div style={{ padding: 20 }} className="flex flex-wrap items-end gap-3">
-          {profile?.scope && (
-            <div>
-              <p style={{ fontSize: 11, color: 'var(--su-text-muted)', margin: '0 0 4px' }}>Escopo</p>
-              <Badge tone="info">{scopeLabel}</Badge>
-            </div>
-          )}
-          <div style={{ minWidth: 240 }}>
-            <Field label="Filtrar por chave de escopo">
+        <div style={{ padding: 20 }}>
+          <FormRow
+            action={
+              <Button variant="secondary" icon="search" onClick={load} disabled={loading}>
+                Filtrar
+              </Button>
+            }
+          >
+            {profile?.scope && (
+              <Field label="Escopo">
+                <Badge tone="info">{scopeLabel}</Badge>
+              </Field>
+            )}
+            <Field grow label="Filtrar por chave de escopo">
               <Input
                 value={scopeKey}
                 onChange={(e) => setScopeKey(e.target.value)}
                 placeholder="ID do contato / da sessão…"
               />
             </Field>
-          </div>
-          <Button variant="secondary" icon="search" onClick={load} disabled={loading}>
-            Filtrar
-          </Button>
+          </FormRow>
         </div>
       </Card>
 

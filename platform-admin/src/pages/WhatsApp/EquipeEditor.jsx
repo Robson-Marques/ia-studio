@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FormScreen, Card, FormGrid, Field, Input, Select, Badge, Button, IconButton, Switch, EmptyState, ConfirmDialog, useToast } from '@studio-ux-ds/react';
+import { FormScreen, Card, FormGrid, FormRow, Field, Input, Select, Badge, Button, IconButton, Switch, EmptyState, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import {
@@ -200,33 +200,39 @@ export default function EquipeEditor() {
               </h2>
 
               {canManage && (
-                <div className="flex flex-wrap items-end gap-2">
-                  <div style={{ flex: 1, minWidth: 200 }}>
-                    <Field label="Adicionar pessoa">
-                      <Select
-                        value={novoMembro.user_id}
-                        onChange={(e) => setNovoMembro((f) => ({ ...f, user_id: e.target.value }))}
-                      >
-                        <option value="">Escolha…</option>
-                        {disponiveis.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                      </Select>
-                    </Field>
-                  </div>
-                  <div style={{ width: 180 }}>
-                    <Field label="Como" hint="Supervisor enxerga tudo da equipe.">
-                      <Select
-                        value={novoMembro.role}
-                        onChange={(e) => setNovoMembro((f) => ({ ...f, role: e.target.value }))}
-                      >
-                        <option value="MEMBER">Atende</option>
-                        <option value="SUPERVISOR">Supervisiona</option>
-                      </Select>
-                    </Field>
-                  </div>
-                  <Button variant="secondary" icon="user-plus" loading={mexendo} onClick={addMembro}>
-                    Adicionar
-                  </Button>
-                </div>
+                /* `FormRow` (DS v1.2.49) no lugar do `flex items-end` montado à
+                   mão: alinhava pela BASE, então a dica do "Como" empurrava o
+                   controle dele para cima e o botão para a altura do texto da
+                   dica — e o `flex:1` esticava o seletor de pessoa até a borda
+                   do cartão. Agora o botão cai na linha dos controles por
+                   medição (etiqueta fantasma) e o campo principal cresce até um
+                   teto de leitura. */
+                <FormRow
+                  action={
+                    <Button variant="secondary" icon="user-plus" loading={mexendo} onClick={addMembro}>
+                      Adicionar
+                    </Button>
+                  }
+                >
+                  <Field grow label="Adicionar pessoa">
+                    <Select
+                      value={novoMembro.user_id}
+                      onChange={(e) => setNovoMembro((f) => ({ ...f, user_id: e.target.value }))}
+                    >
+                      <option value="">Escolha…</option>
+                      {disponiveis.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </Select>
+                  </Field>
+                  <Field label="Como" hint="Supervisor enxerga tudo da equipe.">
+                    <Select
+                      value={novoMembro.role}
+                      onChange={(e) => setNovoMembro((f) => ({ ...f, role: e.target.value }))}
+                    >
+                      <option value="MEMBER">Atende</option>
+                      <option value="SUPERVISOR">Supervisiona</option>
+                    </Select>
+                  </Field>
+                </FormRow>
               )}
 
               {!membros.length ? (

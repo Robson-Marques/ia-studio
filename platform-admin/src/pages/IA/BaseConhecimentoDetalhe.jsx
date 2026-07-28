@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, DescriptionList, Field, Input, NumericInput, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, DescriptionList, FormRow, Field, Input, NumericInput, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getKnowledgeBase, deleteKnowledgeBase, queryKnowledgeBase,
 } from '../../services/ai';
@@ -255,26 +255,28 @@ function QueryTab({ baseId }) {
           <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
             Simula o que o assistente encontraria nesta base ao receber essa pergunta. Nada é enviado a ninguém.
           </p>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1" style={{ minWidth: 260 }}>
-              <Field label="Pergunta de teste">
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !running) handleQuery(); }}
-                  placeholder="Ex.: qual o prazo de entrega?"
-                />
-              </Field>
-            </div>
-            <div style={{ width: 160 }}>
-              <Field label="Quantos trechos">
-                <NumericInput value={topK} onChange={(v) => setTopK(v)} min={1} max={20} step={1} fullWidth />
-              </Field>
-            </div>
-            <Button variant="primary" icon="search" loading={running} onClick={handleQuery}>
-              {running ? 'Consultando…' : 'Consultar'}
-            </Button>
-          </div>
+          {/* `FormRow` do DS (v1.2.49) no lugar do `flex items-end` à mão: o
+              botão cai na linha dos controles por medição, e o campo principal
+              cresce até um teto em vez de esticar até a borda do cartão. */}
+          <FormRow
+            action={
+              <Button variant="primary" icon="search" loading={running} onClick={handleQuery}>
+                {running ? 'Consultando…' : 'Consultar'}
+              </Button>
+            }
+          >
+            <Field grow label="Pergunta de teste">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !running) handleQuery(); }}
+                placeholder="Ex.: qual o prazo de entrega?"
+              />
+            </Field>
+            <Field label="Quantos trechos">
+              <NumericInput value={topK} onChange={(v) => setTopK(v)} min={1} max={20} step={1} fullWidth />
+            </Field>
+          </FormRow>
         </div>
       </Card>
 

@@ -74,7 +74,7 @@ armadilhas). Resumo para re-ancorar:
 - **Os mapas de estado de Integrações declaram `tone` direto**, sem `lib/tone.js`. É o caminho de
   saída da ponte: cada família que migrar deve fazer o mesmo. A ponte engole papel desconhecido no
   `|| 'neutral'` — foi assim que "credencial vencida" ficou cinza por meses.
-- **DS consumido: `^1.2.47`.** A migração rendeu 38 releases do próprio Studio UX — a regra é
+- **DS consumido: `^1.2.49`.** A migração rendeu 40 releases do próprio Studio UX — a regra é
   **evoluir o DS primeiro** e só então o consumidor; nunca improvisar no `platform-admin`.
 - **Auditoria do conjunto (v0.10.20/v0.10.21), cobrada pelo Robson.** Migrar tela por tela deixou de
   fora o que atravessa todas: **ícones** (30 itens, 7 glifos próprios — o mapa `LUCIDE_TO_DS` foi
@@ -98,7 +98,7 @@ armadilhas). Resumo para re-ancorar:
   `MessageScreen`. Cada um com spec no Grupo G da `COMPONENT_LIBRARY` e story com os estados reais.
   **Antes de escrever tela de classe recorrente, instanciar o molde** — e ler o "quando NÃO usar",
   que é parte dele (passo a passo para campos independentes PIORA a tela).
-- **ADOÇÃO DOS MOLDES: família `form` FEITA** (v0.10.24) — 9 editores em rota instanciam `FormScreen`
+- **ADOÇÃO DOS MOLDES: família `form` FEITA** (v0.10.24) — 9 editores em rota instanciam `FormScreen`, e as **5 linhas de ação** (campo+campo+botão) do painel usam `FormRow` (v0.10.25)
   (FilaEditor, EquipeEditor, CalendarioEditor, TemplateEditor, MemoriaPerfilEditor, FerramentaEditor,
   ConexaoEditar, PerfilEditor, MapeamentoEditor). **O Enter passou a enviar** (nenhum era `<form>`), as
   ações desceram do cabeçalho para o rodapé do cartão, sem permissão o Salvar não aparece.

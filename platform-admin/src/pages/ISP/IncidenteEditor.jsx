@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, ConfirmDialog, FormGrid, Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast, Spinner } from '@studio-ux-ds/react';
+import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, ConfirmDialog, FormGrid, FormRow, Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getIncident, createIncident, updateIncident,
   resolveAffected, listTargets, updateTargets,
@@ -574,8 +574,18 @@ function AfetadosTab({ incidentId, incident, canWrite, canDispatch, onChanged })
                 Para quem está afetado mas não caiu no escopo — ex.: cliente de outra região atendido pelo mesmo equipamento.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-              <Field label="Login ou CPF">
+            {/* `FormRow` do DS (v1.2.49): a grade de 4 colunas punha o BOTÃO
+                como quarta coluna e o alinhava pela base — em tela média a linha
+                quebrava e ele descia sozinho. Aqui ele é a ação da linha, não um
+                campo, e cai na altura dos controles por medição. */}
+            <FormRow
+              action={
+                <Button variant="secondary" icon="plus" loading={linking} onClick={addManual}>
+                  Incluir
+                </Button>
+              }
+            >
+              <Field grow label="Login ou CPF">
                 <Input value={manual.customer_ref} onChange={(e) => setManual((m) => ({ ...m, customer_ref: e.target.value }))} />
               </Field>
               <Field label="Nome">
@@ -584,10 +594,7 @@ function AfetadosTab({ incidentId, incident, canWrite, canDispatch, onChanged })
               <Field label="Telefone">
                 <Input value={manual.phone} onChange={(e) => setManual((m) => ({ ...m, phone: e.target.value }))} />
               </Field>
-              <Button variant="secondary" icon="plus" loading={linking} onClick={addManual}>
-                Incluir
-              </Button>
-            </div>
+            </FormRow>
           </div>
         </Card>
       )}

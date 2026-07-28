@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Modal, ConfirmDialog, Field, Input, Select, Button, IconButton, useToast, DSIcon } from '@studio-ux-ds/react';
+import { Modal, ConfirmDialog, Field, Input, Select, Button, useToast, DSIcon } from '@studio-ux-ds/react';
 import { sendChatMessage, uploadChatMedia, sendTyping } from '../../services/whatsapp';
 import { useAudioRecorder } from './composer/useAudioRecorder';
 import AudioRecorderBar from './composer/AudioRecorderBar';

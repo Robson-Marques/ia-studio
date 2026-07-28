@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, EmptyState, FormGrid, Field, Input, Select, Radio, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { PageHeader, Card, EmptyState, FormGrid, FormRow, Field, Input, Select, Radio, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   discoverOsResources, getOsConfig, saveOsConfig,
   getFilaMapping, saveFilaMapping,
@@ -240,53 +240,52 @@ export default function AberturaChamado() {
                     className="space-y-3"
                   >
                     {/* Linha 1: os dois campos do par + remover. */}
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div className="flex-1" style={{ minWidth: 180 }}>
-                        <Field label="Departamento">
-                          {setores.length > 0 ? (
-                            <Select
-                              value={p.setor_id}
-                              disabled={!canManage}
-                              onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
-                            >
-                              <option value="">Selecione…</option>
-                              {setores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </Select>
-                          ) : (
-                            // Nenhum departamento descoberto: cai no id manual.
-                            <Input
-                              value={p.setor_id}
-                              disabled={!canManage}
-                              placeholder="Id do departamento no ERP"
-                              onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
-                            />
-                          )}
-                        </Field>
-                      </div>
-
-                      <div className="flex-1" style={{ minWidth: 180 }}>
-                        <Field label="Assunto">
-                          <Select
-                            value={p.assunto_id}
-                            disabled={!canManage}
-                            onChange={(e) => updatePair(i, 'assunto_id', e.target.value)}
-                          >
-                            <option value="">Selecione…</option>
-                            {assuntos.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                          </Select>
-                        </Field>
-                      </div>
-
-                      {canManage && (
+                    {/* `FormRow` do DS (v1.2.49) no lugar do `flex items-end`:
+                        o alinhamento pela base fazia a lixeira precisar de um
+                        `marginBottom: 1` cravado à mão para parecer no lugar —
+                        sinal clássico de que o arranjo estava errado, não o
+                        botão. Agora a ação cai na linha dos controles sozinha. */}
+                    <FormRow
+                      action={canManage ? (
                         <Button
                           variant="ghost"
                           icon="trash"
                           aria-label="Remover este par"
-                          style={{ marginBottom: 1 }}
                           onClick={() => removePair(i)}
                         />
-                      )}
-                    </div>
+                      ) : null}
+                    >
+                      <Field grow label="Departamento">
+                        {setores.length > 0 ? (
+                          <Select
+                            value={p.setor_id}
+                            disabled={!canManage}
+                            onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
+                          >
+                            <option value="">Selecione…</option>
+                            {setores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </Select>
+                        ) : (
+                          // Nenhum departamento descoberto: cai no id manual.
+                          <Input
+                            value={p.setor_id}
+                            disabled={!canManage}
+                            placeholder="Id do departamento no ERP"
+                            onChange={(e) => updatePair(i, 'setor_id', e.target.value)}
+                          />
+                        )}
+                      </Field>
+                      <Field grow label="Assunto">
+                        <Select
+                          value={p.assunto_id}
+                          disabled={!canManage}
+                          onChange={(e) => updatePair(i, 'assunto_id', e.target.value)}
+                        >
+                          <option value="">Selecione…</option>
+                          {assuntos.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </Select>
+                      </Field>
+                    </FormRow>
 
                     {/* Linha 2: a escolha do par padrão. Ganhou linha própria
                         porque é uma decisão SOBRE o par inteiro, não um terceiro

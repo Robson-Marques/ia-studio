@@ -1,8 +1,26 @@
 # Changelog — IA Studio
 
+## v0.10.25 - 2026-07-27 (Linhas de ação alinhadas — o `FormRow`)
+
+Sem `db push`. Só frontend. Bump do DS: `^1.2.47` → **`^1.2.49`** (`FormRow`).
+
+### Linhas de ação alinhadas — 5 telas
+
+Você apontou no print do `EquipeEditor`: o seletor de pessoa esticado até a borda, a dica do "Como" empurrando o controle dele para cima, o botão "Adicionar" descolado da linha. Não era daquela tela — era o `flex items-end gap-2` montado à mão, que existia em **cinco** lugares:
+
+`WhatsApp/EquipeEditor` (adicionar pessoa) · `IA/BaseConhecimentoDetalhe` (pergunta de teste) · `IA/MemoriaEntradas` (filtrar por chave) · `ISP/IncidenteEditor` (incluir cliente) · `ISP/AberturaChamado` (par departamento/assunto)
+
+As cinco passaram a usar **`FormRow`** (DS v1.2.47). O `AberturaChamado` tinha um `marginBottom: 1` cravado na lixeira para ela "parecer" alinhada — sintoma clássico de arranjo errado, não de botão errado; saiu junto.
+
+### Verificado
+
+Os 113 arquivos parseiam · **nenhum import órfão em nenhuma tela do painel** (um achado e removido: `IconButton` no `MessageComposer`) · no DS, o `FormRow` emite a etiqueta fantasma e o campo `grow`.
+
+**Nota sobre a verificação:** o primeiro detector de import órfão acusou 6, e **5 eram falsos positivos** — ele removia `import[^;]*;` de forma gananciosa e, num arquivo com a palavra "importar" dentro de um comentário, engolia o JSX seguinte, concluindo que o componente não era usado. Corrigido para remover só linhas que **começam** com `import`. Detector que erra para mais é quase tão ruim quanto o que erra para menos: gasta confiança e ensina a ignorar o aviso.
+
 ## v0.10.24 - 2026-07-27 (Família `form`: 9 editores passam a instanciar o molde)
 
-Sem `db push`. Só frontend. Bump do DS: `^1.2.41` → **`^1.2.47`** (os 6 moldes da v1.2.46 + as três peças que esta adoção devolveu ao DS na v1.2.47).
+Sem `db push`. Só frontend. Bump do DS: `^1.2.41` → **`^1.2.47`** (os 6 moldes da v1.2.46 + `type="button"`, `canSubmit` e `bare` da v1.2.47).
 
 Primeira família a adotar **molde** de tela, e não só componentes. Nove editores em rota:
 
@@ -18,7 +36,7 @@ Primeira família a adotar **molde** de tela, e não só componentes. Nove edito
 
 ### O que a adoção devolveu para o DS
 
-Três coisas que só apareceram ao usar o molde de verdade — e as três viraram v1.2.46 **antes** de qualquer improviso aqui:
+Três coisas que só apareceram ao usar o molde de verdade — e as três viraram DS v1.2.47 **antes** de qualquer improviso aqui:
 
 1. **`Button` nascia sem `type`.** Dentro de um `<form>`, isso é `submit`: a lixeira de "remover membro" do `EquipeEditor` passaria a **salvar a equipe e navegar**. HTML correto, zero aviso. Agora `Button` e `IconButton` nascem `type="button"`.
 2. **`canSubmit`** — a regra "quem não pode não vê" precisava existir no molde.
@@ -26,7 +44,9 @@ Três coisas que só apareceram ao usar o molde de verdade — e as três virara
 
 ### Verificado
 
-Os 113 arquivos parseiam · nenhum import órfão nas 9 telas (dois achados e removidos: `Select` no `FerramentaEditor`, `Button` no `PerfilEditor`) · nenhuma referência solta a `PageHeader`/`Spinner` nas telas migradas · no DS, `FormScreen` com botões auxiliares rende **1 submit em 3 botões**.
+Os 113 arquivos parseiam · nenhum import órfão **em nenhuma tela do painel** (dois achados e removidos: `Select` no `FerramentaEditor`, `Button` no `PerfilEditor`) · nenhuma referência solta a `PageHeader`/`Spinner` nas telas migradas · no DS, `FormScreen` com botões auxiliares rende **1 submit em 3 botões**.
+
+**Nota sobre a verificação:** o primeiro detector de import órfão acusou 6 falsos positivos porque removia `import[^;]*;` de forma gananciosa — num arquivo com a palavra "importar" dentro de um comentário, ele engolia o JSX seguinte e concluía que o componente não era usado. Corrigido para remover só linhas que **começam** com `import`. Detector que erra para mais é quase tão ruim quanto o que erra para menos: gasta confiança e ensina a ignorar o aviso.
 
 ### Fora desta leva, de propósito
 
