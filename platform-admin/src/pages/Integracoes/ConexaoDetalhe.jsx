@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, Tabs, Badge, Button, CopyButton, DescriptionList, Timeline, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import { DetailScreen, Card, Badge, Button, CopyButton, DescriptionList, Timeline, EmptyState, useToast } from '@studio-ux-ds/react';
 import {
   getConnection, listConnectionLogs, discoverConnection, testConnection,
 } from '../../services/integrations';
@@ -117,15 +117,6 @@ export default function ConexaoDetalhe() {
     return env ? `${ws.name} / ${env.name || env.kind || ''}` : ws.name;
   }, [conexao, workspaces]);
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   if (!conexao) return null;
 
   const meta = statusMeta(conexao.status);
@@ -142,50 +133,40 @@ export default function ConexaoDetalhe() {
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={conexao.name}
-        subtitle={`${prettifyProviderKey(conexao.provider_key)} · ${escopo}`}
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/integracoes/conexoes')}>Voltar</Button>
-            {podeEscrever && (
-              <Button
-                variant="secondary"
-                icon="zap"
-                loading={testando}
-                title="Abre uma conexão real com o sistema do outro lado e conta o que voltou"
-                onClick={handleTest}
-              >
-                Testar
-              </Button>
-            )}
-            {podeEscrever && precisaAutorizar && (
-              <GoogleOAuthButton connectionId={conexao.id} onActivated={() => load()} />
-            )}
-            {podeEscrever && (
-              <Button variant="primary" icon="edit" onClick={() => navigate(`/integracoes/conexoes/${id}/editar`)}>
-                Editar
-              </Button>
-            )}
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={meta.tone}>{meta.label}</Badge>
-            {(conexao.tags || []).map((t) => <Badge key={t} tone="info">{t}</Badge>)}
-          </div>
-          {conexao.status_detail && (
-            <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>{conexao.status_detail}</p>
+    <DetailScreen
+      back={{ label: 'Voltar para conexões', onClick: () => navigate('/integracoes/conexoes') }}
+      title={conexao.name}
+      subtitle={`${prettifyProviderKey(conexao.provider_key)} · ${escopo}`}
+      actions={
+        <>
+          {podeEscrever && (
+            <Button
+              variant="secondary"
+              icon="zap"
+              loading={testando}
+              title="Abre uma conexão real com o sistema do outro lado e conta o que voltou"
+              onClick={handleTest}
+            >
+              Testar
+            </Button>
           )}
-        </div>
-      </Card>
-
-      <Tabs items={abas} value={aba} onChange={setAba} />
-
+          {podeEscrever && precisaAutorizar && (
+            <GoogleOAuthButton connectionId={conexao.id} onActivated={() => load()} />
+          )}
+          {podeEscrever && (
+            <Button variant="primary" icon="edit" onClick={() => navigate(`/integracoes/conexoes/${id}/editar`)}>
+              Editar
+            </Button>
+          )}
+        </>
+      }
+      tabs={abas}
+      tab={aba}
+      onTab={setAba}
+      loading={loading}
+      /* `bare`: cada aba traz os próprios cartões. */
+      bare
+    >
       {aba === 'dados' && (
         <>
           <Card>
@@ -332,6 +313,6 @@ export default function ConexaoDetalhe() {
           </div>
         </Card>
       )}
-    </div>
+    </DetailScreen>
   );
 }

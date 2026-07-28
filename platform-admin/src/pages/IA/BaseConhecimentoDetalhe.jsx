@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, DescriptionList, FormRow, Field, Input, NumericInput, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { DetailScreen, Card, DataTable, EmptyState, Badge, FormRow, Field, Input, NumericInput, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getKnowledgeBase, deleteKnowledgeBase, queryKnowledgeBase,
 } from '../../services/ai';
@@ -85,10 +85,11 @@ export default function BaseConhecimentoDetalhe() {
   // state, mostramos o cabeçalho em vez de uma tela em branco.
   if (loading && !base) {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
+      <DetailScreen
+        back={{ label: 'Voltar para conhecimento', onClick: () => navigate('/ia/conhecimento') }}
+        title="Carregando…"
+        loading
+      />
     );
   }
 
@@ -97,59 +98,44 @@ export default function BaseConhecimentoDetalhe() {
   const docs = base.documents || [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <DetailScreen
+        back={{ label: 'Voltar para conhecimento', onClick: () => navigate('/ia/conhecimento') }}
         title={base.name}
         subtitle={base.description || `${docs.length} documento(s) indexado(s) para consulta dos assistentes.`}
-        actions={
+        actions={canWrite ? (
           <>
-            <Button variant="secondary" onClick={() => navigate('/ia/conhecimento')}>
-              Voltar
+            <Button
+              variant="danger"
+              icon="trash"
+              title="Excluir a base e tudo que ela indexou — não dá para desfazer"
+              onClick={() => setRemoving(true)}
+            >
+              Excluir base
             </Button>
-            {canWrite && (
-              <>
-                <Button
-                  variant="danger"
-                  icon="trash"
-                  title="Excluir a base e tudo que ela indexou — não dá para desfazer"
-                  onClick={() => setRemoving(true)}
-                >
-                  Excluir base
-                </Button>
-                <Button
-                  variant="primary"
-                  icon="plus"
-                  onClick={() => navigate(`/ia/conhecimento/${id}/documentos/novo`, { state: { base } })}
-                >
-                  Adicionar documento
-                </Button>
-              </>
-            )}
+            <Button
+              variant="primary"
+              icon="plus"
+              onClick={() => navigate(`/ia/conhecimento/${id}/documentos/novo`, { state: { base } })}
+            >
+              Adicionar documento
+            </Button>
           </>
-        }
-      />
+        ) : null}
+        tabs={PAGE_TABS}
+        tab={tab}
+        onTab={setTab}
+        /* `bare`: cada aba (documentos / testar) traz os próprios cartões. */
+        bare
+      >
+        {tab === 'docs'
+          ? <DocsTab docs={docs} loading={loading} canWrite={canWrite} baseId={id} base={base} />
+          : <QueryTab baseId={id} />}
+      </DetailScreen>
 
-      <Card>
-        <div style={{ padding: 20 }}>
-          <DescriptionList
-            items={[
-              { key: 'Documentos', value: String(docs.length) },
-              { key: 'Modelo de indexação', value: <span style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}>{base.embedding_model}</span> },
-              { key: 'Tamanho do trecho', value: `${base.chunk_size} caracteres (sobreposição de ${base.chunk_overlap})` },
-              { key: 'Atualizada em', value: formatDateTime(base.updated_at) },
-            ]}
-          />
-        </div>
-      </Card>
-
-      <Tabs items={PAGE_TABS} value={tab} onChange={setTab} />
-
-      {tab === 'docs'
-        ? <DocsTab docs={docs} loading={loading} canWrite={canWrite} baseId={id} base={base} />
-        : <QueryTab baseId={id} />}
-
-      {/* 5 patrasques: ConfirmDialog + disclaimer na mensagem + tooltip no botão
-          + loading + gate can(). ConfirmDialog não tem campo → segue Modal. */}
+      {/* Overlay fica FORA do molde: dentro dele, o Enter do diálogo agiria
+          sobre o conteúdo da aba. 5 patrasques: ConfirmDialog + disclaimer na
+          mensagem + tooltip no botão + loading + gate can(). */}
       <ConfirmDialog
         open={removing}
         danger
@@ -160,7 +146,7 @@ export default function BaseConhecimentoDetalhe() {
         onClose={() => setRemoving(false)}
         onConfirm={confirmRemove}
       />
-    </div>
+    </>
   );
 }
 
@@ -191,9 +177,7 @@ function DocsTab({ docs, loading, canWrite, baseId, base }) {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Spinner size="lg" />
-      </div>
+      <Spinner size="lg" center />
     );
   }
 

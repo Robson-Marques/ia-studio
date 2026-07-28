@@ -103,8 +103,14 @@ armadilhas). Resumo para re-ancorar:
   ConexaoEditar, PerfilEditor, MapeamentoEditor). **O Enter passou a enviar** (nenhum era `<form>`), as
   ações desceram do cabeçalho para o rodapé do cartão, sem permissão o Salvar não aparece.
   **Fora de propósito:** `AgenteEditor`, `IncidenteEditor` e `AberturaChamado` (abas + fluxo próprio =
-  `form`+`detail`, exige leitura tela a tela). **Ficam:** `detail` (~5), `dashboard` (3),
-  `wizard` (`ConexaoNova`), `list` (~5 que montam tabela à mão).
+  `form`+`detail`, exige leitura tela a tela).
+- **ADOÇÃO DOS MOLDES: família `detail` FEITA** (v0.10.26) — `ConexaoDetalhe`, `BaseConhecimentoDetalhe`,
+  `ExecucaoDetalhe`, `AprovacaoDetalhe`, `MemoriaEntradas` instanciam `DetailScreen`. **Primeira família
+  que NÃO pediu nada ao DS** — sinal de que o molde amadureceu. Achou um bug vivo: `AprovacaoDetalhe`
+  tinha `breadcrumb={breadcrumb}` no `PageHeader` (prop inexistente **com variável inexistente**) →
+  `ReferenceError`, tela em branco — quatro linhas abaixo de um comentário meu dizendo que essa prop não
+  existe. **Documentar a regra não impede de quebrá-la.**
+  **Ficam:** `dashboard` (3), `wizard` (`ConexaoNova`), `list` (~5 que montam tabela à mão).
 - **CUIDADO AO PÔR ALGO DENTRO DE UM `FormScreen`:** botão sem `type` dentro de `<form>` **envia o
   formulário**. O DS passou a nascer com `type="button"` (v1.2.47) por causa disso — foi achado na
   lixeira de "remover membro" do `EquipeEditor`, que salvaria a equipe e navegaria. Diálogo/overlay

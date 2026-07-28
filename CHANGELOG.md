@@ -1,5 +1,28 @@
 # Changelog — IA Studio
 
+## v0.10.26 - 2026-07-27 (Família `detail`: 5 telas de registro no molde)
+
+Sem `db push`. Só frontend. **Sem bump do DS** — as cinco telas couberam no `DetailScreen` que já existe (v1.2.46), sem pedir nada novo. É a primeira família em que isso acontece.
+
+`Integracoes/ConexaoDetalhe` · `IA/BaseConhecimentoDetalhe` · `Automacao/ExecucaoDetalhe` · `IA/AprovacaoDetalhe` · `IA/MemoriaEntradas`
+
+### 🔴 Um bug de verdade, achado no caminho
+
+`IA/AprovacaoDetalhe` tinha `breadcrumb={breadcrumb}` no `PageHeader` — **prop que o DS não tem, com uma variável que não existe no arquivo**. Isso não é prop morta silenciosa: é `ReferenceError: breadcrumb is not defined` no render. **A tela de detalhe de uma aprovação estava quebrada** — abria em branco.
+
+O detalhe que dói: quatro linhas acima havia um comentário escrito por mim dizendo *"Breadcrumb NÃO vai no PageHeader (o componente do DS não tem essa prop)"*. O comentário estava certo e o código logo abaixo fazia exatamente o contrário. **Documentar a regra não impede de quebrá-la** — o que impede é a regra estar no componente ou numa checagem.
+
+### O que muda nas cinco
+
+- **"Voltar" garantido pelo molde**, fora das ações do cabeçalho. Antes ele era um `Button variant="secondary"` no meio das ações do registro, competindo com "Editar" e "Excluir" — três botões cinzas em que o de sair parecia mais uma operação.
+- **As ações do cabeçalho ficaram só com o que age sobre o registro:** Testar/Editar (conexão), Cancelar/Reexecutar (execução), Excluir/Adicionar documento (base), Editar perfil (memória).
+- **Carregando e erro dentro da aba**, não no lugar da tela: quem já leu o título e clicou numa aba não vê o cabeçalho sumir.
+- Sumiram os dois blocos de carregando com um `PageHeader` escrito "Carregando…", e os `flex justify-center py-12` montados à mão viraram `Spinner center`.
+
+### Verificado
+
+Os 113 arquivos parseiam · nenhum import órfão em nenhuma tela (um achado e removido: `DescriptionList` no `BaseConhecimentoDetalhe`) · nenhum resíduo de `PageHeader`/`Tabs` nas cinco.
+
 ## v0.10.25 - 2026-07-27 (Linhas de ação alinhadas — o `FormRow`)
 
 Sem `db push`. Só frontend. Bump do DS: `^1.2.47` → **`^1.2.49`** (`FormRow`).

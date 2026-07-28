@@ -6,7 +6,7 @@
 > governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
 
-## Estado atual — legado visual extinto (2026-07-27, v0.10.25 / DS ^1.2.49)
+## Estado atual — legado visual extinto (2026-07-27, v0.10.26 / DS ^1.2.49)
 
 O `platform-admin` opera com a **casca AppShell do Studio UX** e o **Dashboard**
 migrado para `PageHeader` + `StatCard` + `Card` do DS. O piloto isolado
@@ -70,7 +70,11 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
   **Remover a dependência foi três lugares, não dois** (v0.10.23): o código, o `package.json` e **tudo que a nomeia por string**. O `manualChunks: { 'vendor-icons': ['lucide-react'] }` do `vite.config.js` ficou para trás e **derrubou o build da v0.10.22** com `Could not resolve entry module` — `manualChunks` nomeia um módulo de *entrada*, e nenhuma busca por `import … from` o encontra. O `grep` certo é pelo **nome do pacote no repositório inteiro** (fora `node_modules` e `dist`); ele também mostra que o `platform-console` mantém a dependência **de propósito**, porque não foi migrado ao DS.
 
   **Ícone é NOME, nunca componente.** `<CollapsedRail icon="layers" />` e `{ icon: 'camera' }` — não `icon={Layers}`. Guardar componente era exatamente o que obrigava dois arquivos a manter a outra biblioteca viva: precisavam de algo que se pudesse passar como valor. E foi onde o sweep quase quebrou o sistema: a troca mecânica removeu os `import` e deixou as referências vivas, o que daria tela em branco no trilho do canvas e no menu de anexo — sem erro de build.
-- **Moldes de tela.** Os **9** existem em React (DS v1.2.46). Instanciados aqui: `ListScreen`, `AuthScreen` (login + convite), `MessageScreen` (404 + sem-permissão) e **`FormScreen` em 9 editores** (v0.10.24), mais **`FormRow` em 5 linhas de ação** (v0.10.25). Faltam adotar: `detail` (~5 telas), `dashboard` (3), `wizard` (`ConexaoNova`), `list` em ~5 que ainda montam tabela à mão.
+- **Moldes de tela.** Os **9** existem em React (DS v1.2.46). Instanciados aqui: `ListScreen`, `AuthScreen` (login + convite), `MessageScreen` (404 + sem-permissão) e **`FormScreen` em 9 editores** (v0.10.24), mais **`FormRow` em 5 linhas de ação** (v0.10.25) e **`DetailScreen` em 5 telas de registro** (v0.10.26). Faltam adotar: `dashboard` (3), `wizard` (`ConexaoNova`), `list` em ~5 que ainda montam tabela à mão, e os 3 editores grandes com abas (`AgenteEditor`, `IncidenteEditor`, `AberturaChamado`).
+
+  **A família `detail` foi a primeira a não pedir nada ao DS** — as cinco couberam no `DetailScreen` como ele já era. É o sinal que se procura numa adoção: quando o consumidor para de precisar evoluir o DS a cada família, o molde amadureceu.
+
+  **"Voltar" é do molde, não das ações.** Nas cinco ele era um `Button variant="secondary"` no meio das ações do registro, competindo com Editar e Excluir — três botões cinzas em que o de sair parecia mais uma operação. No cabeçalho ficam só as ações que agem sobre o registro.
 
   **Dentro de um `FormScreen`, botão sem `type` envia o formulário.** O DS passou a nascer com `type="button"` (v1.2.47) exatamente por isso — foi achado na lixeira de "remover membro" do `EquipeEditor`, que salvaria a equipe e navegaria, sem erro nenhum. Diálogo e overlay ficam **fora** do `FormScreen`, senão o Enter deles submete tudo.
 

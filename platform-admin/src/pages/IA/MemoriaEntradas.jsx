@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, FormRow, Field, Input, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { DetailScreen, Card, DataTable, EmptyState, Badge, FormRow, Field, Input, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMemoryProfile, listMemoryEntries } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MEMORY_SCOPES, formatDateTime } from './ia.constants';
@@ -81,32 +81,27 @@ export default function MemoriaEntradas() {
 
   if (loadingProfile) {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
+      <DetailScreen
+        back={{ label: 'Voltar para memória', onClick: () => navigate('/ia/memoria') }}
+        title="Carregando…"
+        loading
+      />
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={profile?.name || 'Perfil de memória'}
-        subtitle="O que o assistente já lembra neste perfil (somente leitura — a escrita acontece durante o atendimento)."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/ia/memoria')}>
-              Voltar
-            </Button>
-            {canWrite && (
-              <Button variant="primary" icon="edit" onClick={() => navigate(`/ia/memoria/perfis/${id}/editar`)}>
-                Editar perfil
-              </Button>
-            )}
-          </>
-        }
-      />
-
+    <DetailScreen
+      back={{ label: 'Voltar para memória', onClick: () => navigate('/ia/memoria') }}
+      title={profile?.name || 'Perfil de memória'}
+      subtitle="O que o assistente já lembra neste perfil (somente leitura — a escrita acontece durante o atendimento)."
+      actions={canWrite ? (
+        <Button variant="primary" icon="edit" onClick={() => navigate(`/ia/memoria/perfis/${id}/editar`)}>
+          Editar perfil
+        </Button>
+      ) : null}
+      /* `bare`: o filtro e a lista são dois cartões. */
+      bare
+    >
       <Card>
         <div style={{ padding: 20 }}>
           <FormRow
@@ -133,9 +128,7 @@ export default function MemoriaEntradas() {
       </Card>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size="lg" />
-        </div>
+        <Spinner size="lg" center />
       ) : !entries.length ? (
         <Card>
           <EmptyState
@@ -149,6 +142,6 @@ export default function MemoriaEntradas() {
       ) : (
         <DataTable columns={columns} rows={entries} getRowId={(e) => e.id} />
       )}
-    </div>
+    </DetailScreen>
   );
 }
