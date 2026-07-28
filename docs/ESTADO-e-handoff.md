@@ -92,11 +92,18 @@ armadilhas). Resumo para re-ancorar:
   componente** — `icon="layers"`, não `icon={Layers}`; guardar componente era o que obrigava o canvas
   e o seletor de anexo a manter a outra biblioteca viva, e foi onde o sweep quase deixou dois
   identificadores órfãos (tela em branco no clique, sem erro de build).
-- **LACUNA MEDIDA E AINDA ABERTA** (auditoria de 2026-07-27):
-  1. **6 dos 9 moldes de tela não existem em React** (`dashboard`, `detail`, `form`, `search`,
-     `settings`, `wizard`) e temos telas em todas essas classes: **18 detalhe/editor em rota**, 16
-     formulários, 1 wizard (`ConexaoNova`), 3 dashboards. Cada uma foi arranjada à mão — é a mesma
-     lacuna que o login tinha, ainda não disparada porque ninguém comparou lado a lado.
+- **OS 9 MOLDES DE TELA EXISTEM EM REACT** (DS v1.2.46). A lacuna que estava aberta era do **DS**, e
+  foi fechada lá: `DetailScreen`, `FormScreen`, `DashboardScreen`, `SearchScreen`,
+  `SettingsScreen`(+`SettingsSection`) e `WizardScreen` se juntaram a `ListScreen`, `AuthScreen` e
+  `MessageScreen`. Cada um com spec no Grupo G da `COMPONENT_LIBRARY` e story com os estados reais.
+  **Antes de escrever tela de classe recorrente, instanciar o molde** — e ler o "quando NÃO usar",
+  que é parte dele (passo a passo para campos independentes PIORA a tela).
+- **ADOÇÃO DOS MOLDES AQUI: frente aberta, ainda não começada.** As telas foram migradas para os
+  *componentes* do DS, não para os *moldes* — então cada uma tem o seu arranjo, o seu jeito de mostrar
+  carregando e a sua decisão sobre onde fica o "voltar". Triagem automática (heurística, **confere
+  tela a tela antes de agir**): ~5 de detalhe, ~17 de formulário/editor, 3 de painel, 1 passo a passo
+  (`Integracoes/ConexaoNova`), 5 de lista que ainda não usam `ListScreen`. `Login`, `AcceptInvite` e
+  `Aviso` **já** instanciam molde. Fazer **por família**, como o resto da migração — não num sweep só.
 - **As telas de acesso e de aviso instanciam MOLDES do DS** (v0.10.21): `AuthScreen` no login e no
   aceite de convite, `MessageScreen` no 404 e no sem-permissão. As quatro nasceram escritas à mão
   porque os moldes existiam só como HTML no gerador — **especificação sem materialização na camada do
