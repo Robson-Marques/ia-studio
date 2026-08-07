@@ -1,7 +1,7 @@
 # Adoção do Studio UX no IA Studio
 
 > Como o `platform-admin` consome o design system **Studio UX** (pacotes
-> `@studio-ux-ds/*`, publicados no GitHub Packages da org `studio-ux-ds`).
+> `@studio-ux-ds/*`, publicados no GitLab da Nivoo).
 > Documento vivo — descreve o estado atual, não o histórico. A frente é
 > governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
@@ -50,7 +50,7 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 | Item | Descrição |
 |---|---|
 | Deps | `@studio-ux-ds/tokens`, `@studio-ux-ds/components`, `@studio-ux-ds/icons`, `@studio-ux-ds/react` (`^1.2.49`) — o `icons` é **peerDependency** do `react` e passou a ser declarado na v0.10.18 |
-| `.npmrc` | Aponta `@studio-ux-ds` para GitHub Packages, token via `NODE_AUTH_TOKEN`. **Sem BOM** — conferido em 2026-07-27 (o arquivo começa em `@studio`), o débito 1 está resolvido |
+| `.npmrc` | Aponta `@studio-ux-ds` para o GitLab da Nivoo, token via `GITLAB_PACKAGE_TOKEN`. **Sem BOM** — o arquivo começa em `@studio`. |
 | `main.jsx` | Importa `tokens.css` + `components.css`, chama `configureTheme({ namespace: 'ia-studio' })` + `applyTheme()`, envolve o app com `<ToastProvider>` do DS |
 | `ThemeContext.jsx` | Wrapper fino do mecanismo de tema do DS. Fonte única = DS (chaves namespaçadas `ia-studio_su_*`); espelha `.dark` no `<html>` para compatibilidade com telas Tailwind com `dark:`; `MutationObserver` sincroniza estado quando o AppShell/Customize trocam o tema |
 | `Layout.jsx` | Casca via `AppShell` do DS. Slots: brand, nav (grupos com filtro por permissão), version, breadcrumb, topbarContext (seletor de workspace + badge de ambiente), user, userMenuItems (Minha conta, Trocar senha), `onNotifications` (redireciona pra `/automacao/notificacoes`), `notifications` (polling 30s), `customize` (painel embutido), `onLogout` |
@@ -84,13 +84,13 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
 ### 1. `.npmrc` era doc-adiante, agora é doc-alinhado
 
-A fase 1 (v0.9.79) documentava `.npmrc` como existente, mas o arquivo não estava versionado. Nesta fase 2, o `.npmrc` foi restabelecido no formato descrito abaixo — o **valor** do token nunca é commitado (fica em `NODE_AUTH_TOKEN` no ambiente do build).
+A fase 1 (v0.9.79) documentava `.npmrc` como existente, mas o arquivo não estava versionado. O `.npmrc` é versionado; o **valor** do token nunca é commitado (fica em `GITLAB_PACKAGE_TOKEN` no ambiente do build).
 
 > **Nota operacional (2026-07-24):** o `.npmrc` deve conter exatamente:
 >
 > ```
-> @studio-ux-ds:registry=https://npm.pkg.github.com
-> //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+> @studio-ux-ds:registry=https://git.nivoo.dev.br/api/v4/projects/1/packages/npm/
+> //git.nivoo.dev.br/api/v4/projects/1/packages/npm/:_authToken=${GITLAB_PACKAGE_TOKEN}
 > ```
 >
 > Criado em 2026-07-24. **Nota de 2026-07-26:** o arquivo está gravado **com BOM**
@@ -208,25 +208,25 @@ trocar o import correspondente em `App.jsx`:
 - Rota `/conta/senha`: excluir a rota do `App.jsx`. O modal de troca de senha volta a viver no `Header.legacy` (que só é usado se o Layout legado for reativado).
 - `.npmrc` e `main.jsx`: reversão dos dois é 5 linhas cada — vale documentar caso a caso, não vale duplicar aqui.
 
-## Pré-requisito operacional — autenticar no GitHub Packages
+## Pré-requisito operacional — autenticar no GitLab da Nivoo
 
 Os pacotes são **privados** (org `studio-ux-ds`). Para o `npm install` baixá-los, o ambiente precisa de um token do GitHub com escopo **`read:packages`**.
 
-**Fonte única do token:** `${API_DIR}/.env` (`/opt/iastudio/platform-api/.env`), variável `NODE_AUTH_TOKEN`. Nada de `.bashrc`, nada de `ecosystem.config.js`, nada de export manual — o `upgrade.sh` (a partir de v0.9.81) faz `source .env` antes de qualquer `npm install`, então o valor fica visível para os builds do platform-api, platform-admin e platform-console.
+**Fonte única do token:** `${API_DIR}/.env` (`/opt/iastudio/platform-api/.env`), variável `GITLAB_PACKAGE_TOKEN`. Nada de `.bashrc`, nada de `ecosystem.config.js`, nada de export manual — o `upgrade.sh` faz `source .env` antes de qualquer `npm install`, então o valor fica visível para os builds do platform-api, platform-admin e platform-console.
 
 1. Gere um token clássico no GitHub (Settings → Developer settings → Personal access tokens → Classic) com o escopo **`read:packages`**. Copie o `ghp_...` (só aparece uma vez).
 
 2. O `.npmrc` do `platform-admin` (versionado) referencia esse token por variável de ambiente (não guarda segredo):
 
    ```
-   @studio-ux-ds:registry=https://npm.pkg.github.com
-   //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+   @studio-ux-ds:registry=https://git.nivoo.dev.br/api/v4/projects/1/packages/npm/
+   //git.nivoo.dev.br/api/v4/projects/1/packages/npm/:_authToken=${GITLAB_PACKAGE_TOKEN}
    ```
 
-3. **Adicionar o token no `.env` do platform-api** — o `install.sh` (a partir de v0.9.81) pergunta durante instalação limpa (`--npm-token=...` também aceito em modo headless). Em instalação já existente, adicionar manualmente:
+3. **Adicionar o token no `.env` do platform-api** — o `install.sh` pergunta durante instalação limpa (`--gitlab-package-token=...` também aceito em modo headless). Em instalação já existente, adicionar manualmente:
 
    ```bash
-   echo "NODE_AUTH_TOKEN=ghp_seu_token_read_packages" >> /opt/iastudio/platform-api/.env
+   echo "GITLAB_PACKAGE_TOKEN=seu_token_de_leitura" >> /opt/iastudio/platform-api/.env
    ```
 
    Reiniciar o backend para o Nest recarregar `.env` (o painel de Atualização lê a var via `source .env` do upgrade.sh — mas se você aplicar antes do reload, o backend passa env do PM2 já herdada; garante-se com `pm2 delete + pm2 start ecosystem.config.js`):

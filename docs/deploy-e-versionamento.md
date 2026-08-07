@@ -61,7 +61,7 @@ Ao concluir qualquer mudança de código em produção futura, entregar ao Robso
 **Todo segredo consumido durante o `upgrade.sh` (npm install, prisma, builds) mora em `${API_DIR}/.env` — nunca no `.bashrc` do root, nem no `ecosystem.config.js` do PM2.** A partir da v0.9.81 o `upgrade.sh` faz `set -a; source "$ENV_FILE"; set +a` antes das fases de build, então qualquer var no `.env` fica visível para os processos filhos sem depender de herança do PM2.
 
 Exemplos:
-- **`NODE_AUTH_TOKEN`** — PAT do GitHub com escopo `read:packages`, usado pelo `.npmrc` do `platform-admin` para autenticar em `@studio-ux-ds/*` (GitHub Packages). O `install.sh` a partir de v0.9.81 pergunta durante instalação (`--npm-token=...` em modo headless). Adicionar em servidor existente: `echo "NODE_AUTH_TOKEN=ghp_..." >> /opt/iastudio/platform-api/.env`.
+- **`GITLAB_PACKAGE_TOKEN`** — credencial somente de leitura do GitLab da Nivoo, usada pelo `.npmrc` do `platform-admin` para autenticar em `@studio-ux-ds/*`. O `install.sh` aceita `--gitlab-package-token=...` em modo headless. Adicionar em servidor existente: `echo "GITLAB_PACKAGE_TOKEN=..." >> /opt/iastudio/platform-api/.env`.
 - `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET` — mesmo padrão. Já estão no `.env` gerado pelo `install.sh`.
 
 **Armadilha comum:** um arquivo antes criado manualmente no servidor (como `platform-admin/.npmrc`) que depois passa a ser **versionado** por um commit — o `git checkout <tag_nova>` recusa com `error: The following untracked working tree files would be overwritten by checkout`. Antes de aplicar a tag que introduz o versionamento, apagar/mover o arquivo untracked do servidor:

@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.10.27 - 2026-08-06 (Studio UX pelo GitLab próprio)
+
+Sem `db push`. Scripts, configuração de pacote e documentação de deploy.
+
+- O painel passa a buscar `@studio-ux-ds/*` do registro privado da Nivoo no GitLab, usando `GITLAB_PACKAGE_TOKEN` somente no `.env` do servidor.
+- O instalador aceita `--gitlab-package-token` e não permite uma instalação nova sem a credencial de leitura necessária ao build.
+
 ## v0.10.26 - 2026-07-27 (Família `detail`: 5 telas de registro no molde)
 
 Sem `db push`. Só frontend. **Sem bump do DS** — as cinco telas couberam no `DetailScreen` que já existe (v1.2.46), sem pedir nada novo. É a primeira família em que isso acontece.

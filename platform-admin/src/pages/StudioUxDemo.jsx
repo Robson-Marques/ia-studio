@@ -5,7 +5,7 @@ import {
   Field, Input, Select, Switch, SegmentedControl,
 } from '@studio-ux-ds/react';
 
-// PILOTO DE ADOÇÃO — consome os pacotes publicados @studio-ux-ds/* (GitHub Packages)
+// PILOTO DE ADOÇÃO — consome os pacotes publicados @studio-ux-ds/* (GitLab da Nivoo)
 // dentro do app real do IA Studio. Rota isolada: NÃO toca em nenhuma tela existente.
 // O tema do Studio UX é escopado a esta página via data-theme, sincronizado com o
 // toggle do IA Studio (que usa a classe .dark). Nada vaza para o resto do painel.
@@ -61,7 +61,7 @@ export default function StudioUxDemo() {
           </div>
           <h1 style={{ fontSize: 'var(--su-text-h1)', fontWeight: 600, margin: '10px 0 4px' }}>Studio UX dentro do IA Studio</h1>
           <p style={{ color: 'var(--su-text-secondary)', margin: 0, fontSize: 'var(--su-text-body)' }}>
-            Esta tela consome os pacotes publicados no GitHub Packages (tokens + componentes + adapter React).
+            Esta tela consome os pacotes publicados no GitLab da Nivoo (tokens + componentes + adapter React).
             É uma rota isolada — nenhuma tela existente foi tocada. O tema segue o toggle do IA Studio.
           </p>
         </header>
