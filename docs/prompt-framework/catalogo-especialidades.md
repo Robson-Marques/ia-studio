@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.0.0
+version: 1.1.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
-reviewed_at: "2026-07-23"
-released_at: "2026-07-23"
-change_reason: Primeira release. Cria o catálogo local do IA Studio no schema formal `prompt-framework/v1` (STUDIO-WORKFLOW v3.1.0), até agora inexistente — o repo só tinha o stub `README.md` apontando pro central. Nasce já com a primeira task local (`ia-studio.studio-ux-adoption@1.0.0`), criada nesta mesma leva pela `workflow.specialty-creation@1.0.0` após aprovação do relatório de alinhamento de 2026-07-23.
+reviewed_at: "2026-08-07"
+released_at: "2026-08-07"
+change_reason: MINOR. Adiciona a task local `ia-studio.tenant-domains@1.0.0` (tenancy/domínios/subdomínios por organização), criada pela `workflow.specialty-creation@1.0.0` após o `ok` do relatório de alinhamento de 2026-08-07 (status `especialidade não catalogada`). Cobre parte das lacunas "Backend/API multi-tenant" e "Console SaaS" antes só declaradas.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -27,6 +27,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 | Slug | Identidade operacional | Missão | Prompt |
 |---|---|---|---|
 | `ia-studio.studio-ux-adoption` | Engenheiro Frontend Sênior especializado em adoção controlada de Design Systems | Governar a adoção do Studio UX no `platform-admin` do IA Studio por famílias de tela, respeitando o piloto `/studio-ux-demo` já existente, o contexto multi-tenant e as regras do próprio DS. | [adocao-studio-ux.md](especialidades/adocao-studio-ux.md) |
+| `ia-studio.tenant-domains` | Engenheiro de plataforma multi-tenant (tenancy, domínios, resolução por Host) | Governar mudanças de tenancy no IA Studio — modelagem de domínio/organização, resolução de tenant por Host, branding white-label por domínio e gestão no Console — respeitando `organization_id`/workspace/environment e a fronteira app↔infra (Nginx/TLS fora do deploy por tag). | [tenant-domains.md](especialidades/tenant-domains.md) |
 
 ## Critérios de aceite
 
@@ -39,8 +40,8 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 
 Estas responsabilidades **existem** no IA Studio mas ainda não têm especialidade catalogada — quando o próximo pedido tocar em uma delas, o alinhador retornará `especialidade não catalogada` e recomendará a criação. Ficam registradas aqui como lacuna conhecida:
 
-- **Backend / API multi-tenant** (`platform-api`): modelagem de domínio, `organization_id`, ACL, eventos.
-- **Console SaaS** (`platform-console`): backoffice interno (gestão de orgs, planos, uso).
+- **Backend / API multi-tenant** (`platform-api`): modelagem de domínio, `organization_id`, ACL, eventos. *(A fatia de **tenancy/domínios/subdomínios** já está coberta por `ia-studio.tenant-domains@1.0.0`; o restante — ACL, eventos, outras entidades — segue lacuna.)*
+- **Console SaaS** (`platform-console`): backoffice interno (gestão de orgs, planos, uso). *(A **gestão de domínios por org** entra por `ia-studio.tenant-domains@1.0.0`; planos/uso/demais seguem lacuna.)*
 - **Runtime de assistentes**: prompts operacionais, tools, knowledge base, memória, workflows — regras próprias, **não confundir** com este framework (que governa pedidos humanos de desenvolvimento).
 - **Integrações externas** (Meta, Google, gateways, etc.) — se surgirem novas.
 - **Segurança / privacidade** (LGPD, retenção, backup, ACL multi-tenant).
@@ -51,3 +52,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | Versão | Estado | Revisão | Impacto |
 |---|---|---|---|
 | 1.0.0 | released | Aprovado por Robson em 2026-07-23 | Primeira release. Catálogo local nasce simultaneamente à primeira task (`ia-studio.studio-ux-adoption@1.0.0`) pela mesma execução de `workflow.specialty-creation@1.0.0`. |
+| 1.1.0 | released | Aprovado por Robson em 2026-08-07 | MINOR. Adiciona `ia-studio.tenant-domains@1.0.0` (tenancy/domínios/subdomínios por org), criada por `workflow.specialty-creation@1.0.0` após o relatório de alinhamento de 2026-08-07. |
