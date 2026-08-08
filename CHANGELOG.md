@@ -1,5 +1,25 @@
 # Changelog — IA Studio
 
+## v0.10.31 - 2026-08-07 (Console em domínio dedicado abre na raiz, sem /console/)
+
+Sem `db push`. Scripts de build/deploy (`install.sh`, `upgrade.sh`) + vhost (`domains-sync.sh`).
+
+A v0.10.30 tirou a página branca redirecionando para `/console/` — funcionava, mas deixava a URL feia num domínio que existe só para o Console. Agora é a solução certa:
+
+- **Duas saídas de build do Console.** `base` do Vite e `basename` do router são definidos **em build**, então um `dist` só não serve dois lugares. O `install.sh` e o `upgrade.sh` passam a gerar também `platform-console/dist-root` (build com `base=/`), além do `dist` normal (`/console/` no modo single). O `npm install` continua rodando uma vez.
+- **O vhost do domínio dedicado serve `dist-root` na raiz** — `console.seudominio.com.br` abre o Console direto, sem `/console/`.
+- **Fallback sem página branca:** se o servidor ainda não passou pelo upgrade que gera o `dist-root`, o script avisa e cai no layout `/console/` (funciona) em vez de servir a raiz quebrada.
+- Para aplicar num vhost já existente: `bash scripts/domains-sync.sh --host <host> --force-vhost` (o script é *create-if-missing* para não apagar o bloco TLS do certbot).
+
+## v0.10.30 - 2026-08-07 (Fix: Console em domínio dedicado abria em branco)
+
+Sem `db push`. Só o script de operação (`scripts/domains-sync.sh`) — nenhum código compilado mudou.
+
+- **A causa:** o Console é buildado com `base=/console/` (o `index.html` pede `/console/assets/…` e o router usa `basename=/console/`). O vhost que eu gerava para um host de superfície `CONSOLE` servia o `dist` na **raiz** do domínio — o HTML carregava, os assets davam 404 e o router não casava rota nenhuma. Resultado: **página branca**, com a situação marcada corretamente como "No ar" (DNS e certificado estavam certos; o errado era o layout do vhost).
+- **A correção:** o vhost de host `CONSOLE` passa a espelhar o layout que já funciona no domínio principal — `/` redireciona para `/console/`, servido por alias, com `/api/` no proxy.
+- **`--force-vhost`:** o script é *create-if-missing* de propósito (para não apagar o bloco TLS que o certbot injeta), então um vhost criado por versão anterior não seria corrigido sozinho. O novo flag recria o arquivo; o certbot reinjeta o TLS em seguida, porque a emissão é idempotente.
+- Registrado em `docs/dominios-e-subdominios.md`. **Pendência conhecida:** servir o Console na raiz do domínio dedicado (sem o `/console/`) exigiria um segundo build com `base=/` — muda `install.sh`/`upgrade.sh` e fica como frente própria.
+
 ## v0.10.29 - 2026-08-07 (Endereço entra no ar pelo painel — sem terminal)
 
 Sem `db push`. Backend + Console.

@@ -406,12 +406,28 @@ else
 fi
 log_ok "platform-admin -> dist/"
 
+# O Console pode ser servido em DOIS lugares ao mesmo tempo:
+#   * sob /console/ do dominio principal (modo single) -> dist
+#   * na RAIZ de um dominio dedicado, cadastrado em Enderecos -> dist-root
+# Base do Vite e basename do router sao definidos em BUILD, entao um dist so nao
+# serve os dois: por isso a 2a copia com base=/ (npm install roda uma vez).
+build_console_all() { # $1=api_url  $2=base_principal
+  build_front "${CONSOLE_DIR}" "$1" "$2"
+  rm -rf "${CONSOLE_DIR}/dist-root"
+  if [ "$2" = "/" ]; then
+    cp -r "${CONSOLE_DIR}/dist" "${CONSOLE_DIR}/dist-root"
+  else
+    cd "${CONSOLE_DIR}"
+    VITE_API_URL="$1" npm run build -- --base="/" --outDir=dist-root
+  fi
+}
+
 log_step "11b" "Compilando Console (platform-console)"
 if [ "${MODE}" = "single" ]; then
   # Console servido sob /console/ no mesmo dominio — base e router basename batem.
-  build_front "${CONSOLE_DIR}" "/api/v1" "/console/"
+  build_console_all "/api/v1" "/console/"
 else
-  build_front "${CONSOLE_DIR}" "https://${DOMAIN_API}/api/v1" "/"
+  build_console_all "https://${DOMAIN_API}/api/v1" "/"
 fi
 log_ok "platform-console -> dist/"
 

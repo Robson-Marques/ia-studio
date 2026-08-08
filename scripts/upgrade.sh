@@ -204,9 +204,22 @@ build_front "$ADMIN_DIR" "$ADMIN_API" "$ADMIN_BASE" "ADMIN_BUILD"
 log_db "ADMIN_BUILD" "painel do cliente publicado"
 
 # ---------- 10) CONSOLE ----------
+# Duas saidas: `dist` (base principal — /console/ no modo single) e `dist-root`
+# (base=/), usada quando o Console tem DOMINIO DEDICADO cadastrado em Enderecos.
+# Base do Vite/basename do router sao definidos em build — um dist so nao serve
+# os dois casos. O npm install acontece uma vez (dentro do build_front).
 log_db "CONSOLE_BUILD" "npm install + vite build (platform-console)"
 build_front "$CONSOLE_DIR" "$CONSOLE_API" "$CONSOLE_BASE" "CONSOLE_BUILD"
-log_db "CONSOLE_BUILD" "console publicado"
+rm -rf "$CONSOLE_DIR/dist-root"
+if [ "$CONSOLE_BASE" = "/" ]; then
+  cp -r "$CONSOLE_DIR/dist" "$CONSOLE_DIR/dist-root"
+else
+  cd "$CONSOLE_DIR"
+  VITE_API_URL="$CONSOLE_API" npm run build -- --base="/" --outDir=dist-root \
+    2>/tmp/iastudio_build.err >/dev/null \
+    || mark_failed "CONSOLE_BUILD" "vite build (dist-root) falhou: $(tail -c 800 /tmp/iastudio_build.err)"
+fi
+log_db "CONSOLE_BUILD" "console publicado (dist + dist-root)"
 
 # ---------- 11) ROTATE_BACKUPS (mantem 7) ----------
 log_db "ROTATE_BACKUPS" "mantendo os 7 backups mais recentes"

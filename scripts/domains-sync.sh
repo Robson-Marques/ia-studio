@@ -121,13 +121,38 @@ write_vhost() { # $1=hostname $2=surface
     return 0
   fi
 
-  # CONSOLE em dominio dedicado: o build do Console e feito com base=/console/
-  # (index.html pede /console/assets/... e o router usa basename=/console/).
-  # Servir esse dist na RAIZ deixa a pagina BRANCA (assets 404 + rota sem match).
-  # Entao o dominio dedicado espelha o mesmo layout do dominio principal:
-  # redirect / -> /console/ e alias em /console/.
+  # CONSOLE em dominio dedicado: serve a copia buildada com base=/ (`dist-root`),
+  # gerada pelo install/upgrade justamente para isto. O `dist` normal e buildado
+  # com base=/console/ (index.html pede /console/assets/... e o router usa
+  # basename=/console/) — servir AQUELE na raiz deixa a pagina BRANCA.
   if [ "$surface" = "CONSOLE" ]; then
-    cat > "$file" <<NGX
+    if [ -d "${CONSOLE_DIR}/dist-root" ]; then
+      cat > "$file" <<NGX
+server {
+    listen 80; listen [::]:80;
+    server_name ${host};
+    client_max_body_size 2048M;
+    server_tokens off;
+    include /etc/nginx/snippets/iastudio-security-headers.conf;
+    proxy_set_header Host              \$host;
+    proxy_set_header X-Real-IP         \$remote_addr;
+    proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 120s;
+
+    location /api/ { proxy_pass http://127.0.0.1:${PORT}; }
+
+    location / {
+        root ${CONSOLE_DIR}/dist-root;
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+NGX
+    else
+      # Servidor ainda nao passou pelo upgrade que gera o dist-root: cai no
+      # layout /console/ (feio, mas FUNCIONA) em vez de servir pagina branca.
+      log_wa "dist-root ausente — servindo o Console sob /console/ ate o proximo upgrade."
+      cat > "$file" <<NGX
 server {
     listen 80; listen [::]:80;
     server_name ${host};
@@ -147,12 +172,10 @@ server {
         alias ${CONSOLE_DIR}/dist/;
         try_files \$uri \$uri/ /console/index.html;
     }
-
-    # O dominio existe para o Console: a raiz leva direto pra ele.
-    location = / { return 301 /console/; }
     location / { return 301 /console/; }
 }
 NGX
+    fi
     ln -sf "$file" "/etc/nginx/sites-enabled/iastudio-domain-${host}"
     return 0
   fi

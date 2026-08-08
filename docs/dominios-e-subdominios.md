@@ -69,11 +69,21 @@ cd /opt/iastudio && bash scripts/domains-sync.sh --host meu.com.br  # só um
 cd /opt/iastudio && bash scripts/domains-sync.sh --pending          # só os que faltam
 ```
 
-**Console em domínio dedicado:** o build do Console é feito com `base=/console/`
-(o `index.html` pede `/console/assets/…` e o router usa `basename=/console/`).
-Por isso o vhost de um host `CONSOLE` **redireciona `/` para `/console/`** em vez
-de servir o `dist` na raiz — servir na raiz deixa a página **branca** (assets 404
-+ rota sem match). Se o vhost já existia de uma versão anterior do script, recrie:
+**Console em domínio dedicado — por que existem dois builds.** A `base` do Vite e o
+`basename` do router são definidos **em tempo de build**, então um único `dist` não
+serve dois lugares. O `install.sh`/`upgrade.sh` geram:
+
+| Saída | Base | Onde é servido |
+|---|---|---|
+| `platform-console/dist` | `/console/` (modo single) | `/console/` do domínio principal |
+| `platform-console/dist-root` | `/` | **raiz** de um domínio dedicado ao Console |
+
+O vhost de um host `CONSOLE` serve `dist-root` na raiz. Se o servidor ainda não
+passou pelo upgrade que gera essa cópia, o script cai no layout `/console/`
+(funciona, só não é a URL limpa) em vez de servir página branca.
+
+Vhost criado por versão anterior do script não é corrigido sozinho (é
+*create-if-missing*): recrie com
 `bash scripts/domains-sync.sh --host console.seudominio.com.br --force-vhost`.
 
 Duas proteções embutidas: o sweep automático usa `--pending` (não re-chama o
