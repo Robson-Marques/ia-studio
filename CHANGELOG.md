@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.33 - 2026-08-07 (Studio UX 1.2.68: medida de leitura, largura escolhida pela pessoa)
+
+Sem `db push`. Só `platform-admin` (dependência do DS).
+
+Sobe o Design System de `^1.2.49` para **`^1.2.68`** (19 versões). O que chega ao painel:
+
+- **Medida de leitura (1.2.66).** Os moldes de tela (`FormScreen`/`DetailScreen`) passam a limitar o conteúdo a 1280px centralizados. É o remédio para o defeito que aparecia em monitor largo: rótulo a mil pixels do valor, barra de progresso virando um fio de 1700px. **Nenhuma tela do painel precisou de `wide`** — as 14 que usam molde são formulários e detalhes, exatamente o caso que o teto beneficia; o canvas de fluxo não usa molde, então não é afetado. `wide` fica reservado para quando aparecer conteúdo que realmente queira o monitor inteiro.
+- **A pessoa escolhe a largura (1.2.67).** O Customize ganhou *Largura do conteúdo* (medida de leitura × tela cheia), persistida junto com tema e acento. Serve de escape se alguma tela ficar apertada — sem precisar de release. Entra sozinho: o painel já chama `configureTheme`/`applyTheme` no boot, então não há piscada.
+- **Também vêm** (sem trabalho no consumidor): `DashboardScreen` com abas mantendo os KPIs fixos (1.2.68), `DataTable` com linha de detalhe expansível (1.2.64), `TableIdentity` (1.2.63), correções de `DescriptionList`, busca da toolbar, `FileUpload`, `NumericInput` e cinco glifos que estavam sendo encobertos por apelidos (1.2.60).
+
+Os "consumer follow-up" das versões desse intervalo eram todos do AquaPark — nada pendente para o IA Studio.
+
 ## v0.10.32 - 2026-08-07 (Com endereço dedicado, o Console some do domínio principal)
 
 Sem `db push`. Backend (rota pública) + Console (boot).

@@ -9,10 +9,10 @@
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
-    "@studio-ux-ds/tokens": "^1.2.49",
-    "@studio-ux-ds/components": "^1.2.49",
-    "@studio-ux-ds/icons": "^1.2.49",
-    "@studio-ux-ds/react": "^1.2.49",
+    "@studio-ux-ds/tokens": "^1.2.68",
+    "@studio-ux-ds/components": "^1.2.68",
+    "@studio-ux-ds/icons": "^1.2.68",
+    "@studio-ux-ds/react": "^1.2.68",
     "@xyflow/react": "^12.3.5",
     "axios": "^1.7.7",
     "clsx": "^2.1.0",
