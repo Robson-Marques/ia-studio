@@ -10,6 +10,7 @@ import { PlatformDomainsService } from './domains/platform-domains.service';
 import { PlatformDomainsRepository } from './domains/platform-domains.repository';
 import { HostResolverService } from './domains/host-resolver.service';
 import { TenantContextController } from './domains/tenant-context.controller';
+import { ConsoleLocationController } from './domains/console-location.controller';
 import { DomainSyncService } from './domains/domain-sync.service';
 import { DomainVerifyCron } from './domains/domain-verify.cron';
 
@@ -19,6 +20,7 @@ import { DomainVerifyCron } from './domains/domain-verify.cron';
     OrgUsersController,
     PlatformDomainsController,
     TenantContextController,
+    ConsoleLocationController,
   ],
   providers: [
     OrganizationsService,

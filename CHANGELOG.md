@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.32 - 2026-08-07 (Com endereço dedicado, o Console some do domínio principal)
+
+Sem `db push`. Backend (rota pública) + Console (boot).
+
+Com o Console tendo endereço próprio, `/<domínio principal>/console/` não deveria mais atender — agora abrir esse caminho leva direto ao endereço dedicado.
+
+- **`GET /public/console-location`** (aberto, throttle): devolve só o hostname do Console canônico (host `CONSOLE` **ACTIVE**, o principal ganha) ou `null` quando não há endereço dedicado. Nada além do hostname sai por aí — e ele não é segredo: o certificado desse host está em Certificate Transparency, público.
+- **O Console redireciona no boot**, antes de montar a aplicação (sem piscar tela). Preserva a rota, tirando o prefixo `/console/` — no endereço dedicado ele mora na raiz.
+- **Por que não editar o vhost principal:** aquele arquivo é gerenciado pelo certbot; cirurgia com `sed` ali arriscaria o TLS do domínio principal. O redirecionamento no app é reversível e vale para qualquer instalação.
+- **Salvaguardas** (redirecionar sozinho pode trancar o operador para fora): só redireciona para host *No ar*; **`?stay=1`** desliga na visita; falha de rede não redireciona; e nunca redireciona se já estiver no host canônico (sem laço).
+
 ## v0.10.31 - 2026-08-07 (Console em domínio dedicado abre na raiz, sem /console/)
 
 Sem `db push`. Scripts de build/deploy (`install.sh`, `upgrade.sh`) + vhost (`domains-sync.sh`).

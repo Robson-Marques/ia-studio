@@ -99,6 +99,19 @@ export class PlatformDomainsRepository {
     });
   }
 
+  /**
+   * Endereco CANONICO do Console: host ACTIVE de superficie CONSOLE (o marcado
+   * como principal ganha). Null = Console nao tem endereco dedicado, entao ele
+   * continua atendendo pelo caminho /console/ do dominio principal.
+   */
+  findCanonicalConsole() {
+    return this.prisma.platformDomain.findFirst({
+      where: { surface: DomainSurface.CONSOLE, status: DomainStatus.ACTIVE },
+      orderBy: [{ is_primary: 'desc' }, { created_at: 'asc' }],
+      select: { hostname: true },
+    });
+  }
+
   create(data: Prisma.PlatformDomainUncheckedCreateInput) {
     return this.prisma.platformDomain.create({ data });
   }

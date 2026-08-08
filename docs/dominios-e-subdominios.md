@@ -86,6 +86,14 @@ Vhost criado por versão anterior do script não é corrigido sozinho (é
 *create-if-missing*): recrie com
 `bash scripts/domains-sync.sh --host console.seudominio.com.br --force-vhost`.
 
+**O caminho antigo some sozinho.** Com um endereço dedicado *No ar*, abrir
+`/<domínio principal>/console/` manda o navegador para o endereço novo (o Console
+consulta `GET /public/console-location` no boot). Escolhi isso em vez de editar o
+vhost principal porque aquele arquivo é gerenciado pelo certbot — mexer nele
+arriscaria o TLS do domínio principal. Salvaguardas: só redireciona para host
+*ATIVO*, `?stay=1` desliga na visita (escape hatch para não trancar o operador
+fora), e falha de rede não redireciona.
+
 Duas proteções embutidas: o sweep automático usa `--pending` (não re-chama o
 certbot em quem já está no ar, poupando o limite do Let's Encrypt) e **um endereço
 `ACTIVE` nunca é rebaixado** pelo teste local de DNS — que dá falso-negativo atrás
