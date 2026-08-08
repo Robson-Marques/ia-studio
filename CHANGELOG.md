@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.28 - 2026-08-07 (Endereços por cliente: subdomínio, domínio próprio e troca do host do Console)
+
+⚠️ **`db push` (destrutivo, só adição)** — tabela `core_platform_domains` + enums `Domain{Scope,Surface,Kind,Status,CertStatus}`; `Organization` ganhou a relação `domains`. `slug`/`custom_domain` seguem **intactos** (coexistência).
+
+O sistema atendia por **um** endereço e resolvia a organização só pelo JWT. Agora o endereço é um registro de primeira classe — e um cliente pode ter **subdomínio no domínio-base** ou **domínio próprio**.
+
+- **Registro (`PlatformDomain`).** Um registro por hostname, com **escopo** (`PLATFORM` = Console/API/painel base, `organization_id` nulo · `ORGANIZATION` = do cliente), **superfície** (`ADMIN`/`CONSOLE`/`API` — é o que permite **trocar o subdomínio do Console**), **tipo** (`SUBDOMAIN` filho do domínio-base × `CUSTOM` domínio próprio, que nasce com token de posse), principal único por escopo, situação e estado de certificado. Mutations auditadas.
+- **Resolução por Host** (`HostResolverService`) + `GET /public/tenant-context` (aberto, throttle, exposição mínima: nome/slug/branding/superfície). **O Host decide só a apresentação** — acesso a dado continua governado por JWT + `organization_id`. Endereço não cadastrado resolve `null` e o sistema se comporta como hoje (**nada muda em produção até cadastrar**).
+- **Login white-label:** a tela de acesso veste a marca do cliente quando a URL é dele; sem endereço cadastrado, mantém a identidade da plataforma. Não bloqueia a renderização.
+- **Console → Endereços** (`/dominios`): domínio-base, cadastro (subdomínio pelo nome com prévia, ou domínio próprio), promover principal e remover — com confirmação, gate e toast. Situação em linguagem de dono: *Aguardando DNS · Verificando · No ar · Falhou · Desativado*.
+- **Operação (`scripts/domains-sync.sh`)**: lê o registro, cria/atualiza o vhost, valida com `nginx -t`, recarrega, emite o certificado (idempotente) e grava a situação de volta. **Certificado por host (HTTP-01)** em vez de wildcard — wildcard exigiria desafio DNS-01 e credencial do provedor de DNS. Roda **fora do deploy por tag** (o `upgrade.sh` não toca no nginx). Runbook: `docs/dominios-e-subdominios.md`.
+
 ## v0.10.27 - 2026-08-06 (Studio UX pelo GitLab próprio)
 
 Sem `db push`. Scripts, configuração de pacote e documentação de deploy.

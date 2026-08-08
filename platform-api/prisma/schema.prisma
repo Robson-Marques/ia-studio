@@ -159,6 +159,9 @@ model Organization {
   slug          String   @unique
   // White Label preparado desde a Fase 1 (diretriz 54): logo/cores/favicon.
   branding      Json     @default("{}")
+  // LEGADO (coexistencia): dominio proprio unico da org. O registro autoritativo
+  // passou a ser PlatformDomain (varios por org + subdominio + console/api).
+  // Mantido intacto ate a migracao — nada le/escreve os dois em conflito.
   custom_domain String?  @unique
   is_active     Boolean  @default(true)
   created_at    DateTime @default(now())
@@ -170,8 +173,86 @@ model Organization {
   invites       UserInvite[]
   license       License?
   subscriptions Subscription[]
+  domains       PlatformDomain[]
 
   @@map("core_organizations")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Dominios/subdominios atendidos pela instalacao (tenancy por Host).
+// Um registro por HOSTNAME. Cobre os dois escopos:
+//   * PLATFORM     — hosts da propria plataforma (Console SaaS, API, painel
+//                    base). `organization_id` NULO.
+//   * ORGANIZATION — host de um cliente (subdominio no dominio-base ou dominio
+//                    proprio). `organization_id` preenchido.
+// A emissao/renovacao de certificado (fase 4) le `cert_status`; o app NUNCA
+// edita Nginx/TLS direto (fronteira app↔infra — `upgrade.sh` nao toca no nginx).
+// ─────────────────────────────────────────────────────────────────────
+
+enum DomainScope {
+  PLATFORM
+  ORGANIZATION
+}
+
+// Qual superficie o host serve (o Console tem host proprio — no modo single
+// hoje ele vive sob /console/ do mesmo dominio).
+enum DomainSurface {
+  ADMIN
+  CONSOLE
+  API
+}
+
+// SUBDOMAIN = host sob o dominio-base da instalacao (coberto por wildcard);
+// CUSTOM    = dominio proprio do cliente (exige certificado por dominio).
+enum DomainKind {
+  SUBDOMAIN
+  CUSTOM
+}
+
+enum DomainStatus {
+  PENDING_DNS
+  VERIFYING
+  ACTIVE
+  FAILED
+  DISABLED
+}
+
+enum DomainCertStatus {
+  NONE
+  PENDING
+  ISSUED
+  ERROR
+}
+
+model PlatformDomain {
+  id              String           @id @default(uuid())
+  // NULO = host da plataforma (Console/API/painel base). Preenchido = do cliente.
+  organization_id String?
+  // Host completo, minusculo, sem esquema nem porta (ex.: "acme.studio.app.br").
+  hostname        String           @unique
+  scope           DomainScope      @default(ORGANIZATION)
+  surface         DomainSurface    @default(ADMIN)
+  kind            DomainKind       @default(SUBDOMAIN)
+  // Host canonico do escopo (para onde os demais apontam/redirecionam).
+  is_primary      Boolean          @default(false)
+  status          DomainStatus     @default(PENDING_DNS)
+  // Token do registro TXT de verificacao de posse (dominio proprio).
+  verify_token    String?
+  verified_at     DateTime?
+  cert_status     DomainCertStatus @default(NONE)
+  cert_issued_at  DateTime?
+  last_error      String?
+  notes           String?
+  created_by      String?
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+
+  organization Organization? @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id])
+  @@index([status])
+  @@index([scope, surface])
+  @@map("core_platform_domains")
 }
 
 model Workspace {

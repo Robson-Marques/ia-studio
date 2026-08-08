@@ -239,6 +239,21 @@ E.164 sem `+`) agora OBRIGATÓRIO em todo campo de telefone; backend com `normal
 `normalizePhoneFromWhatsApp` (troca da heurística ingênua que corrompia estrangeiro). Porte do delivery-system.
 Pendência do Robson: rodar o mesmo ajuste nos outros sistemas (prompt de propagação entregue).
 
+## 🌐 Frente de ENDEREÇOS (tenancy por Host) — implementada, não implantada
+
+Especialidade: `ia-studio.tenant-domains@1.0.0`. Runbook/desenho: **`docs/dominios-e-subdominios.md`**.
+Fases 1–4 escritas (registro · resolução por Host · tela no Console · script de operação) +
+login white-label. **Nada muda em produção até cadastrar endereço** (registro vazio → resolve
+`null` → comportamento de domínio único de hoje).
+
+- Exige **`db push`** (só adição: `core_platform_domains` + 5 enums).
+- Depois do deploy: Console → **Endereços** define o domínio-base e cadastra; DNS aponta;
+  então, **no servidor**, `bash scripts/domains-sync.sh` (fora do deploy por tag — o
+  `upgrade.sh` não toca no nginx).
+- Pendências desta frente: verificação automática do token TXT de posse (modelada, não
+  conferida); migrar os valores legados de `Organization.custom_domain` para o registro novo;
+  disparo do sync pelo painel (hoje é operação no servidor) — cada uma é frente própria.
+
 ## 🧹 Pendências técnicas conhecidas (não urgentes)
 
 - **Catálogo de templates HSM (padrão do Aquapark) — IA Studio NÃO tem.** A regra nova no `CLAUDE.md`

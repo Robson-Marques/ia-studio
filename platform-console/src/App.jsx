@@ -16,6 +16,7 @@ import Consumo from './pages/Consumo';
 import Auditoria from './pages/Auditoria';
 import DashboardConsolidado from './pages/DashboardConsolidado';
 import Atualizacao from './pages/Atualizacao';
+import Dominios from './pages/Dominios';
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/flags" element={<PermissionRoute perm="console.flags.read"><Flags /></PermissionRoute>} />
               <Route path="/consumo" element={<PermissionRoute perm="console.usage.read"><Consumo /></PermissionRoute>} />
               <Route path="/auditoria" element={<PermissionRoute perm="console.audit.read"><Auditoria /></PermissionRoute>} />
+              <Route path="/dominios" element={<PermissionRoute perm="console.organizations.read"><Dominios /></PermissionRoute>} />
               <Route path="/atualizacao" element={<PermissionRoute perm="system.upgrade"><Atualizacao /></PermissionRoute>} />
             </Route>
 

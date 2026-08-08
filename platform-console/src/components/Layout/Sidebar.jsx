@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   Building2, CreditCard, Flag, Gauge, ScrollText, TerminalSquare, Blocks,
-  LayoutDashboard, RefreshCw,
+  LayoutDashboard, RefreshCw, Globe,
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -14,6 +14,7 @@ const NAV = [
   { label: 'Clientes',      icon: Building2,  path: '/clientes',  perm: 'console.organizations.read' },
   { label: 'Planos',        icon: CreditCard, path: '/planos',    perm: 'console.plans.read' },
   { label: 'Marketplace',   icon: Blocks,     path: '/marketplace', perm: 'console.marketplace.read' },
+  { label: 'Endereços',     icon: Globe,      path: '/dominios',  perm: 'console.organizations.read' },
   { label: 'Feature Flags', icon: Flag,       path: '/flags',     perm: 'console.flags.read' },
   { label: 'Consumo',       icon: Gauge,      path: '/consumo',   perm: 'console.usage.read' },
   { label: 'Auditoria',     icon: ScrollText, path: '/auditoria', perm: 'console.audit.read' },

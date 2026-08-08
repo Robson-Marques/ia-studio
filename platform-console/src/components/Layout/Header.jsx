@@ -13,6 +13,7 @@ const BREADCRUMBS = [
   { prefix: '/clientes',   label: 'Clientes' },
   { prefix: '/planos',     label: 'Planos' },
   { prefix: '/marketplace', label: 'Marketplace' },
+  { prefix: '/dominios',   label: 'Endereços' },
   { prefix: '/flags',      label: 'Feature Flags' },
   { prefix: '/consumo',    label: 'Consumo' },
   { prefix: '/auditoria',  label: 'Auditoria' },
