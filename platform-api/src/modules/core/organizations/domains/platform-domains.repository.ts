@@ -10,6 +10,9 @@ import { PrismaService } from '../../../../shared/prisma/prisma.service';
 /** Chave da config de plataforma com o dominio-base dos subdominios. */
 export const BASE_DOMAIN_SETTING_KEY = 'platform.base_domain';
 
+/** Toggle da reverificacao automatica de enderecos (nasce OFF). */
+export const AUTO_VERIFY_SETTING_KEY = 'platform.domains.auto_verify';
+
 @Injectable()
 export class PlatformDomainsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -38,6 +41,36 @@ export class PlatformDomainsRepository {
       });
     }
     return value;
+  }
+
+  // ─── Reverificacao automatica (toggle + fila de pendentes) ──────────
+
+  async isAutoVerifyEnabled(): Promise<boolean> {
+    const row = await this.prisma.systemSetting.findFirst({
+      where: { organization_id: null, key: AUTO_VERIFY_SETTING_KEY },
+    });
+    return row?.value === true || row?.value === 'true';
+  }
+
+  async setAutoVerify(enabled: boolean): Promise<boolean> {
+    const row = await this.prisma.systemSetting.findFirst({
+      where: { organization_id: null, key: AUTO_VERIFY_SETTING_KEY },
+    });
+    if (row) {
+      await this.prisma.systemSetting.update({ where: { id: row.id }, data: { value: enabled } });
+    } else {
+      await this.prisma.systemSetting.create({
+        data: { organization_id: null, key: AUTO_VERIFY_SETTING_KEY, value: enabled },
+      });
+    }
+    return enabled;
+  }
+
+  /** Enderecos que ainda nao entraram no ar (o que a reverificacao persegue). */
+  countPending(): Promise<number> {
+    return this.prisma.platformDomain.count({
+      where: { status: { in: [DomainStatus.PENDING_DNS, DomainStatus.VERIFYING, DomainStatus.FAILED] } },
+    });
   }
 
   // ─── Dominios ───────────────────────────────────────────────────────

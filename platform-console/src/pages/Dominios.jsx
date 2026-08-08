@@ -3,7 +3,7 @@
 // painel base) e os de cada CLIENTE (subdomínio no domínio-base ou domínio
 // próprio). Linguagem do usuário: "endereço", não "hostname/vhost".
 import React, { useEffect, useMemo, useState } from 'react';
-import { Globe, Plus, Loader2, Star, Trash2, Save } from 'lucide-react';
+import { Globe, Plus, Loader2, Star, Trash2, Save, RefreshCw } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -11,7 +11,7 @@ import { Table, Thead, Th, Tbody, Tr, Td, Badge } from '../components/ui/Table';
 import { FormField, TextInput, Select } from '../components/ui/FormField';
 import {
   listDomains, createDomain, setPrimaryDomain, deleteDomain,
-  getBaseDomain, saveBaseDomain,
+  getBaseDomain, saveBaseDomain, activateDomain, getAutoVerify, setAutoVerify,
 } from '../services/domains';
 import { listOrganizations } from '../services/organizations';
 import { usePermissions } from '../hooks/usePermissions';
@@ -48,19 +48,24 @@ export default function Dominios() {
   const [formOpen, setFormOpen] = useState(false);
   const [acting, setActing] = useState(false);
   const [confirm, setConfirm] = useState(null); // { kind:'delete'|'primary', domain }
+  const [verifying, setVerifying] = useState(null); // id em verificação
+  const [autoVerify, setAuto] = useState(false);
+  const [savingAuto, setSavingAuto] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      const [{ items: list }, baseValue, { items: orgList }] = await Promise.all([
+      const [{ items: list }, baseValue, { items: orgList }, auto] = await Promise.all([
         listDomains(),
         getBaseDomain().catch(() => ''),
         listOrganizations().catch(() => ({ items: [] })),
+        getAutoVerify().catch(() => false),
       ]);
       setItems(list);
       setBase(baseValue);
       setBaseDraft(baseValue);
       setOrgs(orgList);
+      setAuto(auto);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -86,6 +91,35 @@ export default function Dominios() {
       toast.error(err.message);
     } finally {
       setSavingBase(false);
+    }
+  }
+
+  // "Verificar e ativar": o servidor confere o DNS, publica o endereço e emite o
+  // certificado. É assíncrono — relemos a lista depois de alguns segundos para
+  // pegar a situação que o servidor gravou.
+  async function handleActivate(domain) {
+    setVerifying(domain.id);
+    try {
+      await activateDomain(domain.id);
+      toast.info('Verificando o endereço… isso leva alguns segundos.');
+      setTimeout(() => { load().finally(() => setVerifying(null)); }, 8000);
+    } catch (err) {
+      toast.error(err.message);
+      setVerifying(null);
+    }
+  }
+
+  async function handleToggleAuto() {
+    const next = !autoVerify;
+    setSavingAuto(true);
+    try {
+      const saved = await setAutoVerify(next);
+      setAuto(saved);
+      toast.success(saved ? 'Reverificação automática ligada.' : 'Reverificação automática desligada.');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingAuto(false);
     }
   }
 
@@ -160,6 +194,22 @@ export default function Dominios() {
             Sem o domínio-base não é possível criar subdomínio por nome — só cadastrar endereço completo.
           </p>
         )}
+
+        {/* Reverificação automática: propagação de DNS demora, então o sistema
+            volta a tentar sozinho. Nasce desligada (regra: automatismo é opt-in). */}
+        <label className="flex items-start gap-2 pt-1 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoVerify}
+            disabled={!canManage || savingAuto}
+            onChange={handleToggleAuto}
+            className="mt-0.5"
+          />
+          <span className="text-xs" style={{ color: 'var(--ap-text-3)' }}>
+            <b>Verificar sozinho os endereços pendentes</b> — a cada 30 minutos o sistema tenta de novo
+            publicar quem ainda está aguardando DNS, e coloca no ar assim que o apontamento propagar.
+          </span>
+        </label>
       </div>
 
       {loading ? (
@@ -174,6 +224,8 @@ export default function Dominios() {
             rows={platform}
             orgs={orgs}
             canManage={canManage}
+            verifying={verifying}
+            onActivate={handleActivate}
             onPrimary={(d) => setConfirm({ kind: 'primary', domain: d })}
             onDelete={(d) => setConfirm({ kind: 'delete', domain: d })}
           />
@@ -183,6 +235,8 @@ export default function Dominios() {
             rows={tenants}
             orgs={orgs}
             canManage={canManage}
+            verifying={verifying}
+            onActivate={handleActivate}
             onPrimary={(d) => setConfirm({ kind: 'primary', domain: d })}
             onDelete={(d) => setConfirm({ kind: 'delete', domain: d })}
           />
@@ -215,7 +269,7 @@ export default function Dominios() {
   );
 }
 
-function DomainTable({ title, hint, rows, orgs, canManage, onPrimary, onDelete }) {
+function DomainTable({ title, hint, rows, orgs, canManage, verifying, onActivate, onPrimary, onDelete }) {
   const orgName = (id) => orgs.find((o) => o.id === id)?.name || '—';
   return (
     <div className="card overflow-hidden">
@@ -243,10 +297,29 @@ function DomainTable({ title, hint, rows, orgs, canManage, onPrimary, onDelete }
                     <Td>{SURFACE_LABEL[d.surface] || d.surface}</Td>
                     <Td>{d.organization_id ? orgName(d.organization_id) : '—'}</Td>
                     <Td>{d.kind === 'SUBDOMAIN' ? 'Subdomínio' : 'Domínio próprio'}</Td>
-                    <Td>{statusBadge(d.status)}</Td>
+                    <Td>
+                      {statusBadge(d.status)}
+                      {d.last_error && d.status !== 'ACTIVE' && (
+                        <p className="text-[11px] mt-1 max-w-[280px]" style={{ color: 'var(--ap-text-4)' }} title={d.last_error}>
+                          {d.last_error.length > 90 ? `${d.last_error.slice(0, 90)}…` : d.last_error}
+                        </p>
+                      )}
+                    </Td>
                     <Td>
                       {canManage && (
                         <div className="flex items-center gap-2 justify-end">
+                          {d.status !== 'ACTIVE' && (
+                            <button
+                              title="Verificar o DNS, publicar o endereço e emitir o certificado"
+                              className="btn-secondary text-xs disabled:opacity-60"
+                              disabled={verifying === d.id}
+                              onClick={() => onActivate(d)}
+                            >
+                              {verifying === d.id
+                                ? <><Loader2 size={13} className="animate-spin" /> Verificando…</>
+                                : <><RefreshCw size={13} /> Verificar e ativar</>}
+                            </button>
+                          )}
                           {!d.is_primary && (
                             <button title="Definir como principal" className="text-brand" onClick={() => onPrimary(d)}>
                               <Star size={15} />
@@ -280,6 +353,16 @@ function DomainTable({ title, hint, rows, orgs, canManage, onPrimary, onDelete }
                 </div>
                 <div className="shrink-0 flex items-center gap-2">
                   {statusBadge(d.status)}
+                  {canManage && d.status !== 'ACTIVE' && (
+                    <button
+                      title="Verificar e ativar"
+                      className="text-brand disabled:opacity-60"
+                      disabled={verifying === d.id}
+                      onClick={() => onActivate(d)}
+                    >
+                      <RefreshCw size={15} className={verifying === d.id ? 'animate-spin' : ''} />
+                    </button>
+                  )}
                   {canManage && (
                     <button title="Remover endereço" className="text-red-500" onClick={() => onDelete(d)}>
                       <Trash2 size={15} />

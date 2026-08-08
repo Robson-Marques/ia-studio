@@ -18,6 +18,7 @@ import {
 import { DomainKind, DomainScope, DomainStatus, DomainSurface, PlatformDomain } from '@prisma/client';
 import { PlatformDomainsRepository } from './platform-domains.repository';
 import { HostResolverService } from './host-resolver.service';
+import { DomainSyncService } from './domain-sync.service';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
 import { PrismaService } from '../../../../shared/prisma/prisma.service';
 import {
@@ -37,6 +38,7 @@ export class PlatformDomainsService {
   constructor(
     private readonly repository: PlatformDomainsRepository,
     private readonly hostResolver: HostResolverService,
+    private readonly sync: DomainSyncService,
     private readonly audit: AuditLogService,
     private readonly prisma: PrismaService,
   ) {}
@@ -195,6 +197,66 @@ export class PlatformDomainsService {
       oldValue: { hostname: domain.hostname, scope: domain.scope, surface: domain.surface },
     });
     return { ok: true };
+  }
+
+  // ─── Ativação (dispara a operação no servidor) ──────────────────────
+
+  /**
+   * "Verificar e ativar": manda o servidor conferir o DNS, publicar o vhost e
+   * emitir o certificado deste endereço. Assíncrono — o script grava o resultado
+   * no próprio registro e a tela relê a situação.
+   */
+  async activate(id: string) {
+    const domain = await this.findById(id);
+    const updated = await this.repository.update(id, {
+      status: DomainStatus.VERIFYING,
+      last_error: null,
+    });
+    this.hostResolver.invalidate(domain.hostname);
+
+    const started = this.sync.run(domain.hostname);
+    if (!started.started) {
+      const failed = await this.repository.update(id, {
+        status: DomainStatus.FAILED,
+        last_error: started.reason ?? 'Falha ao iniciar a verificação.',
+      });
+      await this.audit.record({
+        action: 'core.platform_domain.activate_failed',
+        entityType: 'PlatformDomain',
+        entityId: id,
+        organizationId: domain.organization_id ?? undefined,
+        newValue: { hostname: domain.hostname, reason: started.reason },
+      });
+      return failed;
+    }
+
+    await this.audit.record({
+      action: 'core.platform_domain.activate',
+      entityType: 'PlatformDomain',
+      entityId: id,
+      organizationId: domain.organization_id ?? undefined,
+      newValue: { hostname: domain.hostname },
+    });
+    this.logger.log(`Verificação disparada para ${domain.hostname}.`);
+    return updated;
+  }
+
+  // ─── Reverificação automática (toggle — nasce OFF) ──────────────────
+
+  isAutoVerifyEnabled() {
+    return this.repository.isAutoVerifyEnabled();
+  }
+
+  async setAutoVerify(enabled: boolean) {
+    const before = await this.repository.isAutoVerifyEnabled();
+    await this.repository.setAutoVerify(enabled);
+    await this.audit.record({
+      action: 'core.platform_domain.auto_verify',
+      entityType: 'SystemSetting',
+      oldValue: { auto_verify: before },
+      newValue: { auto_verify: enabled },
+    });
+    return { auto_verify: enabled };
   }
 
   /** hostname explícito, ou montado a partir do label + domínio-base. */

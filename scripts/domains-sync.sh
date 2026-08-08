@@ -10,8 +10,10 @@
 # como operacao — de proposito FORA do deploy por tag (o `upgrade.sh` nao toca
 # no nginx). Rode manualmente ou por cron.
 #
-#   bash scripts/domains-sync.sh            # aplica o que estiver pendente
-#   bash scripts/domains-sync.sh --dry-run  # so mostra o que faria
+#   bash scripts/domains-sync.sh                  # varre tudo que esta pendente
+#   bash scripts/domains-sync.sh --dry-run        # so mostra o que faria
+#   bash scripts/domains-sync.sh --host meu.com   # so um endereco (usado pelo
+#                                                 # botao "Verificar e ativar")
 #
 # Idempotente: rodar de novo nao duplica vhost nem re-emite certificado valido.
 #
@@ -30,7 +32,25 @@ CONSOLE_DIR="${INSTALL_DIR}/platform-console"
 ENV_FILE="${API_DIR}/.env"
 PORT="3000"
 DRY_RUN=0
-[ "${1:-}" = "--dry-run" ] && DRY_RUN=1
+ONLY_HOST=""
+ONLY_PENDING=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1 ;;
+    --pending) ONLY_PENDING=1 ;;
+    --host)    ONLY_HOST="${2:-}"
+               [ -z "$ONLY_HOST" ] && { echo "--host exige um valor"; exit 2; }
+               shift ;;
+    --host=*)  ONLY_HOST="${1#*=}" ;;
+    *)         echo "Argumento desconhecido: $1"; exit 2 ;;
+  esac
+  shift
+done
+# So caracteres validos de hostname — o valor chega do banco/API e vai pra uma
+# consulta SQL e pra linha de comando do certbot.
+if [ -n "$ONLY_HOST" ] && ! echo "$ONLY_HOST" | grep -Eq '^[a-z0-9.-]+$'; then
+  echo "Hostname invalido: $ONLY_HOST"; exit 2
+fi
 
 RED=$'\e[31m'; GREEN=$'\e[32m'; YELLOW=$'\e[33m'; NC=$'\e[0m'
 log()    { echo "  $*"; }
@@ -144,10 +164,18 @@ echo "== IA Studio — sincronizacao de enderecos =="
 # Enderecos que o operador quer no ar. DISABLED fica de fora de proposito.
 # Falha de banco NAO pode se disfarcar de "nada a fazer" (erro silencioso num
 # cron nunca alerta): consulta sem engolir stderr e separa "falhou" de "vazio".
+FILTER="status <> 'DISABLED'"
+# --pending: usado pela reverificacao automatica. Varrer TUDO periodicamente
+# faria o certbot ser chamado de novo em quem ja esta no ar (risco de rate limit).
+[ "$ONLY_PENDING" = "1" ] && FILTER="status IN ('PENDING_DNS','VERIFYING','FAILED')"
+[ -n "$ONLY_HOST" ] && FILTER="hostname = '${ONLY_HOST}'"
 ROWS=$(psql "$DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 \
-  -c "SELECT hostname || '|' || surface || '|' || status FROM core_platform_domains WHERE status <> 'DISABLED' ORDER BY hostname;") || {
+  -c "SELECT hostname || '|' || surface || '|' || status FROM core_platform_domains WHERE ${FILTER} ORDER BY hostname;") || {
   log_er "Falha ao consultar o banco (conexao ou tabela ausente)."; exit 1; }
-[ -z "$ROWS" ] && { log_ok "Nenhum endereco cadastrado — nada a fazer."; exit 0; }
+if [ -z "$ROWS" ]; then
+  [ -n "$ONLY_HOST" ] && { log_er "Endereco nao encontrado no registro: ${ONLY_HOST}"; exit 1; }
+  log_ok "Nenhum endereco cadastrado — nada a fazer."; exit 0
+fi
 
 CHANGED=0
 while IFS='|' read -r HOST SURFACE STATUS; do
@@ -156,6 +184,13 @@ while IFS='|' read -r HOST SURFACE STATUS; do
   log "-> ${HOST} (${SURFACE})"
 
   if ! dns_points_here "$HOST"; then
+    # NUNCA rebaixar quem ja esta ACTIVE: o teste compara com `hostname -I` e da
+    # falso-negativo atras de NAT/proxy/CDN ou com IPv6 fora da lista. Derrubar um
+    # endereco no ar por causa disso seria um estrago causado pela propria rotina.
+    if [ "$STATUS" = "ACTIVE" ]; then
+      log_wa "DNS nao confere pelo teste local, mas o endereco esta ATIVO — mantido como esta."
+      continue
+    fi
     log_wa "DNS ainda nao aponta para este servidor — pulando (segue aguardando)."
     [ "$DRY_RUN" = "0" ] && db_mark "$HOST" "PENDING_DNS" "NONE" "DNS nao aponta para este servidor."
     continue

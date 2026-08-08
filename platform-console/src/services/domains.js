@@ -43,6 +43,28 @@ export async function setPrimaryDomain(id) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao definir o endereço principal')); }
 }
 
+/** Manda o servidor verificar o DNS, publicar o endereço e emitir o certificado. */
+export async function activateDomain(id) {
+  try {
+    const { data } = await api.post(`/console/domains/${id}/activate`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao verificar o endereço')); }
+}
+
+export async function getAutoVerify() {
+  try {
+    const { data } = await api.get('/console/domains/auto-verify');
+    return data?.auto_verify === true;
+  } catch { return false; }
+}
+
+export async function setAutoVerify(enabled) {
+  try {
+    const { data } = await api.patch('/console/domains/auto-verify', { enabled });
+    return data?.auto_verify === true;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao alterar a reverificação automática')); }
+}
+
 export async function deleteDomain(id) {
   try {
     const { data } = await api.delete(`/console/domains/${id}`);

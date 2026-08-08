@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.29 - 2026-08-07 (Endereço entra no ar pelo painel — sem terminal)
+
+Sem `db push`. Backend + Console.
+
+A v0.10.28 deixou o endereço cadastrável, mas para ele **entrar no ar** era preciso rodar um script no servidor. Isso era meia funcionalidade — e não era o que estava decidido (a escolha tinha sido **automatizar a emissão**). Corrigido:
+
+- **Botão "Verificar e ativar"** em cada endereço (`POST /console/domains/:id/activate`): o sistema confere o DNS, publica o vhost e emite o certificado. Dispara o `domains-sync.sh` em processo **detached** — exatamente o padrão que o `upgrade.sh` já usava; não havia limitação técnica, só conservadorismo. Enquanto roda, a linha mostra "Verificando…"; ao fim, a situação vem do próprio registro.
+- **Motivo da falha na tela.** O script já gravava `last_error`; agora a linha mostra (ex.: "DNS não aponta para este servidor"), em vez de deixar o operador adivinhar.
+- **Reverificação automática** (`DomainVerifyCron`, 30 min) para os endereços pendentes — propagação de DNS demora e ninguém deve ficar clicando. **Nasce OFF** (automatismo é opt-in): toggle "Verificar sozinho os endereços pendentes" na tela.
+- **`domains-sync.sh --host <hostname>`** (antes só varria tudo), com validação do hostname; o script segue rodável na mão como diagnóstico.
+- **Correção de rota:** `GET /console/domains/auto-verify` foi declarada **antes** de `:id` — senão "auto-verify" seria capturado como id.
+
 ## v0.10.28 - 2026-08-07 (Endereços por cliente: subdomínio, domínio próprio e troca do host do Console)
 
 ⚠️ **`db push` (destrutivo, só adição)** — tabela `core_platform_domains` + enums `Domain{Scope,Surface,Kind,Status,CertStatus}`; `Organization` ganhou a relação `domains`. `slug`/`custom_domain` seguem **intactos** (coexistência).

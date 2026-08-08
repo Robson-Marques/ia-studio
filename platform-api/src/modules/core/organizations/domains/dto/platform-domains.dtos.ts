@@ -54,3 +54,8 @@ export class SetBaseDomainDto {
   @MinLength(3)
   base_domain!: string;
 }
+
+export class SetAutoVerifyDto {
+  @IsBoolean()
+  enabled!: boolean;
+}

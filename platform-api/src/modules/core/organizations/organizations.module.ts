@@ -10,6 +10,8 @@ import { PlatformDomainsService } from './domains/platform-domains.service';
 import { PlatformDomainsRepository } from './domains/platform-domains.repository';
 import { HostResolverService } from './domains/host-resolver.service';
 import { TenantContextController } from './domains/tenant-context.controller';
+import { DomainSyncService } from './domains/domain-sync.service';
+import { DomainVerifyCron } from './domains/domain-verify.cron';
 
 @Module({
   controllers: [
@@ -26,6 +28,8 @@ import { TenantContextController } from './domains/tenant-context.controller';
     PlatformDomainsService,
     PlatformDomainsRepository,
     HostResolverService,
+    DomainSyncService,
+    DomainVerifyCron,
   ],
   // HostResolverService exportado para quem precisar do contexto do host
   // (branding do painel, gate por endereco em fase futura).

@@ -19,7 +19,9 @@ toca no nginx.
 | Resolução | `.../domains/host-resolver.service.ts` | Host → contexto (marca/superfície), cache 30s, **degradação graciosa** |
 | Contexto público | `GET /api/v1/public/tenant-context` | A tela de login lê para vestir a marca do cliente |
 | Gestão | Console → **Endereços** (`/dominios`) | Domínio-base, cadastro, promover principal, remover |
-| Operação | `scripts/domains-sync.sh` | Cria o vhost e emite o certificado do que está registrado |
+| Ativação | Botão **Verificar e ativar** → `POST /console/domains/:id/activate` | Dispara a operação no servidor (spawn detached, mesmo padrão do `upgrade.sh`) |
+| Automático | `DomainVerifyCron` + toggle `platform.domains.auto_verify` | Retenta os pendentes a cada 30 min — **nasce OFF** |
+| Operação | `scripts/domains-sync.sh` | Cria o vhost e emite o certificado; aceita `--host` e `--dry-run` |
 
 ### Escopo e superfície
 
@@ -38,7 +40,7 @@ endereço serve). Quem governa acesso a dado continua sendo o **JWT +
 nenhuma. Endereço não cadastrado resolve `null` e o sistema se comporta como a
 instalação de domínio único de hoje.
 
-## Runbook — colocar um endereço no ar
+## Runbook — colocar um endereço no ar (pelo painel, sem terminal)
 
 1. **Console → Endereços**: defina o **domínio-base** (uma vez) e cadastre o
    endereço (subdomínio pelo nome, ou domínio próprio completo). Ele nasce em
@@ -46,17 +48,35 @@ instalação de domínio único de hoje.
 2. **DNS**: aponte o host para o IP deste servidor (registro `A`/`AAAA`).
    - Subdomínio seu: crie o registro no domínio-base.
    - Domínio próprio do cliente: **quem cria é o cliente**, no DNS dele.
-3. **No servidor, como root:**
-   ```bash
-   cd /opt/iastudio && bash scripts/domains-sync.sh --dry-run   # confere
-   cd /opt/iastudio && bash scripts/domains-sync.sh             # aplica
-   ```
-   O script pula quem ainda não aponta para cá (evita queimar o limite de
-   emissão do Let's Encrypt), cria/atualiza o vhost, roda `nginx -t`, recarrega,
-   emite o certificado (`--keep-until-expiring`, idempotente) e **grava a
-   situação de volta no registro** — o Console passa a mostrar *No ar*.
-4. Repita o comando quando cadastrar endereços novos (ou deixe em cron, ex.:
-   `*/15 * * * * cd /opt/iastudio && bash scripts/domains-sync.sh >/dev/null 2>&1`).
+3. **Clique em "Verificar e ativar"** na linha do endereço. O sistema confere o
+   DNS, publica o vhost, emite o certificado e atualiza a situação para *No ar*.
+   Se o DNS ainda não propagou, o endereço volta para *Aguardando DNS* — e o
+   motivo aparece na própria linha.
+4. Opcional: ligue **"Verificar sozinho os endereços pendentes"** (no card do
+   domínio-base). A cada 30 min o sistema tenta de novo o que está pendente e
+   coloca no ar assim que o DNS propagar. Nasce **desligado** (automatismo é
+   opt-in, regra do projeto).
+
+### Fallback por linha de comando (diagnóstico)
+
+O mesmo trabalho pode ser feito no servidor, como root — útil para ver a saída
+completa quando algo falha:
+
+```bash
+cd /opt/iastudio && bash scripts/domains-sync.sh --dry-run          # confere tudo
+cd /opt/iastudio && bash scripts/domains-sync.sh                    # aplica tudo
+cd /opt/iastudio && bash scripts/domains-sync.sh --host meu.com.br  # só um
+cd /opt/iastudio && bash scripts/domains-sync.sh --pending          # só os que faltam
+```
+
+Duas proteções embutidas: o sweep automático usa `--pending` (não re-chama o
+certbot em quem já está no ar, poupando o limite do Let's Encrypt) e **um endereço
+`ACTIVE` nunca é rebaixado** pelo teste local de DNS — que dá falso-negativo atrás
+de NAT/proxy/CDN.
+
+O script pula quem ainda não aponta para cá (evita queimar o limite de emissão
+do Let's Encrypt), cria o vhost, roda `nginx -t`, recarrega, emite o certificado
+(`--keep-until-expiring`, idempotente) e **grava a situação de volta no registro**.
 
 ## Decisões e porquês
 
@@ -77,8 +97,10 @@ instalação de domínio único de hoje.
 
 ## Limitações conhecidas
 
-- O script roda **no servidor**, como root — não é disparado pelo painel. Se um
-  dia for, entra como frente própria (exige revisar privilégio e enfileiramento).
+- A ativação pelo painel faz a API **disparar o script no servidor** (spawn
+  detached, como o `upgrade.sh` já fazia) — ele roda com o usuário do PM2, que
+  nesta instalação é root. O endpoint é super-only (`@PlatformAdminOnly`) e o
+  hostname é validado contra `^[a-z0-9.-]+$` antes de virar argumento.
 - A verificação de **posse** do domínio próprio (token TXT em `verify_token`)
   está modelada mas ainda não é conferida automaticamente: hoje a prova de
   controle é o próprio DNS apontar + o certificado emitir.
