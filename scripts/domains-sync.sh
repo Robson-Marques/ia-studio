@@ -14,6 +14,9 @@
 #   bash scripts/domains-sync.sh --dry-run        # so mostra o que faria
 #   bash scripts/domains-sync.sh --host meu.com   # so um endereco (usado pelo
 #                                                 # botao "Verificar e ativar")
+#   bash scripts/domains-sync.sh --host meu.com --force-vhost
+#                                                 # recria o vhost do zero (quando
+#                                                 # o template do script mudou)
 #
 # Idempotente: rodar de novo nao duplica vhost nem re-emite certificado valido.
 #
@@ -34,10 +37,12 @@ PORT="3000"
 DRY_RUN=0
 ONLY_HOST=""
 ONLY_PENDING=0
+FORCE_VHOST=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run) DRY_RUN=1 ;;
-    --pending) ONLY_PENDING=1 ;;
+    --dry-run)     DRY_RUN=1 ;;
+    --pending)     ONLY_PENDING=1 ;;
+    --force-vhost) FORCE_VHOST=1 ;;
     --host)    ONLY_HOST="${2:-}"
                [ -z "$ONLY_HOST" ] && { echo "--host exige um valor"; exit 2; }
                shift ;;
@@ -104,13 +109,50 @@ vhost_path() { echo "/etc/nginx/sites-available/iastudio-domain-$1"; }
 write_vhost() { # $1=hostname $2=surface
   local host="$1" surface="$2" file; file="$(vhost_path "$host")"
   local root_dir="${ADMIN_DIR}/dist"
-  [ "$surface" = "CONSOLE" ] && root_dir="${CONSOLE_DIR}/dist"
 
   # CREATE-IF-MISSING (nao sobrescrever): depois da 1a emissao, quem passa a ser
   # dono deste arquivo e o certbot — e dele o bloco 443/TLS. Reescrever do
   # template a cada rodada apagaria o TLS e deixaria o endereco em HTTP puro ate
   # o certbot reinjetar (e SEM TLS se aquela rodada falhasse).
-  if [ -f "$file" ]; then
+  # `--force-vhost` recria mesmo assim (usado quando o template muda; o certbot
+  # reinjeta o TLS na sequencia porque a emissao e idempotente).
+  if [ -f "$file" ] && [ "$FORCE_VHOST" = "0" ]; then
+    ln -sf "$file" "/etc/nginx/sites-enabled/iastudio-domain-${host}"
+    return 0
+  fi
+
+  # CONSOLE em dominio dedicado: o build do Console e feito com base=/console/
+  # (index.html pede /console/assets/... e o router usa basename=/console/).
+  # Servir esse dist na RAIZ deixa a pagina BRANCA (assets 404 + rota sem match).
+  # Entao o dominio dedicado espelha o mesmo layout do dominio principal:
+  # redirect / -> /console/ e alias em /console/.
+  if [ "$surface" = "CONSOLE" ]; then
+    cat > "$file" <<NGX
+server {
+    listen 80; listen [::]:80;
+    server_name ${host};
+    client_max_body_size 2048M;
+    server_tokens off;
+    include /etc/nginx/snippets/iastudio-security-headers.conf;
+    proxy_set_header Host              \$host;
+    proxy_set_header X-Real-IP         \$remote_addr;
+    proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 120s;
+
+    location /api/ { proxy_pass http://127.0.0.1:${PORT}; }
+
+    location = /console { return 301 /console/; }
+    location /console/ {
+        alias ${CONSOLE_DIR}/dist/;
+        try_files \$uri \$uri/ /console/index.html;
+    }
+
+    # O dominio existe para o Console: a raiz leva direto pra ele.
+    location = / { return 301 /console/; }
+    location / { return 301 /console/; }
+}
+NGX
     ln -sf "$file" "/etc/nginx/sites-enabled/iastudio-domain-${host}"
     return 0
   fi
