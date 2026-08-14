@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Tabs, StatCard, Card, DataTable, EmptyState, Badge, DSIcon, FormGrid, Field, Input, Select, NumericInput, Button, Checkbox, Modal, useToast, Spinner } from '@studio-ux-ds/react';
+import { DashboardScreen, StatCard, Card, DataTable, EmptyState, Badge, DSIcon, FormGrid, Field, Input, Select, NumericInput, Button, Checkbox, Modal, useToast } from '@studio-ux-ds/react';
 import {
   getCostsSummary, listBudgets, createBudget, updateBudget, simulateCost,
 } from '../../services/ai';
@@ -7,35 +7,28 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { PROVIDER_KINDS, formatUsd, formatTokens } from './ia.constants';
 
-// IA/Custos — 1ª tela migrada pro DS na frente de família IA Studio (v0.9.84,
-// 2026-07-24). Substitui components/ui/* locais por @studio-ux-ds/react:
-// PageHeader + Tabs + Card + StatCard (tone info/success/neutral) + DataTable
-// + EmptyState + Modal + Field + Input + Select + NumericInput + Button +
-// Checkbox. Só a casca visual mudou — dados e lógica seguem os mesmos da versão
-// anterior (que está no histórico do git).
-// Modal do DS usa `maxWidth` (número, não `size`). NumericInput onChange
-// recebe number direto. Tabs usa `value`/`onChange` (não `active`).
+// IA/Custos — MOLDE `DashboardScreen` do DS (v0.10.34). Antes era <div> comum +
+// PageHeader + Tabs: como não era `.su-screen`, a preferência de largura do
+// Personalizar não a alcançava (era a única tela do IA Studio que faltava).
+// Não é lista — é um painel (indicadores + tabela + calculadora), então o molde
+// certo é o DashboardScreen, o mesmo que o AquaPark usa nos painéis. As abas
+// Consumo / Orçamentos / Simulador são as `tabs` do molde; os KPIs (que são do
+// Consumo) entram no slot `stats` só nessa aba.
 
 const PAGE_TABS = [
   { id: 'summary',   label: 'Consumo' },
   { id: 'budgets',   label: 'Orçamentos' },
   { id: 'simulator', label: 'Simulador' },
 ];
+const PAGE_TITLE = 'Custos de IA';
+const PAGE_SUBTITLE = 'Consumo de IA e custo por provedor e assistente, com orçamentos e simulador.';
 
 export default function Custos() {
   const [tab, setTab] = useState('summary');
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Custos de IA"
-        subtitle="Consumo de IA e custo por provedor e assistente, com orçamentos e simulador."
-      />
-      <Tabs items={PAGE_TABS} value={tab} onChange={setTab} />
-      {tab === 'summary' && <SummaryTab />}
-      {tab === 'budgets' && <BudgetsTab />}
-      {tab === 'simulator' && <SimulatorTab />}
-    </div>
-  );
+  const seg = { tabs: PAGE_TABS, tab, onTab: setTab };
+  if (tab === 'summary') return <SummaryTab seg={seg} />;
+  if (tab === 'budgets') return <BudgetsTab seg={seg} />;
+  return <SimulatorTab seg={seg} />;
 }
 
 function currentPeriod() {
@@ -43,7 +36,7 @@ function currentPeriod() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function SummaryTab() {
+function SummaryTab({ seg }) {
   const toast = useToast();
   const { environmentId } = useWorkspace();
   const [period, setPeriod] = useState(currentPeriod());
@@ -67,6 +60,14 @@ function SummaryTab() {
   const rows = summary?.records || summary?.items || summary?.breakdown || [];
   const providerLabel = (k) => PROVIDER_KINDS.find((p) => p.value === k)?.label || k;
 
+  // KPIs do Consumo — no slot `stats` do DashboardScreen (matiz por assunto,
+  // igual ao Painel: custo=verde-água, tokens=roxo, gente=azul).
+  const stats = loading ? [] : [
+    { label: 'Custo total', value: formatUsd(totals.cost_usd ?? totals.total_cost_usd), icon: <DSIcon name="chart-bar" />, hue: 'teal' },
+    { label: 'Tokens', value: formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens), sub: 'prompt + resposta', icon: <DSIcon name="message" />, hue: 'indigo' },
+    { label: 'Assistentes ativos', value: formatTokens(totals.agent_count ?? rows.length), icon: <DSIcon name="users" />, hue: 'blue' },
+  ];
+
   const columns = [
     { key: 'provider_kind', header: 'Provedor', render: (r) => <Badge tone="info">{providerLabel(r.provider_kind)}</Badge> },
     { key: 'model', header: 'Modelo', render: (r) => <span style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12, color: 'var(--su-text-muted)' }}>{r.model}</span> },
@@ -77,41 +78,24 @@ function SummaryTab() {
   ];
 
   return (
-    <div className="space-y-4">
+    <DashboardScreen title={PAGE_TITLE} subtitle={PAGE_SUBTITLE} {...seg} stats={stats} statsCount={3} loading={loading}>
       <div style={{ maxWidth: 180 }}>
         <Field label="Mês">
           <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
         </Field>
       </div>
-
-      {loading ? (
-        <Spinner size="lg" center />
+      {!rows.length ? (
+        <Card>
+          <EmptyState icon="chart-bar" title="Sem consumo no período" description="Nenhum registro de custo para o período selecionado." />
+        </Card>
       ) : (
-        <>
-          {/* Matiz por assunto, igual ao Painel e ao console (DS v1.2.29):
-              custo = verde-água, consumo de IA = roxo, gente = azul. A cor tem de
-              ser a MESMA para o mesmo assunto em toda tela — é o que a torna
-              informação em vez de enfeite. */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <StatCard label="Custo total" value={formatUsd(totals.cost_usd ?? totals.total_cost_usd)} icon={<DSIcon name="chart-bar" />} hue="teal" />
-            <StatCard label="Tokens" value={formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens)} sub="prompt + resposta" icon={<DSIcon name="message" />} hue="indigo" />
-            <StatCard label="Assistentes ativos" value={formatTokens(totals.agent_count ?? rows.length)} icon={<DSIcon name="users" />} hue="blue" />
-          </div>
-
-          {!rows.length ? (
-            <Card>
-              <EmptyState icon="chart-bar" title="Sem consumo no período" description="Nenhum registro de custo para o período selecionado." />
-            </Card>
-          ) : (
-            <DataTable columns={columns} rows={rows} getRowId={(r, i) => r.id || i} />
-          )}
-        </>
+        <DataTable columns={columns} rows={rows} getRowId={(r, i) => r.id || i} />
       )}
-    </div>
+    </DashboardScreen>
   );
 }
 
-function BudgetsTab() {
+function BudgetsTab({ seg }) {
   const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
@@ -150,35 +134,24 @@ function BudgetsTab() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <p className="text-xs flex-1" style={{ color: 'var(--su-text-muted)' }}>
-          Orçamentos mensais com alerta e bloqueio opcional. Alerta e bloqueio nascem desligados.
-        </p>
-        {canManage && (
+    <>
+      <DashboardScreen
+        title={PAGE_TITLE}
+        subtitle={PAGE_SUBTITLE}
+        {...seg}
+        statsCount={0}
+        loading={loading}
+        actions={canManage && (
           <Button variant="primary" icon="plus" onClick={() => { setEditing(null); setEditorOpen(true); }}>
             Novo orçamento
           </Button>
         )}
-      </div>
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState icon="file" title="Nenhum orçamento" description="Crie um orçamento para controlar o gasto mensal com IA." />
-        </Card>
-      ) : (
-        <>
-          {canManage && (
-            <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-              Clique num orçamento para ajustar limite, alerta e bloqueio.
-            </p>
-          )}
-          {/* Linha clicável em vez de lápis por linha (regra do DS
-              STUDIO_UX_TABLES.md §3 — a linha é o alvo, sem botão redundante).
-              O BudgetModal continua Modal: só tem NumericInput + Checkbox,
-              nenhum TextArea — respeita a regra do Modal (v1.2.11+ do DS). */}
+      >
+        {!items.length ? (
+          <Card>
+            <EmptyState icon="file" title="Nenhum orçamento" description="Crie um orçamento para controlar o gasto mensal com IA." />
+          </Card>
+        ) : (
           <DataTable
             columns={columns}
             rows={items}
@@ -186,8 +159,8 @@ function BudgetsTab() {
             onRowClick={canManage ? (b) => { setEditing(b); setEditorOpen(true); } : undefined}
             getRowLabel={(b) => `Editar orçamento de ${formatUsd(b.limit_usd)}/mês`}
           />
-        </>
-      )}
+        )}
+      </DashboardScreen>
 
       <BudgetModal
         open={editorOpen}
@@ -197,7 +170,7 @@ function BudgetsTab() {
         onClose={() => setEditorOpen(false)}
         onSaved={() => { setEditorOpen(false); load(); }}
       />
-    </div>
+    </>
   );
 }
 
@@ -220,8 +193,6 @@ function BudgetModal({ open, budget, onClose, onSaved, workspaceId, environmentI
     if (!isEdit && (!workspaceId || !environmentId)) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
     setSaving(true);
     try {
-      // Corpos separados: create aceita period_kind (imutável) mas não is_active;
-      // update aceita is_active mas não period_kind (whitelist do backend).
       const base = {
         limit_usd: form.limit_usd,
         alert_threshold_pct: form.alert_threshold_pct,
@@ -279,7 +250,7 @@ function BudgetModal({ open, budget, onClose, onSaved, workspaceId, environmentI
   );
 }
 
-function SimulatorTab() {
+function SimulatorTab({ seg }) {
   const toast = useToast();
   const [form, setForm] = useState({ provider_kind: 'OPENAI', model: 'gpt-4o-mini', prompt_tokens: 1000, completion_tokens: 500, runs: 1 });
   const [running, setRunning] = useState(false);
@@ -307,7 +278,7 @@ function SimulatorTab() {
   }
 
   return (
-    <div className="space-y-4" style={{ maxWidth: 720 }}>
+    <DashboardScreen title={PAGE_TITLE} subtitle={PAGE_SUBTITLE} {...seg} statsCount={0}>
       <Card>
         <div style={{ padding: 20 }} className="space-y-3">
           <FormGrid columns={2}>
@@ -345,6 +316,6 @@ function SimulatorTab() {
           <StatCard label="Custo total estimado" value={formatUsd(result.total_cost_usd ?? result.cost_usd)} sub={`${form.runs} execuções`} icon={<DSIcon name="chart-bar" />} hue="teal" />
         </div>
       )}
-    </div>
+    </DashboardScreen>
   );
 }

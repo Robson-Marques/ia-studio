@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.10.35 - 2026-08-07 (Adoção do DS: Custos vira DashboardScreen — a última tela do IA Studio)
+
+Sem `db push`. Só `platform-admin`.
+
+**Custos** era a única tela do IA Studio que a preferência de largura do Personalizar (Medida de leitura / Tela inteira) não alcançava — porque não era `.su-screen`. Não é lista: é um painel (indicadores + tabela + calculadora). Convertida para o molde `DashboardScreen` do DS, o mesmo que o AquaPark usa nos painéis. As abas Consumo/Orçamentos/Simulador viraram as `tabs` do molde; os KPIs entram no slot `stats` só no Consumo (onde eles existem). Comportamento preservado: mesmo mês/tabela no Consumo, lista + criar orçamento em Orçamentos, calculadora no Simulador.
+
+Com isso, **todas as telas do IA Studio respeitam a largura**.
+
 ## v0.10.34 - 2026-08-07 (Adoção do DS: listas viram ListScreen — leva 1 (família IA))
 
 Sem `db push`. Só `platform-admin`.
