@@ -1,27 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { listAgents, exportAgent, listAgentVersions } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { formatDateTime } from './ia.constants';
 import AgentVersionsModal from './editor/AgentVersionsModal';
 
-// IA/Agentes — 6ª e última tela da família migrada pro DS (v0.9.90, 2026-07-24).
-//
-// A tela virou só LISTAGEM. Tudo que era Modal saiu:
-//  · `AgentEditorModal` (8 abas, ~12 TextArea) → rotas /ia/agentes/nova e
-//    /ia/agentes/:id (`AgenteEditor.jsx`).
-//  · `ImportAgentModal` (TextArea de JSON) → rota /ia/agentes/importar.
-//  · `AgentExecuteModal` (o ▶ da linha) → **absorvido** pela aba Testar do
-//    editor. Eram duas UIs de teste no código; agora é uma.
-//  · `AgentVersionsModal` → segue Modal (não tem campo), mas abre do cabeçalho
-//    do editor, não da linha.
-//
-// A linha tinha 4 botões (▶ Testar, Versões, Exportar, ✎ Editar) **e** o nome
-// clicável — cinco alvos disputando o mesmo clique. Pela regra do
-// STUDIO_UX_TABLES.md §3, sobrou um: a linha inteira abre o assistente, e as
-// três ações secundárias moraram no cabeçalho do editor, onde têm contexto.
+// IA/Agentes — LISTAGEM no molde `ListScreen` do DS (v0.10.34): a tela passa a
+// ser `.su-screen`, então a preferência de largura do Personalizar vale aqui.
+// Antes era <div> comum + DataTable. Mesmo padrão do AquaPark. Comportamento
+// preservado: a linha abre o assistente; a barra de lote exporta N e, com 1
+// marcado, abre Versões; o modal de versões segue igual. Busca por nome dá
+// propósito à toolbar do molde.
 
 export default function Agentes() {
   const toast = useToast();
@@ -33,6 +24,7 @@ export default function Agentes() {
   const [exporting, setExporting] = useState(false);
   const [versionsAgent, setVersionsAgent] = useState(null);
   const [versions, setVersions] = useState([]);
+  const [q, setQ] = useState('');
 
   const canWrite = can('ai.agents.write');
 
@@ -52,9 +44,13 @@ export default function Agentes() {
 
   const byId = (agentId) => items.find((a) => a.id === agentId);
 
-  // Exporta N assistentes — um arquivo por assistente, em sequência. É a ação
-  // que justifica a seleção múltipla aqui: baixar a configuração de cinco de uma
-  // vez em vez de abrir cinco telas.
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((a) => (a.name || '').toLowerCase().includes(term));
+  }, [items, q]);
+
+  // Exporta N assistentes — um arquivo por assistente, em sequência.
   async function handleExport(ids) {
     setExporting(true);
     let ok = 0;
@@ -117,87 +113,69 @@ export default function Agentes() {
     </Button>
   ) : null;
 
+  const importBtn = canWrite ? (
+    <Button
+      variant="secondary"
+      icon="arrow-up-right"
+      title="Recriar um assistente a partir de um arquivo exportado"
+      onClick={() => navigate('/ia/agentes/importar')}
+    >
+      Importar
+    </Button>
+  ) : null;
+
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Assistentes"
         subtitle="Quem atende: personalidade, o que faz, o que sabe e o que pode fazer. Cada mudança vira uma versão."
-        actions={
+        primaryAction={<>{importBtn}{newAgentBtn}</>}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar assistente…"
+        loading={loading}
+        columns={columns}
+        rows={rows}
+        getRowId={(a) => a.id}
+        onRowClick={(a) => navigate(`/ia/agentes/${a.id}`)}
+        getRowLabel={(a) => `Abrir ${a.name}`}
+        selectionMode="multiple"
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'user',
+          title: 'Nenhum assistente neste ambiente',
+          description: 'Crie um assistente e configure quem ele é, o que faz e o que pode fazer.',
+          action: newAgentBtn,
+        }}
+        emptyFiltered={{ title: 'Nenhum assistente encontrado', description: 'Nenhum assistente com esse nome.', onClear: () => setQ('') }}
+        bulkActions={(ids, clear) => (
           <>
-            {canWrite && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="download"
+              loading={exporting}
+              title={ids.length > 1
+                ? `Baixar a configuração dos ${ids.length} assistentes (sem segredos)`
+                : 'Baixar a configuração deste assistente (sem segredos)'}
+              onClick={async () => { await handleExport(ids); clear(); }}
+            >
+              {ids.length > 1 ? `Exportar ${ids.length}` : 'Exportar'}
+            </Button>
+            {ids.length === 1 && (
               <Button
                 variant="secondary"
-                icon="arrow-up-right"
-                title="Recriar um assistente a partir de um arquivo exportado"
-                onClick={() => navigate('/ia/agentes/importar')}
+                size="sm"
+                icon="refresh"
+                title="Histórico de versões — publicar ou voltar a uma anterior"
+                onClick={() => openVersions(ids[0])}
               >
-                Importar
+                Versões
               </Button>
             )}
-            {newAgentBtn}
           </>
-        }
+        )}
       />
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="user"
-            title="Nenhum assistente neste ambiente"
-            description="Crie um assistente e configure quem ele é, o que faz e o que pode fazer."
-            action={newAgentBtn}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num assistente para editar e testar. Marque as caixas para exportar vários de uma vez.
-          </p>
-          {/* Taxonomia de ações do DS (STUDIO_UX_TABLES.md §3):
-              · abrir o assistente  → a linha inteira (onRowClick);
-              · agir sobre 1+       → barra de lote (Exportar em massa);
-              · só com 1 marcado    → Versões (não faz sentido em cinco).
-              Testar não entra aqui: é sobre o assistente aberto, com o resultado
-              na frente — vive na aba Testar do editor. */}
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(a) => a.id}
-            onRowClick={(a) => navigate(`/ia/agentes/${a.id}`)}
-            getRowLabel={(a) => `Abrir ${a.name}`}
-            selectionMode="multiple"
-            bulkActions={(ids, clear) => (
-              <>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon="download"
-                  loading={exporting}
-                  title={ids.length > 1
-                    ? `Baixar a configuração dos ${ids.length} assistentes (sem segredos)`
-                    : 'Baixar a configuração deste assistente (sem segredos)'}
-                  onClick={async () => { await handleExport(ids); clear(); }}
-                >
-                  {ids.length > 1 ? `Exportar ${ids.length}` : 'Exportar'}
-                </Button>
-                {ids.length === 1 && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon="refresh"
-                    title="Histórico de versões — publicar ou voltar a uma anterior"
-                    onClick={() => openVersions(ids[0])}
-                  >
-                    Versões
-                  </Button>
-                )}
-              </>
-            )}
-          />
-        </>
-      )}
 
       <AgentVersionsModal
         open={!!versionsAgent}
@@ -206,6 +184,6 @@ export default function Agentes() {
         onClose={() => setVersionsAgent(null)}
         onPublished={() => { setVersionsAgent(null); load(); }}
       />
-    </div>
+    </>
   );
 }

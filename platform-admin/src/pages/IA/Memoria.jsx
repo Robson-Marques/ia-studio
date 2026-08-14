@@ -1,25 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { listMemoryProfiles } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { MEMORY_SCOPES } from './ia.constants';
 
-// IA/Memoria — migrada pro DS na v0.9.85; padronizada na v0.9.88.
-//
-// v0.9.88 aplicou 2 regras do DS retroativamente:
-//  1) STUDIO_UX_TABLES.md §3 — a linha é o alvo. O lápis "Editar perfil" saiu
-//     da linha (competia com o clique da linha); clicar na linha abre as
-//     entradas do perfil (/ia/memoria/:id), e o "Editar perfil" vive lá.
-//  2) Modal sem TextArea (v1.2.11+ do DS) — o `ProfileModal` (Descrição) virou
-//     as rotas /ia/memoria/perfis/nova e /ia/memoria/perfis/:id/editar.
-//
-// O master-detail por state (`selected` + botão "voltar" falso) foi promovido a
-// rota real (MemoriaEntradas.jsx) — a URL agora reflete onde o usuário está, e
-// F5 / voltar do navegador funcionam.
-//
-// Esta tela ficou sendo só LISTAGEM — sem nenhum overlay.
+// IA/Memoria — LISTAGEM no molde `ListScreen` do DS (v0.10.34). Antes era um
+// `<div>` comum com PageHeader + DataTable: como não era `.su-screen`, a
+// preferência de largura do Personalizar (Medida de leitura / Tela inteira) não
+// alcançava esta tela. O ListScreen é o mesmo padrão que o AquaPark usa nas
+// listas — traz a `.su-screen` e a toolbar padrão. Comportamento preservado:
+// mesmas colunas, clique-na-linha abre as entradas do perfil, mesmo estado
+// vazio; a busca por nome é client-side (a lista é curta) e dá à toolbar um
+// propósito em vez de uma barra vazia.
 
 export default function Memoria() {
   const toast = useToast();
@@ -28,6 +22,7 @@ export default function Memoria() {
   const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
 
   const canWrite = can('ai.memory.write');
 
@@ -46,6 +41,12 @@ export default function Memoria() {
   useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scopeLabel = (s) => (MEMORY_SCOPES.find((x) => x.value === s)?.label || s);
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((p) => (p.name || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   const columns = [
     { key: 'name', header: 'Nome', render: (p) => (
@@ -70,38 +71,31 @@ export default function Memoria() {
   ) : null;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Memória"
-        subtitle="O que os assistentes lembram, por escopo (sessão / contato / fluxo / assistente), com validade e limite de itens."
-        actions={newProfileBtn}
-      />
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="settings"
-            title="Nenhum perfil de memória"
-            description="Crie perfis para o assistente lembrar contexto entre mensagens."
-            action={newProfileBtn}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num perfil para ver o que ele já guardou e ajustar as regras.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(p) => p.id}
-            onRowClick={(p) => navigate(`/ia/memoria/${p.id}`, { state: { profile: p } })}
-            getRowLabel={(p) => `Abrir ${p.name}`}
-          />
-        </>
-      )}
-    </div>
+    <ListScreen
+      title="Memória"
+      subtitle="O que os assistentes lembram, por escopo (sessão / contato / fluxo / assistente), com validade e limite de itens."
+      primaryAction={newProfileBtn}
+      search={q}
+      onSearch={setQ}
+      searchPlaceholder="Buscar perfil…"
+      loading={loading}
+      columns={columns}
+      rows={rows}
+      getRowId={(p) => p.id}
+      onRowClick={(p) => navigate(`/ia/memoria/${p.id}`, { state: { profile: p } })}
+      getRowLabel={(p) => `Abrir ${p.name}`}
+      filterActive={!!q.trim()}
+      emptyNew={{
+        icon: 'settings',
+        title: 'Nenhum perfil de memória',
+        description: 'Crie perfis para o assistente lembrar contexto entre mensagens.',
+        action: newProfileBtn,
+      }}
+      emptyFiltered={{
+        title: 'Nenhum perfil encontrado',
+        description: 'Nenhum perfil com esse nome. Ajuste a busca.',
+        onClear: () => setQ(''),
+      }}
+    />
   );
 }

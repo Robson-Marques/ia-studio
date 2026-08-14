@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { listApprovals, listApprovalPolicies } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -10,38 +10,26 @@ import {
 } from './ia.constants';
 import { statusToTone } from '../../lib/tone';
 
-// IA/Aprovacoes — migrada pro DS na v0.9.86; padronizada na v0.9.88.
-//
-// v0.9.88 aplicou 2 regras do DS retroativamente:
-//  1) STUDIO_UX_TABLES.md §3 — a linha é o alvo. Os 2 botões (Aprovar/Rejeitar)
-//     saíram da linha; clicar na linha abre o detalhe da pendência
-//     (/ia/aprovacoes/:id) onde a decisão é tomada com o contexto na frente.
-//  2) Modal sem TextArea (v1.2.11+ do DS) — o `RejectModal` (motivo) foi
-//     ABSORVIDO pelo detalhe (inline) e o `PolicyModal` (Descrição + Condição
-//     JSON) virou a rota /ia/aprovacoes/politicas/nova.
-//
-// Esta tela ficou sendo só LISTAGEM (fila + políticas) — sem nenhum overlay.
+// IA/Aprovacoes — LISTAGEM no molde `ListScreen` do DS (v0.10.34): a tela passa
+// a ser `.su-screen`, então a preferência de largura do Personalizar vale aqui.
+// As abas Fila / Políticas viraram SEGMENTS do molde (padrão do AquaPark).
+// Comportamento preservado: fila com clique-na-linha pro detalhe; políticas
+// como lista + criar.
 
-const PAGE_TABS = [
+const PAGE_SEGMENTS = [
   { id: 'queue',    label: 'Fila' },
   { id: 'policies', label: 'Políticas' },
 ];
+const PAGE_TITLE = 'Pendências';
+const PAGE_SUBTITLE = 'Ações dos assistentes que exigem sua revisão antes de executar.';
 
 export default function Aprovacoes() {
   const [tab, setTab] = useState('queue');
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Pendências"
-        subtitle="Ações dos assistentes que exigem sua revisão antes de executar."
-      />
-      <Tabs items={PAGE_TABS} value={tab} onChange={setTab} />
-      {tab === 'queue' ? <QueueTab /> : <PoliciesTab />}
-    </div>
-  );
+  const seg = { segments: PAGE_SEGMENTS, segment: tab, onSegment: setTab };
+  return tab === 'queue' ? <QueueTab seg={seg} /> : <PoliciesTab seg={seg} />;
 }
 
-function QueueTab() {
+function QueueTab({ seg }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { environmentId } = useWorkspace();
@@ -81,32 +69,22 @@ function QueueTab() {
   ];
 
   return (
-    <div className="space-y-4">
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState icon="check-circle" title="Nada pendente" description="Nenhuma ação aguardando aprovação." />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique numa pendência para ver o que o assistente quer fazer e decidir.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(a) => a.id}
-            onRowClick={(a) => navigate(`/ia/aprovacoes/${a.id}`, { state: { approval: a } })}
-            getRowLabel={(a) => `Revisar ${friendlyTarget(a.target)}`}
-          />
-        </>
-      )}
-    </div>
+    <ListScreen
+      title={PAGE_TITLE}
+      subtitle={PAGE_SUBTITLE}
+      {...seg}
+      loading={loading}
+      columns={columns}
+      rows={items}
+      getRowId={(a) => a.id}
+      onRowClick={(a) => navigate(`/ia/aprovacoes/${a.id}`, { state: { approval: a } })}
+      getRowLabel={(a) => `Revisar ${friendlyTarget(a.target)}`}
+      emptyNew={{ icon: 'check-circle', title: 'Nada pendente', description: 'Nenhuma ação aguardando aprovação.' }}
+    />
   );
 }
 
-function PoliciesTab() {
+function PoliciesTab({ seg }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
@@ -147,30 +125,20 @@ function PoliciesTab() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <p className="text-xs flex-1" style={{ color: 'var(--su-text-muted)' }}>
-          Políticas definem quais ações exigem aprovação. Nascem desligadas — ative após revisar.
-        </p>
-        {canDecide && (
-          <Button variant="primary" icon="plus" onClick={() => navigate('/ia/aprovacoes/politicas/nova')}>
-            Nova política
-          </Button>
-        )}
-      </div>
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState icon="lock" title="Nenhuma política" description="Crie políticas para exigir aprovação em ações sensíveis." />
-        </Card>
-      ) : (
-        // Sem linha clicável e sem menu de ações: o backend só expõe
-        // POST /ai/approvals/policies (criar). Não há PATCH — não existe edição
-        // de política hoje, então a linha não tem destino pra abrir.
-        <DataTable columns={columns} rows={items} getRowId={(p) => p.id} />
+    <ListScreen
+      title={PAGE_TITLE}
+      subtitle={PAGE_SUBTITLE}
+      {...seg}
+      primaryAction={canDecide && (
+        <Button variant="primary" icon="plus" onClick={() => navigate('/ia/aprovacoes/politicas/nova')}>
+          Nova política
+        </Button>
       )}
-    </div>
+      loading={loading}
+      columns={columns}
+      rows={items}
+      getRowId={(p) => p.id}
+      emptyNew={{ icon: 'lock', title: 'Nenhuma política', description: 'Crie políticas para exigir aprovação em ações sensíveis.' }}
+    />
   );
 }

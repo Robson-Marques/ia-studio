@@ -1,28 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Button, useToast } from '@studio-ux-ds/react';
 import { listKnowledgeBases } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { formatDateTime } from './ia.constants';
 
-// IA/BasesConhecimento — 5ª tela da família migrada pro DS (v0.9.89, 2026-07-24).
-// Nasce alinhada às 2 regras endurecidas na v1.2.13 do DS:
-//
-//  1) STUDIO_UX_TABLES.md §3 — a linha é o alvo. O legado tinha `onClick` na
-//     linha E um lixeira "Excluir base" na mesma linha (dois alvos disputando o
-//     clique, e o destrutivo do lado do navegacional — pedindo clique errado).
-//     Agora: a linha abre a base (/ia/conhecimento/:id) e o excluir vive LÁ,
-//     onde o operador vê quantos documentos vai perder antes de confirmar.
-//
-//  2) Modal sem TextArea — o `CreateBaseModal` (Descrição) virou a rota
-//     /ia/conhecimento/nova, e o `AddDocumentModal` (conteúdo de até 8 linhas,
-//     markdown/texto colado) virou /ia/conhecimento/:id/documentos/novo.
-//
-// O master-detail por state (`selected` + botão voltar falso) foi promovido a
-// rota real, igual foi feito na Memória na v0.9.88.
-//
-// Esta tela ficou sendo só LISTAGEM — sem nenhum overlay.
+// IA/BasesConhecimento — LISTAGEM no molde `ListScreen` do DS (v0.10.34): a tela
+// passa a ser `.su-screen`, então a preferência de largura do Personalizar vale
+// aqui. Antes era <div> comum + DataTable. Mesmo padrão do AquaPark. Comportamento
+// preservado: mesmas colunas, clique-na-linha abre a base, mesmo estado vazio.
+// Busca por nome client-side dá propósito à toolbar do molde.
 
 export default function BasesConhecimento() {
   const toast = useToast();
@@ -31,6 +19,7 @@ export default function BasesConhecimento() {
   const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
 
   const canWrite = can('ai.knowledge.write');
 
@@ -47,6 +36,12 @@ export default function BasesConhecimento() {
   }
 
   useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((b) => (b.name || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   const columns = [
     { key: 'name', header: 'Nome', render: (b) => (
@@ -73,38 +68,27 @@ export default function BasesConhecimento() {
   ) : null;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Conhecimento"
-        subtitle="O que os assistentes consultam para responder — documentos indexados e pesquisáveis por significado."
-        actions={newBaseBtn}
-      />
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="file"
-            title="Nenhuma base neste ambiente"
-            description="Crie uma base e adicione documentos para os assistentes consultarem."
-            action={newBaseBtn}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique numa base para ver os documentos, testar uma consulta e ajustar o que ela contém.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(b) => b.id}
-            onRowClick={(b) => navigate(`/ia/conhecimento/${b.id}`, { state: { base: b } })}
-            getRowLabel={(b) => `Abrir ${b.name}`}
-          />
-        </>
-      )}
-    </div>
+    <ListScreen
+      title="Conhecimento"
+      subtitle="O que os assistentes consultam para responder — documentos indexados e pesquisáveis por significado."
+      primaryAction={newBaseBtn}
+      search={q}
+      onSearch={setQ}
+      searchPlaceholder="Buscar base…"
+      loading={loading}
+      columns={columns}
+      rows={rows}
+      getRowId={(b) => b.id}
+      onRowClick={(b) => navigate(`/ia/conhecimento/${b.id}`, { state: { base: b } })}
+      getRowLabel={(b) => `Abrir ${b.name}`}
+      filterActive={!!q.trim()}
+      emptyNew={{
+        icon: 'file',
+        title: 'Nenhuma base neste ambiente',
+        description: 'Crie uma base e adicione documentos para os assistentes consultarem.',
+        action: newBaseBtn,
+      }}
+      emptyFiltered={{ title: 'Nenhuma base encontrada', description: 'Nenhuma base com esse nome.', onClear: () => setQ('') }}
+    />
   );
 }

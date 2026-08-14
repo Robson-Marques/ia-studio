@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, Field, Input, Select, Checkbox, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, EmptyState, Badge, Modal, Field, Input, Select, Checkbox, Button, useToast } from '@studio-ux-ds/react';
 import {
   listTools,
   listMcpServers, createMcpServer, syncMcpServer, getMcpServerTools,
@@ -19,26 +19,22 @@ import { MCP_TRANSPORTS, formatDateTime } from './ia.constants';
 //   endpoint, checkbox) sem escrita reflexiva.
 // - Modal "Habilidades de <server>" MANTIDO: leitura curta, não é form.
 
-const PAGE_TABS = [
+// Abas viram SEGMENTS do ListScreen (padrão do AquaPark): a tela é `.su-screen`,
+// então a preferência de largura do Personalizar passa a valer aqui.
+const PAGE_SEGMENTS = [
   { id: 'catalog', label: 'Catálogo' },
   { id: 'mcp',     label: 'Servidores MCP' },
 ];
+const PAGE_TITLE = 'Habilidades';
+const PAGE_SUBTITLE = 'O que os assistentes podem fazer — habilidades da plataforma, personalizadas e importadas de servidores MCP.';
 
 export default function Ferramentas() {
   const [tab, setTab] = useState('catalog');
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Habilidades"
-        subtitle="O que os assistentes podem fazer — habilidades da plataforma, personalizadas e importadas de servidores MCP."
-      />
-      <Tabs items={PAGE_TABS} value={tab} onChange={setTab} />
-      {tab === 'catalog' ? <CatalogTab /> : <McpTab />}
-    </div>
-  );
+  const seg = { segments: PAGE_SEGMENTS, segment: tab, onSegment: setTab };
+  return tab === 'catalog' ? <CatalogTab seg={seg} /> : <McpTab seg={seg} />;
 }
 
-function CatalogTab() {
+function CatalogTab({ seg }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
@@ -107,46 +103,31 @@ function CatalogTab() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <p className="text-xs flex-1" style={{ color: 'var(--su-text-muted)' }}>
-          As habilidades prontas da plataforma não podem ser reescritas — crie as suas próprias para operações de conexões.
-        </p>
-        {canWrite && (
-          <Button
-            variant="primary"
-            icon="plus"
-            onClick={() => navigate('/ia/ferramentas/tool/nova')}
-          >
-            Nova habilidade
-          </Button>
-        )}
-      </div>
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="settings"
-            title="Nenhuma habilidade"
-            description="As habilidades da plataforma já vêm instaladas — sincronize um servidor MCP para importar outras."
-          />
-        </Card>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={items}
-          getRowId={(t) => t.id || t.key}
-          onRowClick={canWrite ? (t) => navigate(`/ia/ferramentas/tool/${t.id}/editar`, { state: { tool: t } }) : undefined}
-          getRowLabel={(t) => t.builtin ? `Ajustes de ${t.name}` : `Editar ${t.name}`}
-        />
+    <ListScreen
+      title={PAGE_TITLE}
+      subtitle={PAGE_SUBTITLE}
+      {...seg}
+      primaryAction={canWrite && (
+        <Button variant="primary" icon="plus" onClick={() => navigate('/ia/ferramentas/tool/nova')}>
+          Nova habilidade
+        </Button>
       )}
-    </div>
+      loading={loading}
+      columns={columns}
+      rows={items}
+      getRowId={(t) => t.id || t.key}
+      onRowClick={canWrite ? (t) => navigate(`/ia/ferramentas/tool/${t.id}/editar`, { state: { tool: t } }) : undefined}
+      getRowLabel={(t) => t.builtin ? `Ajustes de ${t.name}` : `Editar ${t.name}`}
+      emptyNew={{
+        icon: 'settings',
+        title: 'Nenhuma habilidade',
+        description: 'As habilidades da plataforma já vêm instaladas — sincronize um servidor MCP para importar outras.',
+      }}
+    />
   );
 }
 
-function McpTab() {
+function McpTab({ seg }) {
   const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
@@ -244,72 +225,59 @@ function McpTab() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <p className="text-xs flex-1" style={{ color: 'var(--su-text-muted)' }}>
-          Servidores MCP trazem habilidades de fora — cadastre, ative e sincronize para importar.
-        </p>
-        {canWrite && (
+    <>
+      <ListScreen
+        title={PAGE_TITLE}
+        subtitle={PAGE_SUBTITLE}
+        {...seg}
+        primaryAction={canWrite && (
           <Button variant="primary" icon="plus" onClick={() => setCreateOpen(true)}>
             Novo servidor
           </Button>
         )}
-      </div>
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="settings"
-            title="Nenhum servidor MCP"
-            description="Cadastre um servidor para importar habilidades externas."
-          />
-        </Card>
-      ) : (
-        // Taxonomia de ações do DS (STUDIO_UX_TABLES.md §3):
-        // · ver as habilidades do servidor → a linha inteira;
-        // · sincronizar 1+                 → barra de lote (roda em N);
-        // · com 1 marcado                  → também "Ver habilidades" (atalho).
-        <DataTable
-          columns={columns}
-          rows={items}
-          getRowId={(s) => s.id}
-          onRowClick={(s) => openTools(s)}
-          getRowLabel={(s) => `Ver habilidades de ${s.name}`}
-          selectionMode="multiple"
-          bulkActions={canWrite ? (ids, clear) => (
-            <>
+        loading={loading}
+        columns={columns}
+        rows={items}
+        getRowId={(s) => s.id}
+        onRowClick={(s) => openTools(s)}
+        getRowLabel={(s) => `Ver habilidades de ${s.name}`}
+        selectionMode="multiple"
+        emptyNew={{
+          icon: 'settings',
+          title: 'Nenhum servidor MCP',
+          description: 'Cadastre um servidor para importar habilidades externas.',
+        }}
+        bulkActions={canWrite ? (ids, clear) => (
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="refresh"
+              loading={syncingMany}
+              title={ids.length > 1
+                ? `Buscar habilidades novas nos ${ids.length} servidores`
+                : 'Buscar habilidades novas neste servidor'}
+              onClick={async () => { await handleSyncMany(ids); clear(); }}
+            >
+              {ids.length > 1 ? `Sincronizar ${ids.length}` : 'Sincronizar'}
+            </Button>
+            {ids.length === 1 && (
               <Button
                 variant="secondary"
                 size="sm"
-                icon="refresh"
-                loading={syncingMany}
-                title={ids.length > 1
-                  ? `Buscar habilidades novas nos ${ids.length} servidores`
-                  : 'Buscar habilidades novas neste servidor'}
-                onClick={async () => { await handleSyncMany(ids); clear(); }}
+                icon="search"
+                title="Ver as habilidades que este servidor já trouxe"
+                onClick={() => {
+                  const server = items.find((s) => s.id === ids[0]);
+                  if (server) openTools(server);
+                }}
               >
-                {ids.length > 1 ? `Sincronizar ${ids.length}` : 'Sincronizar'}
+                Ver habilidades
               </Button>
-              {ids.length === 1 && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon="search"
-                  title="Ver as habilidades que este servidor já trouxe"
-                  onClick={() => {
-                    const server = items.find((s) => s.id === ids[0]);
-                    if (server) openTools(server);
-                  }}
-                >
-                  Ver habilidades
-                </Button>
-              )}
-            </>
-          ) : undefined}
-        />
-      )}
+            )}
+          </>
+        ) : undefined}
+      />
 
       <McpServerModal
         open={createOpen}
@@ -373,7 +341,7 @@ function McpTab() {
           </div>
         )}
       </Modal>
-    </div>
+    </>
   );
 }
 

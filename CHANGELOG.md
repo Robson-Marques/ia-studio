@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.34 - 2026-08-07 (Adoção do DS: listas viram ListScreen — leva 1 (família IA))
+
+Sem `db push`. Só `platform-admin`.
+
+As listas que eram `<div>` comum + `DataTable` não eram `.su-screen`, então a preferência de largura do Personalizar (Medida de leitura / Tela inteira) não as alcançava. Convertidas para o molde `ListScreen` do DS — o mesmo padrão que o AquaPark usa — que traz a `.su-screen` e a toolbar padrão. Comportamento preservado (mesmas colunas, clique-na-linha, ações, estados vazios).
+
+Convertida a **família IA inteira** (as telas que são lista):
+
+- **Memória**, **Conhecimento**, **Assistentes** → `ListScreen` com busca por nome (pra a toolbar do molde não ficar vazia). Assistentes preserva a barra de lote (exportar N, Versões) e o modal de versões.
+- **Habilidades** e **Pendências** → `ListScreen` com as abas viradas em **segments** do molde (Catálogo/Servidores MCP; Fila/Políticas), preservando ações em lote e modais.
+
+Leva 1 de uma migração por família (regra do DS: adoção tela a tela). Próximas: Automação, WhatsApp, Integrações, Recursos e as avulsas — as que são de fato lista. Telas mistas (ex.: Custos = resumo + lista + calculadora) entram com o molde certo de cada uma (Dashboard/Form), não à força em ListScreen.
+
 ## v0.10.33 - 2026-08-07 (Studio UX 1.2.68: medida de leitura, largura escolhida pela pessoa)
 
 Sem `db push`. Só `platform-admin` (dependência do DS).
