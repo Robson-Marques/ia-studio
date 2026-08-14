@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DashboardScreen, StatCard, Card, DataTable, EmptyState, Badge, DSIcon, FormGrid, Field, Input, Select, NumericInput, Button, Checkbox, Modal, useToast } from '@studio-ux-ds/react';
+import { DashboardScreen, StatCard, Card, DataTable, EmptyState, Badge, DSIcon, FormGrid, Field, Input, Select, NumericInput, Button, Checkbox, Modal, Spinner, useToast } from '@studio-ux-ds/react';
 import {
   getCostsSummary, listBudgets, createBudget, updateBudget, simulateCost,
 } from '../../services/ai';
@@ -7,13 +7,15 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { PROVIDER_KINDS, formatUsd, formatTokens } from './ia.constants';
 
-// IA/Custos — MOLDE `DashboardScreen` do DS (v0.10.34). Antes era <div> comum +
-// PageHeader + Tabs: como não era `.su-screen`, a preferência de largura do
-// Personalizar não a alcançava (era a única tela do IA Studio que faltava).
-// Não é lista — é um painel (indicadores + tabela + calculadora), então o molde
-// certo é o DashboardScreen, o mesmo que o AquaPark usa nos painéis. As abas
-// Consumo / Orçamentos / Simulador são as `tabs` do molde; os KPIs (que são do
-// Consumo) entram no slot `stats` só nessa aba.
+// IA/Custos — MOLDE `DashboardScreen` do DS (v0.10.35). Não é lista — é um painel
+// (indicadores + tabela + calculadora). O molde traz a `.su-screen` (a largura do
+// Personalizar passa a valer) + o padrão do AquaPark.
+//
+// REGRA do DashboardScreen (v1.2.68): os KPIs ficam FIXOS acima das abas e NÃO
+// mudam com elas — são o assunto da tela. Por isso os indicadores são carregados
+// no NÍVEL DA PÁGINA (constantes nas três abas) em vez de aparecer só no Consumo;
+// senão a barra de abas pula de posição ao trocar de aba (o bug reportado).
+// As abas Consumo/Orçamentos/Simulador são o conteúdo (`children`).
 
 const PAGE_TABS = [
   { id: 'summary',   label: 'Consumo' },
@@ -23,27 +25,20 @@ const PAGE_TABS = [
 const PAGE_TITLE = 'Custos de IA';
 const PAGE_SUBTITLE = 'Consumo de IA e custo por provedor e assistente, com orçamentos e simulador.';
 
-export default function Custos() {
-  const [tab, setTab] = useState('summary');
-  const seg = { tabs: PAGE_TABS, tab, onTab: setTab };
-  if (tab === 'summary') return <SummaryTab seg={seg} />;
-  if (tab === 'budgets') return <BudgetsTab seg={seg} />;
-  return <SimulatorTab seg={seg} />;
-}
-
 function currentPeriod() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function SummaryTab({ seg }) {
+export default function Custos() {
   const toast = useToast();
   const { environmentId } = useWorkspace();
+  const [tab, setTab] = useState('summary');
   const [period, setPeriod] = useState(currentPeriod());
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  async function load() {
+  async function loadSummary() {
     setLoading(true);
     try {
       setSummary(await getCostsSummary({ period, environment_id: environmentId || undefined }));
@@ -54,20 +49,31 @@ function SummaryTab({ seg }) {
     }
   }
 
-  useEffect(() => { load(); }, [period, environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadSummary(); }, [period, environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totals = summary?.totals || summary || {};
   const rows = summary?.records || summary?.items || summary?.breakdown || [];
-  const providerLabel = (k) => PROVIDER_KINDS.find((p) => p.value === k)?.label || k;
 
-  // KPIs do Consumo — no slot `stats` do DashboardScreen (matiz por assunto,
-  // igual ao Painel: custo=verde-água, tokens=roxo, gente=azul).
-  const stats = loading ? [] : [
-    { label: 'Custo total', value: formatUsd(totals.cost_usd ?? totals.total_cost_usd), icon: <DSIcon name="chart-bar" />, hue: 'teal' },
-    { label: 'Tokens', value: formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens), sub: 'prompt + resposta', icon: <DSIcon name="message" />, hue: 'indigo' },
-    { label: 'Assistentes ativos', value: formatTokens(totals.agent_count ?? rows.length), icon: <DSIcon name="users" />, hue: 'blue' },
+  // KPIs FIXOS (o assunto da tela — matiz por assunto, igual ao Painel).
+  const stats = [
+    { label: 'Custo total', value: formatUsd(totals.cost_usd ?? totals.total_cost_usd ?? 0), icon: <DSIcon name="chart-bar" />, hue: 'teal' },
+    { label: 'Tokens', value: formatTokens((totals.tokens_prompt ?? 0) + (totals.tokens_completion ?? 0) || totals.total_tokens || 0), sub: 'prompt + resposta', icon: <DSIcon name="message" />, hue: 'indigo' },
+    { label: 'Assistentes ativos', value: formatTokens(totals.agent_count ?? rows.length ?? 0), icon: <DSIcon name="users" />, hue: 'blue' },
   ];
 
+  return (
+    <DashboardScreen title={PAGE_TITLE} subtitle={PAGE_SUBTITLE} stats={stats} statsCount={3} tabs={PAGE_TABS} tab={tab} onTab={setTab}>
+      {tab === 'summary' && (
+        <SummaryContent period={period} setPeriod={setPeriod} loading={loading} rows={rows} />
+      )}
+      {tab === 'budgets' && <BudgetsTab />}
+      {tab === 'simulator' && <SimulatorTab />}
+    </DashboardScreen>
+  );
+}
+
+function SummaryContent({ period, setPeriod, loading, rows }) {
+  const providerLabel = (k) => PROVIDER_KINDS.find((p) => p.value === k)?.label || k;
   const columns = [
     { key: 'provider_kind', header: 'Provedor', render: (r) => <Badge tone="info">{providerLabel(r.provider_kind)}</Badge> },
     { key: 'model', header: 'Modelo', render: (r) => <span style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12, color: 'var(--su-text-muted)' }}>{r.model}</span> },
@@ -78,24 +84,26 @@ function SummaryTab({ seg }) {
   ];
 
   return (
-    <DashboardScreen title={PAGE_TITLE} subtitle={PAGE_SUBTITLE} {...seg} stats={stats} statsCount={3} loading={loading}>
+    <>
       <div style={{ maxWidth: 180 }}>
         <Field label="Mês">
           <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
         </Field>
       </div>
-      {!rows.length ? (
+      {loading ? (
+        <Spinner size="lg" center />
+      ) : !rows.length ? (
         <Card>
           <EmptyState icon="chart-bar" title="Sem consumo no período" description="Nenhum registro de custo para o período selecionado." />
         </Card>
       ) : (
         <DataTable columns={columns} rows={rows} getRowId={(r, i) => r.id || i} />
       )}
-    </DashboardScreen>
+    </>
   );
 }
 
-function BudgetsTab({ seg }) {
+function BudgetsTab() {
   const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
@@ -135,32 +143,28 @@ function BudgetsTab({ seg }) {
 
   return (
     <>
-      <DashboardScreen
-        title={PAGE_TITLE}
-        subtitle={PAGE_SUBTITLE}
-        {...seg}
-        statsCount={0}
-        loading={loading}
-        actions={canManage && (
+      {canManage && (
+        <div className="flex justify-end">
           <Button variant="primary" icon="plus" onClick={() => { setEditing(null); setEditorOpen(true); }}>
             Novo orçamento
           </Button>
-        )}
-      >
-        {!items.length ? (
-          <Card>
-            <EmptyState icon="file" title="Nenhum orçamento" description="Crie um orçamento para controlar o gasto mensal com IA." />
-          </Card>
-        ) : (
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(b) => b.id}
-            onRowClick={canManage ? (b) => { setEditing(b); setEditorOpen(true); } : undefined}
-            getRowLabel={(b) => `Editar orçamento de ${formatUsd(b.limit_usd)}/mês`}
-          />
-        )}
-      </DashboardScreen>
+        </div>
+      )}
+      {loading ? (
+        <Spinner size="lg" center />
+      ) : !items.length ? (
+        <Card>
+          <EmptyState icon="file" title="Nenhum orçamento" description="Crie um orçamento para controlar o gasto mensal com IA." />
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={items}
+          getRowId={(b) => b.id}
+          onRowClick={canManage ? (b) => { setEditing(b); setEditorOpen(true); } : undefined}
+          getRowLabel={(b) => `Editar orçamento de ${formatUsd(b.limit_usd)}/mês`}
+        />
+      )}
 
       <BudgetModal
         open={editorOpen}
@@ -250,7 +254,7 @@ function BudgetModal({ open, budget, onClose, onSaved, workspaceId, environmentI
   );
 }
 
-function SimulatorTab({ seg }) {
+function SimulatorTab() {
   const toast = useToast();
   const [form, setForm] = useState({ provider_kind: 'OPENAI', model: 'gpt-4o-mini', prompt_tokens: 1000, completion_tokens: 500, runs: 1 });
   const [running, setRunning] = useState(false);
@@ -278,7 +282,7 @@ function SimulatorTab({ seg }) {
   }
 
   return (
-    <DashboardScreen title={PAGE_TITLE} subtitle={PAGE_SUBTITLE} {...seg} statsCount={0}>
+    <>
       <Card>
         <div style={{ padding: 20 }} className="space-y-3">
           <FormGrid columns={2}>
@@ -316,6 +320,6 @@ function SimulatorTab({ seg }) {
           <StatCard label="Custo total estimado" value={formatUsd(result.total_cost_usd ?? result.cost_usd)} sub={`${form.runs} execuções`} icon={<DSIcon name="chart-bar" />} hue="teal" />
         </div>
       )}
-    </DashboardScreen>
+    </>
   );
 }

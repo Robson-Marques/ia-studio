@@ -1,12 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.36 - 2026-08-07 (Fix: abas da Custos paravam de pular)
+
+Sem `db push`. Só `platform-admin`.
+
+Na v0.10.35 os KPIs da Custos apareciam **só na aba Consumo** — então trocar de aba fazia a barra de abas **pular de posição** (com KPIs no Consumo, sem KPIs nas outras). Corrigido: os indicadores (Custo total / Tokens / Assistentes ativos) passam a ser carregados no **nível da página** e ficam **fixos acima das abas**, iguais nas três — é o que o `DashboardScreen` (v1.2.68) manda ("os KPIs são o assunto da tela e não mudam com a aba"). A barra de abas fica sempre no mesmo lugar; só o conteúdo abaixo troca.
+
 ## v0.10.35 - 2026-08-07 (Adoção do DS: Custos vira DashboardScreen — a última tela do IA Studio)
 
 Sem `db push`. Só `platform-admin`.
 
-**Custos** era a única tela do IA Studio que a preferência de largura do Personalizar (Medida de leitura / Tela inteira) não alcançava — porque não era `.su-screen`. Não é lista: é um painel (indicadores + tabela + calculadora). Convertida para o molde `DashboardScreen` do DS, o mesmo que o AquaPark usa nos painéis. As abas Consumo/Orçamentos/Simulador viraram as `tabs` do molde; os KPIs entram no slot `stats` só no Consumo (onde eles existem). Comportamento preservado: mesmo mês/tabela no Consumo, lista + criar orçamento em Orçamentos, calculadora no Simulador.
-
-Com isso, **todas as telas do IA Studio respeitam a largura**.
+**Custos** era a única tela do IA Studio que a preferência de largura do Personalizar (Medida de leitura / Tela inteira) não alcançava — porque não era `.su-screen`. Não é lista: é um painel (indicadores + tabela + calculadora). Convertida para o molde `DashboardScreen` do DS, o mesmo que o AquaPark usa nos painéis. As abas Consumo/Orçamentos/Simulador viraram as `tabs` do molde. Com isso, **todas as telas do IA Studio respeitam a largura**.
 
 ## v0.10.34 - 2026-08-07 (Adoção do DS: listas viram ListScreen — leva 1 (família IA))
 
