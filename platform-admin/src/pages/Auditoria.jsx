@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { PageHeader, Card, FormGrid, Field, Input, Button, DataTable, Badge, Modal, DescriptionList, CopyButton, Pagination, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Field, Input, Button, Badge, Modal, DescriptionList, CopyButton, useToast } from '@studio-ux-ds/react';
 import { listAudit } from '../services/audit';
 import { formatDateTime } from '../lib/format';
 
@@ -89,65 +89,58 @@ export default function Auditoria({
     ) },
   ];
 
+  const filtrando = Boolean(filtros.action || filtros.entity || filtros.from || filtros.to);
+
+  const limpar = () => {
+    const vazio = { action: '', entity: '', from: '', to: '' };
+    setFiltros(vazio);
+    load(1, vazio);
+  };
+
+  const filterContent = (
+    <div className="space-y-3" style={{ minWidth: 260 }}>
+      <Field label="Ação">
+        <Input placeholder="ex.: sale.cancel" value={filtros.action} onChange={(e) => set('action', e.target.value)} />
+      </Field>
+      <Field label="Item afetado">
+        <Input placeholder="ex.: Connection" value={filtros.entity} onChange={(e) => set('entity', e.target.value)} />
+      </Field>
+      <Field label="De">
+        <Input type="date" value={filtros.from} onChange={(e) => set('from', e.target.value)} />
+      </Field>
+      <Field label="Até">
+        <Input type="date" value={filtros.to} onChange={(e) => set('to', e.target.value)} />
+      </Field>
+      <Button variant="primary" icon="search" loading={loading} onClick={() => load(1)}>Filtrar</Button>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <PageHeader title={title} subtitle={subtitle} />
-
-      <Card>
-        <div style={{ padding: 20 }}>
-          <FormGrid columns="auto">
-            <Field label="Ação">
-              <Input placeholder="ex.: sale.cancel" value={filtros.action} onChange={(e) => set('action', e.target.value)} />
-            </Field>
-            <Field label="Item afetado">
-              <Input placeholder="ex.: Connection" value={filtros.entity} onChange={(e) => set('entity', e.target.value)} />
-            </Field>
-            <Field label="De">
-              <Input type="date" value={filtros.from} onChange={(e) => set('from', e.target.value)} />
-            </Field>
-            <Field label="Até">
-              <div className="flex items-center gap-2">
-                <Input type="date" value={filtros.to} onChange={(e) => set('to', e.target.value)} style={{ flex: 1 }} />
-                <Button variant="primary" icon="search" loading={loading} onClick={() => load(1)}>
-                  Filtrar
-                </Button>
-              </div>
-            </Field>
-          </FormGrid>
-        </div>
-      </Card>
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="file"
-            title="Nenhum registro"
-            description="Ou os filtros não casaram com nada, ou ainda não houve ação administrativa no período."
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique numa linha para ver o antes e o depois da mudança.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(log) => log.id}
-            onRowClick={(log) => setDetalhe(log)}
-            getRowLabel={(log) => `Ver o detalhe de ${log.action}`}
-          />
-          <Pagination
-            page={page}
-            perPage={POR_PAGINA}
-            total={total}
-            itemLabel={['registro', 'registros']}
-            onPage={(p) => load(p)}
-          />
-        </>
-      )}
+    <>
+      <ListScreen
+        title={title}
+        subtitle={subtitle}
+        filterContent={filterContent}
+        filtersActive={filtrando}
+        onClearFilters={limpar}
+        loading={loading && !items.length}
+        columns={columns}
+        rows={items}
+        getRowId={(log) => log.id}
+        onRowClick={(log) => setDetalhe(log)}
+        getRowLabel={(log) => `Ver o detalhe de ${log.action}`}
+        page={page}
+        pageCount={Math.ceil(total / POR_PAGINA)}
+        onPage={(p) => load(p)}
+        summary={total ? `${total} registro(s)` : undefined}
+        filterActive={filtrando}
+        emptyNew={{
+          icon: 'file',
+          title: 'Nenhum registro',
+          description: 'Ainda não houve ação administrativa registrada.',
+        }}
+        emptyFiltered={{ title: 'Nenhum registro', description: 'Os filtros não casaram com nada no período.', onClear: limpar }}
+      />
 
       <Modal
         open={Boolean(detalhe)}
@@ -181,7 +174,7 @@ export default function Auditoria({
           </div>
         )}
       </Modal>
-    </div>
+    </>
   );
 }
 

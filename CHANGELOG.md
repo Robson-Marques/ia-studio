@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.10.39 - 2026-08-14 (Adoção do DS: listas viram ListScreen — leva 4 (telas de administração))
+
+Sem `db push`. Só `platform-admin`.
+
+Última leva das telas de **lista** (leva 1 = IA na v0.10.34; leva 2 = Automação + WhatsApp na v0.10.37; leva 3 = Integrações + Recursos na v0.10.38). Convertidas as listas de administração/plataforma que faltavam — agora `.su-screen`, então a preferência de largura do Personalizar vale nelas. Comportamento preservado (colunas, clique-na-linha, barras de lote, paginação, estados vazios, os 5 patrasques).
+
+- **Incidentes e Manutenções** (ISP) → `ListScreen` com busca por título.
+- **Perfis de acesso** → `ListScreen` com busca + barra de lote (excluir, só perfis personalizados).
+- **Chaves de API** (Desenvolvedor) → `ListScreen` com busca + barra de lote (revogar); os modais de criar/mostrar chave preservados.
+- **Auditoria** → `ListScreen` com os filtros (ação/item/período) no painel de filtros do molde, paginação server-side e o Modal de detalhe (antes/depois) preservado.
+- **Pessoas e convites** → `ListScreen` com as abas (Pessoas/Convites) viradas em **segments** do molde, busca por nome/e-mail, paginação (Pessoas) + os formulários em Modal preservados.
+
+Ficam de fora (não são lista de tabela, entram com outro molde numa frente própria): **Workspaces e ambientes** (grade de cards aninhados workspace→ambiente — precisa de um molde de grade, não de tabela), Integrações/**Marketplace** e Recursos/**Explorer** (catálogo/busca → Search), **Dashboard** (painel → Dashboard) e as telas de ajustes (Atendimento IA, Minha conta etc. → Settings). Com isso, todas as telas que são **lista** no IA Studio já usam o molde do DS.
+
 ## v0.10.38 - 2026-08-14 (Adoção do DS: listas viram ListScreen — leva 3 (Integrações + Recursos))
 
 Sem `db push`. Só `platform-admin`.

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, DataTable, Badge, Button, Modal, Field, Input, ConfirmDialog, Banner, CopyButton, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ListScreen, Badge, Button, Modal, Field, Input, ConfirmDialog, Banner, CopyButton, useToast } from '@studio-ux-ds/react';
 import { listApiKeys, createApiKey, revokeApiKey } from '../../services/developer';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
@@ -34,8 +34,17 @@ export default function ApiKeys() {
   const [chaveNova, setChaveNova] = useState(null); // { key, plaintext }
   const [revogar, setRevogar] = useState(null);     // { ids, clear }
   const [revogando, setRevogando] = useState(false);
+  const [q, setQ] = useState('');
 
   const podeGerenciar = can('developer.apikeys.manage');
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((k) =>
+      (k.name || '').toLowerCase().includes(term) ||
+      (k.prefix || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   async function load() {
     setLoading(true);
@@ -121,32 +130,28 @@ export default function ApiKeys() {
   const varias = (revogar?.ids.length || 0) > 1;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Chaves de API"
         subtitle="Autenticam quem chama a API da plataforma de fora. A chave aparece uma única vez, na criação — depois guardamos só o prefixo e um resumo criptográfico."
-        actions={nova}
+        primaryAction={nova}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar chave…"
+        loading={loading && !items.length}
+        columns={columns}
+        rows={rows}
+        getRowId={(k) => k.id}
+        bulkActions={bulkActions}
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'lock',
+          title: 'Nenhuma chave',
+          description: 'Crie uma chave para um sistema de fora chamar a API da plataforma em nome da sua organização.',
+          action: nova,
+        }}
+        emptyFiltered={{ title: 'Nenhuma chave encontrada', description: 'Nenhuma chave com esse nome ou prefixo.', onClear: () => setQ('') }}
       />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="lock"
-            title="Nenhuma chave"
-            description="Crie uma chave para um sistema de fora chamar a API da plataforma em nome da sua organização."
-            action={nova}
-          />
-        </Card>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={items}
-          getRowId={(k) => k.id}
-          bulkActions={bulkActions}
-        />
-      )}
 
       <CriarChave
         open={criando}
@@ -170,7 +175,7 @@ export default function ApiKeys() {
         onClose={() => setRevogar(null)}
         onConfirm={confirmarRevogacao}
       />
-    </div>
+    </>
   );
 }
 

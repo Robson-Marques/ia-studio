@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, Badge, Button, ConfirmDialog, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { listProfiles, deleteProfile } from '../services/profiles';
 import { usePermissions } from '../hooks/usePermissions';
 
@@ -27,8 +27,17 @@ export default function PerfisAcesso() {
   const [loading, setLoading] = useState(true);
   const [excluir, setExcluir] = useState(null); // { ids, clear }
   const [excluindo, setExcluindo] = useState(false);
+  const [q, setQ] = useState('');
 
   const podeEscrever = can('core.profiles.write');
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((p) =>
+      (p.name || '').toLowerCase().includes(term) ||
+      (p.description || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   async function load() {
     setLoading(true);
@@ -107,39 +116,30 @@ export default function PerfisAcesso() {
   const varios = (excluir?.ids.length || 0) > 1;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Perfis de acesso"
         subtitle="Cada perfil é um conjunto de permissões. Os que vêm da plataforma podem ser consultados, mas não alterados."
-        actions={novo}
+        primaryAction={novo}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar perfil…"
+        loading={loading && !items.length}
+        columns={columns}
+        rows={rows}
+        getRowId={(p) => p.id}
+        onRowClick={(p) => navigate(`/perfis/${p.id}`)}
+        getRowLabel={(p) => `Abrir o perfil ${p.name}`}
+        bulkActions={bulkActions}
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'lock',
+          title: 'Nenhum perfil',
+          description: 'Crie um perfil para poder dar acesso a alguém — ninguém entra no sistema sem estar em um.',
+          action: novo,
+        }}
+        emptyFiltered={{ title: 'Nenhum perfil encontrado', description: 'Nenhum perfil com esse nome.', onClear: () => setQ('') }}
       />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="lock"
-            title="Nenhum perfil"
-            description="Crie um perfil para poder dar acesso a alguém — ninguém entra no sistema sem estar em um."
-            action={novo}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num perfil para ver ou mudar o que ele libera.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(p) => p.id}
-            onRowClick={(p) => navigate(`/perfis/${p.id}`)}
-            getRowLabel={(p) => `Abrir o perfil ${p.name}`}
-            bulkActions={bulkActions}
-          />
-        </>
-      )}
 
       <ConfirmDialog
         open={Boolean(excluir)}
@@ -155,6 +155,6 @@ export default function PerfisAcesso() {
         onClose={() => !excluindo && setExcluir(null)}
         onConfirm={confirmarExclusao}
       />
-    </div>
+    </>
   );
 }

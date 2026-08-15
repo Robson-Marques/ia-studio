@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { PageHeader, Card, Tabs, DataTable, Badge, Button, Modal, ConfirmDialog, Field, Input, Select, PhoneInput, Pagination, CopyButton, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Modal, ConfirmDialog, Field, Input, Select, PhoneInput, CopyButton, useToast } from '@studio-ux-ds/react';
 import { listUsers, createUser, updateUser, inactivateUser, activateUser } from '../services/users';
 import { listInvites, createInvite, revokeInvite } from '../services/invites';
 import { listProfiles } from '../services/profiles';
@@ -42,26 +42,23 @@ export default function Usuarios() {
     return () => { vivo = false; };
   }, []);
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Pessoas e convites"
-        subtitle="Quem tem acesso à organização, e quem foi convidado e ainda não entrou."
-      />
-      <Tabs items={ABAS} value={aba} onChange={setAba} />
-      {aba === 'usuarios' ? <AbaPessoas profiles={profiles} /> : <AbaConvites profiles={profiles} />}
-    </div>
-  );
+  const seg = { segments: ABAS, segment: aba, onSegment: setAba };
+  return aba === 'usuarios'
+    ? <AbaPessoas profiles={profiles} seg={seg} />
+    : <AbaConvites profiles={profiles} seg={seg} />;
 }
+
+const SUBTITLE = 'Quem tem acesso à organização, e quem foi convidado e ainda não entrou.';
 
 /* ───────────────────────── Pessoas ───────────────────────── */
 
-function AbaPessoas({ profiles }) {
+function AbaPessoas({ profiles, seg }) {
   const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [q, setQ] = useState('');
   const [form, setForm] = useState(null); // { editing? }
   const [acao, setAcao] = useState(null); // { tipo: 'inativar'|'reativar', ids, clear }
   const [agindo, setAgindo] = useState(false);
@@ -83,9 +80,19 @@ function AbaPessoas({ profiles }) {
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const filtradas = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((u) =>
+      (u.name || '').toLowerCase().includes(term) ||
+      (u.email || '').toLowerCase().includes(term));
+  }, [items, q]);
+
+  useEffect(() => { setPage(1); }, [q]);
+
   const pagina = useMemo(
-    () => items.slice((page - 1) * POR_PAGINA, page * POR_PAGINA),
-    [items, page],
+    () => filtradas.slice((page - 1) * POR_PAGINA, page * POR_PAGINA),
+    [filtradas, page],
   );
 
   const perfilDe = (u) =>
@@ -169,45 +176,38 @@ function AbaPessoas({ profiles }) {
   };
 
   const varias = (acao?.ids.length || 0) > 1;
+  const novaPessoa = podeEscrever ? (
+    <Button variant="primary" icon="plus" onClick={() => setForm({})}>Nova pessoa</Button>
+  ) : null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-          {items.length === 1 ? '1 pessoa' : `${items.length} pessoas`}
-        </p>
-        {podeEscrever && (
-          <Button variant="primary" icon="plus" onClick={() => setForm({})}>Nova pessoa</Button>
-        )}
-      </div>
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="users"
-            title="Ninguém além de você"
-            description="Cadastre uma pessoa com senha inicial, ou mande um convite pela aba ao lado para ela mesma criar a senha."
-          />
-        </Card>
-      ) : (
-        <>
-          <DataTable
-            columns={columns}
-            rows={pagina}
-            getRowId={(u) => u.id}
-            bulkActions={bulkActions}
-          />
-          <Pagination
-            page={page}
-            perPage={POR_PAGINA}
-            total={items.length}
-            itemLabel={['pessoa', 'pessoas']}
-            onPage={setPage}
-          />
-        </>
-      )}
+    <>
+      <ListScreen
+        title="Pessoas e convites"
+        subtitle={SUBTITLE}
+        {...seg}
+        primaryAction={novaPessoa}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar pessoa…"
+        loading={loading && !items.length}
+        columns={columns}
+        rows={pagina}
+        getRowId={(u) => u.id}
+        bulkActions={bulkActions}
+        page={page}
+        pageCount={Math.ceil(filtradas.length / POR_PAGINA)}
+        onPage={setPage}
+        summary={filtradas.length ? (filtradas.length === 1 ? '1 pessoa' : `${filtradas.length} pessoas`) : undefined}
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'users',
+          title: 'Ninguém além de você',
+          description: 'Cadastre uma pessoa com senha inicial, ou mande um convite pela aba ao lado para ela mesma criar a senha.',
+          action: novaPessoa,
+        }}
+        emptyFiltered={{ title: 'Nenhuma pessoa encontrada', description: 'Nenhuma pessoa com esse nome ou e-mail.', onClear: () => setQ('') }}
+      />
 
       <FormPessoa
         open={Boolean(form)}
@@ -231,7 +231,7 @@ function AbaPessoas({ profiles }) {
         onClose={() => !agindo && setAcao(null)}
         onConfirm={confirmar}
       />
-    </div>
+    </>
   );
 }
 
@@ -345,7 +345,7 @@ function FormPessoa({ open, editing, profiles, onClose, onSaved }) {
 
 /* ───────────────────────── Convites ───────────────────────── */
 
-function AbaConvites({ profiles }) {
+function AbaConvites({ profiles, seg }) {
   const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
@@ -353,8 +353,15 @@ function AbaConvites({ profiles }) {
   const [criando, setCriando] = useState(false);
   const [revogar, setRevogar] = useState(null); // { ids, clear }
   const [agindo, setAgindo] = useState(false);
+  const [q, setQ] = useState('');
 
   const podeConvidar = can('core.invites.write');
+
+  const filtrados = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((inv) => (inv.email || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   async function load() {
     setLoading(true);
@@ -437,36 +444,35 @@ function AbaConvites({ profiles }) {
   };
 
   const varios = (revogar?.ids.length || 0) > 1;
+  const novoConvite = podeConvidar ? (
+    <Button variant="primary" icon="plus" onClick={() => setCriando(true)}>Novo convite</Button>
+  ) : null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-          {items.length === 1 ? '1 convite' : `${items.length} convites`}
-        </p>
-        {podeConvidar && (
-          <Button variant="primary" icon="plus" onClick={() => setCriando(true)}>Novo convite</Button>
-        )}
-      </div>
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="mail"
-            title="Nenhum convite"
-            description="No convite você escolhe o e-mail e o perfil; a pessoa cria a própria senha ao aceitar. O link tem que ser enviado por você — o sistema não manda e-mail sozinho."
-          />
-        </Card>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={items}
-          getRowId={(inv) => inv.id}
-          bulkActions={bulkActions}
-        />
-      )}
+    <>
+      <ListScreen
+        title="Pessoas e convites"
+        subtitle={SUBTITLE}
+        {...seg}
+        primaryAction={novoConvite}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar convite…"
+        loading={loading && !items.length}
+        columns={columns}
+        rows={filtrados}
+        getRowId={(inv) => inv.id}
+        bulkActions={bulkActions}
+        summary={filtrados.length ? (filtrados.length === 1 ? '1 convite' : `${filtrados.length} convites`) : undefined}
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'mail',
+          title: 'Nenhum convite',
+          description: 'No convite você escolhe o e-mail e o perfil; a pessoa cria a própria senha ao aceitar. O link tem que ser enviado por você — o sistema não manda e-mail sozinho.',
+          action: novoConvite,
+        }}
+        emptyFiltered={{ title: 'Nenhum convite encontrado', description: 'Nenhum convite com esse e-mail.', onClear: () => setQ('') }}
+      />
 
       <FormConvite
         open={criando}
@@ -489,7 +495,7 @@ function AbaConvites({ profiles }) {
         onClose={() => !agindo && setRevogar(null)}
         onConfirm={confirmarRevogacao}
       />
-    </div>
+    </>
   );
 }
 

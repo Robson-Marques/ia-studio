@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { listIncidents } from '../../services/isp';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -26,8 +26,15 @@ export default function Incidentes() {
   const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
 
   const canWrite = can('isp.incidents.write');
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((it) => (it.title || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   async function load() {
     setLoading(true);
@@ -74,38 +81,27 @@ export default function Incidentes() {
   ) : null;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Incidentes e Manutenções"
-        subtitle="Informativo de rede. No modo reativo o assistente informa quem procurar; no proativo o aviso é disparado em massa (com confirmação)."
-        actions={newBtn}
-      />
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="alert-circle"
-            title="Nenhum incidente"
-            description="Crie um incidente para informar os clientes sobre manutenções ou quedas."
-            action={newBtn}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num incidente para ver os afetados, editar, ativar, disparar ou encerrar.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(it) => it.id}
-            onRowClick={(it) => navigate(`/isp/incidentes/${it.id}`)}
-            getRowLabel={(it) => `Abrir ${it.title}`}
-          />
-        </>
-      )}
-    </div>
+    <ListScreen
+      title="Incidentes e Manutenções"
+      subtitle="Informativo de rede. No modo reativo o assistente informa quem procurar; no proativo o aviso é disparado em massa (com confirmação)."
+      primaryAction={newBtn}
+      search={q}
+      onSearch={setQ}
+      searchPlaceholder="Buscar incidente…"
+      loading={loading}
+      columns={columns}
+      rows={rows}
+      getRowId={(it) => it.id}
+      onRowClick={(it) => navigate(`/isp/incidentes/${it.id}`)}
+      getRowLabel={(it) => `Abrir ${it.title}`}
+      filterActive={!!q.trim()}
+      emptyNew={{
+        icon: 'alert-circle',
+        title: 'Nenhum incidente',
+        description: 'Crie um incidente para informar os clientes sobre manutenções ou quedas.',
+        action: newBtn,
+      }}
+      emptyFiltered={{ title: 'Nenhum incidente encontrado', description: 'Nenhum incidente com esse título.', onClear: () => setQ('') }}
+    />
   );
 }
