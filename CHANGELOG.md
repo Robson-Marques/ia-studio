@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.10.42 - 2026-08-15 (Deploy: `npm install --prefer-online` nos fronts)
+
+Só `scripts/upgrade.sh`. Sem `db push`, sem mudança de código de app.
+
+Os deploys da v0.10.40 e v0.10.41 falharam na etapa `ADMIN_BUILD` com `ETARGET` não porque a versão do Studio UX não existia, e sim porque o **cache de metadata do npm no servidor estava velho** e escondia as versões novas do DS publicadas no GitLab — só voltou a enxergar depois de um `npm cache clean --force` manual. Para não depender disso, o `npm install` dos fronts (os únicos que puxam `@studio-ux-ds/*`) passa a usar `--prefer-online`, que força o npm a revalidar a metadata contra o registry antes de resolver as versões.
+
+Efeito a partir do próximo upgrade que rodar com este script (o `upgrade.sh` que executa é o da versão já instalada).
+
 ## v0.10.41 - 2026-08-14 (Fix do deploy da v0.10.40: Studio UX ^1.3.10)
 
 Sem `db push`. Só `platform-admin`.

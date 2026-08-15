@@ -185,7 +185,11 @@ build_front() {
   local dir="$1"; local api_url="$2"; local base="$3"; local step="$4"
   [ ! -f "$dir/package.json" ] && { log_db "$step" "front ausente ($dir) — pulado"; return 0; }
   cd "$dir"
-  npm install --no-audit --no-fund 2>/tmp/iastudio_npm.err >/dev/null || mark_failed "$step" "npm install falhou: $(tail -c 600 /tmp/iastudio_npm.err)"
+  # --prefer-online: revalida a metadata do registry (GitLab @studio-ux-ds) em vez
+  # de confiar no cache. Sem isso, um packument velho em cache esconde versoes novas
+  # do DS e o install quebra com ETARGET (derrubou os deploys v0.10.40/41 ate limpar
+  # o cache a mao). Os fronts sao os unicos que puxam @studio-ux-ds.
+  npm install --no-audit --no-fund --prefer-online 2>/tmp/iastudio_npm.err >/dev/null || mark_failed "$step" "npm install falhou: $(tail -c 600 /tmp/iastudio_npm.err)"
   VITE_API_URL="$api_url" npm run build -- --base="$base" 2>/tmp/iastudio_build.err >/dev/null || mark_failed "$step" "vite build falhou: $(tail -c 800 /tmp/iastudio_build.err)"
 }
 
