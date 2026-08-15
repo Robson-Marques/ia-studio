@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.10.43 - 2026-08-15 (Adoção do DS: Workspaces no molde base `Screen`)
+
+Sem `db push`. Só `platform-admin`.
+
+**Workspaces e ambientes** era a última tela de gestão que ainda não era `.su-screen`, então a preferência de largura do Personalizar não a alcançava. Ela não é lista nem formulário: é uma **grade de cards aninhados** (cada workspace contém seus ambientes), e forçá-la num `ListScreen` (que vira tabela no desktop) perderia o aninhamento. Então usa o molde base **`Screen`** do DS — o contêiner oficial para "jornada composta que nenhum molde especializado cobre" —, que traz o `.su-screen` (e a largura) preservando o grid de cards e os dois modais (renomear workspace / criar-renomear ambiente). Nada de comportamento mudou.
+
 ## v0.10.42 - 2026-08-15 (Deploy: `npm install --prefer-online` nos fronts)
 
 Só `scripts/upgrade.sh`. Sem `db push`, sem mudança de código de app.

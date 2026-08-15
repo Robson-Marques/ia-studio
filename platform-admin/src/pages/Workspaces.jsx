@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, Badge, Button, IconButton, Modal, Field, Input, Select, EmptyState, DSIcon, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Card, Badge, Button, IconButton, Modal, Field, Input, Select, EmptyState, DSIcon, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   listWorkspaces, createWorkspace, updateWorkspace, createEnvironment, updateEnvironment,
 } from '../services/workspaces';
@@ -65,7 +65,7 @@ export default function Workspaces() {
   );
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title="Workspaces e ambientes"
         subtitle="Workspaces separam projetos que não devem se misturar; dentro de cada um ficam os ambientes — produção, homologação, desenvolvimento."
@@ -163,7 +163,7 @@ export default function Workspaces() {
         onClose={() => setFormEnv(null)}
         onSaved={() => { setFormEnv(null); depoisDeSalvar(); }}
       />
-    </div>
+    </Screen>
   );
 }
 
