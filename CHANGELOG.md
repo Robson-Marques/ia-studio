@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.10.45 - 2026-08-15 (Adoção do DS: Dashboard no molde `DashboardScreen`)
+
+Sem `db push`. Só `platform-admin`.
+
+O **Dashboard** (primeira tela após login) passa a usar o molde `DashboardScreen` do DS — o mesmo de Custos de IA. Vira `.su-screen` (a largura do Personalizar vale nele) e ganha o comportamento do molde: os 4 indicadores (Usuários, Workspaces, Execuções, Consumo de IA) viram `stats` renderizados pelo molde, com **skeleton na forma do KPI** durante o carregamento em vez do spinner solto que fazia o painel pular de "nada" para os números. O card de Plano segue como conteúdo abaixo dos indicadores. Cores por assunto (`hue`) preservadas.
+
 ## v0.10.44 - 2026-08-15 (Adoção do DS: Marketplace e Explorer no molde base `Screen`)
 
 Sem `db push`. Só `platform-admin`.

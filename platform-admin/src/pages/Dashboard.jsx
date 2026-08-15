@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, StatCard, Card, Badge, DSIcon, useToast, Spinner } from '@studio-ux-ds/react';
+import { DashboardScreen, Card, Badge, DSIcon, useToast } from '@studio-ux-ds/react';
 import { getLicense } from '../services/account';
 import { useAuth } from '../context/AuthContext';
 import { formatNumber, formatLimit, formatDate } from '../lib/format';
@@ -45,14 +45,6 @@ export default function Dashboard() {
     return () => { alive = false; };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
   const usage  = license?.usage  || {};
   const limits = license?.limits || {};
   const planName = license?.plan?.name || license?.plan_name || license?.plan || '—';
@@ -65,51 +57,25 @@ export default function Dashboard() {
       ? `Válida até ${formatDate(license.expires_at)}.`
       : null;
 
+  // `hue` = matiz por ASSUNTO (DS v1.2.29): a cor não diz "bom/ruim" — diz de que
+  // domínio o número é, e é estável entre telas (consumo de IA é sempre índigo,
+  // aqui e em Custos). `sub` (não `delta`) porque "Limite: 5" é legenda, não
+  // variação.
+  const stats = [
+    { label: 'Usuários', value: formatNumber(usage.users ?? 0), sub: `Limite: ${formatLimit(limits.users)}`, icon: <DSIcon name="users" />, hue: 'violet' },
+    { label: 'Workspaces', value: formatNumber(workspacesCount), sub: `Limite: ${formatLimit(limits.workspaces)}`, icon: <DSIcon name="home" />, hue: 'blue' },
+    { label: 'Execuções no mês', value: formatNumber(usage.executions ?? 0), sub: `Limite: ${formatLimit(limits.executions)}`, icon: <DSIcon name="play" />, hue: 'teal' },
+    { label: 'Consumo de IA no mês', value: formatNumber(usage.tokens ?? 0), sub: `Limite: ${formatLimit(limits.tokens)}`, icon: <DSIcon name="chart-bar" />, hue: 'indigo' },
+  ];
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={me?.organization?.name || 'Dashboard'}
-        subtitle="Visão geral da sua conta no mês corrente."
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* `hue` = matiz por ASSUNTO (DS v1.2.29, onde o `tone` semântico saiu do
-            StatCard). A cor não diz "bom/ruim" — diz de que domínio o número é, e
-            é **estável**: consumo de IA é sempre roxo, aqui e em Custos de IA;
-            execuções é sempre verde-água, aqui e no console. É isso que faz o olho
-            reencontrar o assunto entre telas.
-            `sub` (não `delta`) porque "Limite: 5" é legenda, não variação — o
-            `delta` é colorido por direção e pintava a legenda de verde. */}
-        <StatCard
-          label="Usuários"
-          value={formatNumber(usage.users ?? 0)}
-          sub={`Limite: ${formatLimit(limits.users)}`}
-          icon={<DSIcon name="users" />}
-          hue="violet"
-        />
-        <StatCard
-          label="Workspaces"
-          value={formatNumber(workspacesCount)}
-          sub={`Limite: ${formatLimit(limits.workspaces)}`}
-          icon={<DSIcon name="home" />}
-          hue="blue"
-        />
-        <StatCard
-          label="Execuções no mês"
-          value={formatNumber(usage.executions ?? 0)}
-          sub={`Limite: ${formatLimit(limits.executions)}`}
-          icon={<DSIcon name="play" />}
-          hue="teal"
-        />
-        <StatCard
-          label="Consumo de IA no mês"
-          value={formatNumber(usage.tokens ?? 0)}
-          sub={`Limite: ${formatLimit(limits.tokens)}`}
-          icon={<DSIcon name="chart-bar" />}
-          hue="indigo"
-        />
-      </div>
-
+    <DashboardScreen
+      title={me?.organization?.name || 'Dashboard'}
+      subtitle="Visão geral da sua conta no mês corrente."
+      stats={stats}
+      loading={loading}
+      statsCount={4}
+    >
       <Card>
         <div style={{ padding: 20 }}>
           <div className="flex flex-wrap items-center gap-3">
@@ -126,6 +92,6 @@ export default function Dashboard() {
           )}
         </div>
       </Card>
-    </div>
+    </DashboardScreen>
   );
 }
