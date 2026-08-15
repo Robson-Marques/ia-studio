@@ -1,5 +1,22 @@
 # Changelog — IA Studio
 
+## v0.10.38 - 2026-08-14 (Adoção do DS: listas viram ListScreen — leva 3 (Integrações + Recursos))
+
+Sem `db push`. Só `platform-admin`.
+
+Continuação da adoção do DS tela a tela (leva 1 = IA na v0.10.34; leva 2 = Automação + WhatsApp na v0.10.37). Mais telas de **lista** viram `.su-screen`, então a preferência de largura do Personalizar passa a valer nelas. Comportamento preservado (colunas, clique-na-linha, barras de lote, estados vazios, os 5 patrasques).
+
+Família **Integrações**:
+
+- **Conexões** → `ListScreen` com busca por nome/conector/etiqueta + barra de lote (testar/editar/ativar/desativar/manutenção) + ConfirmDialog.
+- **Cofre de Segredos** → `ListScreen` com busca por nome, seleção única, barra de lote (trocar os valores) + o Modal de rotação com ConfirmDialog.
+
+Família **Recursos**:
+
+- **Mapeamentos** → `ListScreen` com busca por tipo/conexão/operação + barra de lote (editar/ativar/desativar/excluir) + ConfirmDialog.
+
+Ficam de fora (não são lista, entram com outro molde): Integrações/**Marketplace** (catálogo de cards → Search) e Recursos/**Explorer** (ferramenta de busca → Search). Telas de ajustes (WhatsApp/Atendimento IA e afins) entram com o molde de configuração.
+
 ## v0.10.37 - 2026-08-14 (Adoção do DS: listas viram ListScreen — leva 2 (Automação + WhatsApp))
 
 Sem `db push`. Só `platform-admin`.

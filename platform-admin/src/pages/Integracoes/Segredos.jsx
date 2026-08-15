@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, DataTable, Badge, Button, Modal, Field, Input, ConfirmDialog, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ListScreen, Badge, Button, Modal, Field, Input, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { listSecrets, rotateSecret } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
@@ -34,8 +34,15 @@ export default function Segredos() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rotacionando, setRotacionando] = useState(null); // { secret, clear }
+  const [q, setQ] = useState('');
 
   const podeTrocar = can('integrations.secrets.manage');
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((s) => (s.name || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   async function load() {
     setLoading(true);
@@ -84,38 +91,34 @@ export default function Segredos() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Cofre de Segredos"
         subtitle="As credenciais das conexões, guardadas cifradas. Esta tela mostra só o que existe — o valor em si nunca sai do cofre, nem aqui."
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar segredo…"
+        loading={loading && !items.length}
+        columns={columns}
+        rows={rows}
+        getRowId={(s) => s.id}
+        selectionMode="single"
+        bulkActions={bulkActions}
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'lock',
+          title: 'Cofre vazio',
+          description: 'Os segredos entram sozinhos quando você cria uma conexão — não se cadastra segredo por aqui.',
+        }}
+        emptyFiltered={{ title: 'Nenhum segredo encontrado', description: 'Nenhum segredo com esse nome.', onClear: () => setQ('') }}
       />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="lock"
-            title="Cofre vazio"
-            description="Os segredos entram sozinhos quando você cria uma conexão — não se cadastra segredo por aqui."
-          />
-        </Card>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={items}
-          getRowId={(s) => s.id}
-          selectionMode="single"
-          bulkActions={bulkActions}
-        />
-      )}
 
       <RotacionarSegredo
         entrada={rotacionando}
         onClose={() => setRotacionando(null)}
         onDone={() => { rotacionando?.clear?.(); setRotacionando(null); load(); }}
       />
-    </div>
+    </>
   );
 }
 

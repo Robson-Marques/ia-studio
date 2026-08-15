@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import {
   listConnections, changeConnectionState, testConnection, getMarketplace,
 } from '../../services/integrations';
@@ -49,6 +49,7 @@ export default function Conexoes() {
   const [stateAction, setStateAction] = useState(null); // { ids, action, clear }
   const [acting, setActing] = useState(false);
   const [providerNames, setProviderNames] = useState({});
+  const [q, setQ] = useState('');
 
   const podeEscrever = can('integrations.connections.write');
 
@@ -95,6 +96,15 @@ export default function Conexoes() {
     });
     return (c) => map.get(`${c.workspace_id}:${c.environment_id}`) || map.get(`${c.workspace_id}:`) || '—';
   }, [workspaces]);
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((c) =>
+      (c.name || '').toLowerCase().includes(term) ||
+      providerName(c.provider_key).toLowerCase().includes(term) ||
+      (c.tags || []).some((t) => t.toLowerCase().includes(term)));
+  }, [items, q, providerNames]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleTest(ids, clear) {
     setTesting(true);
@@ -236,39 +246,30 @@ export default function Conexoes() {
   const varias = (stateAction?.ids.length || 0) > 1;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Conexões"
         subtitle="Cada conexão é um acesso nomeado a um sistema de fora. Conexões nunca são excluídas — só mudam de estado, para o histórico não sumir junto."
-        actions={novaConexao}
+        primaryAction={novaConexao}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar conexão…"
+        loading={loading && !items.length}
+        columns={columns}
+        rows={rows}
+        getRowId={(c) => c.id}
+        onRowClick={(c) => navigate(`/integracoes/conexoes/${c.id}`)}
+        getRowLabel={(c) => `Abrir a conexão ${c.name}`}
+        bulkActions={bulkActions}
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'zap',
+          title: 'Nenhuma conexão ainda',
+          description: 'Instale um conector no Marketplace e crie a primeira conexão — o passo a passo pede só o que aquele sistema precisa.',
+          action: novaConexao,
+        }}
+        emptyFiltered={{ title: 'Nenhuma conexão encontrada', description: 'Nenhuma conexão com esse nome, conector ou etiqueta.', onClear: () => setQ('') }}
       />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="zap"
-            title="Nenhuma conexão ainda"
-            description="Instale um conector no Marketplace e crie a primeira conexão — o passo a passo pede só o que aquele sistema precisa."
-            action={novaConexao}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique numa conexão para ver os dados, os recursos que ela expõe e o histórico de chamadas.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(c) => c.id}
-            onRowClick={(c) => navigate(`/integracoes/conexoes/${c.id}`)}
-            getRowLabel={(c) => `Abrir a conexão ${c.name}`}
-            bulkActions={bulkActions}
-          />
-        </>
-      )}
 
       {/* Os 5 patrasques: confirmação + a consequência escrita + tooltip no botão
           + loading + o gate de permissão que já esconde a ação. */}
@@ -288,6 +289,6 @@ export default function Conexoes() {
         onClose={() => setStateAction(null)}
         onConfirm={handleStateConfirm}
       />
-    </div>
+    </>
   );
 }

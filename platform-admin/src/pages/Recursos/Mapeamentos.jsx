@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, Badge, Button, ConfirmDialog, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import {
   getResourceCatalog, listMappings, updateMapping, deleteMapping,
 } from '../../services/resource';
@@ -35,6 +35,7 @@ export default function Mapeamentos() {
   const [loading, setLoading] = useState(true);
   const [acao, setAcao] = useState(null); // { tipo: 'ativar'|'desativar'|'excluir', ids, clear }
   const [agindo, setAgindo] = useState(false);
+  const [q, setQ] = useState('');
 
   const podeEscrever = can('resource.mappings.write');
 
@@ -67,6 +68,16 @@ export default function Mapeamentos() {
     const map = new Map(catalog.map((t) => [t.type, t.label]));
     return (type) => map.get(type) || type;
   }, [catalog]);
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((m) =>
+      typeLabel(m.resource_type).toLowerCase().includes(term) ||
+      (m.resource_type || '').toLowerCase().includes(term) ||
+      connName(m.connection_id).toLowerCase().includes(term) ||
+      (m.source_operation || '').toLowerCase().includes(term));
+  }, [items, q, typeLabel, connName]);
 
   async function confirmar() {
     if (!acao) return;
@@ -178,34 +189,30 @@ export default function Mapeamentos() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Mapeamentos"
         subtitle="Ensinam a plataforma a ler a resposta de cada sistema de fora. Nascem inativos de propósito — revise o que a IA sugeriu antes de pôr em uso."
-        actions={novo}
+        primaryAction={novo}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar mapeamento…"
+        loading={loading && !items.length}
+        columns={columns}
+        rows={rows}
+        getRowId={(m) => m.id}
+        onRowClick={(m) => navigate(`/recursos/mapeamentos/${m.id}`)}
+        getRowLabel={(m) => `Abrir o mapeamento de ${typeLabel(m.resource_type)}`}
+        bulkActions={bulkActions}
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'dashboard',
+          title: 'Nenhum mapeamento',
+          description: 'Um mapeamento diz de onde vem cada campo na resposta de uma conexão. Crie o primeiro — a IA pode sugerir o preenchimento a partir de uma amostra real.',
+          action: novo,
+        }}
+        emptyFiltered={{ title: 'Nenhum mapeamento encontrado', description: 'Nenhum mapeamento com esse tipo, conexão ou operação.', onClear: () => setQ('') }}
       />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="dashboard"
-            title="Nenhum mapeamento"
-            description="Um mapeamento diz de onde vem cada campo na resposta de uma conexão. Crie o primeiro — a IA pode sugerir o preenchimento a partir de uma amostra real."
-            action={novo}
-          />
-        </Card>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={items}
-          getRowId={(m) => m.id}
-          onRowClick={(m) => navigate(`/recursos/mapeamentos/${m.id}`)}
-          getRowLabel={(m) => `Abrir o mapeamento de ${typeLabel(m.resource_type)}`}
-          bulkActions={bulkActions}
-        />
-      )}
 
       <ConfirmDialog
         open={Boolean(acao)}
@@ -223,6 +230,6 @@ export default function Mapeamentos() {
         onClose={() => setAcao(null)}
         onConfirm={confirmar}
       />
-    </div>
+    </>
   );
 }
