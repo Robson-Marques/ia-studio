@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Pagination, Select, Input, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Select, Input, Field, useToast } from '@studio-ux-ds/react';
 import { listExecutions, listWorkflows } from '../../services/automation';
 import { EXECUTION_STATUS, TRIGGER_TYPE_LABEL, formatDateTime } from './automation.constants';
 import { statusToTone } from '../../lib/tone';
@@ -80,79 +80,63 @@ export default function Execucoes() {
     { key: 'started_at', header: 'Começou', render: (e) => formatDateTime(e.started_at || e.created_at) },
   ];
 
-  const toolbar = (
-    <div className="flex flex-wrap items-center gap-2" style={{ padding: 'var(--su-space-2) var(--su-space-4)' }}>
-      <div style={{ width: 180 }}>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filtrar por situação">
+  const filtrando = !!(status || workflowId || traceId.trim());
+
+  const filterContent = (
+    <div className="space-y-3" style={{ minWidth: 240 }}>
+      <Field label="Situação">
+        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">Todas as situações</option>
           {Object.entries(EXECUTION_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </Select>
-      </div>
-      <div style={{ width: 220 }}>
-        <Select value={workflowId} onChange={(e) => setWorkflowId(e.target.value)} aria-label="Filtrar por fluxo">
+      </Field>
+      <Field label="Fluxo">
+        <Select value={workflowId} onChange={(e) => setWorkflowId(e.target.value)}>
           <option value="">Todos os fluxos</option>
           {workflows.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </Select>
-      </div>
-      <div style={{ width: 220 }}>
+      </Field>
+      <Field label="Código de rastreio">
         <Input
           value={traceId}
           onChange={(e) => setTraceId(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); load(1); } }}
           placeholder="Código de rastreio…"
-          aria-label="Filtrar por código de rastreio"
           style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
         />
-      </div>
-      <Button variant="ghost" icon="refresh" loading={loading} aria-label="Atualizar" onClick={() => load()} />
+      </Field>
     </div>
   );
 
-  const filtrando = !!(status || workflowId || traceId.trim());
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Execuções"
-        subtitle="Cada vez que uma automação rodou — o que disparou, quanto durou, e onde parou passo a passo."
-      />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="dashboard"
-            title={filtrando ? 'Nenhuma execução com esses filtros' : 'Nenhuma automação rodou ainda'}
-            description={filtrando
-              ? 'Limpe os filtros para ver todas as execuções.'
-              : 'Execute um fluxo pela tela de Fluxos, ou espere um gatilho disparar — cada rodada aparece aqui.'}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique numa execução para ver o passo a passo, o que entrou, o que saiu — e reexecutar se precisar.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(e) => e.id}
-            onRowClick={(e) => navigate(`/automacao/execucoes/${e.id}`)}
-            getRowLabel={(e) => `Abrir execução de ${e.workflow?.name || 'fluxo'}`}
-            toolbar={toolbar}
-            footer={
-              <Pagination
-                page={page}
-                pageCount={Math.ceil(total / PER_PAGE)}
-                total={total}
-                itemLabel={['execução', 'execuções']}
-                onChange={(p) => { setPage(p); load(p); }}
-              />
-            }
-          />
-        </>
-      )}
-    </div>
+    <ListScreen
+      title="Execuções"
+      subtitle="Cada vez que uma automação rodou — o que disparou, quanto durou, e onde parou passo a passo."
+      filterContent={filterContent}
+      filtersActive={filtrando}
+      onClearFilters={() => { setStatus(''); setWorkflowId(''); setTraceId(''); }}
+      toolbarActions={[{ icon: 'refresh', label: 'Atualizar', onClick: () => load() }]}
+      loading={loading && !items.length}
+      columns={columns}
+      rows={items}
+      getRowId={(e) => e.id}
+      onRowClick={(e) => navigate(`/automacao/execucoes/${e.id}`)}
+      getRowLabel={(e) => `Abrir execução de ${e.workflow?.name || 'fluxo'}`}
+      page={page}
+      pageCount={Math.ceil(total / PER_PAGE)}
+      onPage={(p) => { setPage(p); load(p); }}
+      summary={total ? `${total} execução(ões)` : undefined}
+      filterActive={filtrando}
+      emptyNew={{
+        icon: 'dashboard',
+        title: 'Nenhuma automação rodou ainda',
+        description: 'Execute um fluxo pela tela de Fluxos, ou espere um gatilho disparar — cada rodada aparece aqui.',
+      }}
+      emptyFiltered={{
+        title: 'Nenhuma execução com esses filtros',
+        description: 'Limpe os filtros para ver todas as execuções.',
+        onClear: () => { setStatus(''); setWorkflowId(''); setTraceId(''); },
+      }}
+    />
   );
 }

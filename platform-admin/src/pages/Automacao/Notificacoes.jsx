@@ -1,21 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Pagination, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, useToast } from '@studio-ux-ds/react';
 import { getNotificationsLog } from '../../services/automation';
 import { NOTIFICATION_STATUS, NOTIFICATION_CHANNEL, formatDateTime } from './automation.constants';
 import { statusToTone } from '../../lib/tone';
 
-// Automação/Notificações — 1ª tela da família Automação migrada pro DS (v0.9.99).
-//
-// É um LOG: só leitura, sem ação por registro. Portanto:
-//  · nenhum botão na linha e nenhuma coluna de seleção — não existe ação que
-//    aja sobre uma notificação enviada (taxonomia do STUDIO_UX_TABLES.md §3);
-//  · a linha NÃO é clicável, porque não há detalhe para abrir (caso 3 da árvore
-//    de decisão — não inventar rota que não existe só pra cumprir a regra);
-//  · "Atualizar" fica no cabeçalho: age sobre a TELA, não sobre um registro.
-//
-// O legado montava Table desktop + cards mobile à mão. O `DataTable` do DS já
-// resolve a densidade; o recorte mobile desta família entra na frente de Mobile,
-// não aqui (P4 — Cards no lugar de tabela é reprojeto, não encolhimento).
+// Automação/Notificações — LOG no molde `ListScreen` do DS (v0.10.37): a tela
+// passa a ser `.su-screen`, então a preferência de largura do Personalizar vale
+// aqui. É só leitura (sem ação por registro, sem clique na linha — caso 3 da
+// taxonomia do DS); o "Atualizar" fica na toolbar do molde (age sobre a TELA).
 
 const PER_PAGE = 50;
 
@@ -59,46 +51,23 @@ export default function Notificacoes() {
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Notificações"
-        subtitle="Tudo que os fluxos enviaram — tenta WhatsApp, cai para e-mail e, em último caso, para o sino do sistema."
-        actions={
-          <Button variant="secondary" icon="refresh" loading={loading} onClick={() => load()}>
-            {loading ? 'Atualizando…' : 'Atualizar'}
-          </Button>
-        }
-      />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="bell"
-            title="Nenhuma notificação enviada"
-            description="O que os fluxos disparam pelo nó de Notificação aparece aqui, com o resultado de cada tentativa."
-          />
-        </Card>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={items}
-          getRowId={(n) => n.id}
-          // O `Pagination` do DS (v1.2.21) escreve a contagem quando recebe
-          // `total` — a barra "N registros … navegação" é do componente, não da
-          // tela. A tela só converte total de registros em número de páginas.
-          footer={
-            <Pagination
-              page={page}
-              pageCount={Math.ceil(total / PER_PAGE)}
-              total={total}
-              itemLabel={['notificação', 'notificações']}
-              onChange={(p) => { setPage(p); load(p); }}
-            />
-          }
-        />
-      )}
-    </div>
+    <ListScreen
+      title="Notificações"
+      subtitle="Tudo que os fluxos enviaram — tenta WhatsApp, cai para e-mail e, em último caso, para o sino do sistema."
+      toolbarActions={[{ icon: 'refresh', label: loading ? 'Atualizando…' : 'Atualizar', onClick: () => load() }]}
+      loading={loading && !items.length}
+      columns={columns}
+      rows={items}
+      getRowId={(n) => n.id}
+      page={page}
+      pageCount={Math.ceil(total / PER_PAGE)}
+      onPage={(p) => { setPage(p); load(p); }}
+      summary={total ? `${total} notificação(ões)` : undefined}
+      emptyNew={{
+        icon: 'bell',
+        title: 'Nenhuma notificação enviada',
+        description: 'O que os fluxos disparam pelo nó de Notificação aparece aqui, com o resultado de cada tentativa.',
+      }}
+    />
   );
 }

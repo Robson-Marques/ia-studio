@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Button, Select, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Select, Field, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import { listNumbers, listTemplates, syncTemplates } from '../../services/whatsapp';
@@ -91,17 +91,16 @@ export default function Templates() {
     { key: 'synced_at', header: 'Sincronizado', render: (t) => (t.synced_at ? formatDateTime(t.synced_at) : '—') },
   ];
 
-  const toolbar = (
-    <div className="flex flex-wrap items-center gap-2" style={{ padding: 'var(--su-space-2) var(--su-space-4)' }}>
-      <div style={{ width: 260 }}>
-        <Select value={connectionId} onChange={(e) => setConnectionId(e.target.value)} aria-label="Filtrar por número">
+  const filterContent = (
+    <div style={{ minWidth: 260 }}>
+      <Field label="Número">
+        <Select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}>
           <option value="">Todos os números</option>
           {numbers.map((n) => (
             <option key={n.id} value={n.id}>{n.name}{n.phone ? ` — ${n.phone}` : ''}</option>
           ))}
         </Select>
-      </div>
-      <Button variant="ghost" icon="refresh" loading={loading} aria-label="Atualizar" onClick={() => load()} />
+      </Field>
     </div>
   );
 
@@ -124,33 +123,27 @@ export default function Templates() {
   );
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Templates"
-        subtitle="Mensagens aprovadas pela Meta — as únicas que podem ser enviadas depois de 24h sem resposta do cliente."
-        actions={acoes}
-      />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="file"
-            title={connectionId ? 'Nenhum template neste número' : 'Nenhum template'}
-            description="Crie um template para enviar à análise da Meta, ou use Sincronizar para trazer os que já existem por lá."
-            action={acoes}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Template já publicado não se edita — nem aqui, nem na Meta. Para mudar o texto, crie outro com nome novo.
-          </p>
-          <DataTable columns={columns} rows={items} getRowId={(t) => t.id} toolbar={toolbar} />
-        </>
-      )}
-    </div>
+    <ListScreen
+      title="Templates"
+      subtitle="Mensagens aprovadas pela Meta — as únicas que podem ser enviadas depois de 24h sem resposta do cliente. Template já publicado não se edita: para mudar o texto, crie outro com nome novo."
+      primaryAction={acoes}
+      filterContent={filterContent}
+      filtersActive={!!connectionId}
+      onClearFilters={() => setConnectionId('')}
+      toolbarActions={[{ icon: 'refresh', label: 'Atualizar', onClick: () => load() }]}
+      loading={loading && !items.length}
+      columns={columns}
+      rows={items}
+      getRowId={(t) => t.id}
+      filterActive={!!connectionId}
+      emptyNew={{
+        icon: 'file',
+        title: 'Nenhum template',
+        description: 'Crie um template para enviar à análise da Meta, ou use Sincronizar para trazer os que já existem por lá.',
+        action: acoes,
+      }}
+      emptyFiltered={{ title: 'Nenhum template neste número', description: 'Troque o número no filtro, ou use Sincronizar para trazer os que já existem na Meta.', onClear: () => setConnectionId('') }}
+    />
   );
 }
 

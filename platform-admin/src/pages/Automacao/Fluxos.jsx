@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { listWorkflows, archiveWorkflow, deleteWorkflow } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -30,8 +30,15 @@ export default function Fluxos() {
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState(null); // { kind: 'archive'|'delete', ids, clear }
   const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState('');
 
   const canWrite = can('automation.workflows.write');
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((w) => (w.name || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   async function load() {
     setLoading(true);
@@ -153,39 +160,30 @@ export default function Fluxos() {
   const lista = `${nomes.slice(0, 3).join(', ')}${nomes.length > 3 ? '…' : ''}`;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Fluxos"
         subtitle="Cada fluxo é uma automação. Salvar cria uma versão nova; publicar escolhe qual versão está no ar — as anteriores ficam guardadas."
-        actions={acoesCabecalho}
+        primaryAction={acoesCabecalho}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar fluxo…"
+        loading={loading && !items.length}
+        columns={columns}
+        rows={rows}
+        getRowId={(w) => w.id}
+        onRowClick={(w) => navigate(`/automacao/fluxos/${w.id}`)}
+        getRowLabel={(w) => `Abrir fluxo ${w.name}`}
+        bulkActions={bulkActions}
+        filterActive={!!q.trim()}
+        emptyNew={{
+          icon: 'settings',
+          title: 'Nenhum fluxo neste ambiente',
+          description: 'Um fluxo tem um gatilho (o que o dispara) e uma sequência de passos. Crie um e monte os passos no editor.',
+          action: acoesCabecalho,
+        }}
+        emptyFiltered={{ title: 'Nenhum fluxo encontrado', description: 'Nenhum fluxo com esse nome.', onClear: () => setQ('') }}
       />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="settings"
-            title="Nenhum fluxo neste ambiente"
-            description="Um fluxo tem um gatilho (o que o dispara) e uma sequência de passos. Crie um e monte os passos no editor."
-            action={acoesCabecalho}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num fluxo para abrir o editor.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(w) => w.id}
-            onRowClick={(w) => navigate(`/automacao/fluxos/${w.id}`)}
-            getRowLabel={(w) => `Abrir fluxo ${w.name}`}
-            bulkActions={bulkActions}
-          />
-        </>
-      )}
 
       {/* 5 patrasques: ConfirmDialog + a consequência escrita + tooltip no botão
           + loading + gate can('automation.workflows.write'). */}
@@ -211,6 +209,6 @@ export default function Fluxos() {
         onClose={() => setConfirm(null)}
         onConfirm={handleConfirm}
       />
-    </div>
+    </>
   );
 }

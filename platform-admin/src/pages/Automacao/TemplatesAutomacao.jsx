@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Button, Select, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Select, Field, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { listAutomationTemplates, deleteAutomationTemplate } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -115,15 +115,14 @@ export default function TemplatesAutomacao() {
     )
     : undefined;
 
-  const toolbar = (
-    <div className="flex flex-wrap items-center gap-2" style={{ padding: 'var(--su-space-2) var(--su-space-4)' }}>
-      <div style={{ width: 200 }}>
-        <Select value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Filtrar por onde é usado">
+  const filterContent = (
+    <div style={{ minWidth: 220 }}>
+      <Field label="Onde é usado">
+        <Select value={channel} onChange={(e) => setChannel(e.target.value)}>
           <option value="">Todos os canais</option>
           {Object.entries(CHANNEL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select>
-      </div>
-      <Button variant="ghost" icon="refresh" loading={loading} aria-label="Atualizar" onClick={load} />
+      </Field>
     </div>
   );
 
@@ -132,42 +131,31 @@ export default function TemplatesAutomacao() {
     .filter(Boolean);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Templates"
         subtitle={`Textos prontos com ${'{{variáveis}}'} que os fluxos reaproveitam — a automação escolhe o template e o sistema preenche o resto.`}
-        actions={novo}
+        primaryAction={novo}
+        filterContent={filterContent}
+        filtersActive={!!channel}
+        onClearFilters={() => setChannel('')}
+        toolbarActions={[{ icon: 'refresh', label: 'Atualizar', onClick: load }]}
+        loading={loading && !items.length}
+        columns={columns}
+        rows={items}
+        getRowId={(t) => t.id}
+        onRowClick={(t) => navigate(`/automacao/templates/${t.id}`)}
+        getRowLabel={(t) => `Abrir template ${t.name}`}
+        bulkActions={bulkActions}
+        filterActive={!!channel}
+        emptyNew={{
+          icon: 'file',
+          title: 'Nenhum template ainda',
+          description: `Um template guarda o texto uma vez e deixa os pedaços que mudam como ${'{{variáveis}}'} — assim o mesmo aviso serve para todo mundo.`,
+          action: novo,
+        }}
+        emptyFiltered={{ title: 'Nenhum template para esse canal', description: 'Troque o filtro para ver os outros canais, ou crie um template para este.', onClear: () => setChannel('') }}
       />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="file"
-            title={channel ? 'Nenhum template para esse canal' : 'Nenhum template ainda'}
-            description={channel
-              ? 'Troque o filtro para ver os outros canais, ou crie um template para este.'
-              : `Um template guarda o texto uma vez e deixa os pedaços que mudam como ${'{{variáveis}}'} — assim o mesmo aviso serve para todo mundo.`}
-            action={novo}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num template para ler e editar o conteúdo dele.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(t) => t.id}
-            onRowClick={(t) => navigate(`/automacao/templates/${t.id}`)}
-            getRowLabel={(t) => `Abrir template ${t.name}`}
-            toolbar={toolbar}
-            bulkActions={bulkActions}
-          />
-        </>
-      )}
 
       {/* 5 patrasques: ConfirmDialog + a consequência escrita + tooltip no botão
           + loading + gate can('automation.templates.write'). */}
@@ -185,6 +173,6 @@ export default function TemplatesAutomacao() {
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
       />
-    </div>
+    </>
   );
 }

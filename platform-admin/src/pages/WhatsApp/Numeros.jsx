@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import { listNumbers, syncNumber } from '../../services/whatsapp';
@@ -47,6 +47,16 @@ export default function Numeros() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [q, setQ] = useState('');
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((n) =>
+      (n.name || '').toLowerCase().includes(term) ||
+      (n.phone || '').toLowerCase().includes(term) ||
+      (n.display_name || '').toLowerCase().includes(term));
+  }, [items, q]);
 
   async function load() {
     setLoading(true);
@@ -148,39 +158,28 @@ export default function Numeros() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Números"
-        subtitle="Os números de WhatsApp conectados à Meta. A sincronização automática roda a cada 10 minutos."
-        actions={conectar}
-      />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="phone"
-            title="Nenhum número conectado"
-            description="Conecte um número pela conexão “WhatsApp (Meta Cloud API)”, em Integrações → Conexões. Enquanto a Meta não aprovar o cadastro rápido, a conexão é feita informando as credenciais."
-            action={conectar}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num número para abrir a conexão dele — é lá que se troca a credencial e se desliga.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(n) => n.id}
-            onRowClick={(n) => navigate(`/integracoes/conexoes/${n.id}`)}
-            getRowLabel={(n) => `Abrir a conexão de ${n.name}`}
-            bulkActions={bulkActions}
-          />
-        </>
-      )}
-    </div>
+    <ListScreen
+      title="Números"
+      subtitle="Os números de WhatsApp conectados à Meta. A sincronização automática roda a cada 10 minutos."
+      primaryAction={conectar}
+      search={q}
+      onSearch={setQ}
+      searchPlaceholder="Buscar número…"
+      loading={loading && !items.length}
+      columns={columns}
+      rows={rows}
+      getRowId={(n) => n.id}
+      onRowClick={(n) => navigate(`/integracoes/conexoes/${n.id}`)}
+      getRowLabel={(n) => `Abrir a conexão de ${n.name}`}
+      bulkActions={bulkActions}
+      filterActive={!!q.trim()}
+      emptyNew={{
+        icon: 'phone',
+        title: 'Nenhum número conectado',
+        description: 'Conecte um número pela conexão “WhatsApp (Meta Cloud API)”, em Integrações → Conexões. Enquanto a Meta não aprovar o cadastro rápido, a conexão é feita informando as credenciais.',
+        action: conectar,
+      }}
+      emptyFiltered={{ title: 'Nenhum número encontrado', description: 'Nenhum número com esse nome ou telefone.', onClear: () => setQ('') }}
+    />
   );
 }

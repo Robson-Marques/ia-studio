@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, Tabs, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { listQueues, listTeams, updateQueue, updateTeam } from '../../services/whatsapp';
 
@@ -138,67 +138,38 @@ export default function EquipesFilas() {
     .map((id) => (confirm.kind === 'team' ? teams : queues).find((x) => x.id === id)?.name)
     .filter(Boolean);
 
+  const isTeams = tab === 'teams';
+
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Equipes e Filas"
         subtitle="Equipe é quem atende; fila é onde a conversa espera. A distribuição é manual — alguém assume ou transfere."
-        actions={acao}
+        primaryAction={acao}
+        segments={TABS}
+        segment={tab}
+        onSegment={setTab}
+        loading={loading}
+        columns={isTeams ? teamColumns : queueColumns}
+        rows={isTeams ? teams : queues}
+        getRowId={(x) => x.id}
+        onRowClick={(x) => navigate(isTeams ? `/whatsapp/equipes/${x.id}` : `/whatsapp/filas/${x.id}`)}
+        getRowLabel={(x) => (isTeams ? `Abrir a equipe ${x.name}` : `Abrir a fila ${x.name}`)}
+        bulkActions={isTeams ? bulkFor('team', teams, manageTeams) : bulkFor('queue', queues, manageQueues)}
+        emptyNew={isTeams
+          ? {
+            icon: 'users',
+            title: 'Nenhuma equipe',
+            description: 'Equipes organizam quem atende o quê. Criar uma equipe não liga distribuição automática: quem assume a conversa é uma pessoa, ou alguém transfere para a fila dela.',
+            action: acao,
+          }
+          : {
+            icon: 'menu',
+            title: 'Nenhuma fila',
+            description: 'Fila é o destino de uma transferência e a casa da conversa enquanto ninguém a assume.',
+            action: acao,
+          }}
       />
-
-      <Tabs items={TABS} value={tab} onChange={setTab} />
-
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : tab === 'teams' ? (
-        !teams.length ? (
-          <Card>
-            <EmptyState
-              icon="users"
-              title="Nenhuma equipe"
-              description="Equipes organizam quem atende o quê. Criar uma equipe não liga distribuição automática: quem assume a conversa é uma pessoa, ou alguém transfere para a fila dela."
-              action={acao}
-            />
-          </Card>
-        ) : (
-          <>
-            <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-              Clique numa equipe para editar os dados e as pessoas dela.
-            </p>
-            <DataTable
-              columns={teamColumns}
-              rows={teams}
-              getRowId={(t) => t.id}
-              onRowClick={(t) => navigate(`/whatsapp/equipes/${t.id}`)}
-              getRowLabel={(t) => `Abrir a equipe ${t.name}`}
-              bulkActions={bulkFor('team', teams, manageTeams)}
-            />
-          </>
-        )
-      ) : !queues.length ? (
-        <Card>
-          <EmptyState
-            icon="menu"
-            title="Nenhuma fila"
-            description="Fila é o destino de uma transferência e a casa da conversa enquanto ninguém a assume."
-            action={acao}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique numa fila para editar.
-          </p>
-          <DataTable
-            columns={queueColumns}
-            rows={queues}
-            getRowId={(q) => q.id}
-            onRowClick={(q) => navigate(`/whatsapp/filas/${q.id}`)}
-            getRowLabel={(q) => `Abrir a fila ${q.name}`}
-            bulkActions={bulkFor('queue', queues, manageQueues)}
-          />
-        </>
-      )}
 
       {/* 5 patrasques: ConfirmDialog + consequência escrita + tooltip + loading +
           gate de permissão (a barra só existe com `manage`). */}
@@ -216,6 +187,6 @@ export default function EquipesFilas() {
         onClose={() => setConfirm(null)}
         onConfirm={confirmToggle}
       />
-    </div>
+    </>
   );
 }

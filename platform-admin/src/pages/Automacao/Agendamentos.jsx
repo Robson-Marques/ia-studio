@@ -1,49 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, Tabs, DataTable, EmptyState, Badge, Button, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { listSchedules, listCalendars, deleteCalendar } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime, WEEKDAYS } from './automation.constants';
 import { statusToTone } from '../../lib/tone';
 
 // Automação/Agendamentos — próximos disparos dos fluxos agendados + calendários
-// de feriados/dias úteis (diretriz 12). Migrada pro DS na v0.9.99.
+// de feriados/dias úteis (diretriz 12). Migrada pros moldes do DS na v0.10.37:
+// cada aba é uma `ListScreen` (`.su-screen`), então a preferência de largura do
+// Personalizar vale aqui. As abas viram `segments` do molde — a página-mãe só
+// guarda qual está ativa e cada aba mostra a mesma barra de segmentos.
 //
-// Decisões de composição:
+// Decisões de composição (preservadas da migração anterior):
 //
-//  · **O calendário saiu do Modal e virou rota** (`/automacao/calendarios/:id`).
-//    O campo "Feriados" é uma lista de datas escrita à mão, uma por linha — texto
-//    longo, com scroll, do tipo que o usuário revisa e reescreve. É exatamente o
-//    caso que a regra do Modal do DS proíbe (todo TextArea vai pra rota).
-//  · **Os calendários viraram tabela, não grade de cards com lápis e lixeira.**
-//    A linha abre o calendário; as ações vivem na barra de lote. Card com dois
-//    botõezinhos no canto era a forma que a taxonomia do DS aposentou.
-//  · A aba "Agendamentos" é **só leitura de propósito**: a recorrência mora no
-//    gatilho do fluxo, então clicar na linha leva pro fluxo — não há o que editar
-//    aqui, e por isso ela não tem coluna de seleção.
+//  · O calendário é rota (`/automacao/calendarios/:id`) — o campo "Feriados" é
+//    uma lista longa de datas, o caso que a regra do Modal do DS manda pra rota.
+//  · A aba "Agendamentos" é só leitura de propósito: a recorrência mora no
+//    gatilho do fluxo, então clicar na linha leva pro fluxo.
 
-const TABS = [
-  { id: 'agendamentos', label: 'Agendamentos', icon: 'calendar' },
-  { id: 'calendarios', label: 'Calendários', icon: 'calendar' },
+const SEGMENTS = [
+  { id: 'agendamentos', label: 'Agendamentos' },
+  { id: 'calendarios', label: 'Calendários' },
 ];
+
+const SUBTITLE = 'Quando cada fluxo agendado roda de novo, e quais dias contam como úteis. A recorrência em si é configurada no gatilho do fluxo.';
 
 export default function Agendamentos() {
   const [tab, setTab] = useState('agendamentos');
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Agendamentos"
-        subtitle="Quando cada fluxo agendado roda de novo, e quais dias contam como úteis. A recorrência em si é configurada no gatilho do fluxo."
-      />
-      {/* `value`, não `active` — o Tabs do DS tem outra API que o Tabs local. */}
-      <Tabs items={TABS} value={tab} onChange={setTab} />
-      {tab === 'agendamentos' ? <SchedulesTab /> : <CalendarsTab />}
-    </div>
-  );
+  const seg = { segments: SEGMENTS, segment: tab, onSegment: setTab };
+  return tab === 'agendamentos'
+    ? <SchedulesTab seg={seg} />
+    : <CalendarsTab seg={seg} />;
 }
 
-function SchedulesTab() {
+function SchedulesTab({ seg }) {
   const toast = useToast();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -55,24 +46,6 @@ function SchedulesTab() {
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (loading) {
-    return (
-      <Spinner size="lg" center />
-    );
-  }
-
-  if (!items.length) {
-    return (
-      <Card>
-        <EmptyState
-          icon="calendar"
-          title="Nenhum fluxo agendado"
-          description='Publique um fluxo com o gatilho "Agendado" e o próximo disparo dele aparece aqui.'
-        />
-      </Card>
-    );
-  }
 
   const columns = [
     { key: 'workflow', header: 'Fluxo', render: (s) => (
@@ -87,22 +60,26 @@ function SchedulesTab() {
   ];
 
   return (
-    <>
-      <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-        Clique num agendamento para abrir o fluxo — é lá que se muda o horário e a repetição.
-      </p>
-      <DataTable
-        columns={columns}
-        rows={items}
-        getRowId={(s) => s.id}
-        onRowClick={(s) => s.workflow?.id && navigate(`/automacao/fluxos/${s.workflow.id}`)}
-        getRowLabel={(s) => `Abrir fluxo ${s.workflow?.name || ''}`.trim()}
-      />
-    </>
+    <ListScreen
+      title="Agendamentos"
+      subtitle={SUBTITLE}
+      {...seg}
+      loading={loading}
+      columns={columns}
+      rows={items}
+      getRowId={(s) => s.id}
+      onRowClick={(s) => s.workflow?.id && navigate(`/automacao/fluxos/${s.workflow.id}`)}
+      getRowLabel={(s) => `Abrir fluxo ${s.workflow?.name || ''}`.trim()}
+      emptyNew={{
+        icon: 'calendar',
+        title: 'Nenhum fluxo agendado',
+        description: 'Publique um fluxo com o gatilho "Agendado" e o próximo disparo dele aparece aqui.',
+      }}
+    />
   );
 }
 
-function CalendarsTab() {
+function CalendarsTab({ seg }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
@@ -163,9 +140,8 @@ function CalendarsTab() {
     { key: 'holidays', header: 'Feriados', align: 'right', render: (c) => (Array.isArray(c.holidays) ? c.holidays.length : 0) },
   ];
 
-  // Excluir calendário aceita lote (são registros independentes), então
-  // `selectionMode` fica no default `multiple` — quadrado. Com 1 marcado cabe
-  // também "Editar", que é ação de um só.
+  // Excluir aceita lote (registros independentes); com 1 marcado cabe também
+  // "Editar", que é ação de um só.
   const bulkActions = canManage
     ? (ids, clear) => (
       <>
@@ -191,36 +167,26 @@ function CalendarsTab() {
     .filter(Boolean);
 
   return (
-    <div className="space-y-3">
-      {loading ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="calendar"
-            title="Nenhum calendário"
-            description="Um calendário diz quais dias da semana valem como úteis e quais datas são feriado — os agendamentos consultam isso antes de disparar."
-            action={novo}
-          />
-        </Card>
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-              Clique num calendário para ver e editar os feriados dele.
-            </p>
-            {novo}
-          </div>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(c) => c.id}
-            onRowClick={(c) => navigate(`/automacao/calendarios/${c.id}`)}
-            getRowLabel={(c) => `Abrir calendário ${c.name}`}
-            bulkActions={bulkActions}
-          />
-        </>
-      )}
+    <>
+      <ListScreen
+        title="Agendamentos"
+        subtitle={SUBTITLE}
+        {...seg}
+        primaryAction={novo}
+        loading={loading && !items.length}
+        columns={columns}
+        rows={items}
+        getRowId={(c) => c.id}
+        onRowClick={(c) => navigate(`/automacao/calendarios/${c.id}`)}
+        getRowLabel={(c) => `Abrir calendário ${c.name}`}
+        bulkActions={bulkActions}
+        emptyNew={{
+          icon: 'calendar',
+          title: 'Nenhum calendário',
+          description: 'Um calendário diz quais dias da semana valem como úteis e quais datas são feriado — os agendamentos consultam isso antes de disparar.',
+          action: novo,
+        }}
+      />
 
       {/* 5 patrasques: ConfirmDialog + a consequência escrita + tooltip no botão
           + loading + gate can('automation.calendars.manage'). */}
@@ -238,6 +204,6 @@ function CalendarsTab() {
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
       />
-    </div>
+    </>
   );
 }

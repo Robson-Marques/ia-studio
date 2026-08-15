@@ -1,5 +1,28 @@
 # Changelog — IA Studio
 
+## v0.10.37 - 2026-08-14 (Adoção do DS: listas viram ListScreen — leva 2 (Automação + WhatsApp))
+
+Sem `db push`. Só `platform-admin`.
+
+Continuação da adoção do DS tela a tela (leva 1 foi a família IA na v0.10.34). As telas de **lista** que eram `<div>` comum + `DataTable` não eram `.su-screen`, então a preferência de largura do Personalizar (Medida de leitura / Tela inteira) não as alcançava. Convertidas para o molde `ListScreen` do DS — o mesmo padrão do AquaPark. Comportamento preservado (mesmas colunas, clique-na-linha, ações em lote, estados vazios, os 5 patrasques nos ConfirmDialog).
+
+Família **Automação** (as telas que são lista):
+
+- **Fluxos** → `ListScreen` com busca por nome + barra de lote (arquivar/excluir) + ConfirmDialog.
+- **Eventos** → `ListScreen` com busca server-side (debounce) pelo nome do evento, "Atualizar" na toolbar, paginação, e o detalhe (payload + reprocessar) segue em Modal.
+- **Execuções** → `ListScreen` com os filtros (situação/fluxo/rastreio) no painel de filtros do molde, "Atualizar" na toolbar, paginação.
+- **Notificações** → `ListScreen` só-leitura (log), "Atualizar" na toolbar, paginação.
+- **Templates (Automação)** → `ListScreen` com filtro por canal no painel de filtros + barra de lote (editar/excluir).
+- **Agendamentos** → `ListScreen` com as abas (Agendamentos/Calendários) viradas em **segments** do molde.
+
+Família **WhatsApp** (as telas que são lista):
+
+- **Números** → `ListScreen` com busca por nome/telefone + barra de lote (Sincronizar agora).
+- **Templates (WhatsApp)** → `ListScreen` com filtro por número no painel de filtros + "Atualizar" na toolbar; Sincronizar/Novo no cabeçalho.
+- **Equipes e Filas** → `ListScreen` com as abas (Equipes/Filas) viradas em **segments** do molde, preservando a barra de lote (Desativar/Reativar) e o ConfirmDialog.
+
+Ficam de fora (não são lista): WhatsApp **Conversas** (inbox full-bleed) e **Atendimento IA** (tela de ajustes — entra depois com o molde de configuração). Próximas levas de lista: Integrações e Recursos.
+
 ## v0.10.36 - 2026-08-07 (Fix: abas da Custos paravam de pular)
 
 Sem `db push`. Só `platform-admin`.

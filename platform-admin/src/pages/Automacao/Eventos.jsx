@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, DataTable, EmptyState, Badge, Pagination, Modal, ConfirmDialog, Input, Button, DescriptionList, useToast, Spinner } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Modal, ConfirmDialog, Button, DescriptionList, useToast } from '@studio-ux-ds/react';
 import { listEvents, replayEvent } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from './automation.constants';
@@ -55,7 +55,13 @@ export default function Eventos() {
     }
   }
 
-  useEffect(() => { load(1); setPage(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Busca server-side: recarrega (página 1) quando o filtro muda, com debounce
+  // (a busca do ListScreen dispara a cada tecla; sem debounce, uma chamada por
+  // caractere). O mount roda com filtro vazio → primeira carga.
+  useEffect(() => {
+    const t = setTimeout(() => { setPage(1); load(1); }, 350);
+    return () => clearTimeout(t);
+  }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function confirmReplay() {
     setReplayBusy(true);
@@ -72,8 +78,6 @@ export default function Eventos() {
     }
   }
 
-  function search() { setPage(1); load(1); }
-
   const columns = [
     { key: 'event', header: 'O que aconteceu', render: (e) => (
       <span style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12, color: 'var(--su-text-primary)' }}>
@@ -87,65 +91,33 @@ export default function Eventos() {
     },
   ];
 
-  const toolbar = (
-    <div className="flex flex-wrap items-center gap-2" style={{ padding: 'var(--su-space-2) var(--su-space-4)' }}>
-      <div style={{ maxWidth: 260, flex: 1, minWidth: 180 }}>
-        <Input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') search(); }}
-          placeholder="Filtrar pelo nome do evento…"
-          aria-label="Filtrar pelo nome do evento"
-        />
-      </div>
-      <Button variant="secondary" icon="search" onClick={search}>Filtrar</Button>
-      <Button variant="ghost" icon="refresh" loading={loading} aria-label="Atualizar" onClick={() => load()} />
-    </div>
-  );
-
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <ListScreen
         title="Eventos"
         subtitle="Tudo que acontece na plataforma fica registrado aqui — e pode ser reprocessado se algo falhou no caminho."
+        search={filter}
+        onSearch={setFilter}
+        searchPlaceholder="Filtrar pelo nome do evento…"
+        toolbarActions={[{ icon: 'refresh', label: 'Atualizar', onClick: () => load() }]}
+        loading={loading && !items.length}
+        columns={columns}
+        rows={items}
+        getRowId={(e) => e.id}
+        onRowClick={(e) => setDetail(e)}
+        getRowLabel={(e) => `Ver ${e.event}`}
+        page={page}
+        pageCount={Math.ceil(total / PER_PAGE)}
+        onPage={(p) => { setPage(p); load(p); }}
+        summary={total ? `${total} evento(s)` : undefined}
+        filterActive={!!filter.trim()}
+        emptyNew={{
+          icon: 'alert-circle',
+          title: 'Nenhum evento ainda',
+          description: 'Acontecimentos da plataforma aparecem aqui — mensagem recebida no WhatsApp, execução concluída, aprovação decidida.',
+        }}
+        emptyFiltered={{ title: `Nenhum evento com "${filter}"`, description: 'Limpe o filtro para ver todos os eventos registrados.', onClear: () => setFilter('') }}
       />
-
-      {loading && !items.length ? (
-        <Spinner size="lg" center />
-      ) : !items.length ? (
-        <Card>
-          <EmptyState
-            icon="alert-circle"
-            title={filter ? `Nenhum evento com "${filter}"` : 'Nenhum evento ainda'}
-            description={filter
-              ? 'Limpe o filtro para ver todos os eventos registrados.'
-              : 'Acontecimentos da plataforma aparecem aqui — mensagem recebida no WhatsApp, execução concluída, aprovação decidida.'}
-          />
-        </Card>
-      ) : (
-        <>
-          <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>
-            Clique num evento para ver o conteúdo dele e, se precisar, reprocessar.
-          </p>
-          <DataTable
-            columns={columns}
-            rows={items}
-            getRowId={(e) => e.id}
-            onRowClick={(e) => setDetail(e)}
-            getRowLabel={(e) => `Ver ${e.event}`}
-            toolbar={toolbar}
-            footer={
-              <Pagination
-                page={page}
-                pageCount={Math.ceil(total / PER_PAGE)}
-                total={total}
-                itemLabel={['evento', 'eventos']}
-                onChange={(p) => { setPage(p); load(p); }}
-              />
-            }
-          />
-        </>
-      )}
 
       {/* Leitura, sem campo nenhum → Modal é o lugar certo. O Replay vive aqui,
           ao lado do payload que ele vai re-emitir. */}
@@ -211,6 +183,6 @@ export default function Eventos() {
         onClose={() => setReplaying(null)}
         onConfirm={confirmReplay}
       />
-    </div>
+    </>
   );
 }
