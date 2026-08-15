@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, Input, Select, Badge, Button, EmptyState, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Card, Input, Select, Badge, Button, EmptyState, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMarketplace, installProvider, uninstallProvider } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { CATEGORY_LABELS, categoryLabel } from './integration.constants';
@@ -97,7 +97,7 @@ export default function Marketplace() {
   }
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title="Marketplace"
         subtitle="Os sistemas com que a plataforma sabe conversar. Instalar habilita o conector para a organização; conectar é o passo seguinte."
@@ -209,6 +209,6 @@ export default function Marketplace() {
         onClose={() => setRemovendo(null)}
         onConfirm={desinstalar}
       />
-    </div>
+    </Screen>
   );
 }

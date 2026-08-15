@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { PageHeader, Card, Field, Input, Select, Button, DataTable, DescriptionList, Modal, CopyButton, EmptyState, FormGrid, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Card, Field, Input, Select, Button, DataTable, DescriptionList, Modal, CopyButton, EmptyState, FormGrid, useToast, Spinner } from '@studio-ux-ds/react';
 import { getResourceCatalog, exploreResource } from '../../services/resource';
 import { listConnections } from '../../services/integrations';
 
@@ -105,7 +105,7 @@ export default function Explorer() {
   }));
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title="Explorador de recursos"
         subtitle="Consulta de leitura: escolha a conexão e o tipo de recurso para ver os dados já traduzidos para o formato da plataforma. Nada é gravado."
@@ -221,6 +221,6 @@ export default function Explorer() {
           </div>
         )}
       </Modal>
-    </div>
+    </Screen>
   );
 }

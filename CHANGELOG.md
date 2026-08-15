@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.44 - 2026-08-15 (Adoção do DS: Marketplace e Explorer no molde base `Screen`)
+
+Sem `db push`. Só `platform-admin`.
+
+As duas telas que faltavam passam a ser `.su-screen` (a largura do Personalizar vale nelas). Nenhuma das duas encaixa no molde `SearchScreen` — que é para "campo único de busca é a razão da tela, que começa vazia" — então usam o molde base **`Screen`** (jornada composta), preservando a estrutura atual:
+
+- **Marketplace** (Integrações) é **browse-first**: mostra o catálogo de conectores em grade agrupada por categoria de cara, com filtro por nome/categoria. Não é busca-primeiro nem tabela — segue em grade, agora dentro de `Screen`.
+- **Explorador de recursos** (Recursos) tem uma **busca composta** (conexão + tipo obrigatórios + texto opcional + botão), não um campo único. Segue com o formulário + a tabela de resultados + o Modal de detalhe, agora dentro de `Screen`.
+
+Com isso, **todas as telas do IA Studio já usam um molde do DS** (ListScreen / DashboardScreen / SettingsScreen / Screen), então a preferência de largura do Personalizar alcança o painel inteiro. Restam só telas de **editor/formulário** e o **Dashboard** para revisão de molde numa próxima passada, se desejado.
+
 ## v0.10.43 - 2026-08-15 (Adoção do DS: Workspaces no molde base `Screen`)
 
 Sem `db push`. Só `platform-admin`.
