@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Screen, PageHeader, Card, Stepper, Field, Input, Select, Button, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, WizardScreen, PageHeader, Card, Field, Input, Select, Button, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMarketplace, createConnection } from '../../services/integrations';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
@@ -190,36 +190,17 @@ export default function ConexaoNova() {
   }
 
   return (
-    <Screen as="div" className="space-y-6">
-      <PageHeader
-        title="Nova conexão"
-        subtitle={provider ? provider.name : 'Escolha o conector e informe o que ele precisa para entrar.'}
-        actions={
-          <>
-            <Button variant="secondary" disabled={salvando} onClick={() => navigate('/integracoes/conexoes')}>
-              Cancelar
-            </Button>
-            {passo > 0 && (
-              <Button variant="secondary" icon="chevron-left" disabled={salvando} onClick={() => setPasso((i) => Math.max(0, i - 1))}>
-                Voltar
-              </Button>
-            )}
-            {noFinal ? (
-              <Button variant="primary" icon="zap" loading={salvando} onClick={salvar}>
-                Criar e testar
-              </Button>
-            ) : (
-              <Button variant="primary" iconRight="chevron-right" onClick={avancar}>
-                Avançar
-              </Button>
-            )}
-          </>
-        }
-      />
-
-      <Stepper steps={etapas} current={passo + 1} />
-
-      <Card>
+    <WizardScreen
+      title="Nova conexão"
+      subtitle={provider ? provider.name : 'Escolha o conector e informe o que ele precisa para entrar.'}
+      back={{ label: 'Cancelar', onClick: () => navigate('/integracoes/conexoes') }}
+      steps={etapas}
+      current={passo + 1}
+      onBack={() => setPasso((i) => Math.max(0, i - 1))}
+      onNext={noFinal ? salvar : avancar}
+      nextLabel={noFinal ? 'Criar e testar' : 'Avançar'}
+      working={salvando}
+    >
         <div style={{ padding: 20, maxWidth: 720 }} className="space-y-4">
           {carregandoProviders ? (
             <div className="flex justify-center py-10">
@@ -279,7 +260,6 @@ export default function ConexaoNova() {
             </>
           )}
         </div>
-      </Card>
-    </Screen>
+    </WizardScreen>
   );
 }

@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.48 - 2026-08-15 (Adoção do DS: polimento — WizardScreen, FluxoCanvas e fechamento)
+
+Sem `db push`. Só `platform-admin`.
+
+Polimento final da adoção do DS:
+
+- **Nova conexão** → do `Screen` base para o molde **`WizardScreen`**. É o caso de uso do wizard: o passo seguinte depende do anterior (escolher o conector define quais credenciais pedir). O molde traz o Stepper, o "Voltar/Avançar" e, no último passo, o verbo do que vai acontecer ("Criar e testar") — some a barra de botões montada à mão no cabeçalho. As telas de "conexão criada" e "nenhum conector instalado" seguem no `Screen` base (não são passos do wizard).
+- **Editor de fluxo (canvas)** → entra no `Screen` base. Reavaliado: ele **não** é full-bleed — tem cabeçalho + canvas numa página normal, então deve respeitar a preferência de largura como as outras (quem quiser o canvas em largura total escolhe "Tela inteira" no Personalizar). Com isso **nenhuma tela com cabeçalho fica fora** da preferência de largura.
+
+**Decisão registrada:** **Abertura de chamado** (ISP) foi mantida no `Screen` base, e **não** migrada para `SettingsScreen`. O molde de configuração envolve tudo num único cartão, mas essa tela tem 5 contextos de configuração independentes, cada um com seu próprio Salvar (decisão de design já documentada no arquivo). Colapsar em um cartão com 5 botões de salvar pioraria a clareza — forçar o molde aqui seria o oposto de adotá-lo bem.
+
+Encerra a adoção: as únicas telas sem molde de largura agora são as genuinamente full-bleed (o **inbox de Conversas** do WhatsApp, `h-full` sem cabeçalho), por design.
+
 ## v0.10.47 - 2026-08-15 (Adoção do DS: telas restantes — fecha a cobertura de largura)
 
 Sem `db push`. Só `platform-admin`.

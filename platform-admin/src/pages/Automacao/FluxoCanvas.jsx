@@ -7,7 +7,7 @@ import {
   Handle, Position, addEdge, applyNodeChanges, applyEdgeChanges, useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { PageHeader, Badge, Button, IconButton, SegmentedControl, Modal, ConfirmDialog, Field, Input, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Badge, Button, IconButton, SegmentedControl, Modal, ConfirmDialog, Field, Input, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
 import {
   getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions,
   exportWorkflow, publishWorkflow, unpublishWorkflow,
@@ -461,10 +461,10 @@ function FluxoCanvasInner() {
 
   if (loading || !workflow) {
     return (
-      <div className="space-y-6">
+      <Screen as="div" className="space-y-6">
         <PageHeader title="Carregando…" />
         <Spinner size="lg" center />
-      </div>
+      </Screen>
     );
   }
 
@@ -472,7 +472,7 @@ function FluxoCanvasInner() {
   const proximaVersao = (versions[0]?.version ?? 0) + 1;
 
   return (
-    <div className="space-y-3">
+    <Screen as="div" className="space-y-3">
       <PageHeader
         title={workflow.name}
         subtitle={workflow.description || undefined}
@@ -774,7 +774,7 @@ function FluxoCanvasInner() {
         onPublished={() => { setVersionsOpen(false); load(); }}
       />
       <ExecuteDrawer open={executeOpen} onClose={() => setExecuteOpen(false)} workflow={workflow} />
-    </div>
+    </Screen>
   );
 }
 
