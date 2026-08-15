@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  PageHeader, Card, Field, TextArea, Button, useToast,
-} from '@studio-ux-ds/react';
+import { FormScreen, Field, TextArea, useToast } from '@studio-ux-ds/react';
 import { importAgent } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -50,44 +48,27 @@ export default function AgenteImportar() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Importar assistente"
-        subtitle="Recria um assistente a partir do arquivo gerado pela ação Exportar."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/ia/agentes')} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleImport}
-              disabled={!canWrite}
-              loading={saving}
-              icon="check"
-            >
-              {saving ? 'Importando…' : 'Importar'}
-            </Button>
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20 }}>
-          <Field
-            label="Conteúdo do arquivo exportado"
-            hint="Abra o arquivo .json baixado na ação Exportar e cole o conteúdo inteiro aqui. Segredos não viajam no arquivo — a conexão de IA precisa ser escolhida de novo depois."
-          >
-            <TextArea
-              rows={18}
-              value={json}
-              onChange={(e) => setJson(e.target.value)}
-              placeholder='{"schema_version":1,"kind":"iastudio.agent",...}'
-              style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
-            />
-          </Field>
-        </div>
-      </Card>
-    </div>
+    <FormScreen
+      title="Importar assistente"
+      subtitle="Recria um assistente a partir do arquivo gerado pela ação Exportar."
+      onSubmit={handleImport}
+      onCancel={() => navigate('/ia/agentes')}
+      submitLabel="Importar"
+      saving={saving}
+      canSubmit={canWrite}
+    >
+      <Field
+        label="Conteúdo do arquivo exportado"
+        hint="Abra o arquivo .json baixado na ação Exportar e cole o conteúdo inteiro aqui. Segredos não viajam no arquivo — a conexão de IA precisa ser escolhida de novo depois."
+      >
+        <TextArea
+          rows={18}
+          value={json}
+          onChange={(e) => setJson(e.target.value)}
+          placeholder='{"schema_version":1,"kind":"iastudio.agent",...}'
+          style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+        />
+      </Field>
+    </FormScreen>
   );
 }

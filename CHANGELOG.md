@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.46 - 2026-08-15 (Adoção do DS: formulários simples no molde `FormScreen`)
+
+Sem `db push`. Só `platform-admin`.
+
+Os formulários de criação/importação passam a usar o molde `FormScreen` do DS — viram `.su-screen` (a largura do Personalizar vale neles) e ganham o comportamento do molde: é um `<form>` de verdade (Enter submete), o Salvar traz o estado de carregando no próprio botão, e o Cancelar/Salvar ficam na base do cartão (Cancelar *ghost* à esquerda, Salvar *primary* à direita). Onde há permissão, o Salvar **some** para quem não pode (via `canSubmit`), em vez de ficar cinza.
+
+- **Novo fluxo** e **Importar fluxo** (Automação).
+- **Importar assistente** e **Nova política de aprovação** (IA).
+- **Adicionar documento** (IA/Conhecimento) — com o carregamento da base no skeleton do molde.
+- **Novo template** (WhatsApp) — usa `FormScreen bare` (o formulário tem duas seções em cartão: os campos e os Botões), tudo submetido junto.
+
+Ficam para levas seguintes: **Abertura de chamado** (ISP) é config de 5 seções independentes → molde `SettingsScreen`; **editores grandes** (AgenteEditor, FluxoEditor, IncidenteEditor, ConexaoEditar, BaseConhecimentoEditor), o **wizard** ConexaoNova (`WizardScreen`), o **canvas** FluxoCanvas e o **Console** do desenvolvedor → avaliados caso a caso.
+
 ## v0.10.45 - 2026-08-15 (Adoção do DS: Dashboard no molde `DashboardScreen`)
 
 Sem `db push`. Só `platform-admin`.

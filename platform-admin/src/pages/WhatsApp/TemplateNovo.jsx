@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  PageHeader, Card, FormGrid, Field, Input, TextArea, Select, Badge, Button, IconButton, useToast,
+  FormScreen, Card, FormGrid, Field, Input, TextArea, Select, Badge, Button, IconButton, useToast,
 } from '@studio-ux-ds/react';
 import { createTemplate, listNumbers } from '../../services/whatsapp';
 import { CATEGORY_LABEL, LANGUAGE_LABEL } from './Templates';
@@ -107,22 +107,16 @@ export default function TemplateNovo() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Novo template"
-        subtitle="Depois de aprovado pela Meta, este texto pode ser enviado a quem não respondeu nas últimas 24 horas."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/whatsapp/templates')} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button variant="primary" loading={saving} onClick={handleSave}>
-              Enviar para análise
-            </Button>
-          </>
-        }
-      />
-
+    <FormScreen
+      bare
+      title="Novo template"
+      subtitle="Depois de aprovado pela Meta, este texto pode ser enviado a quem não respondeu nas últimas 24 horas."
+      onSubmit={handleSave}
+      onCancel={() => navigate('/whatsapp/templates')}
+      submitLabel="Enviar para análise"
+      saving={saving}
+    >
+      <div className="space-y-6">
       <Card>
         <div style={{ padding: 20 }} className="space-y-4">
           <FormGrid columns={2}>
@@ -247,6 +241,7 @@ export default function TemplateNovo() {
           )}
         </div>
       </Card>
-    </div>
+      </div>
+    </FormScreen>
   );
 }

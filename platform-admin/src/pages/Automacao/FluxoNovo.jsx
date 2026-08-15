@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, Field, Input, TextArea, Button, useToast } from '@studio-ux-ds/react';
+import { FormScreen, Field, Input, TextArea, useToast } from '@studio-ux-ds/react';
 import { createWorkflow } from '../../services/automation';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
@@ -45,41 +45,31 @@ export default function FluxoNovo() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Novo fluxo"
-        subtitle="O fluxo nasce vazio. Depois de criar, você escolhe o que o dispara e quais passos ele executa."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/automacao/fluxos')} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button variant="primary" loading={saving} onClick={handleSave}>
-              Criar
-            </Button>
-          </>
-        }
-      />
+    <FormScreen
+      title="Novo fluxo"
+      subtitle="O fluxo nasce vazio. Depois de criar, você escolhe o que o dispara e quais passos ele executa."
+      onSubmit={handleSave}
+      onCancel={() => navigate('/automacao/fluxos')}
+      submitLabel="Criar"
+      saving={saving}
+    >
+      <div className="space-y-4">
+        <Field label="Nome" required hint="Como o fluxo aparece na lista.">
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex.: Boas-vindas no WhatsApp"
+          />
+        </Field>
 
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-4">
-          <Field label="Nome" required hint="Como o fluxo aparece na lista.">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: Boas-vindas no WhatsApp"
-            />
-          </Field>
+        <Field label="Descrição" hint="Para que serve este fluxo — quem mexer nele depois vai ler isto primeiro.">
+          <TextArea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Field>
 
-          <Field label="Descrição" hint="Para que serve este fluxo — quem mexer nele depois vai ler isto primeiro.">
-            <TextArea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </Field>
-
-          <Field label="Tags" hint="Separadas por vírgula. Servem para achar o fluxo depois.">
-            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="onboarding, whatsapp" />
-          </Field>
-        </div>
-      </Card>
-    </div>
+        <Field label="Tags" hint="Separadas por vírgula. Servem para achar o fluxo depois.">
+          <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="onboarding, whatsapp" />
+        </Field>
+      </div>
+    </FormScreen>
   );
 }

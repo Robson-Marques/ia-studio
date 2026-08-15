@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, Field, TextArea, Button, useToast } from '@studio-ux-ds/react';
+import { FormScreen, Field, TextArea, useToast } from '@studio-ux-ds/react';
 import { importWorkflow } from '../../services/automation';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
@@ -43,39 +43,27 @@ export default function FluxoImportar() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Importar fluxo"
-        subtitle="Recria um fluxo a partir de um arquivo exportado. Ele entra como rascunho — nada dispara antes de você publicar."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/automacao/fluxos')} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button variant="primary" loading={saving} onClick={handleImport}>
-              Importar
-            </Button>
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-3">
-          <Field
-            label="Conteúdo do arquivo exportado"
-            required
-            hint="Use o botão Exportar de um fluxo para gerar o arquivo. Ele não carrega senhas nem chaves — as conexões precisam ser escolhidas de novo aqui."
-          >
-            <TextArea
-              rows={18}
-              value={json}
-              onChange={(e) => setJson(e.target.value)}
-              placeholder={'{\n  "schema_version": 1,\n  "kind": "iastudio.workflow",\n  ...\n}'}
-              style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
-            />
-          </Field>
-        </div>
-      </Card>
-    </div>
+    <FormScreen
+      title="Importar fluxo"
+      subtitle="Recria um fluxo a partir de um arquivo exportado. Ele entra como rascunho — nada dispara antes de você publicar."
+      onSubmit={handleImport}
+      onCancel={() => navigate('/automacao/fluxos')}
+      submitLabel="Importar"
+      saving={saving}
+    >
+      <Field
+        label="Conteúdo do arquivo exportado"
+        required
+        hint="Use o botão Exportar de um fluxo para gerar o arquivo. Ele não carrega senhas nem chaves — as conexões precisam ser escolhidas de novo aqui."
+      >
+        <TextArea
+          rows={18}
+          value={json}
+          onChange={(e) => setJson(e.target.value)}
+          placeholder={'{\n  "schema_version": 1,\n  "kind": "iastudio.workflow",\n  ...\n}'}
+          style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }}
+        />
+      </Field>
+    </FormScreen>
   );
 }

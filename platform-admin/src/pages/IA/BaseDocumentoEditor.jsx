@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { PageHeader, Card, Field, Input, Select, TextArea, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { FormScreen, Field, Input, Select, TextArea, useToast } from '@studio-ux-ds/react';
 import { getKnowledgeBase, addKnowledgeDocument } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -87,89 +87,66 @@ export default function BaseDocumentoEditor() {
     }
   }
 
-  if (loadingBase) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Carregando…" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Adicionar documento"
-        subtitle={base?.name ? `Vai entrar na base "${base.name}".` : undefined}
-        actions={
+    <FormScreen
+      title="Adicionar documento"
+      subtitle={base?.name ? `Vai entrar na base "${base.name}".` : undefined}
+      onSubmit={handleSave}
+      onCancel={() => navigate(backTo)}
+      submitLabel="Adicionar"
+      saving={saving}
+      canSubmit={canWrite}
+      loading={loadingBase}
+    >
+      <div className="space-y-4">
+        <div style={{ maxWidth: 360 }}>
+          <Field label="De onde vem o conteúdo">
+            <Select value={mode} onChange={(e) => setMode(e.target.value)}>
+              {MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </Select>
+          </Field>
+        </div>
+
+        {mode === 'URL' ? (
+          <Field
+            label="Endereço da página"
+            hint="A plataforma abre a página e extrai o texto dela."
+          >
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://exemplo.com/faq"
+            />
+          </Field>
+        ) : (
           <>
-            <Button variant="secondary" onClick={() => navigate(backTo)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              disabled={!canWrite}
-              loading={saving}
-              icon="check"
-            >
-              {saving ? 'Adicionando…' : 'Adicionar'}
-            </Button>
-          </>
-        }
-      />
-
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-4">
-          <div style={{ maxWidth: 360 }}>
-            <Field label="De onde vem o conteúdo">
-              <Select value={mode} onChange={(e) => setMode(e.target.value)}>
-                {MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </Select>
-            </Field>
-          </div>
-
-          {mode === 'URL' ? (
-            <Field
-              label="Endereço da página"
-              hint="A plataforma abre a página e extrai o texto dela."
-            >
+            <Field label="Como chamar este documento" hint="É o nome que aparece na lista da base.">
               <Input
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://exemplo.com/faq"
+                value={ref}
+                onChange={(e) => setRef(e.target.value)}
+                placeholder="Ex.: Política de trocas"
               />
             </Field>
-          ) : (
-            <>
-              <Field label="Como chamar este documento" hint="É o nome que aparece na lista da base.">
-                <Input
-                  value={ref}
-                  onChange={(e) => setRef(e.target.value)}
-                  placeholder="Ex.: Política de trocas"
-                />
-              </Field>
 
-              <Field
-                label={mode === 'MARKDOWN' ? 'Conteúdo em Markdown' : 'Conteúdo'}
-                hint={mode === 'MARKDOWN'
-                  ? 'Aceita títulos, listas e o resto da sintaxe Markdown.'
-                  : 'Cole o texto inteiro — a plataforma divide em trechos e indexa.'}
-              >
-                <TextArea
-                  rows={18}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder={mode === 'MARKDOWN' ? '# Título\n\n- item…' : 'Cole aqui o conteúdo…'}
-                  style={mode === 'MARKDOWN'
-                    ? { fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }
-                    : undefined}
-                />
-              </Field>
-            </>
-          )}
-        </div>
-      </Card>
-    </div>
+            <Field
+              label={mode === 'MARKDOWN' ? 'Conteúdo em Markdown' : 'Conteúdo'}
+              hint={mode === 'MARKDOWN'
+                ? 'Aceita títulos, listas e o resto da sintaxe Markdown.'
+                : 'Cole o texto inteiro — a plataforma divide em trechos e indexa.'}
+            >
+              <TextArea
+                rows={18}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={mode === 'MARKDOWN' ? '# Título\n\n- item…' : 'Cole aqui o conteúdo…'}
+                style={mode === 'MARKDOWN'
+                  ? { fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12 }
+                  : undefined}
+              />
+            </Field>
+          </>
+        )}
+      </div>
+    </FormScreen>
   );
 }
