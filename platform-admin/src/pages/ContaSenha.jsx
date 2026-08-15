@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, Field, Input, Button, useToast } from '@studio-ux-ds/react';
+import { SettingsScreen, SettingsSection, Field, Input, useToast } from '@studio-ux-ds/react';
 import { useAuth } from '../context/AuthContext';
 
 // ContaSenha — rota /conta/senha. Substitui o ChangePasswordModal do Header
@@ -36,14 +36,19 @@ export default function ContaSenha() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Trocar senha"
-        subtitle="Escolha uma senha nova. Mínimo de 8 caracteres."
-      />
-
-      <Card>
-        <form onSubmit={handleSave} style={{ padding: 20, maxWidth: 480 }} className="space-y-4">
+    <SettingsScreen
+      title="Trocar senha"
+      subtitle="Escolha uma senha nova. Mínimo de 8 caracteres."
+      onSave={handleSave}
+      onCancel={() => navigate('/minha-conta')}
+      saving={saving}
+      saveLabel="Salvar nova senha"
+    >
+      <SettingsSection
+        title="Senha"
+        description="Você precisa da senha atual para definir uma nova. A nova senha vale no próximo acesso."
+      >
+        <div className="space-y-4" style={{ maxWidth: 480 }}>
           <Field label="Senha atual" required>
             <Input
               type="password"
@@ -71,21 +76,8 @@ export default function ContaSenha() {
               disabled={saving}
             />
           </Field>
-
-          <div className="flex gap-2 pt-2">
-            <Button variant="secondary" type="button" onClick={() => navigate('/minha-conta')} disabled={saving}>
-              Cancelar
-            </Button>
-            {/* `loading` do DS (v1.2.13) monta o spinner na escala e na cor do
-                botão, e já desabilita + marca `aria-busy`. Aqui havia um spinner
-                montado à mão com margem cravada — o anti-padrão que a prop
-                existe pra eliminar. */}
-            <Button variant="primary" type="submit" loading={saving}>
-              Salvar nova senha
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+        </div>
+      </SettingsSection>
+    </SettingsScreen>
   );
 }

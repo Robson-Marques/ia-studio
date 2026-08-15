@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Card, EmptyState, Badge, Button, Switch, ConfirmDialog, useToast, Spinner } from '@studio-ux-ds/react';
+import { SettingsScreen, SettingsSection, EmptyState, Badge, Button, Switch, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { listWorkflows, publishWorkflow, unpublishWorkflow } from '../../services/automation';
 
@@ -69,24 +69,14 @@ export default function AtendimentoIA() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Atendimento por IA" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <SettingsScreen
         title="Atendimento por IA"
         subtitle="Deixe o assistente responder as mensagens do WhatsApp quando não houver ninguém na conversa."
-      />
-
-      {!workflow ? (
-        <Card>
+        loading={loading}
+      >
+        {!workflow ? (
           <EmptyState
             icon="message"
             title="Ainda não há atendimento por IA nesta organização"
@@ -97,41 +87,28 @@ export default function AtendimentoIA() {
               </Button>
             }
           />
-        </Card>
-      ) : (
-        <Card>
-          <div style={{ padding: 20 }} className="space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
-                    A IA responde no WhatsApp
-                  </p>
-                  <Badge tone={ligado ? 'success' : 'neutral'}>{ligado ? 'ligado' : 'desligado'}</Badge>
-                </div>
-                <p style={{ fontSize: 13, margin: 0, lineHeight: 1.5, color: 'var(--su-text-secondary)' }}>
-                  Quando um cliente manda mensagem e <strong>ninguém da equipe está atendendo</strong> aquela conversa,
-                  o assistente responde sozinho. Se um atendente humano estiver conduzindo, a IA fica quieta.
-                </p>
-              </div>
-
-              <div className="shrink-0 flex items-center gap-2">
-                {saving && <Spinner size="sm" />}
-                <Switch
-                  checked={ligado}
-                  aria-label={ligado ? 'Desligar o atendimento por IA' : 'Ligar o atendimento por IA'}
-                  onChange={() => {
-                    if (!canToggle) {
-                      toast.error('Você não tem permissão para ligar ou desligar isto.');
-                      return;
-                    }
-                    setConfirm(ligado ? 'off' : 'on');
-                  }}
-                />
-              </div>
+        ) : (
+          <SettingsSection
+            title="A IA responde no WhatsApp"
+            description="Quando um cliente manda mensagem e ninguém da equipe está atendendo aquela conversa, o assistente responde sozinho. Se um atendente humano estiver conduzindo, a IA fica quieta."
+          >
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <Badge tone={ligado ? 'success' : 'neutral'}>{ligado ? 'ligado' : 'desligado'}</Badge>
+              <Switch
+                checked={ligado}
+                disabled={saving}
+                aria-label={ligado ? 'Desligar o atendimento por IA' : 'Ligar o atendimento por IA'}
+                onChange={() => {
+                  if (!canToggle) {
+                    toast.error('Você não tem permissão para ligar ou desligar isto.');
+                    return;
+                  }
+                  setConfirm(ligado ? 'off' : 'on');
+                }}
+              />
             </div>
 
-            <div style={{ paddingTop: 16, borderTop: '1px solid var(--su-border-subtle)' }} className="space-y-1">
+            <div style={{ paddingTop: 16, marginTop: 16, borderTop: '1px solid var(--su-border-subtle)' }} className="space-y-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -144,9 +121,9 @@ export default function AtendimentoIA() {
                 O fluxo mostra o passo a passo: mensagem recebida → confere se há alguém atendendo → assistente responde.
               </p>
             </div>
-          </div>
-        </Card>
-      )}
+          </SettingsSection>
+        )}
+      </SettingsScreen>
 
       {/* 5 patrasques nos DOIS sentidos — desligar também para um canal em uso. */}
       <ConfirmDialog
@@ -163,6 +140,6 @@ export default function AtendimentoIA() {
         onClose={() => setConfirm(null)}
         onConfirm={confirmToggle}
       />
-    </div>
+    </>
   );
 }

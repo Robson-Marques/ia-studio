@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.10.40 - 2026-08-14 (Adoção do DS: telas de ajuste viram SettingsScreen + Studio UX 1.3.8)
+
+Sem `db push`. Só `platform-admin`.
+
+Primeira leva do molde **`SettingsScreen`** do DS (as levas 1–4 foram de listas → `ListScreen`). As telas de **ajuste/configuração** viram `.su-screen`, então a preferência de largura do Personalizar passa a valer nelas. O molde separa as duas ergonomias de configuração: ajuste de **efeito imediato** (um toggle que liga algo agora, retorno por toast, sem Salvar) e ajuste que **só vale em conjunto** (formulário com Salvar/Cancelar).
+
+- **Trocar senha** → `SettingsScreen` com Salvar/Cancelar (formulário — vale em conjunto). Os campos foram para uma `SettingsSection`; o molde renderiza os botões.
+- **Atendimento por IA** (WhatsApp) → `SettingsScreen` **sem Salvar** (efeito imediato): o toggle liga/desliga o fluxo na hora, com ConfirmDialog nos dois sentidos (os 5 patrasques) e retorno por toast.
+- **Minha conta** → `SettingsScreen` **sem Salvar** (leitura): plano, consumo e recursos do plano em três `SettingsSection` (antes eram três cards soltos).
+
+Além disso, **dependência do Studio UX subida para `^1.3.8`** (era `^1.2.68`) nos quatro pacotes (`tokens`/`components`/`icons`/`react`). Como não há `package-lock.json`, o `npm install` do `upgrade.sh` resolve a nova versão no deploy.
+
+Ficam de fora (outro molde, frente própria): **Workspaces** (grade de cards aninhados), **Marketplace**/**Explorer** (→ Search) e **Dashboard** (→ Dashboard).
+
 ## v0.10.39 - 2026-08-14 (Adoção do DS: listas viram ListScreen — leva 4 (telas de administração))
 
 Sem `db push`. Só `platform-admin`.

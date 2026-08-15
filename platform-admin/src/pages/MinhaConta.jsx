@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, Badge, ProgressBar, CopyButton, CheckGroup, Checkbox, DSIcon, useToast, Spinner } from '@studio-ux-ds/react';
+import { SettingsScreen, SettingsSection, Badge, ProgressBar, CopyButton, CheckGroup, Checkbox, DSIcon, useToast } from '@studio-ux-ds/react';
 import { getLicense } from '../services/account';
 import { formatNumber, formatLimit, formatDate } from '../lib/format';
 
@@ -76,15 +76,6 @@ export default function MinhaConta() {
     return () => { vivo = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Minha conta" />
-        <Spinner size="lg" center />
-      </div>
-    );
-  }
-
   const situacao = SITUACAO[license?.status] || { label: license?.status || '—', tone: 'neutral' };
   const plano = license?.plan?.name || license?.plan_name || license?.plan || '—';
   const chave = license?.key || license?.license_key || '';
@@ -104,11 +95,13 @@ export default function MinhaConta() {
       : null;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Minha conta" subtitle="O plano da organização, o que ele libera e quanto já foi usado." />
-
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-3">
+    <SettingsScreen
+      title="Minha conta"
+      subtitle="O plano da organização, o que ele libera e quanto já foi usado."
+      loading={loading}
+    >
+      <SettingsSection title="Plano" description={validade || undefined}>
+        <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <span style={{ color: 'var(--su-action)' }}><DSIcon name="user" size="lg" /></span>
             <div className="flex-1 min-w-0">
@@ -117,10 +110,6 @@ export default function MinhaConta() {
             </div>
             <Badge tone={situacao.tone}>{situacao.label}</Badge>
           </div>
-
-          {validade && (
-            <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>{validade}</p>
-          )}
 
           {chave && (
             <div className="space-y-1.5">
@@ -149,66 +138,56 @@ export default function MinhaConta() {
             </div>
           )}
         </div>
-      </Card>
+      </SettingsSection>
 
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-4">
-          <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
-            Quanto já foi usado
-          </h2>
-          {!medidas.length ? (
-            <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-muted)' }}>
-              O plano não declara medida de consumo.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {medidas.map((k) => {
-                const usado = uso[k] ?? 0;
-                const limite = limites[k];
-                const semLimite = limite == null;
-                const pct = semLimite ? 0 : Math.min(100, (usado / (limite || 1)) * 100);
-                // O papel da cor é o aviso: perto do teto muda de tom.
-                const tone = pct >= 90 ? 'danger' : pct >= 70 ? 'warning' : undefined;
-                return (
-                  <div key={k} className="space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>{MEDIDAS[k]}</p>
-                      <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-muted)' }}>
-                        {semLimite
-                          ? `${formatNumber(usado)} · sem limite`
-                          : `${formatNumber(usado)} de ${formatLimit(limite)}`}
-                      </p>
-                    </div>
-                    {/* Sem teto não há barra: barra sem limite não compara nada. */}
-                    {!semLimite && <ProgressBar value={pct} tone={tone} label={MEDIDAS[k]} />}
+      <SettingsSection title="Quanto já foi usado" description="O consumo do mês vai contra o limite do plano. Perto do teto, a barra muda de cor.">
+        {!medidas.length ? (
+          <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-muted)' }}>
+            O plano não declara medida de consumo.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {medidas.map((k) => {
+              const usado = uso[k] ?? 0;
+              const limite = limites[k];
+              const semLimite = limite == null;
+              const pct = semLimite ? 0 : Math.min(100, (usado / (limite || 1)) * 100);
+              // O papel da cor é o aviso: perto do teto muda de tom.
+              const tone = pct >= 90 ? 'danger' : pct >= 70 ? 'warning' : undefined;
+              return (
+                <div key={k} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>{MEDIDAS[k]}</p>
+                    <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-muted)' }}>
+                      {semLimite
+                        ? `${formatNumber(usado)} · sem limite`
+                        : `${formatNumber(usado)} de ${formatLimit(limite)}`}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </Card>
+                  {/* Sem teto não há barra: barra sem limite não compara nada. */}
+                  {!semLimite && <ProgressBar value={pct} tone={tone} label={MEDIDAS[k]} />}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SettingsSection>
 
-      <Card>
-        <div style={{ padding: 20 }} className="space-y-3">
-          <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
-            O que este plano libera
-          </h2>
-          <CheckGroup columns={3} role="group">
-            {Object.entries(RECURSOS).map(([k, label]) => (
-              <Checkbox
-                key={k}
-                variant="card"
-                label={label}
-                checked={ligados.includes(k)}
-                disabled
-                readOnly
-                meta={ligados.includes(k) ? 'incluído' : 'fora do plano'}
-              />
-            ))}
-          </CheckGroup>
-        </div>
-      </Card>
-    </div>
+      <SettingsSection title="O que este plano libera" description="Leitura — a mudança de plano é feita pelo comercial, não por aqui.">
+        <CheckGroup columns={3} role="group">
+          {Object.entries(RECURSOS).map(([k, label]) => (
+            <Checkbox
+              key={k}
+              variant="card"
+              label={label}
+              checked={ligados.includes(k)}
+              disabled
+              readOnly
+              meta={ligados.includes(k) ? 'incluído' : 'fora do plano'}
+            />
+          ))}
+        </CheckGroup>
+      </SettingsSection>
+    </SettingsScreen>
   );
 }
