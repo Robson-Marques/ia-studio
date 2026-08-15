@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.10.41 - 2026-08-14 (Fix do deploy da v0.10.40: Studio UX ^1.3.10)
+
+Sem `db push`. Só `platform-admin`.
+
+A v0.10.40 falhou no deploy na etapa `ADMIN_BUILD`: o `npm install` deu `ETARGET` porque `@studio-ux-ds/*@^1.3.8` **não existia no registry** (o número foi pulado). O servidor fez rollback sozinho para a v0.10.39 — nada ficou aplicado pela metade. Corrigido: a dependência do Studio UX passa a `^1.3.10` (versão publicada atual) nos quatro pacotes.
+
+Todo o conteúdo da v0.10.40 (telas de ajuste no molde `SettingsScreen` — Trocar senha, Atendimento por IA, Minha conta) vai junto nesta versão, já que a v0.10.40 nunca chegou a ser aplicada.
+
 ## v0.10.40 - 2026-08-14 (Adoção do DS: telas de ajuste viram SettingsScreen + Studio UX 1.3.8)
 
 Sem `db push`. Só `platform-admin`.
