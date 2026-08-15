@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.47 - 2026-08-15 (Adoção do DS: telas restantes — fecha a cobertura de largura)
+
+Sem `db push`. Só `platform-admin`.
+
+Última frente da adoção do DS: as telas de editor/config que faltavam passam a ser `.su-screen`, então a preferência de largura do Personalizar (Medida de leitura / Tela inteira) alcança **o painel inteiro**. Feito numa frente só para não gastar tantos versionamentos.
+
+- **Base de conhecimento (nova)** → molde `FormScreen` (`bare`, duas seções em cartão submetidas juntas).
+- **Abertura de chamado** (ISP), **Nova conexão** (assistente com passos/Stepper), **Editor de fluxo**, **Editor de incidente**, **Editor de assistente** e **Bancada de testes** (Desenvolvedor) → molde base **`Screen`**, o contêiner oficial do DS para "jornada composta que nenhum molde especializado cobre". Preserva a estrutura de cada tela (abas, canvas do editor, tabelas, modais) e só traz o `.su-screen`/largura. Nada de comportamento mudou.
+
+Ficam **de fora de propósito** (não devem ser capados na medida de leitura): o **canvas do editor de fluxo** (`FluxoCanvas`) e o **inbox de Conversas** do WhatsApp — telas full-bleed que querem a largura total, como manda o design. **Editar conexão** (`ConexaoEditar`) já usava `FormScreen`.
+
+Com isso, **todas as telas de conteúdo do IA Studio usam um molde do DS** (ListScreen / DashboardScreen / SettingsScreen / FormScreen / Screen), e a largura escolhida no Personalizar vale em todas.
+
 ## v0.10.46 - 2026-08-15 (Adoção do DS: formulários simples no molde `FormScreen`)
 
 Sem `db push`. Só `platform-admin`.

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, ConfirmDialog, FormGrid, FormRow, Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Tabs, Card, DataTable, EmptyState, Badge, Modal, ConfirmDialog, FormGrid, FormRow, Field, Input, Select, TextArea, NumericInput, Button, Checkbox, CheckGroup, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getIncident, createIncident, updateIncident,
   resolveAffected, listTargets, updateTargets,
@@ -174,17 +174,17 @@ export default function IncidenteEditor() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <Screen as="div" className="space-y-6">
         <PageHeader title="Carregando…" />
         <Spinner size="lg" center />
-      </div>
+      </Screen>
     );
   }
 
   const st = INCIDENT_STATUS[status] || INCIDENT_STATUS.DRAFT;
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title={isEdit ? (incident?.title || 'Incidente') : 'Novo incidente'}
         subtitle={isEdit
@@ -400,7 +400,7 @@ export default function IncidenteEditor() {
             : 'O incidente será encerrado. Se o aviso de normalização estiver ligado (modos proativo e combinado), ele é enviado agora. Confirma?'
         }
       />
-    </div>
+    </Screen>
   );
 }
 

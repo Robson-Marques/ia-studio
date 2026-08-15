@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Tabs, Card, FormGrid, Field, Input, Select, NumericInput, TextArea, Button, Checkbox, CheckGroup, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Tabs, Card, FormGrid, Field, Input, Select, NumericInput, TextArea, Button, Checkbox, CheckGroup, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getAgent, createAgent, updateAgent, saveAgentVersion, executeAgent,
   exportAgent, listAgentVersions,
@@ -301,15 +301,15 @@ export default function AgenteEditor() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <Screen as="div" className="space-y-6">
         <PageHeader title="Carregando…" />
         <Spinner size="lg" center />
-      </div>
+      </Screen>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title={isEdit ? (agentName || 'Assistente') : 'Novo assistente'}
         subtitle="Quem atende: personalidade, o que faz, o que sabe e o que pode fazer."
@@ -744,7 +744,7 @@ export default function AgenteEditor() {
           if (savedId) await refreshVersionMeta(savedId);
         }}
       />
-    </div>
+    </Screen>
   );
 }
 

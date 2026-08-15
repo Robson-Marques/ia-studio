@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader, Card, Badge, Button, Modal, ConfirmDialog, EmptyState, SegmentedControl, Field, Input, Select, IconButton, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Card, Badge, Button, Modal, ConfirmDialog, EmptyState, SegmentedControl, Field, Input, Select, IconButton, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getWorkflow, getNodesCatalog, saveWorkflowVersion, listWorkflowVersions, exportWorkflow,
   publishWorkflow, unpublishWorkflow,
@@ -184,17 +184,17 @@ export default function FluxoEditor() {
 
   if (loading || !workflow) {
     return (
-      <div className="space-y-6">
+      <Screen as="div" className="space-y-6">
         <PageHeader title="Carregando…" />
         <Spinner size="lg" center />
-      </div>
+      </Screen>
     );
   }
 
   const proximaVersao = (versions[0]?.version ?? 0) + 1;
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title={workflow.name}
         subtitle={workflow.description || undefined}
@@ -436,7 +436,7 @@ export default function FluxoEditor() {
         onPublished={() => { setVersionsOpen(false); load(); }}
       />
       <ExecuteDrawer open={executeOpen} onClose={() => setExecuteOpen(false)} workflow={workflow} />
-    </div>
+    </Screen>
   );
 }
 

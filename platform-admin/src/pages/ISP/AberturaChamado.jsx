@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, EmptyState, FormGrid, FormRow, Field, Input, Select, Radio, Button, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Card, EmptyState, FormGrid, FormRow, Field, Input, Select, Radio, Button, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   discoverOsResources, getOsConfig, saveOsConfig,
   getFilaMapping, saveFilaMapping,
@@ -188,17 +188,17 @@ export default function AberturaChamado() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <Screen as="div" className="space-y-6">
         <PageHeader title="Carregando…" />
         <Spinner size="lg" center />
-      </div>
+      </Screen>
     );
   }
 
   const semRecursos = !setores.length && !assuntos.length;
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title="Abertura de chamado"
         subtitle="O que o assistente usa quando precisa abrir um chamado, encaminhar a conversa, mandar boleto ou avisar a equipe."
@@ -519,6 +519,6 @@ export default function AberturaChamado() {
           )}
         </div>
       </Card>
-    </div>
+    </Screen>
   );
 }

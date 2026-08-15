@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  PageHeader, Card, FormGrid, Field, Input, Select, NumericInput, TextArea,
-  Button, useToast,
+  FormScreen, Card, FormGrid, Field, Input, Select, NumericInput, TextArea, useToast,
 } from '@studio-ux-ds/react';
 import { createKnowledgeBase } from '../../services/ai';
 import { listConnections } from '../../services/integrations';
@@ -78,28 +77,17 @@ export default function BaseConhecimentoEditor() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Nova base de conhecimento"
-        subtitle="Uma coleção de documentos que os assistentes consultam para responder."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/ia/conhecimento')} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              disabled={!canWrite}
-              loading={saving}
-              icon="check"
-            >
-              {saving ? 'Criando…' : 'Criar base'}
-            </Button>
-          </>
-        }
-      />
-
+    <FormScreen
+      bare
+      title="Nova base de conhecimento"
+      subtitle="Uma coleção de documentos que os assistentes consultam para responder."
+      onSubmit={handleSave}
+      onCancel={() => navigate('/ia/conhecimento')}
+      submitLabel="Criar base"
+      saving={saving}
+      canSubmit={canWrite}
+    >
+      <div className="space-y-6">
       <Card>
         <div style={{ padding: 20 }} className="space-y-4">
           <Field label="Nome">
@@ -183,6 +171,7 @@ export default function BaseConhecimentoEditor() {
           </FormGrid>
         </div>
       </Card>
-    </div>
+      </div>
+    </FormScreen>
   );
 }

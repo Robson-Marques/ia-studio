@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { PageHeader, Card, Stepper, Field, Input, Select, Button, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Card, Stepper, Field, Input, Select, Button, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMarketplace, createConnection } from '../../services/integrations';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
@@ -136,7 +136,7 @@ export default function ConexaoNova() {
     const meta = statusMeta(resultado.status);
     const precisaGoogle = resultado.provider_key === 'google-workspace' && resultado.status !== 'ACTIVE';
     return (
-      <div className="space-y-6">
+      <Screen as="div" className="space-y-6">
         <PageHeader title={resultado.name} subtitle="Conexão criada" />
         <Card>
           <div style={{ padding: 20 }} className="space-y-3">
@@ -168,14 +168,14 @@ export default function ConexaoNova() {
             </div>
           </div>
         </Card>
-      </div>
+      </Screen>
     );
   }
 
   // --- Nenhum conector instalado: o passo a passo não tem como começar ---
   if (!carregandoProviders && !providers.length) {
     return (
-      <div className="space-y-6">
+      <Screen as="div" className="space-y-6">
         <PageHeader title="Nova conexão" />
         <Card>
           <EmptyState
@@ -185,12 +185,12 @@ export default function ConexaoNova() {
             action={<Button variant="primary" onClick={() => navigate('/integracoes/marketplace')}>Ir ao Marketplace</Button>}
           />
         </Card>
-      </div>
+      </Screen>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title="Nova conexão"
         subtitle={provider ? provider.name : 'Escolha o conector e informe o que ele precisa para entrar.'}
@@ -280,6 +280,6 @@ export default function ConexaoNova() {
           )}
         </div>
       </Card>
-    </div>
+    </Screen>
   );
 }

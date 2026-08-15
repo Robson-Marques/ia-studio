@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, Tabs, FormGrid, Field, Input, TextArea, Select, NumericInput, Button, Banner, CopyButton, useToast, Spinner } from '@studio-ux-ds/react';
+import { Screen, PageHeader, Card, Tabs, FormGrid, Field, Input, TextArea, Select, NumericInput, Button, Banner, CopyButton, useToast, Spinner } from '@studio-ux-ds/react';
 import { listConnections } from '../../services/integrations';
 import { listTools } from '../../services/ai';
 import { runExecute, runSql, runHttp, runAi, runTool } from '../../services/devtools';
@@ -45,7 +45,7 @@ export default function Console() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="space-y-6">
+    <Screen as="div" className="space-y-6">
       <PageHeader
         title="Bancada de testes"
         subtitle="Chame uma operação, uma consulta ou a IA direto daqui para ver o que volta. Toda execução fica registrada; nada de negócio é criado."
@@ -56,7 +56,7 @@ export default function Console() {
       {tab === 'http'    && <AbaHttp connections={connections} />}
       {tab === 'ai'      && <AbaIa connections={connections} />}
       {tab === 'tool'    && <AbaFerramenta connections={connections} tools={tools} />}
-    </div>
+    </Screen>
   );
 }
 
