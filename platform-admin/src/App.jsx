@@ -49,11 +49,10 @@ import BasesConhecimento from './pages/IA/BasesConhecimento';
 import BaseConhecimentoEditor from './pages/IA/BaseConhecimentoEditor';
 import BaseConhecimentoDetalhe from './pages/IA/BaseConhecimentoDetalhe';
 import BaseDocumentoEditor from './pages/IA/BaseDocumentoEditor';
-import Memoria from './pages/IA/Memoria';
 import MemoriaEntradas from './pages/IA/MemoriaEntradas';
 import MemoriaPerfilEditor from './pages/IA/MemoriaPerfilEditor';
-import Ferramentas from './pages/IA/Ferramentas';
 import FerramentaEditor from './pages/IA/FerramentaEditor';
+import AjustesGerais from './pages/IA/AjustesGerais';
 import Aprovacoes from './pages/IA/Aprovacoes';
 import AprovacaoDetalhe from './pages/IA/AprovacaoDetalhe';
 import AprovacaoPoliticaEditor from './pages/IA/AprovacaoPoliticaEditor';
@@ -153,11 +152,12 @@ export default function App() {
                 <Route path="/ia/conhecimento/nova" element={<PermissionRoute perm="ai.knowledge.write"><BaseConhecimentoEditor /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/:id" element={<PermissionRoute perm="ai.knowledge.read"><BaseConhecimentoDetalhe /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/:id/documentos/novo" element={<PermissionRoute perm="ai.knowledge.write"><BaseDocumentoEditor /></PermissionRoute>} />
-                <Route path="/ia/memoria" element={<PermissionRoute perm="ai.memory.read"><Memoria /></PermissionRoute>} />
+                <Route path="/ia/ajustes" element={<PermissionRoute perm={['ai.tools.read', 'ai.memory.read']}><AjustesGerais /></PermissionRoute>} />
+                <Route path="/ia/ferramentas" element={<Navigate to="/ia/ajustes?tab=habilidades" replace />} />
+                <Route path="/ia/memoria" element={<Navigate to="/ia/ajustes?tab=memoria" replace />} />
                 <Route path="/ia/memoria/perfis/nova" element={<PermissionRoute perm="ai.memory.write"><MemoriaPerfilEditor /></PermissionRoute>} />
                 <Route path="/ia/memoria/perfis/:id/editar" element={<PermissionRoute perm="ai.memory.write"><MemoriaPerfilEditor /></PermissionRoute>} />
                 <Route path="/ia/memoria/:id" element={<PermissionRoute perm="ai.memory.read"><MemoriaEntradas /></PermissionRoute>} />
-                <Route path="/ia/ferramentas" element={<PermissionRoute perm="ai.tools.read"><Ferramentas /></PermissionRoute>} />
                 <Route path="/ia/ferramentas/tool/nova" element={<PermissionRoute perm="ai.tools.write"><FerramentaEditor /></PermissionRoute>} />
                 <Route path="/ia/ferramentas/tool/:id/editar" element={<PermissionRoute perm="ai.tools.write"><FerramentaEditor /></PermissionRoute>} />
                 <Route path="/ia/aprovacoes" element={<PermissionRoute perm="ai.approvals.read"><Aprovacoes /></PermissionRoute>} />

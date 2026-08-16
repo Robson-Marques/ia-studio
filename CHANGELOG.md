@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.51 - 2026-08-16 (Navegação: Habilidades + Memória viram "Ajustes gerais")
+
+Sem `db push`. Só `platform-admin`.
+
+Fecha a consolidação da navegação da área de IA (par do Monitoramento na v0.10.50, mesma direção do Aquapark). O grupo **IA Studio** vai de 6 → 5 itens: **Assistentes · Conhecimento · Pendências · Custos · Ajustes gerais**.
+
+- **Ajustes gerais** *(novo)* reúne, em abas (segments do molde), **Habilidades** (catálogo de ferramentas), **Servidores MCP** e **Memória** — a configuração avançada que os assistentes usam por baixo, tirada do primeiro nível. Nenhuma capacidade some. Reaproveita as sub-telas existentes (as abas da Ferramentas + a Memória), cada uma renderizando a própria ListScreen com o mesmo padrão de segments.
+- Rotas antigas (`/ia/ferramentas`, `/ia/memoria`) **redirecionam** para `/ia/ajustes?tab=…`. Os editores (ferramenta, perfil de memória, entradas de memória) seguem intactos.
+
+Com as duas levas de navegação (Monitoramento + Ajustes gerais), a área de IA+Automação foi de **12 → 9** entradas de menu (IA Studio 5 + Automação 4). Direção mais enxuta, sem perda de capacidade — o "(A) reframe" combinado com o Robson.
+
 ## v0.10.50 - 2026-08-16 (Navegação: Execuções + Eventos + Notificações viram "Monitoramento")
 
 Sem `db push`. Só `platform-admin`.

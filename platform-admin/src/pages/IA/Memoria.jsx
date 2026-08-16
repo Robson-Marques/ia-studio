@@ -15,7 +15,9 @@ import { MEMORY_SCOPES } from './ia.constants';
 // vazio; a busca por nome é client-side (a lista é curta) e dá à toolbar um
 // propósito em vez de uma barra vazia.
 
-export default function Memoria() {
+const DEFAULT_SUBTITLE = 'O que os assistentes lembram, por escopo (sessão / contato / fluxo / assistente), com validade e limite de itens.';
+
+export default function Memoria({ seg, title = 'Memória', subtitle = DEFAULT_SUBTITLE } = {}) {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
@@ -72,8 +74,9 @@ export default function Memoria() {
 
   return (
     <ListScreen
-      title="Memória"
-      subtitle="O que os assistentes lembram, por escopo (sessão / contato / fluxo / assistente), com validade e limite de itens."
+      title={title}
+      subtitle={subtitle}
+      {...seg}
       primaryAction={newProfileBtn}
       search={q}
       onSearch={setQ}

@@ -34,7 +34,7 @@ export default function Ferramentas() {
   return tab === 'catalog' ? <CatalogTab seg={seg} /> : <McpTab seg={seg} />;
 }
 
-function CatalogTab({ seg }) {
+export function CatalogTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
@@ -104,8 +104,8 @@ function CatalogTab({ seg }) {
 
   return (
     <ListScreen
-      title={PAGE_TITLE}
-      subtitle={PAGE_SUBTITLE}
+      title={title}
+      subtitle={subtitle}
       {...seg}
       primaryAction={canWrite && (
         <Button variant="primary" icon="plus" onClick={() => navigate('/ia/ferramentas/tool/nova')}>
@@ -127,7 +127,7 @@ function CatalogTab({ seg }) {
   );
 }
 
-function McpTab({ seg }) {
+export function McpTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }) {
   const toast = useToast();
   const { can } = usePermissions();
   const { workspaceId, environmentId } = useWorkspace();
@@ -227,8 +227,8 @@ function McpTab({ seg }) {
   return (
     <>
       <ListScreen
-        title={PAGE_TITLE}
-        subtitle={PAGE_SUBTITLE}
+        title={title}
+        subtitle={subtitle}
         {...seg}
         primaryAction={canWrite && (
           <Button variant="primary" icon="plus" onClick={() => setCreateOpen(true)}>
