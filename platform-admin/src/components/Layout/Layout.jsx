@@ -78,10 +78,8 @@ const NAV = [
     children: [
       { label: 'Fluxos',        icon: 'git-branch', path: '/automacao/fluxos',        perm: 'automation.workflows.read' },
       { label: 'Agendamentos',  icon: 'calendar',   path: '/automacao/agendamentos',  perm: 'automation.workflows.read' },
-      { label: 'Execuções',     icon: 'activity',   path: '/automacao/execucoes',     perm: 'automation.executions.read' },
       { label: 'Templates',     icon: 'file',       path: '/automacao/templates',     perm: 'automation.templates.read' },
-      { label: 'Eventos',       icon: 'zap',        path: '/automacao/eventos',       perm: 'automation.events.read' },
-      { label: 'Notificações',  icon: 'bell',       path: '/automacao/notificacoes',  perm: 'automation.notifications.read' },
+      { label: 'Monitoramento', icon: 'activity',   path: '/automacao/monitoramento', perm: ['automation.executions.read', 'automation.events.read', 'automation.notifications.read'] },
     ],
   },
   {
@@ -151,12 +149,10 @@ const BREADCRUMBS = {
   '/isp/abertura-chamado': 'ISP / Abertura de chamado',
   '/isp/incidentes':       'ISP / Incidentes',
   '/whatsapp/atendimento-ia': 'WhatsApp / Atendimento por IA',
-  '/automacao/fluxos':       'Automação / Fluxos',
-  '/automacao/agendamentos': 'Automação / Agendamentos',
-  '/automacao/execucoes':    'Automação / Execuções',
-  '/automacao/templates':    'Automação / Templates',
-  '/automacao/eventos':      'Automação / Eventos',
-  '/automacao/notificacoes': 'Automação / Notificações',
+  '/automacao/fluxos':         'Automação / Fluxos',
+  '/automacao/agendamentos':   'Automação / Agendamentos',
+  '/automacao/templates':      'Automação / Templates',
+  '/automacao/monitoramento':  'Automação / Monitoramento',
   '/ia/agentes':      'IA Studio / Assistentes',
   '/ia/conhecimento': 'IA Studio / Conhecimento',
   '/ia/memoria':      'IA Studio / Memória',
@@ -516,7 +512,7 @@ export default function Layout() {
         topbarContext={topbarContext}
         user={userForShell}
         userMenuItems={userMenuItems}
-        onNotifications={() => navigate('/automacao/notificacoes')}
+        onNotifications={() => navigate('/automacao/monitoramento?tab=notificacoes')}
         notifications={unread}
         customize
         onLogout={() => setConfirmarSaida(true)}

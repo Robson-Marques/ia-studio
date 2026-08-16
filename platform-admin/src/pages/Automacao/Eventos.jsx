@@ -24,7 +24,7 @@ import { formatDateTime } from './automation.constants';
 
 const PER_PAGE = 25;
 
-export default function Eventos() {
+export default function Eventos({ seg } = {}) {
   const toast = useToast();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
@@ -94,8 +94,9 @@ export default function Eventos() {
   return (
     <>
       <ListScreen
-        title="Eventos"
+        title={seg ? 'Monitoramento' : 'Eventos'}
         subtitle="Tudo que acontece na plataforma fica registrado aqui — e pode ser reprocessado se algo falhou no caminho."
+        {...seg}
         search={filter}
         onSearch={setFilter}
         searchPlaceholder="Filtrar pelo nome do evento…"

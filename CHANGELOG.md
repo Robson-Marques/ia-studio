@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.50 - 2026-08-16 (Navegação: Execuções + Eventos + Notificações viram "Monitoramento")
+
+Sem `db push`. Só `platform-admin`.
+
+Segunda frente da simplificação (porte da direção do Aquapark): **enxugar a navegação** dobrando telas de observação/diagnóstico numa entrada só. O grupo **Automação** vai de 6 → 4 itens: **Fluxos · Agendamentos · Templates · Monitoramento**.
+
+- **Monitoramento** *(novo)* reúne **Execuções**, **Eventos** e **Notificações** em abas (segments do molde) — nenhuma capacidade some, só deixaram de ser três itens de menu separados. Cada aba é a tela existente renderizada com o mesmo padrão de segments de Agendamentos/Usuários.
+- Rotas antigas (`/automacao/execucoes`, `/eventos`, `/notificacoes`) **redirecionam** para `/automacao/monitoramento?tab=…` — links antigos e o sino do topo continuam funcionando. O detalhe de execução (`/automacao/execucoes/:id`) segue intacto.
+
+É a leva (A) reframe decidida com o Robson: reorganiza e esconde o avançado, sem jogar fora nada. **Próxima frente (imediata):** o grupo **IA Studio** — dobrar **Habilidades** + **Memória** numa entrada "Ajustes gerais" (6 → 5 itens). Navegação é frente crítica, por isso feita em passos validados um a um.
+
 ## v0.10.49 - 2026-08-16 (Custos de IA vira painel de leitura — porte da ideia do Aquapark)
 
 Sem `db push`. Só `platform-admin`.

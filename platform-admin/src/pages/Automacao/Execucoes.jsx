@@ -19,7 +19,7 @@ import { statusToTone } from '../../lib/tone';
 
 const PER_PAGE = 25;
 
-export default function Execucoes() {
+export default function Execucoes({ seg } = {}) {
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -110,8 +110,9 @@ export default function Execucoes() {
 
   return (
     <ListScreen
-      title="Execuções"
+      title={seg ? 'Monitoramento' : 'Execuções'}
       subtitle="Cada vez que uma automação rodou — o que disparou, quanto durou, e onde parou passo a passo."
+      {...seg}
       filterContent={filterContent}
       filtersActive={filtrando}
       onClearFilters={() => { setStatus(''); setWorkflowId(''); setTraceId(''); }}

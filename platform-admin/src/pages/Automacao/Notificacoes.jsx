@@ -11,7 +11,7 @@ import { statusToTone } from '../../lib/tone';
 
 const PER_PAGE = 50;
 
-export default function Notificacoes() {
+export default function Notificacoes({ seg } = {}) {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
@@ -52,8 +52,9 @@ export default function Notificacoes() {
 
   return (
     <ListScreen
-      title="Notificações"
+      title={seg ? 'Monitoramento' : 'Notificações'}
       subtitle="Tudo que os fluxos enviaram — tenta WhatsApp, cai para e-mail e, em último caso, para o sino do sistema."
+      {...seg}
       toolbarActions={[{ icon: 'refresh', label: loading ? 'Atualizando…' : 'Atualizar', onClick: () => load() }]}
       loading={loading && !items.length}
       columns={columns}
