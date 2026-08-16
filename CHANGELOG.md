@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.49 - 2026-08-16 (Custos de IA vira painel de leitura — porte da ideia do Aquapark)
+
+Sem `db push`. Só `platform-admin`.
+
+Primeira frente da simplificação da área de IA, portando a direção do "Painel da IA" do Aquapark: **custo é acompanhamento, não gestão**. A tela **Custos de IA** deixa de ser um produto de 3 abas (Consumo / Orçamentos / Simulador) e passa a ser um **painel de leitura**: os indicadores (Custo total, Tokens, Assistentes ativos) + o consumo por provedor/modelo/assistente no mês. Segue no molde `DashboardScreen`.
+
+Saíram da superfície:
+
+- **Orçamentos** (definir limite mensal + alerta + bloqueio) — era uma **segunda fonte de configuração**; se o limite voltar a ser exposto, mora em Ajustes, não num produto de custo à parte. O backend de orçamento (`listBudgets`/`createBudget`/enforcement) **não foi tocado** — só o UI saiu de cena.
+- **Simulador** de custo — planejamento, fora do escopo de um painel de observação.
+
+Nada de dado novo foi inventado: a tela usa o mesmo `getCostsSummary` de antes. É uma redução de superfície reversível (o menu segue com "Custos"). Frente decidida com o Robson após o estudo comparativo Aquapark × IA Studio.
+
 ## v0.10.48 - 2026-08-15 (Adoção do DS: polimento — WizardScreen, FluxoCanvas e fechamento)
 
 Sem `db push`. Só `platform-admin`.
