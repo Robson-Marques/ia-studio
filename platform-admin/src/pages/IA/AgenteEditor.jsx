@@ -40,15 +40,15 @@ import AgentVersionsModal from './editor/AgentVersionsModal';
 //  · `AgentVersionsModal` **segue Modal**: não tem campo nenhum (lista de
 //    versões + publicar/rollback), então respeita a regra.
 
+// 5 abas (porte da direção do Aquapark). "O que pode fazer" (ferramentas) foi
+// dobrado em "O que faz"; "Ajustes avançados" virou seção recolhível em "Visão
+// geral"; "Quem atende" (era um placeholder sem campos) saiu.
 const TABS = [
-  { id: 'visao',      label: 'Visão geral' },
-  { id: 'quem',       label: 'Quem é' },
-  { id: 'faz',        label: 'O que faz' },
-  { id: 'sabe',       label: 'O que sabe' },
-  { id: 'pode',       label: 'O que pode fazer' },
-  { id: 'quematende', label: 'Quem atende' },
-  { id: 'testar',     label: 'Testar' },
-  { id: 'avancado',   label: 'Ajustes avançados' },
+  { id: 'visao',  label: 'Visão geral' },
+  { id: 'quem',   label: 'Quem é' },
+  { id: 'faz',    label: 'O que faz' },
+  { id: 'sabe',   label: 'O que sabe' },
+  { id: 'testar', label: 'Testar' },
 ];
 
 const EMPTY = {
@@ -80,6 +80,7 @@ export default function AgenteEditor() {
   // é "voltar para" vs "publicar"). Sem isto o badge "Em uso" nunca aparece.
   const [currentVersion, setCurrentVersion] = useState(0);
   const [tab, setTab] = useState('visao');
+  const [advExpanded, setAdvExpanded] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -225,7 +226,7 @@ export default function AgenteEditor() {
   async function handleSave() {
     if (!canWrite) { toast.error('Sem permissão.'); return; }
     if (!form.name.trim()) { toast.error('Dê um nome ao assistente (aba "Visão geral").'); setTab('visao'); return; }
-    if (!form.model.trim()) { toast.error('Escolha o modelo em "Ajustes avançados".'); setTab('avancado'); return; }
+    if (!form.model.trim()) { toast.error('Escolha o modelo em "Ajustes avançados" (dentro de Visão geral).'); setTab('visao'); setAdvExpanded(true); return; }
     if (!savedId && (!workspaceId || !environmentId)) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
     setSaving(true);
     try {
@@ -400,6 +401,12 @@ export default function AgenteEditor() {
               )}
             </div>
           </Card>
+
+          {/* Ajustes avançados: modelo, criatividade, memória e salvaguardas —
+              recolhidos por padrão (a maioria não precisa mexer). */}
+          <Button variant="ghost" size="sm" icon={advExpanded ? 'chevron-down' : 'chevron-right'} onClick={() => setAdvExpanded((v) => !v)}>
+            Ajustes avançados
+          </Button>
         </div>
       )}
 
@@ -575,9 +582,12 @@ export default function AgenteEditor() {
         </Card>
       )}
 
-      {tab === 'pode' && (
+      {tab === 'faz' && (
         <Card>
           <div style={{ padding: 20 }} className="space-y-3">
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+              O que pode fazer
+            </h2>
             <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
               Marque as habilidades do assistente. As marcadas com <Badge tone="warning">grava dados</Badge> mudam ou
               registram algo no sistema.
@@ -609,24 +619,9 @@ export default function AgenteEditor() {
         </Card>
       )}
 
-      {tab === 'quematende' && (
-        <Card>
-          <div style={{ padding: 20 }} className="space-y-2">
-            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
-              Quando este assistente atende
-            </h2>
-            <p style={{ fontSize: 14, color: 'var(--su-text-secondary)', margin: 0 }}>
-              O atendimento automático pelo WhatsApp (o assistente responder sozinho às mensagens que chegam) ainda
-              está sendo montado. Por enquanto, você usa este assistente pela aba <strong>Testar</strong> ou
-              ligando-o num fluxo em <strong>Automações</strong> (gatilho de mensagem recebida → Agente de IA).
-            </p>
-          </div>
-        </Card>
-      )}
-
       {tab === 'testar' && <TestTab agentId={savedId} canExecute={canExecute} />}
 
-      {tab === 'avancado' && (
+      {tab === 'visao' && advExpanded && (
         <div className="space-y-4">
           <Card>
             <div style={{ padding: 20 }} className="space-y-4">

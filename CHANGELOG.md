@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.54 - 2026-08-16 (Editor de assistente: 8 → 5 abas)
+
+Sem `db push`. Só `platform-admin`.
+
+Última frente do porte da direção do Aquapark: o editor de assistente enxuga de **8 → 5 abas** — **Visão geral · Quem é · O que faz · O que sabe · Testar** —, sem perder nenhuma configuração.
+
+- **"O que pode fazer"** (seleção de habilidades) foi **dobrada em "O que faz"** (o que o assistente faz inclui as ações que pode usar), com um subtítulo próprio.
+- **"Ajustes avançados"** (conexão/modelo, criatividade, passos/tokens, memória, salvaguardas) virou uma **seção recolhível** no fim de "Visão geral" — recolhida por padrão, porque a maioria não precisa mexer. A validação do modelo agora leva pra "Visão geral" e expande a seção.
+- **"Quem atende"** era um **placeholder sem campo nenhum** (só um aviso de que o atendimento automático ainda está sendo montado) — saiu de cena. Nenhuma capacidade perdida.
+
+Fecha a simplificação da área de IA inspirada no Aquapark: Custos como painel de leitura, navegação consolidada (Monitoramento, Ajustes gerais), Atendimento por IA reagrupado e agora o editor mais direto.
+
 ## v0.10.53 - 2026-08-16 (Blindagem do VersionService: tag de outro sistema nunca vira "versão atual")
 
 Sem `db push`. Só `platform-api` (build da API).
