@@ -8,6 +8,16 @@
 // clone de /opt/iastudio so enxerga as tags que existiam na instalacao e a tela
 // dizia "Instancia atualizada" pra sempre. O fetch e best-effort: sem rede ou
 // sem credencial, cai nas tags locais (a tela degrada, nao quebra).
+//
+// BLINDAGEM (contra contaminacao entre sistemas): o `/opt` pode acabar com uma
+// tag de OUTRO sistema (ex.: uma `v2.2.62` do AquaPark entrou no repo do IA
+// Studio e foi lida como "versao atual", travando o painel — ela era maior que
+// qualquer v0.10.x). O CHANGELOG.md e' conteudo SEMPRE do proprio sistema
+// (versionado no repo), entao a LINHA de versao (o `major` do topo do CHANGELOG)
+// e' a ancora: `git describe` e `git tag --list` so aceitam tags do mesmo major.
+// Uma tag de outra linha e' ignorada, nunca vira "atual" nem "disponivel". Se o
+// CHANGELOG nao puder ser lido, o filtro e' desligado (degrada pro comportamento
+// antigo, nao quebra).
 import { Injectable, Logger } from '@nestjs/common';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -38,9 +48,10 @@ export class VersionService {
     if (!force && this.cache && Date.now() - this.cache.at < CACHE_TTL_MS) {
       return this.cache.info;
     }
-    const current = await this.readCurrentVersion();
+    const expectedMajor = await this.readExpectedMajor();
+    const current = await this.readCurrentVersion(expectedMajor);
     const remoteSynced = await this.fetchTags();
-    const tags = await this.readTags();
+    const tags = await this.readTags(expectedMajor);
     const available = tags
       .filter((t) => (current ? this.compare(t, current) > 0 : true))
       .sort((a, b) => this.compare(b, a));
@@ -61,16 +72,40 @@ export class VersionService {
     this.cache = null;
   }
 
-  private async readCurrentVersion(): Promise<string | null> {
-    // 1) Tag exata do HEAD (git describe). So aceita se casar com vX.Y.Z.
+  /**
+   * `major` esperado da linha de versao deste sistema — o do topo do CHANGELOG.md
+   * (conteudo sempre do proprio repo). `null` quando nao da pra ler: nesse caso o
+   * filtro de blindagem fica desligado (degrada pro comportamento antigo).
+   */
+  private async readExpectedMajor(): Promise<number | null> {
+    try {
+      const changelog = await readFile(path.join(appDir(), 'CHANGELOG.md'), 'utf8');
+      const m = changelog.match(/^##\s+v(\d+)\.\d+\.\d+/m);
+      if (m) return Number(m[1]);
+    } catch (e) {
+      this.logger.warn(`Falha ao ler CHANGELOG.md (blindagem desligada): ${(e as Error).message}`);
+    }
+    return null;
+  }
+
+  /** true se a tag e' da linha de versao esperada (mesmo major) ou se nao ha ancora. */
+  private isOwnLine(tag: string, expectedMajor: number | null): boolean {
+    if (expectedMajor == null) return true;
+    const p = TAG_REGEX.exec(tag);
+    return !!p && Number(p[1]) === expectedMajor;
+  }
+
+  private async readCurrentVersion(expectedMajor: number | null): Promise<string | null> {
+    // 1) Tag exata do HEAD (git describe). So aceita se casar com vX.Y.Z E for da
+    //    linha de versao deste sistema — uma tag de outro sistema no HEAD e' ignorada.
     try {
       const { stdout } = await exec('git', ['describe', '--tags', '--exact-match'], { cwd: appDir() });
       const tag = stdout.trim();
-      if (TAG_REGEX.test(tag)) return tag;
+      if (TAG_REGEX.test(tag) && this.isOwnLine(tag, expectedMajor)) return tag;
     } catch {
       // HEAD nao aponta exatamente numa tag — segue pro fallback.
     }
-    // 2) Fallback: primeiro "## vX.Y.Z" do CHANGELOG.md.
+    // 2) Fallback: primeiro "## vX.Y.Z" do CHANGELOG.md (sempre deste sistema).
     try {
       const changelog = await readFile(path.join(appDir(), 'CHANGELOG.md'), 'utf8');
       const m = changelog.match(/^##\s+(v\d+\.\d+\.\d+)/m);
@@ -99,13 +134,13 @@ export class VersionService {
     }
   }
 
-  private async readTags(): Promise<string[]> {
+  private async readTags(expectedMajor: number | null): Promise<string[]> {
     try {
       const { stdout } = await exec('git', ['tag', '--list', 'v*'], { cwd: appDir() });
       return stdout
         .split('\n')
         .map((t) => t.trim())
-        .filter((t) => TAG_REGEX.test(t));
+        .filter((t) => TAG_REGEX.test(t) && this.isOwnLine(t, expectedMajor));
     } catch (e) {
       this.logger.warn(`Falha ao listar tags git: ${(e as Error).message}`);
       return [];

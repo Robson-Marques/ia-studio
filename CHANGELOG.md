@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.10.53 - 2026-08-16 (Blindagem do VersionService: tag de outro sistema nunca vira "versão atual")
+
+Sem `db push`. Só `platform-api` (build da API).
+
+Conserto de raiz do incidente em que uma **tag `v2.2.62` do AquaPark** entrou no `/opt/iastudio` e foi lida como "versão atual" — como era maior que qualquer `v0.10.x`, o painel de Atualização travava em "nada disponível" e não oferecia as versões novas do IA Studio.
+
+O `VersionService` passa a **ancorar a linha de versão no `CHANGELOG.md`** (conteúdo sempre do próprio repo): usa o `major` do cabeçalho do topo (`## vX.Y.Z`) como referência e **ignora qualquer tag de outra linha** (major diferente), tanto na "versão atual" (`git describe`) quanto na lista de "disponíveis" (`git tag --list`). Uma tag intrusa de outro sistema nunca mais é lida como atual nem oferecida. Degradação segura: se o CHANGELOG não puder ser lido, o filtro se desliga e volta ao comportamento antigo (não quebra).
+
+Contexto: a limpeza no servidor (remover a tag intrusa) já resolveu o sintoma; esta mudança impede a recorrência.
+
 ## v0.10.52 - 2026-08-16 (Navegação: "Atendimento por IA" volta pro grupo IA Studio)
 
 Sem `db push`. Só `platform-admin`.
