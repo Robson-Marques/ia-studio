@@ -58,8 +58,9 @@ const NAV = [
   {
     label: 'IA Studio', icon: 'spark',
     children: [
-      { label: 'Assistentes',    icon: 'bot',          path: '/ia/agentes',      perm: 'ai.agents.read' },
-      { label: 'Conhecimento',   icon: 'book',         path: '/ia/conhecimento', perm: 'ai.knowledge.read' },
+      { label: 'Assistentes',       icon: 'bot',          path: '/ia/agentes',              perm: 'ai.agents.read' },
+      { label: 'Atendimento por IA', icon: 'bot',          path: '/whatsapp/atendimento-ia', perm: 'automation.workflows.read' },
+      { label: 'Conhecimento',      icon: 'book',         path: '/ia/conhecimento',         perm: 'ai.knowledge.read' },
       { label: 'Pendências',     icon: 'check-circle', path: '/ia/aprovacoes',   perm: 'ai.approvals.read' },
       { label: 'Custos',         icon: 'coin',         path: '/ia/custos',       perm: 'ai.costs.read' },
       { label: 'Ajustes gerais', icon: 'sliders',      path: '/ia/ajustes',      perm: ['ai.tools.read', 'ai.memory.read'] },
@@ -88,7 +89,6 @@ const NAV = [
         label: 'Conversas', icon: 'messages', path: '/whatsapp/conversas',
         perm: ['comm.whatsapp.view.assigned', 'comm.whatsapp.view.unassigned', 'comm.whatsapp.view.team', 'comm.whatsapp.view.all'],
       },
-      { label: 'Atendimento por IA', icon: 'bot',   path: '/whatsapp/atendimento-ia', perm: 'automation.workflows.read' },
       { label: 'Templates',       icon: 'file',    path: '/whatsapp/templates', perm: 'comm.whatsapp.templates.read' },
       { label: 'Equipes e Filas', icon: 'list',    path: '/whatsapp/equipes',   perm: 'comm.whatsapp.teams.read' },
       { label: 'Números',         icon: 'phone',   path: '/whatsapp/numeros',   perm: 'comm.whatsapp.numbers.read' },
@@ -147,7 +147,7 @@ const BREADCRUMBS = {
   '/whatsapp/numeros':   'WhatsApp / Números',
   '/isp/abertura-chamado': 'ISP / Abertura de chamado',
   '/isp/incidentes':       'ISP / Incidentes',
-  '/whatsapp/atendimento-ia': 'WhatsApp / Atendimento por IA',
+  '/whatsapp/atendimento-ia': 'IA Studio / Atendimento por IA',
   '/automacao/fluxos':         'Automação / Fluxos',
   '/automacao/agendamentos':   'Automação / Agendamentos',
   '/automacao/templates':      'Automação / Templates',

@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.10.52 - 2026-08-16 (Navegação: "Atendimento por IA" volta pro grupo IA Studio)
+
+Sem `db push`. Só `platform-admin`.
+
+Pequeno ajuste de agrupamento: **"Atendimento por IA"** sai do grupo **WhatsApp** e vai para o grupo **IA Studio** (logo abaixo de Assistentes), onde conceitualmente pertence — é o assistente respondendo no WhatsApp, config de IA, não gestão de canal. A tela e a rota (`/whatsapp/atendimento-ia`) **não mudam**; só o lugar no menu e o breadcrumb ("IA Studio / Atendimento por IA"). O grupo WhatsApp fica com Conversas · Templates · Equipes e Filas · Números.
+
 ## v0.10.51 - 2026-08-16 (Navegação: Habilidades + Memória viram "Ajustes gerais")
 
 Sem `db push`. Só `platform-admin`.
