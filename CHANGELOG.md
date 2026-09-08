@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.55 - 2026-09-08 (Conectores WhatsApp: contrato/tipos — Checkpoint 1)
+
+Sem `db push`. Só `platform-api` (arquivo de contrato, ainda sem consumidor — não altera comportamento).
+
+Primeiro passo do porte dos conectores WhatsApp do Aquapark (especialidade `ia-studio.whatsapp-connectors@1.0.0`). Entra o contrato unificado dos conectores em `modules/comm/whatsapp/connectors/connector.types.ts`, **aditivo** — nada importa dele ainda.
+
+- Define a fronteira **HTTP (stateless, via `IProvider.execute` — Meta/YCloud)** vs **SOCKET (stateful — Baileys)**, com uma porta única de envio (`WhatsappOutboundPort`) que os dois transportes satisfazem.
+- `WhatsappProviderKey` (whatsapp-meta/ycloud/baileys-internal/baileys-manual), presets de `ConnectorCapabilities` por conector, `PairingResult` (QR), e o runtime stateful `WhatsappConnectionRuntime` (socket/QR/eventos) para o Baileys.
+- Coexistência: `ConnectorInboundMessage` com `isHistory`/`isSelf` (histórico compartilhado não dispara automação), `BaileysManualConfig.officialConnectionId`, e erros tipados sem fallback silencioso (`UnsupportedMessageError`/`ConnectionNotReadyError`/`SendFailedError`/`ManualChannelOnlyError`).
+- Reusa `RichMessage`/`NormalizedMessage` de `shared/integration/whatsapp.types` — sem duplicar.
+
+Próxima fase (após validação): provider YCloud (`whatsapp-ycloud`) + webhook.
+
 ## v0.10.54 - 2026-08-16 (Editor de assistente: 8 → 5 abas)
 
 Sem `db push`. Só `platform-admin`.
