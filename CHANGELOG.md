@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.10.57 - 2026-09-08 (Conector YCloud: correção do template.language conforme doc oficial)
+
+Sem `db push`. Só `platform-api` (build da API).
+
+Ajuste de conformidade com a doc da YCloud (`POST /v2/whatsapp/messages/sendDirectly`): no envio de **template**, o campo `template.language` é uma **string** (ex.: `"pt_BR"`), não o objeto `{ code }` da Cloud API. O `ycloud.client.ts` (v0.10.56) montava como objeto — corrigido para string. Sem essa correção, o envio de template pela YCloud seria recusado.
+
+Também confirmado pela doc: autenticação por header `X-API-Key` (já estava correto) e endpoint de envio `/v2/whatsapp/messages/sendDirectly` (correto).
+
 ## v0.10.56 - 2026-09-08 (Conector YCloud: envio + registro — Checkpoint 2a)
 
 Sem `db push`. Só `platform-api` (build da API).

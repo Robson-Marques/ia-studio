@@ -125,7 +125,9 @@ function buildYCloudPayload(
         type: 'template',
         template: {
           name: message.name,
-          language: { code: message.language ?? 'pt_BR' },
+          // YCloud sendDirectly usa `language` como STRING (ex.: "pt_BR"),
+          // diferente do objeto { code } da Cloud API. Confirmado na doc oficial.
+          language: message.language ?? 'pt_BR',
           components: templateComponents(message.variables),
         },
       };
