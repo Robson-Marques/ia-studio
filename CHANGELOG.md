@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.56 - 2026-09-08 (Conector YCloud: envio + registro — Checkpoint 2a)
+
+Sem `db push`. Só `platform-api` (build da API).
+
+Fase 2a do porte dos conectores (especialidade `ia-studio.whatsapp-connectors@1.0.0`): entra o **provider YCloud** (`whatsapp-ycloud`) no Provider Registry — coexiste com o `whatsapp-meta`, ambos oficiais.
+
+- `shared/integration/ycloud.client.ts` — cliente REST da YCloud (`fetch` nativo, sem novas dependências): `sendYCloudMessage` (texto/mídia/template via `sendDirectly`), `uploadYCloudMedia` (multipart) e `pingYCloud` (health leve).
+- `registry/providers/whatsapp-ycloud.provider.ts` — `IProvider` espelhando o `whatsapp-meta`: wizard (número, WABA, chave da API e segredo do webhook — os dois últimos no Cofre), `health`/`connect` (valida a chave), `execute` (sendText/sendTemplate/sendMedia/uploadMedia/sendRich) e `discover`.
+- Registrado no `registry.module.ts` e no `provider-seed.service.ts` (semeado no boot como definição do marketplace).
+
+Interativos (cta_url/botões/lista) e o **inbound** (webhook + assinatura + persistência, com histórico compartilhado → `isHistory`) entram no Checkpoint 2b. Nada de coexistência de conversa ainda; sem alteração de schema.
+
 ## v0.10.55 - 2026-09-08 (Conectores WhatsApp: contrato/tipos — Checkpoint 1)
 
 Sem `db push`. Só `platform-api` (arquivo de contrato, ainda sem consumidor — não altera comportamento).

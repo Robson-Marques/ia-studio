@@ -12,6 +12,7 @@ import { SqlServerProvider } from './providers/sqlserver.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { S3Provider } from './providers/s3.provider';
 import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
+import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 
 @Module({
@@ -28,6 +29,7 @@ import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
     SmtpProvider,
     S3Provider,
     WhatsappMetaProvider,
+    WhatsappYcloudProvider,
     GoogleWorkspaceProvider,
   ],
   // GoogleWorkspaceProvider exportado: o OAuth controller monta a URL de
