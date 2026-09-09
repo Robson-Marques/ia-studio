@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.59 - 2026-09-09 (Baileys internal: fundação — deps + sessão + runtime — Checkpoint 3a)
+
+**Com `db push`** (cria `comm_whatsapp_baileys_sessions`). `platform-api` (build + dependências novas).
+
+Fundação da Fase 3 (Baileys), o conector stateful. É **aditivo e inerte**: nada instancia o runtime ainda — a ativação (registry + provider + endpoint de QR) entra no Checkpoint 3b. O objetivo desta versão é validar no servidor que o `baileys` instala e a tabela sobe, antes do socket.
+
+- **Dependências:** `@whiskeysockets/baileys ^7.0.0-rc14` + `qrcode ^1.5.4` (+ `@types/qrcode`), pinadas iguais ao Aquapark (código provado nessa versão).
+- **Schema:** `WhatsappBaileysSession` (1 por conexão, multi-tenant) guarda o estado de auth do socket cifrado (AES-256-GCM). Não é segredo do usuário — é sessão de socket, atualizada a cada rotação de chave Signal.
+- `whatsapp-baileys-session.repository.ts` — load/save/clear cifrado do blob.
+- `connectors/whatsapp-baileys.runtime.ts` — runtime portado do `baileys-internal-adapter` do Aquapark, implementando o contrato `WhatsappConnectionRuntime` (socket + QR→dataURL + eventos). Só OUTBOUND; interno = só texto; sem reconexão automática após queda (segurança contra ban).
+
+IMPORTANTE: o Baileys é WhatsApp não-oficial e **não é testável daqui** — exige `npm install` no servidor e pareamento com um celular real, e carrega risco de bloqueio da conta. A validação ponta a ponta acontece no servidor após aplicar esta tag.
+
 ## v0.10.58 - 2026-09-09 (Conector YCloud: webhook inbound + coexistência — Checkpoint 2b)
 
 Sem `db push`. Só `platform-api` (build da API).

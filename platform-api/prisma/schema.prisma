@@ -1989,3 +1989,27 @@ model SystemRestore {
   @@index([status])
   @@map("system_restores")
 }
+
+
+// ─────────────────────────────────────────────────────────────────────
+// COMM — Sessão do socket Baileys (Checkpoint 3a do porte de conectores).
+// NÃO é um segredo gerenciado pelo usuário: é o estado de auth do socket
+// (creds + chaves Signal), atualizado a cada rotação de chave. 1 por conexão
+// (provider_key whatsapp-baileys-*). Blob serializado (BufferJSON) e cifrado
+// em repouso (AES-256-GCM via shared/crypto). Multi-tenant (regra do tenant).
+// ─────────────────────────────────────────────────────────────────────
+model WhatsappBaileysSession {
+  id              String   @id @default(uuid())
+  organization_id String
+  workspace_id    String
+  environment_id  String
+  connection_id   String   @unique
+  auth_state      String
+  status          String   @default("disconnected")
+  phone_number    String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([organization_id])
+  @@map("comm_whatsapp_baileys_sessions")
+}
