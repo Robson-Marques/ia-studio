@@ -248,7 +248,11 @@ export class WhatsappBaileysRuntime implements WhatsappConnectionRuntime {
   // ─── Biblioteca / auth (portado do Aquapark) ────────
   private async loadLibrary(): Promise<BaileysLibrary> {
     try {
-      return (await import('@whiskeysockets/baileys')) as unknown as BaileysLibrary;
+      // Especificador em variável: evita a resolução de módulo em tempo de
+      // build (o pacote pode ainda não estar instalado). Em runtime resolve
+      // normal; se faltar, o catch abaixo devolve erro claro.
+      const spec = '@whiskeysockets/baileys';
+      return (await import(spec)) as unknown as BaileysLibrary;
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'dependência indisponível';
       throw new SendFailedError(this.providerKey, `Biblioteca Baileys indisponível: ${reason}`, error);
@@ -345,7 +349,8 @@ export class WhatsappBaileysRuntime implements WhatsappConnectionRuntime {
   /** Converte a string de QR do Baileys em data URL PNG para a UI. */
   private async renderQr(raw: string): Promise<void> {
     try {
-      const qrcode = (await import('qrcode')) as unknown as { toDataURL(text: string): Promise<string> };
+      const spec = 'qrcode';
+      const qrcode = (await import(spec)) as unknown as { toDataURL(text: string): Promise<string> };
       this.pairingQrImage = await qrcode.toDataURL(raw);
     } catch (error) {
       this.logger.error(`Falha ao renderizar QR Baileys: ${(error as Error).message}`);

@@ -4,7 +4,7 @@
 // cliente. Coexistência: eventos de histórico compartilhado (sync) entram na
 // conversa mas NUNCA disparam IA/automação (isHistory = não publica o evento).
 import { Injectable, Logger } from '@nestjs/common';
-import { CommMessageDirection, Connection, IntegrationDirection, IntegrationLogStatus } from '@prisma/client';
+import { CommMessageDirection, Connection, IntegrationDirection, IntegrationLogStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
@@ -213,7 +213,9 @@ export class WhatsappYcloudInboundService {
       sender: n.direction === CommMessageDirection.OUTGOING ? 'system' : 'contact',
       type: n.type,
       content: n.content,
-      media: n.media,
+      // media é Json do Prisma (InputJsonValue): o Record<string,unknown> não
+      // casa direto — cast explícito, undefined quando não há mídia.
+      media: n.media ? (n.media as Prisma.InputJsonValue) : undefined,
       status: n.direction === CommMessageDirection.INCOMING ? 'received' : 'sent',
     });
 

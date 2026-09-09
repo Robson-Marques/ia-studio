@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.60 - 2026-09-09 (Correção de build: media (Json) no inbound YCloud + blindagem do import Baileys)
+
+Sem `db push`. Só `platform-api` (build da API).
+
+Conserta o erro de compilação (TS2322) que **quebrou o build** das v0.10.58/0.10.59 na etapa API_BUILD (a produção ficou na v0.10.57 pelo fail-safe — nada aplicado pela metade).
+
+- **`whatsapp-ycloud-inbound.service.ts`:** o campo `media` do `createMessage` é `Json` do Prisma (`InputJsonValue`) e estava tipado como `Record<string, unknown>`, que o Prisma Client não aceita direto. Agora com cast explícito para `Prisma.InputJsonValue` (e `undefined` quando não há mídia).
+- **`whatsapp-baileys.runtime.ts`:** os `import()` dinâmicos de `@whiskeysockets/baileys` e `qrcode` passam por especificador em variável, para não exigir resolução do módulo em tempo de build (o `nest build` compila o runtime mesmo inerte). Assim o build não quebra caso as deps ainda não estejam instaladas; em runtime resolvem normalmente e, se faltarem, devolvem erro claro (sem fallback silencioso).
+
+Atualize direto para a v0.10.60 — inclui tudo das v0.10.58 (webhook YCloud) e v0.10.59 (fundação Baileys). As tags 58/59 não compilavam e ficam para trás.
+
+Nota: o Baileys só é exercitado quando a ativação (Checkpoint 3b) entrar. Antes disso, garanta que o pipeline de atualização roda `npm install` das dependências novas no servidor.
+
 ## v0.10.59 - 2026-09-09 (Baileys internal: fundação — deps + sessão + runtime — Checkpoint 3a)
 
 **Com `db push`** (cria `comm_whatsapp_baileys_sessions`). `platform-api` (build + dependências novas).
