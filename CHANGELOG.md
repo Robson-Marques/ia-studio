@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.58 - 2026-09-09 (Conector YCloud: webhook inbound + coexistência — Checkpoint 2b)
+
+Sem `db push`. Só `platform-api` (build da API).
+
+Fase 2b do porte dos conectores: entra o **inbound da YCloud** e a coexistência de histórico compartilhado.
+
+- `whatsapp-ycloud-webhook.controller.ts` — rota pública `POST /api/webhooks/whatsapp/ycloud`. Resolve a conexão dona validando a assinatura `YCloud-Signature` (HMAC-SHA256 sobre `t.corpo`, conforme doc oficial) contra o `webhook_secret` de cada conexão `whatsapp-ycloud` no Cofre.
+- `whatsapp-ycloud-inbound.service.ts` — normaliza os eventos (`whatsapp.inbound_message.received`, `whatsapp.message.updated` e os de histórico `whatsapp.business_app.sync_history_message`/`sent_message_sync`) e persiste na MESMA inbox (`comm_whatsapp_chats`/`messages`), reaproveitando o `WhatsappChatsRepository`. Mensagem viva do cliente publica `whatsapp.inbound.message` (dispara IA/automação); **histórico compartilhado entra na conversa mas NUNCA dispara automação** (coexistência).
+- `verifyYCloudSignature` adicionado ao `ycloud.client.ts`; controller + serviço registrados no `comm.module.ts`.
+
+Sem alteração de schema: o marcador de "histórico" é decisão de roteamento (não publica o evento), não coluna. Uma ressalva honesta: a doc diverge no ponto final do payload assinado — a verificação aceita as duas formas até confirmarmos contra um evento real.
+
 ## v0.10.57 - 2026-09-08 (Conector YCloud: correção do template.language conforme doc oficial)
 
 Sem `db push`. Só `platform-api` (build da API).

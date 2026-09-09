@@ -8,6 +8,7 @@
 // Escopo deste arquivo (Checkpoint 2a — outbound): enviar texto/midia/template
 // e subir midia. O inbound (webhook + verificacao de assinatura) entra no
 // Checkpoint 2b.
+import { createHmac } from 'crypto';
 import { RichMessage, TemplateVariables } from './whatsapp.types';
 
 export const YCLOUD_API_BASE = 'https://api.ycloud.com/v2';
@@ -183,4 +184,41 @@ export async function uploadYCloudMedia(
   const id = (data['id'] ?? data['mediaId']) as string | undefined;
   if (!id) throw new Error('YCloud (subir mídia): resposta sem identificador da mídia.');
   return { media_id: id };
+}
+
+
+// ─── Verificação de assinatura do webhook (Checkpoint 2b) ───────────────────
+//
+// Header `YCloud-Signature: t=<unix_seconds>,s=<hex>`. HMAC-SHA256 (hex) do
+// segredo do webhook sobre `{timestamp}.{corpo_cru}`. A doc oficial diverge no
+// ponto final (uma página usa `{t}.{body}.`, o exemplo de código usa sem ponto):
+// aceitamos as duas formas até confirmar contra um evento real. Comparação em
+// tempo constante.
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+export function verifyYCloudSignature(
+  rawBody: Buffer | string,
+  signatureHeader: string | undefined,
+  secret: string | null,
+): boolean {
+  if (!secret || !signatureHeader) return false;
+  const parts: Record<string, string> = {};
+  for (const kv of signatureHeader.split(',')) {
+    const i = kv.indexOf('=');
+    if (i > 0) parts[kv.slice(0, i).trim()] = kv.slice(i + 1).trim();
+  }
+  const t = parts['t'];
+  const s = parts['s'];
+  if (!t || !s) return false;
+  const body = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
+  for (const payload of [`${t}.${body}`, `${t}.${body}.`]) {
+    const expected = createHmac('sha256', secret).update(payload).digest('hex');
+    if (timingSafeEqualHex(expected, s)) return true;
+  }
+  return false;
 }

@@ -16,6 +16,8 @@ import { WhatsappSmartSendService } from './whatsapp/whatsapp-smart-send.service
 import { WhatsappTemplatesService } from './whatsapp/whatsapp-templates.service';
 import { WhatsappSyncService } from './whatsapp/whatsapp-sync.service';
 import { WhatsappWebhookController } from './whatsapp/whatsapp-webhook.controller';
+import { WhatsappYcloudWebhookController } from './whatsapp/whatsapp-ycloud-webhook.controller';
+import { WhatsappYcloudInboundService } from './whatsapp/whatsapp-ycloud-inbound.service';
 import { WhatsappInboxController } from './whatsapp/whatsapp-inbox.controller';
 import { WhatsappTemplatesController } from './whatsapp/whatsapp-templates.controller';
 import { WhatsappNumbersController } from './whatsapp/whatsapp-numbers.controller';
@@ -33,6 +35,7 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
   imports: [IntegrationModule, LicensingModule],
   controllers: [
     WhatsappWebhookController,
+    WhatsappYcloudWebhookController,
     WhatsappInboxController,
     WhatsappTemplatesController,
     WhatsappNumbersController,
@@ -46,6 +49,7 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
     WhatsappOrchestratorService,
     EmailOrchestratorService,
     WhatsappInboundService,
+    WhatsappYcloudInboundService,
     WhatsappInboxService,
     WhatsappSmartSendService,
     WhatsappTemplatesService,
