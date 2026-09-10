@@ -741,8 +741,9 @@ model WhatsappChat {
   created_at           DateTime         @default(now())
   updated_at           DateTime         @updatedAt
 
-  messages WhatsappMessage[]
-  events   WhatsappChatEvent[]
+  messages             WhatsappMessage[]
+  events               WhatsappChatEvent[]
+  attendance_analyses  AiAttendanceAnalysis[]
 
   @@unique([connection_id, phone])
   @@index([organization_id, environment_id, last_message_at])
@@ -778,6 +779,34 @@ model WhatsappMessage {
   @@index([external_id])
   @@index([organization_id, created_at])
   @@map("comm_whatsapp_messages")
+}
+
+// Análise de atendimento (Checkpoint 1a): uma sugestão de melhoria produzida
+// por IA ao analisar uma conversa, sob pedido explícito de uma pessoa. Genérico
+// — sem viés de vertical. `improvement_target` = AI (ajuste de conhecimento/
+// instrução/automação/resposta da IA) | HUMAN (abordagem/processo da equipe).
+// Uma execução gera várias linhas com o mesmo `analysis_trace_id`.
+model AiAttendanceAnalysis {
+  id                 String    @id @default(uuid())
+  organization_id    String
+  workspace_id       String
+  environment_id     String
+  chat_id            String
+  improvement_target String // 'AI' | 'HUMAN'
+  content            String
+  evidence           String
+  source             String    @default("MANUAL_ANALYSIS")
+  analysis_trace_id  String
+  analyzed_at        DateTime?
+  created_by         String?
+  created_at         DateTime  @default(now())
+
+  chat WhatsappChat @relation(fields: [chat_id], references: [id])
+
+  @@index([organization_id, environment_id, created_at])
+  @@index([chat_id])
+  @@index([analysis_trace_id])
+  @@map("ai_attendance_analyses")
 }
 
 // Trilha de atendimento por conversa (claim/transfer/close/reopen/takeover).

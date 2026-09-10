@@ -95,6 +95,10 @@ export const PERMISSIONS = {
   AI_MCP_READ: 'ai.mcp.read',
   AI_MCP_WRITE: 'ai.mcp.write',
   AI_PROVIDERS_READ: 'ai.providers.read',
+  // Análise de atendimento: diagnóstico de melhorias (IA/equipe) a partir de
+  // uma conversa. READ vê as análises; RUN dispara a análise (gasta IA).
+  AI_ANALYSIS_READ: 'ai.analysis.read',
+  AI_ANALYSIS_RUN: 'ai.analysis.run',
 
   // ─── ISP (Fase 6 — Solução Altarede / Manutenção) ───
   ISP_INCIDENTS_READ: 'isp.incidents.read',
@@ -240,6 +244,8 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       PERMISSIONS.AI_MCP_READ,
       PERMISSIONS.AI_MCP_WRITE,
       PERMISSIONS.AI_PROVIDERS_READ,
+      PERMISSIONS.AI_ANALYSIS_READ,
+      PERMISSIONS.AI_ANALYSIS_RUN,
     ],
   },
   {
@@ -348,6 +354,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.AI_MCP_READ]: 'Ver servidores MCP',
   [PERMISSIONS.AI_MCP_WRITE]: 'Cadastrar/sincronizar servidores MCP',
   [PERMISSIONS.AI_PROVIDERS_READ]: 'Ver provedores e conexões de IA',
+  [PERMISSIONS.AI_ANALYSIS_READ]: 'Ver análises de atendimento',
+  [PERMISSIONS.AI_ANALYSIS_RUN]: 'Analisar conversas com IA',
   [PERMISSIONS.ISP_INCIDENTS_READ]: 'Ver incidentes/manutenções (ISP)',
   [PERMISSIONS.ISP_INCIDENTS_WRITE]: 'Criar/editar incidentes e afetados (ISP)',
   [PERMISSIONS.ISP_INCIDENTS_ACTIVATE]: 'Ativar/encerrar incidentes (ISP)',
@@ -426,6 +434,8 @@ export const SYSTEM_PROFILES: SystemProfileDef[] = [
       PERMISSIONS.AI_TOOLS_READ,
       PERMISSIONS.AI_APPROVALS_READ,
       PERMISSIONS.AI_COSTS_READ,
+      PERMISSIONS.AI_ANALYSIS_READ,
+      PERMISSIONS.AI_ANALYSIS_RUN,
     ],
   },
   {

@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.10.66 - 2026-09-10 (Menu IA Studio: Análise de atendimento — backend — Checkpoint 1a)
+
+**Com `db push`** (adiciona a tabela `ai_attendance_analyses`). Só `platform-api`.
+
+Primeira frente do porte do menu IA Studio (genérica, sem viés de vertical): backend da **Análise de atendimento** — sob pedido explícito de uma pessoa, a IA lê uma conversa e propõe melhorias, cada uma marcada como **IA** (conhecimento/instrução/automação/resposta da IA) ou **equipe** (abordagem/processo humano). Não envia nada ao cliente nem altera o atendimento.
+
+- **Modelo `AiAttendanceAnalysis`** (`ai_attendance_analyses`), multi-tenant (organization/workspace/environment), ligado à conversa. Uma execução grava várias linhas com o mesmo `analysis_trace_id`.
+- **Endpoints** `@Controller('ai/attendance-analysis')`: `GET` (lista, `ai.analysis.read`) e `POST analyze-chat` (dispara, `ai.analysis.run`).
+- **Diferença de arquitetura vs. Aquapark:** lá o LLM era `openai/gpt-5.5` fixo; aqui resolvemos uma **Conexão de IA** pelo Orchestrator (Provider Registry + Cofre) e passamos pelo `LlmProviderService`. O modelo vem da conexão (`config.default_model`/`model`) ou de um default por tipo de provedor — sem acoplar a um provedor. Gate de orçamento e registro de custo reaproveitados (`CostsService`).
+- **Permissões** novas `ai.analysis.read` / `ai.analysis.run` (grupo IA, rótulos, perfil Operador de IA; Administrador herda por `ALL_PERMISSIONS`).
+- Prompt de análise trata o histórico como **dado não confiável** (não segue instruções embutidas); mapeia os remetentes do IA Studio (`bot`=IA, `user:<id>`=equipe, `contact`=cliente).
+
+A tela (menu IA Studio › Análise de atendimento) entra no Checkpoint 1b (front). Requer ao menos uma conexão de IA ativa para rodar a análise.
+
 ## v0.10.65 - 2026-09-10 (Coexistência: modo manual na conversa — Checkpoint 5b)
 
 Sem `db push`. Só `platform-admin` (build do painel). Consome os endpoints da v0.10.63.

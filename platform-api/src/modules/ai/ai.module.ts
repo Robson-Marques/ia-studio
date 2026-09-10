@@ -69,6 +69,11 @@ import { AgentRunnerService } from './agents/agent-runner.service';
 import { PromptSecurityService } from './agents/prompt-security.service';
 import { AgentsController } from './agents/agents.controller';
 
+// Análise de atendimento (Checkpoint 1a)
+import { AttendanceAnalysisRepository } from './analysis/attendance-analysis.repository';
+import { AttendanceAnalysisService } from './analysis/attendance-analysis.service';
+import { AttendanceAnalysisController } from './analysis/attendance-analysis.controller';
+
 // Nodes (integra com a Automacao)
 import { AgentNodes } from './nodes/agent.nodes';
 
@@ -87,6 +92,7 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     CollaborationController,
     McpController,
     AgentsController,
+    AttendanceAnalysisController,
   ],
   providers: [
     // Providers LLM
@@ -130,6 +136,9 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     AgentsService,
     AgentRunnerService,
     PromptSecurityService,
+    // Análise de atendimento
+    AttendanceAnalysisRepository,
+    AttendanceAnalysisService,
     // Nodes
     AgentNodes,
     // Seed
