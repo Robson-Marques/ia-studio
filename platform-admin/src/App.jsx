@@ -57,6 +57,7 @@ import Aprovacoes from './pages/IA/Aprovacoes';
 import AprovacaoDetalhe from './pages/IA/AprovacaoDetalhe';
 import AprovacaoPoliticaEditor from './pages/IA/AprovacaoPoliticaEditor';
 import Custos from './pages/IA/Custos';
+import AnaliseAtendimento from './pages/IA/AnaliseAtendimento';
 import Incidentes from './pages/ISP/Incidentes';
 import IncidenteEditor from './pages/ISP/IncidenteEditor';
 import AberturaChamado from './pages/ISP/AberturaChamado';
@@ -164,6 +165,7 @@ export default function App() {
                 <Route path="/ia/aprovacoes/politicas/nova" element={<PermissionRoute perm="ai.approvals.decide"><AprovacaoPoliticaEditor /></PermissionRoute>} />
                 <Route path="/ia/aprovacoes/:id" element={<PermissionRoute perm="ai.approvals.read"><AprovacaoDetalhe /></PermissionRoute>} />
                 <Route path="/ia/custos" element={<PermissionRoute perm="ai.costs.read"><Custos /></PermissionRoute>} />
+                <Route path="/ia/analise" element={<PermissionRoute perm="ai.analysis.read"><AnaliseAtendimento /></PermissionRoute>} />
                 <Route path="/isp/incidentes" element={<PermissionRoute perm="isp.incidents.read"><Incidentes /></PermissionRoute>} />
                 <Route path="/isp/incidentes/novo" element={<PermissionRoute perm="isp.incidents.write"><IncidenteEditor /></PermissionRoute>} />
                 {/* `read`: a aba Afetados e as ações de ativar/disparar têm gate

@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.67 - 2026-09-10 (Menu IA Studio: Análise de atendimento — tela — Checkpoint 1b)
+
+Sem `db push`. Só `platform-admin` (build do painel). Consome os endpoints da v0.10.66.
+
+Fecha o Checkpoint 1: a **Análise de atendimento** ganha tela no menu **IA Studio**.
+
+- **Nova entrada de menu** "Análise de atendimento" (`/ia/analise`), entre Pendências e Custos, visível com `ai.analysis.read`.
+- **Tela** (`pages/IA/AnaliseAtendimento`): lista as análises agrupadas por execução (cada sugestão marcada como **Melhoria da IA** ou **Melhoria da equipe**, com o sinal observado). Botão **Analisar conversa** (só com `ai.analysis.run`) abre um seletor de conversa e dispara a análise; ao concluir, recarrega. Filtra pelo ambiente ativo.
+- `services/ai.js` — `listAttendanceAnalyses` e `analyzeAttendanceChat`.
+- Construída só com componentes que este DS exporta (Card, Badge, Button, EmptyState, Spinner, Modal, Field, Select) — cabeçalho montado com tokens `--su-*`, sem cor fixa.
+
+Para a análise rodar de verdade, é preciso ao menos uma **conexão de IA ativa** em Integrações › Conexões. Fecha a frente 1 do porte do menu IA Studio; próximo checkpoint: Ajustes › Ações da IA.
+
 ## v0.10.66 - 2026-09-10 (Menu IA Studio: Análise de atendimento — backend — Checkpoint 1a)
 
 **Com `db push`** (adiciona a tabela `ai_attendance_analyses`). Só `platform-api`.

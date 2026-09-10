@@ -307,3 +307,21 @@ export async function createCollaboration(body) {
     return data;
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao criar colaboração')); }
 }
+
+// ─── Análise de atendimento ──────────────────────────────────
+
+// Lista as análises (uma linha por sugestão; a tela agrupa por trace).
+export async function listAttendanceAnalyses(params = {}) {
+  try {
+    const { data } = await api.get('/ai/attendance-analysis', { params });
+    return Array.isArray(data) ? data : [];
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar análises de atendimento')); }
+}
+
+// Dispara a análise de uma conversa. Gasta IA; só quem tem ai.analysis.run.
+export async function analyzeAttendanceChat(chatId) {
+  try {
+    const { data } = await api.post('/ai/attendance-analysis/analyze-chat', { chat_id: chatId });
+    return data; // { trace_id, chat_id, contact_name, suggestions }
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao analisar a conversa')); }
+}
