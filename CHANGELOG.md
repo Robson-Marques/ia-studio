@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.10.64 - 2026-09-10 (Baileys: aba de Pareamento (QR) na conexão — Checkpoint 5a)
+
+Sem `db push`. Só `platform-admin` (build do painel).
+
+Primeira frente de UI da coexistência: a conexão Baileys agora se pareia pela própria tela de detalhe, em **Integrações › Conexões** (o único ponto que mantivemos do nosso desenho — nada de tela dedicada de WhatsApp Conexões).
+
+- **Aba "Pareamento"** em `ConexaoDetalhe` — aparece **só** para `whatsapp-baileys-internal` e `whatsapp-baileys-manual`, e só para quem pode escrever conexão (o endpoint exige `integrations.connections.write`). Fica logo após "Dados".
+- **QR ao vivo:** consulta `GET /comm/whatsapp/baileys/connections/:id/pairing-qr` a cada ~4s enquanto a aba está aberta (o QR expira rápido; para de consultar ao sair da aba). Mostra o código sobre fundo branco (contraste que a câmera exige), estado do socket como `Badge` semântico (`disconnected`/`connecting`/`qr_pending`/`connected`/`error`) e a instrução de escanear.
+- **Ações:** `Reconectar` (religa uma sessão já pareada, sem QR novo) e `Reiniciar pareamento` (descarta a sessão e gera QR do zero — trocar de número).
+- `services/whatsappBaileys.js` — novo cliente (`getBaileysPairingQr`, `reconnectBaileys`, `restartBaileysPairing`).
+- Corrige de passagem o `import` do `Spinner` no `ConexaoDetalhe` (já era usado nas abas Recursos/Histórico sem estar importado).
+
+Próxima frente: o botão de **modo manual** na janela da conversa (liga/desliga o canal Baileys de coexistência), consumindo os endpoints da v0.10.63.
+
 ## v0.10.63 - 2026-09-10 (Baileys manual: coexistência no envio — Checkpoint 4b)
 
 Sem `db push` (o campo já veio na v0.10.62). `platform-api`.
