@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.65 - 2026-09-10 (Coexistência: modo manual na conversa — Checkpoint 5b)
+
+Sem `db push`. Só `platform-admin` (build do painel). Consome os endpoints da v0.10.63.
+
+Fecha a coexistência pela UI: a conversa pode ser passada para um número Baileys direto da janela de atendimento, e a barra de resposta se adapta ao canal.
+
+- **Botão "Modo manual"** no cabeçalho da conversa (`ChatWindow`) — aparece quando há canal Baileys manual elegível (ativo e vinculado à conexão oficial desta conversa). Um canal: liga direto; mais de um: abre um seletor. Ligado, vira **"Voltar ao oficial"** e um `Badge` "Modo manual" acompanha a situação.
+- **Aviso na conversa:** enquanto em modo manual, uma faixa deixa claro que IA, automações e modelos ficam de fora e que o envio sai pelo número Baileys (sem janela de 24h).
+- **Barra de resposta ciente do canal** (`MessageComposer`): no modo manual não há janela de 24h (o atendente escreve sempre), e somem o modelo, o anexo do aparelho e o áudio gravado — o backend recusa esses no canal manual. Texto e mídia por endereço público continuam.
+- `services/whatsapp.js` — `listManualChannels` e `setManualChannel` (liga/desliga).
+
+Fecha a Fase 5 (UI da coexistência). Com a aba de Pareamento (v0.10.64) e o modo manual, dá para parear um número Baileys e responder por ele numa conversa oficial, ponta a ponta.
+
 ## v0.10.64 - 2026-09-10 (Baileys: aba de Pareamento (QR) na conexão — Checkpoint 5a)
 
 Sem `db push`. Só `platform-admin` (build do painel).
