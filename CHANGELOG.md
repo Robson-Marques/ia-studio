@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.63 - 2026-09-10 (Baileys manual: coexistência no envio — Checkpoint 4b)
+
+Sem `db push` (o campo já veio na v0.10.62). `platform-api`.
+
+Ativa a coexistência no fluxo de envio: a conversa pode ficar em **modo manual** (respondida por um número Baileys), e nesse modo IA/automações/modelos ficam de fora.
+
+- **Guarda automática:** `WhatsappOrchestratorService.send()` (por onde passam IA, relacionamento e cobrança) recusa (`409`) quando a conversa está em modo manual. O envio humano não passa por aqui, então não é afetado.
+- **Roteamento humano:** `WhatsappInboxService.deliver()` — se a conversa está em modo manual, a resposta do atendente sai pelo canal Baileys manual (sem janela de 24h, sem Meta) e é registrada na mesma conversa (origem oficial preservada). Modelo (template) é bloqueado no canal manual; mídia gravada no aparelho também (envie por link).
+- **Registry:** `sendViaBaileysConnection` (envio por um canal Baileys específico).
+- **Endpoints:** `POST /comm/whatsapp/chats/:id/manual-channel` (liga/desliga, validando que o canal é `whatsapp-baileys-manual` e que o vínculo bate com a conexão oficial da conversa) e `GET .../manual-channels` (lista os elegíveis).
+
+Fecha a Fase 4 (coexistência backend). A UI (botão de modo manual na conversa, tela de conexões com QR) é a próxima frente — front, com `studio-ux-adoption`.
+
 ## v0.10.62 - 2026-09-10 (Baileys manual: fundação — provider + vínculo — Checkpoint 4a)
 
 **Com `db push`** (adiciona `manual_connection_id` em `comm_whatsapp_chats`). `platform-api`.

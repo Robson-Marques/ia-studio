@@ -11,6 +11,7 @@ import { ConnectionsRepository } from '../../integration/connections/connections
 import { WhatsappBaileysSessionRepository } from './whatsapp-baileys-session.repository';
 import { WhatsappBaileysRuntime } from './connectors/whatsapp-baileys.runtime';
 import { BAILEYS_PROVIDER_KEYS, WhatsappProviderKey } from './connectors/connector.types';
+import { RichMessage } from '../../../shared/integration/whatsapp.types';
 
 export interface BaileysScope {
   organizationId: string;
@@ -142,6 +143,30 @@ export class WhatsappBaileysRegistryService implements OnApplicationBootstrap, O
     if (!active) throw new BadRequestException('Nenhum número interno (Baileys) ativo configurado.');
     const runtime = await this.ensureStarted(active);
     const result = await runtime.sendRich(active.id, to, { kind: 'text', body: text });
+    return { providerMessageId: result.providerMessageId };
+  }
+
+  /**
+   * Envia por um canal Baileys específico (usado pela inbox no modo manual).
+   * `connectionId` deve ser uma conexão Baileys (interno ou manual) da org.
+   */
+  async sendViaBaileysConnection(
+    organizationId: string,
+    connectionId: string,
+    to: string,
+    message: RichMessage,
+  ): Promise<{ providerMessageId: string | null }> {
+    const connection = await this.connections.findById(connectionId);
+    if (
+      !connection ||
+      connection.organization_id !== organizationId ||
+      !BAILEYS_PROVIDER_KEYS.includes(connection.provider_key as WhatsappProviderKey)
+    ) {
+      throw new NotFoundException('Canal Baileys não encontrado.');
+    }
+    if (!connection.is_active) throw new BadRequestException('Canal Baileys inativo.');
+    const runtime = await this.ensureStarted(connection);
+    const result = await runtime.sendRich(connection.id, to, message);
     return { providerMessageId: result.providerMessageId };
   }
 }
