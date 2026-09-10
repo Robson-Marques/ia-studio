@@ -709,6 +709,10 @@ model WhatsappChat {
   workspace_id         String
   environment_id       String
   connection_id        String
+  // Canal manual (baileys_manual) escolhido para escrita manual. Mantém a
+  // origem oficial (connection_id) intacta. Coexistência: enquanto setado,
+  // IA, modelos e automações NÃO podem usar esta conversa. FK solta.
+  manual_connection_id String?
   phone                String
   contact_name         String?
   last_message         String?
@@ -744,6 +748,7 @@ model WhatsappChat {
   @@index([organization_id, environment_id, last_message_at])
   @@index([organization_id, attendance_status])
   @@index([organization_id, current_handler_id])
+  @@index([manual_connection_id])
   @@map("comm_whatsapp_chats")
 }
 
