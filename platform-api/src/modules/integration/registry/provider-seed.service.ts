@@ -20,6 +20,8 @@ import { SmtpProvider } from './providers/smtp.provider';
 import { S3Provider } from './providers/s3.provider';
 import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
 import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
+import { WhatsappBaileysInternalProvider } from './providers/whatsapp-baileys-internal.provider';
+import { WhatsappBaileysManualProvider } from './providers/whatsapp-baileys-manual.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 
 // Providers cuja definicao deve ser atualizada no boot (ganhou implementacao).
@@ -44,12 +46,14 @@ export class ProviderSeedService implements OnApplicationBootstrap {
     private readonly s3: S3Provider,
     private readonly whatsappMeta: WhatsappMetaProvider,
     private readonly whatsappYcloud: WhatsappYcloudProvider,
+    private readonly whatsappBaileysInternal: WhatsappBaileysInternalProvider,
+    private readonly whatsappBaileysManual: WhatsappBaileysManualProvider,
     private readonly googleWorkspace: GoogleWorkspaceProvider,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     // 1) Registro em memoria das implementacoes (diretriz 2).
-    for (const provider of [this.altarede, this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.googleWorkspace]) {
+    for (const provider of [this.altarede, this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.whatsappBaileysInternal, this.whatsappBaileysManual, this.googleWorkspace]) {
       this.registry.register(provider);
     }
 

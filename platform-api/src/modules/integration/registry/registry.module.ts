@@ -13,6 +13,8 @@ import { SmtpProvider } from './providers/smtp.provider';
 import { S3Provider } from './providers/s3.provider';
 import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
 import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
+import { WhatsappBaileysInternalProvider } from './providers/whatsapp-baileys-internal.provider';
+import { WhatsappBaileysManualProvider } from './providers/whatsapp-baileys-manual.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 
 @Module({
@@ -30,6 +32,8 @@ import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
     S3Provider,
     WhatsappMetaProvider,
     WhatsappYcloudProvider,
+    WhatsappBaileysInternalProvider,
+    WhatsappBaileysManualProvider,
     GoogleWorkspaceProvider,
   ],
   // GoogleWorkspaceProvider exportado: o OAuth controller monta a URL de

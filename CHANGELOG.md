@@ -1,5 +1,32 @@
 # Changelog — IA Studio
 
+## v0.10.62 - 2026-09-10 (Baileys manual: fundação — provider + vínculo — Checkpoint 4a)
+
+**Com `db push`** (adiciona `manual_connection_id` em `comm_whatsapp_chats`). `platform-api`.
+
+Fundação do canal **manual** (coexistência). Cria o tipo de conexão e o campo do vínculo; o comportamento no fluxo de envio (bloquear IA/automação/modelos e rotear o envio humano) entra no Checkpoint 4b.
+
+- **Schema:** `WhatsappChat.manual_connection_id` (FK solta para a conexão `whatsapp-baileys-manual` escolhida). A origem oficial (`connection_id`) fica intacta; enquanto o manual está setado, IA/modelos/automações não podem usar a conversa (guarda no 4b).
+- `providers/whatsapp-baileys-manual.provider.ts` — provider no Registry (`whatsapp-baileys-manual`) com o campo `official_connection_id` (conexão oficial que este canal acompanha). Fino como o interno; `health` reflete o pareamento. Reaproveita o runtime e o registry Baileys (a fase 3b já cobre os dois `provider_key`).
+- Registrado em `registry.module.ts` e `provider-seed.service.ts`.
+
+Requer `baileys`/`qrcode` no servidor (deps da v0.10.59) para parear. Build e boot seguem seguros sem parear (import blindado; boot só sobe socket de conexão com sessão salva).
+
+## v0.10.61 - 2026-09-10 (Baileys internal: ativação — provider + registry + QR — Checkpoint 3b)
+
+Sem `db push`. Só `platform-api` (build da API). **Requer o `baileys`/`qrcode` instalados no servidor** (deps da v0.10.59).
+
+Ativa o conector Baileys interno (o runtime da v0.10.59 deixa de ser inerte).
+
+- `providers/whatsapp-baileys-internal.provider.ts` — provider no Registry (`whatsapp-baileys-internal`), fino de propósito (sem ciclo de módulo). Aparece no marketplace/wizard; `health` diz a verdade do pareamento lendo a `WhatsappBaileysSession`.
+- `whatsapp-baileys-registry.service.ts` — Map de runtimes por conexão, religa os pareados no boot (só os que têm sessão salva), e expõe QR/reconectar/reparear + `sendInternalNotification` (avisos internos por texto).
+- `whatsapp-baileys.controller.ts` — `GET/POST /comm/whatsapp/baileys/connections/:id/{pairing-qr,reconnect,restart-pairing}` (perm `integrations.connections.write`).
+- Registrado no `registry.module.ts`, `provider-seed.service.ts` e `comm.module.ts` (+ `WhatsappBaileysSessionRepository` no DI).
+
+Como criar: em Integrações › Conexões, novo tipo "WhatsApp interno (Baileys)", salvar, abrir e ler o QR num número dedicado a avisos internos (não recebe conversas). O envio interno (`sendInternalNotification`) fica exposto para os módulos de notificação usarem — o gancho de quem chama entra numa integração posterior.
+
+Fecha a Fase 3 (interno). O Baileys **manual** + o vínculo de coexistência é a Fase 4.
+
 ## v0.10.60 - 2026-09-09 (Correção de build: media (Json) no inbound YCloud + blindagem do import Baileys)
 
 Sem `db push`. Só `platform-api` (build da API).
