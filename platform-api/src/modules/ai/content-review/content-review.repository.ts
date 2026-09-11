@@ -50,6 +50,12 @@ export class ContentReviewRepository {
     });
   }
 
+  findReview(organizationId: string, agentId: string, reviewId: string) {
+    return this.prisma.aiAgentContentReview.findFirst({
+      where: { id: reviewId, agent_id: agentId, organization_id: organizationId },
+    });
+  }
+
   // Documentos prontos (texto extraído) das bases indicadas, só de bases ativas
   // e da própria organização. O rótulo do documento sai do source_ref/type.
   async listReadyDocuments(organizationId: string, baseIds: string[]): Promise<ContentReviewSource[]> {

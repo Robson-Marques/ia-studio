@@ -77,6 +77,7 @@ import { AttendanceAnalysisController } from './analysis/attendance-analysis.con
 // Revisão de conteúdo do assistente (diffs de Assistentes)
 import { ContentReviewRepository } from './content-review/content-review.repository';
 import { ContentReviewService } from './content-review/content-review.service';
+import { ContentReviewExportService } from './content-review/content-review-export.service';
 import { ContentReviewController } from './content-review/content-review.controller';
 
 // Nodes (integra com a Automacao)
@@ -148,6 +149,7 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     // Revisão de conteúdo do assistente
     ContentReviewRepository,
     ContentReviewService,
+    ContentReviewExportService,
     // Nodes
     AgentNodes,
     // Seed

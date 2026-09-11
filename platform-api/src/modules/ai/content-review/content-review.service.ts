@@ -14,6 +14,7 @@ import {
 import { AiOrchestratorService } from '../orchestrator/ai-orchestrator.service';
 import { LlmProviderService, ResolvedLlmConnection } from '../providers/llm-provider.service';
 import { CostsService } from '../costs/costs.service';
+import { ContentReviewExportService, ContentReviewExportFormat } from './content-review-export.service';
 
 const REVIEW_TEMPERATURE = 0.1;
 const REVIEW_MAX_TOKENS = 5_000;
@@ -37,12 +38,30 @@ export class ContentReviewService {
     private readonly orchestrator: AiOrchestratorService,
     private readonly llm: LlmProviderService,
     private readonly costs: CostsService,
+    private readonly exporter: ContentReviewExportService,
   ) {}
 
   async list(organizationId: string, agentId: string) {
     const agent = await this.repository.findAgent(organizationId, agentId);
     if (!agent) throw new NotFoundException('Assistente não encontrado.');
     return this.repository.listReviews(organizationId, agentId);
+  }
+
+  // Exporta uma revisão já produzida (PDF/TXT). Não reexecuta a IA.
+  async export(organizationId: string, agentId: string, reviewId: string, format: ContentReviewExportFormat) {
+    const agent = await this.repository.findAgent(organizationId, agentId);
+    if (!agent) throw new NotFoundException('Assistente não encontrado.');
+    const review = await this.repository.findReview(organizationId, agentId, reviewId);
+    if (!review) throw new NotFoundException('Revisão não encontrada para este assistente.');
+    return this.exporter.build({
+      agentName: agent.name,
+      status: review.status,
+      createdAt: review.created_at,
+      finishedAt: review.finished_at,
+      error: review.error,
+      result: review.result_json,
+      sources: review.source_snapshot,
+    }, format);
   }
 
   async review(organizationId: string, agentId: string, actor?: ReviewActor) {

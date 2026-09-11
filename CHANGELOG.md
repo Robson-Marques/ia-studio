@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.71 - 2026-09-11 (Assistentes: export da revisão de conteúdo — backend)
+
+Sem `db push`. **Nova dependência `pdf-lib`** no `platform-api` (o painel roda `npm install` antes do build). Só `platform-api`.
+
+Backend do export da revisão de conteúdo — gera o parecer já produzido em **PDF ou TXT**, sem reexecutar a IA.
+
+- **Endpoint** `GET ai/agents/:id/content-reviews/:reviewId/export?format=pdf|txt` (`ai.agents.read`), devolve o arquivo (Content-Type + Content-Disposition).
+- `content-review-export.service.ts` — porte do Aquapark com `pdf-lib` (JS puro, sem headless), adaptado: sem escopo, usa `document_label`, autoria genérica ("IA Studio").
+- `findReview` no repositório; `export()` no serviço (carrega assistente + revisão e monta o arquivo).
+
+Requer o `pdf-lib` instalado no servidor (vai no `npm install` da Atualização). O botão de baixar na aba Revisão entra na próxima versão (front).
+
 ## v0.10.70 - 2026-09-11 (Assistentes: histórico de execuções na aba Testar)
 
 Sem `db push`. Só `platform-admin` (build do painel). Sem endpoint novo — usa o `GET ai/agents/:id/runs` que já existia.
