@@ -74,6 +74,11 @@ import { AttendanceAnalysisRepository } from './analysis/attendance-analysis.rep
 import { AttendanceAnalysisService } from './analysis/attendance-analysis.service';
 import { AttendanceAnalysisController } from './analysis/attendance-analysis.controller';
 
+// Revisão de conteúdo do assistente (diffs de Assistentes)
+import { ContentReviewRepository } from './content-review/content-review.repository';
+import { ContentReviewService } from './content-review/content-review.service';
+import { ContentReviewController } from './content-review/content-review.controller';
+
 // Nodes (integra com a Automacao)
 import { AgentNodes } from './nodes/agent.nodes';
 
@@ -93,6 +98,7 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     McpController,
     AgentsController,
     AttendanceAnalysisController,
+    ContentReviewController,
   ],
   providers: [
     // Providers LLM
@@ -139,6 +145,9 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     // Análise de atendimento
     AttendanceAnalysisRepository,
     AttendanceAnalysisService,
+    // Revisão de conteúdo do assistente
+    ContentReviewRepository,
+    ContentReviewService,
     // Nodes
     AgentNodes,
     // Seed

@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.68 - 2026-09-11 (Assistentes: revisão de conteúdo — backend — Checkpoint 2a)
+
+**Com `db push`** (adiciona a tabela `ai_agent_content_reviews`). Só `platform-api`.
+
+Primeiro diff genuíno de Assistentes (o resto do menu IA Studio já existe): **revisão de conteúdo** — a IA compara as fontes de conhecimento vinculadas ao assistente e aponta **conflitos, redundâncias, lacunas e riscos de promessa**, com trechos e recomendação. Só leitura das fontes; não conversa nem executa ações.
+
+- **Modelo `AiAgentContentReview`** (`ai_agent_content_reviews`), multi-tenant, ligado ao assistente. `result_json` guarda o resultado estruturado (resumo, status, issues, pontos fortes).
+- **Endpoints** sob `ai/agents`: `GET :id/content-reviews` (histórico, `ai.agents.read`) e `POST :id/content-reviews` (dispara, `ai.agents.write`). Sem perm nova — é operação do assistente.
+- **Adaptação ao nosso modelo (não cópia):** o Aquapark separa fontes em INFO vs BEHAVIOR (escopos KNOWLEDGE/BEHAVIOR/COMPLETE); a nossa base de conhecimento **não tem categoria**, então a revisão é de escopo único (compara os documentos prontos das bases vinculadas ao assistente, exige ≥2). Prompt genérico (sem viés comercial).
+- **Arquitetura:** LLM via Orchestrator + `LlmProviderService` (conexão de IA resolvida, modelo da conexão ou default por tipo) — igual à Análise de atendimento. Gate de orçamento + registro de custo reaproveitados.
+
+A tela (aba/painel de revisão no editor do assistente) e o **export PDF** entram nos próximos sub-checkpoints. Requer conexão de IA ativa e ao menos duas fontes prontas.
+
 ## v0.10.67 - 2026-09-10 (Menu IA Studio: Análise de atendimento — tela — Checkpoint 1b)
 
 Sem `db push`. Só `platform-admin` (build do painel). Consome os endpoints da v0.10.66.

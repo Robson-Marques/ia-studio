@@ -1324,10 +1324,44 @@ model AiAgent {
   runs             AiAgentRun[]
   prompt_versions  AiAgentPromptVersion[]
   collaborations   AiCollaborationRule[]  @relation("PrincipalAgent")
+  content_reviews  AiAgentContentReview[]
 
   @@index([organization_id, workspace_id, environment_id])
   @@index([organization_id, is_active])
   @@map("ai_agents")
+}
+
+// Revisão de conteúdo (Checkpoint diffs de Assistentes): compara por IA as
+// fontes de conhecimento vinculadas ao assistente e aponta conflitos,
+// redundâncias, lacunas e riscos de promessa. Só leitura das fontes — não
+// executa ações nem conversa. Genérico (sem a divisão INFO/BEHAVIOR do Aquapark,
+// que o nosso modelo de base não tem). `result_json` = ContentReviewResult.
+model AiAgentContentReview {
+  id                String    @id @default(uuid())
+  organization_id   String
+  workspace_id      String
+  environment_id    String
+  agent_id          String
+  status            String    @default("PENDING") // PENDING | COMPLETED | FAILED
+  source_snapshot   Json // [{ base_id, base_name, document_id, document_label }]
+  result_json       Json?
+  provider_kind     String?
+  model             String?
+  prompt_tokens     Int?
+  completion_tokens Int?
+  total_tokens      Int?
+  cost_usd          Float?
+  error             String?
+  analysis_trace_id String
+  created_by        String?
+  created_at        DateTime  @default(now())
+  finished_at       DateTime?
+
+  agent AiAgent @relation(fields: [agent_id], references: [id])
+
+  @@index([organization_id, environment_id, created_at])
+  @@index([agent_id])
+  @@map("ai_agent_content_reviews")
 }
 
 // Versao IMUTAVEL do prompt/config do agente (diretriz 3 — estilo git).
