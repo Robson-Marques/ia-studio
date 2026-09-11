@@ -35,6 +35,10 @@ export class WhatsappTemplatesRepository {
     return this.prisma.whatsappTemplate.update({ where: { id }, data });
   }
 
+  delete(id: string): Promise<WhatsappTemplate> {
+    return this.prisma.whatsappTemplate.delete({ where: { id } });
+  }
+
   /** Upsert usado pelo sync (Meta → IA Studio). */
   upsertFromMeta(input: {
     organizationId: string;

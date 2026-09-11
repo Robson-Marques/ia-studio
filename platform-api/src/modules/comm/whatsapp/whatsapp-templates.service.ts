@@ -10,6 +10,7 @@ import { ConnectionsRepository } from '../../integration/connections/connections
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import { MetaTemplate } from '../../../shared/integration/meta-graph.client';
 import { CreateTemplateDto } from '../dto/create-template.dto';
+import { UpdateTemplateDto } from '../dto/update-template.dto';
 
 const META_STATUS_MAP: Record<string, CommTemplateStatus> = {
   APPROVED: 'APPROVED',
@@ -34,6 +35,75 @@ export class WhatsappTemplatesService {
 
   list(organizationId: string, connectionId?: string): Promise<WhatsappTemplate[]> {
     return this.repository.list(organizationId, connectionId);
+  }
+
+  // ─── CRUD local + vínculo a evento (Checkpoint 1) ───
+
+  /** Detalhe de um template (com checagem de dono). */
+  async getById(organizationId: string, id: string): Promise<WhatsappTemplate> {
+    const template = await this.repository.findById(id);
+    if (!template || template.organization_id !== organizationId) {
+      throw new NotFoundException('Template não encontrado.');
+    }
+    return template;
+  }
+
+  /** Edita o conteúdo de um template em rascunho. Publicados se alteram por
+   *  push-edit (checkpoint futuro), nunca em silêncio por baixo da Meta. */
+  async update(organizationId: string, id: string, dto: UpdateTemplateDto): Promise<WhatsappTemplate> {
+    const template = await this.getById(organizationId, id);
+    if (template.status !== 'DRAFT') {
+      throw new BadRequestException('Só rascunhos podem ser editados aqui. Um template já enviado à Meta se altera por "editar publicado" (checkpoint futuro).');
+    }
+    const components = this.buildComponents({
+      ...dto,
+      connection_id: template.connection_id,
+      name: template.name,
+      language: template.language,
+    } as CreateTemplateDto);
+    const updated = await this.repository.update(id, { category: dto.category, components: components as never });
+    await this.audit.record({
+      action: 'comm.whatsapp.template.update',
+      entityType: 'WhatsappTemplate',
+      entityId: id,
+      organizationId,
+      newValue: { category: dto.category },
+    });
+    return updated;
+  }
+
+  /** Exclui o template LOCAL. Bloqueia quando ele ainda vive na Meta (remover de
+   *  lá é o delete-official — checkpoint futuro), para não deixar órfão. */
+  async remove(organizationId: string, id: string): Promise<{ deleted: true }> {
+    const template = await this.getById(organizationId, id);
+    if (template.meta_template_id && ['APPROVED', 'PENDING', 'PAUSED'].includes(template.status)) {
+      throw new BadRequestException('Este template existe na Meta. Remova-o da Meta primeiro (checkpoint futuro) antes de excluí-lo aqui.');
+    }
+    await this.repository.delete(id);
+    await this.audit.record({
+      action: 'comm.whatsapp.template.delete',
+      entityType: 'WhatsappTemplate',
+      entityId: id,
+      organizationId,
+      oldValue: { name: template.name, language: template.language, status: template.status },
+    });
+    return { deleted: true };
+  }
+
+  /** Liga/desliga o vínculo do template a um evento do sistema (docs-as-code).
+   *  É metadado local — vale em qualquer status. event vazio desvincula. */
+  async bindEvent(organizationId: string, id: string, event: string | null): Promise<WhatsappTemplate> {
+    await this.getById(organizationId, id);
+    const normalized = (event ?? '').trim() || null;
+    const updated = await this.repository.update(id, { event: normalized });
+    await this.audit.record({
+      action: 'comm.whatsapp.template.bind',
+      entityType: 'WhatsappTemplate',
+      entityId: id,
+      organizationId,
+      newValue: { event: normalized },
+    });
+    return updated;
   }
 
   // ─── Criacao local + publicacao na Meta ─────────────

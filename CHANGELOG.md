@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.74 - 2026-09-11 (WhatsApp Templates: CRUD + vínculo a evento — Checkpoint 1)
+
+Sem `db push` (o modelo `WhatsappTemplate` já tinha os campos). Só `platform-api`.
+
+Primeiro checkpoint do porte de Templates HSM: fecha o CRUD local do catálogo, que hoje só tinha listar/criar/sincronizar.
+
+- **`GET :id`** — detalhe do template (com dono).
+- **`PUT :id`** — edita o conteúdo de um **rascunho** (categoria + header/body/footer/botões). Templates já enviados à Meta não se editam por aqui (isso é o "editar publicado"/push-edit, checkpoint futuro) — bloqueado com mensagem clara.
+- **`DELETE :id`** — exclui o template local; bloqueia quando ele ainda vive na Meta (removê-lo de lá é o delete-official, checkpoint futuro), para não deixar órfão.
+- **`POST :id/bind`** — liga/desliga o vínculo do template a um evento do sistema (docs-as-code); metadado local, vale em qualquer status.
+
+Sem conteúdo vertical: o mecanismo de vínculo a evento é genérico; nada do seed de cobrança do Aquapark foi trazido. Próximo: importar templates já existentes na Meta.
+
 ## v0.10.73 - 2026-09-11 (WhatsApp/YCloud: correção do envio de mídia — paridade com o Aquapark)
 
 Sem `db push`. Só `platform-api`. Traz para o nosso lado a correção de envio de mídia que o Aquapark aplicou (o nosso porte era anterior a ela).
