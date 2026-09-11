@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.69 - 2026-09-11 (Assistentes: revisão de conteúdo — aba no editor — Checkpoint 2b)
+
+Sem `db push`. Só `platform-admin` (build do painel). Consome os endpoints da v0.10.68.
+
+A revisão de conteúdo ganha lugar no **editor do assistente**.
+
+- **Nova aba "Revisão"** no `AgenteEditor` (entre "O que sabe" e "Testar"), espelhando o padrão da aba Testar (habilita depois de salvar).
+- Botão **Revisar conteúdo** (só com `ai.agents.write`) dispara a comparação das fontes; o resultado aparece com **status** (Coerente / Pontos a conferir), os apontamentos (severidade Crítico/Atenção/Melhoria + tipo Conflito/Redundância/Lacuna/Risco de promessa, com explicação, recomendação e trechos citados) e os pontos fortes.
+- Histórico de revisões anteriores, clicáveis para rever cada resultado.
+- `services/ai.js` — `listContentReviews` e `reviewAgentContent`. Só componentes que o DS exporta; tokens `--su-*`, sem cor fixa.
+
+Fecha a frente de Assistentes do porte do menu IA Studio (revisão de conteúdo, backend + UI). O **export PDF** da revisão fica como sub-checkpoint opcional. Requer conexão de IA ativa e ao menos duas fontes prontas no assistente.
+
 ## v0.10.68 - 2026-09-11 (Assistentes: revisão de conteúdo — backend — Checkpoint 2a)
 
 **Com `db push`** (adiciona a tabela `ai_agent_content_reviews`). Só `platform-api`.

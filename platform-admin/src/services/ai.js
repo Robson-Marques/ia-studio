@@ -325,3 +325,21 @@ export async function analyzeAttendanceChat(chatId) {
     return data; // { trace_id, chat_id, contact_name, suggestions }
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao analisar a conversa')); }
 }
+
+// ─── Revisão de conteúdo do assistente ───────────────────────
+
+// Histórico de revisões de um assistente (cada uma com result_json).
+export async function listContentReviews(agentId) {
+  try {
+    const { data } = await api.get(`/ai/agents/${agentId}/content-reviews`);
+    return Array.isArray(data) ? data : [];
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar revisões de conteúdo')); }
+}
+
+// Dispara a revisão: compara as fontes do assistente. Gasta IA; ai.agents.write.
+export async function reviewAgentContent(agentId) {
+  try {
+    const { data } = await api.post(`/ai/agents/${agentId}/content-reviews`);
+    return data; // a revisão criada (status/result_json/...)
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao revisar o conteúdo do assistente')); }
+}

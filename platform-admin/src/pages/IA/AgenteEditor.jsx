@@ -15,6 +15,7 @@ import {
 } from './ia.constants';
 import { statusToTone } from '../../lib/tone';
 import AgentVersionsModal from './editor/AgentVersionsModal';
+import ContentReviewTab from './editor/ContentReviewTab';
 
 // IA/AgenteEditor — editor de assistente (v0.9.90).
 //
@@ -48,6 +49,7 @@ const TABS = [
   { id: 'quem',   label: 'Quem é' },
   { id: 'faz',    label: 'O que faz' },
   { id: 'sabe',   label: 'O que sabe' },
+  { id: 'revisao', label: 'Revisão' },
   { id: 'testar', label: 'Testar' },
 ];
 
@@ -618,6 +620,8 @@ export default function AgenteEditor() {
           </div>
         </Card>
       )}
+
+      {tab === 'revisao' && <ContentReviewTab agentId={savedId} canReview={canWrite} />}
 
       {tab === 'testar' && <TestTab agentId={savedId} canExecute={canExecute} />}
 
