@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.10.73 - 2026-09-11 (WhatsApp/YCloud: correção do envio de mídia — paridade com o Aquapark)
+
+Sem `db push`. Só `platform-api`. Traz para o nosso lado a correção de envio de mídia que o Aquapark aplicou (o nosso porte era anterior a ela).
+
+- **Nome de arquivo com extensão** no upload à YCloud (`uploadYCloudMedia`): o nome enviado passa a ter extensão coerente com o mime (mapa mime→extensão). Sem isso, mídia sem nome/extensão — o caso clássico é **áudio gravado no navegador** — era recusada pelo WhatsApp.
+- **Motivo de erro mais útil** da YCloud: extrai a razão real de `error.message` e, quando é a Meta que recusa, de `error.whatsappApiError.message` (é aí que vem o "porquê" da recusa da mídia); mensagem amigável no 400.
+
+Revisão de paridade: o resto do caminho de mídia do nosso conector (upload via `fetch`+`Blob`, que já manda o tamanho do corpo) estava alinhado — a lacuna real era o nome do arquivo.
+
 ## v0.10.72 - 2026-09-11 (Assistentes: botão de baixar a revisão — front)
 
 Sem `db push`. Só `platform-admin` (build do painel). Consome o endpoint da v0.10.71.

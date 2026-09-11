@@ -19,12 +19,6 @@ function toPlus(phone: string): string {
   return digits ? `+${digits}` : '';
 }
 
-interface YCloudError {
-  message?: string;
-  error?: string;
-  code?: string | number;
-}
-
 async function ycloudFetch(
   apiKey: string,
   path: string,
@@ -50,11 +44,26 @@ async function ycloudFetch(
     }
   }
   if (!response.ok) {
-    const err = data as YCloudError;
-    const reason = err.message ?? err.error ?? `HTTP ${response.status}`;
-    throw new Error(`YCloud (${context}): ${reason}`);
+    throw new Error(`YCloud (${context}): ${ycloudReason(data, response.status)}`);
   }
   return data;
+}
+
+// Extrai a razão mais útil do corpo de erro da YCloud. Ela aninha o motivo real
+// da recusa em `error.message` e, quando é a Meta que recusa, em
+// `error.whatsappApiError.message` — é aí que vem "por que" a mídia foi negada.
+function ycloudReason(data: Record<string, unknown>, status: number): string {
+  const errRaw = data['error'];
+  if (typeof errRaw === 'string' && errRaw.trim()) return errRaw.trim();
+  const errObj = errRaw && typeof errRaw === 'object' ? (errRaw as Record<string, unknown>) : undefined;
+  const waErr = errObj && typeof errObj['whatsappApiError'] === 'object' && errObj['whatsappApiError']
+    ? (errObj['whatsappApiError'] as Record<string, unknown>)
+    : undefined;
+  const candidates = [data['message'], data['detail'], data['error_description'], errObj?.['message'], waErr?.['message']];
+  const found = candidates.find((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  if (found) return found;
+  if (status === 400) return 'A YCloud recusou a requisição. Confira o formato e o tamanho da mídia (ou os campos enviados).';
+  return `HTTP ${status}`;
 }
 
 /** Health leve: confirma que a chave autentica (lista de numeros da conta). */
@@ -166,6 +175,27 @@ export async function sendYCloudMessage(
   return { id };
 }
 
+// Extensão do arquivo por mime — o nome enviado à YCloud PRECISA ter extensão
+// que bata com o formato, senão o WhatsApp recusa a mídia (o caso clássico é
+// áudio gravado no navegador, que chega sem nome/extensão).
+const EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+  'audio/aac': 'aac', 'audio/amr': 'amr', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a',
+  'audio/ogg': 'ogg', 'audio/opus': 'ogg', 'audio/webm': 'webm', 'audio/wav': 'wav',
+  'video/mp4': 'mp4', 'video/3gpp': '3gp', 'video/webm': 'webm',
+  'application/pdf': 'pdf',
+};
+
+// Garante um nome de arquivo com extensão coerente com o mime.
+function filenameForMedia(filename: string | undefined, mime: string): string {
+  const normalized = String(mime ?? '').split(';')[0].trim().toLowerCase();
+  const ext = EXT_BY_MIME[normalized];
+  const base = String(filename ?? '').trim();
+  if (base && /\.[a-z0-9]{2,4}$/i.test(base)) return base; // já tem extensão
+  if (base && ext) return `${base}.${ext}`;
+  return `midia.${ext ?? 'bin'}`;
+}
+
 /** Sobe uma mídia para a YCloud (multipart) e devolve o media id. */
 export async function uploadYCloudMedia(
   apiKey: string,
@@ -174,7 +204,7 @@ export async function uploadYCloudMedia(
 ): Promise<{ media_id: string }> {
   const form = new FormData();
   const blob = new Blob([new Uint8Array(file.data)], { type: file.mimeType });
-  form.append('file', blob, file.filename ?? 'midia');
+  form.append('file', blob, filenameForMedia(file.filename, file.mimeType));
   const data = await ycloudFetch(
     apiKey,
     `/whatsapp/media/${toPlus(fromPhone)}/upload`,
