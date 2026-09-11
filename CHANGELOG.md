@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.10.70 - 2026-09-11 (Assistentes: histórico de execuções na aba Testar)
+
+Sem `db push`. Só `platform-admin` (build do painel). Sem endpoint novo — usa o `GET ai/agents/:id/runs` que já existia.
+
+Diff pequeno de Assistentes: a aba **Testar** passa a mostrar as **execuções recentes**, não só a última.
+
+- Lista as últimas execuções (status, data, tokens, custo); cada linha é clicável para rever aquele resultado no cartão de saída.
+- Depois de um teste, o histórico recarrega e o cartão passa a mostrar a execução recém-criada pela linha do banco (com tokens/custo já consolidados) — antes a resposta imediata não trazia esses números.
+- `services/ai.js`: reaproveita `listAgentRuns` (já existia). Só componentes do DS; tokens `--su-*`.
+
 ## v0.10.69 - 2026-09-11 (Assistentes: revisão de conteúdo — aba no editor — Checkpoint 2b)
 
 Sem `db push`. Só `platform-admin` (build do painel). Consome os endpoints da v0.10.68.

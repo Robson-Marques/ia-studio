@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Screen, PageHeader, Tabs, Card, FormGrid, Field, Input, Select, NumericInput, TextArea, Button, Checkbox, CheckGroup, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getAgent, createAgent, updateAgent, saveAgentVersion, executeAgent,
-  exportAgent, listAgentVersions,
+  exportAgent, listAgentVersions, listAgentRuns,
   listTools, listKnowledgeBases, listMemoryProfiles,
 } from '../../services/ai';
 import { listConnections } from '../../services/integrations';
@@ -752,6 +752,21 @@ function TestTab({ agentId, canExecute }) {
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
   const [run, setRun] = useState(null);
+  const [runs, setRuns] = useState([]);
+
+  // Histórico de execuções — antes a aba só mostrava a última. As linhas são
+  // clicáveis para rever o resultado de uma execução anterior.
+  async function loadRuns() {
+    if (!agentId) return [];
+    try {
+      const { items } = await listAgentRuns(agentId, { take: 20 });
+      const list = items || [];
+      setRuns(list);
+      return list;
+    } catch { return []; }
+  }
+
+  useEffect(() => { if (agentId && canExecute) loadRuns(); }, [agentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!agentId) {
     return (
@@ -787,6 +802,10 @@ function TestTab({ agentId, canExecute }) {
       if (st === 'AWAITING_APPROVAL') toast.warn('Execução aguardando aprovação de uma ação.');
       else if (st === 'ERROR') toast.error('A execução terminou com erro.');
       else toast.success('Execução concluída.');
+      // Recarrega o histórico e mostra a execução recém-criada (linha do banco,
+      // com tokens/custo já consolidados).
+      const list = await loadRuns();
+      if (list.length) setRun(list[0]);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -841,6 +860,43 @@ function TestTab({ agentId, canExecute }) {
                 {run.output}
               </pre>
             )}
+          </div>
+        </Card>
+      )}
+
+      {runs.length > 0 && (
+        <Card>
+          <div style={{ padding: 20 }} className="space-y-2">
+            <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>Execuções recentes</p>
+            <div style={{ border: '1px solid var(--su-border-default)', borderRadius: 8, overflow: 'hidden' }}>
+              {runs.map((r, i) => {
+                const info = RUN_STATUS[r.status] || { label: r.status, variant: 'gray' };
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setRun(r)}
+                    className="flex items-center gap-3 w-full text-left px-3 py-2"
+                    style={{
+                      background: run?.id === r.id ? 'var(--su-surface-hover, var(--su-surface-overlay))' : 'transparent',
+                      border: 0, borderTop: i ? '1px solid var(--su-border-subtle, var(--su-border-default))' : 'none',
+                      cursor: 'pointer', font: 'inherit',
+                    }}
+                  >
+                    <Badge tone={statusToTone(info.variant)}>{info.label}</Badge>
+                    <span style={{ flex: 1, fontSize: 12, color: 'var(--su-text-muted)' }}>
+                      {r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : ''}
+                    </span>
+                    {r.total_tokens != null && (
+                      <span style={{ fontSize: 12, color: 'var(--su-text-muted)' }}>{formatTokens(r.total_tokens)} tok</span>
+                    )}
+                    {r.cost_usd != null && (
+                      <span style={{ fontSize: 12, color: 'var(--su-text-muted)' }}>{formatUsd(r.cost_usd)}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </Card>
       )}
