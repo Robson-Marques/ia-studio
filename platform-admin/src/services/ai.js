@@ -343,3 +343,25 @@ export async function reviewAgentContent(agentId) {
     return data; // a revisão criada (status/result_json/...)
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao revisar o conteúdo do assistente')); }
 }
+
+// Baixa uma revisão já produzida (PDF/TXT). Retorna binário — dispara o download
+// no navegador (não é artifact, então <a download> funciona normalmente).
+export async function exportContentReview(agentId, reviewId, format = 'pdf') {
+  try {
+    const { data, headers } = await api.get(
+      `/ai/agents/${agentId}/content-reviews/${reviewId}/export`,
+      { params: { format }, responseType: 'blob' },
+    );
+    const cd = headers?.['content-disposition'] || '';
+    const match = /filename="?([^"]+)"?/.exec(cd);
+    const filename = match ? match[1] : `revisao-ia.${format}`;
+    const url = window.URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao exportar a revisão')); }
+}

@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.10.72 - 2026-09-11 (Assistentes: botão de baixar a revisão — front)
+
+Sem `db push`. Só `platform-admin` (build do painel). Consome o endpoint da v0.10.71.
+
+- **Botão "Exportar PDF"** na aba Revisão do editor do assistente — aparece na revisão selecionada quando ela está concluída; baixa o parecer pelo navegador.
+- `services/ai.js`: `exportContentReview` (busca o binário e dispara o download).
+
+Fecha a revisão de conteúdo de ponta a ponta (comparar → ver → baixar).
+
 ## v0.10.71 - 2026-09-11 (Assistentes: export da revisão de conteúdo — backend)
 
 Sem `db push`. **Nova dependência `pdf-lib`** no `platform-api` (o painel roda `npm install` antes do build). Só `platform-api`.

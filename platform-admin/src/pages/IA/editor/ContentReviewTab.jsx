@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Badge, Button, EmptyState, Spinner, useToast } from '@studio-ux-ds/react';
-import { listContentReviews, reviewAgentContent } from '../../../services/ai';
+import { listContentReviews, reviewAgentContent, exportContentReview } from '../../../services/ai';
 
 // AgenteEditor › aba "Revisão" (Checkpoint 2b). Compara por IA as fontes de
 // conhecimento vinculadas ao assistente e lista conflitos/redundâncias/lacunas/
@@ -93,6 +93,7 @@ export default function ContentReviewTab({ agentId, canReview }) {
   const [reviews, setReviews] = useState(null);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
 
   async function load(selectLatest = false) {
@@ -117,6 +118,18 @@ export default function ContentReviewTab({ agentId, canReview }) {
     () => (reviews || []).find((r) => r.id === selectedId) || (reviews || [])[0] || null,
     [reviews, selectedId],
   );
+
+  async function handleExport() {
+    if (!selected || exporting) return;
+    setExporting(true);
+    try {
+      await exportContentReview(agentId, selected.id, 'pdf');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function handleReview() {
     if (running) return;
@@ -183,6 +196,16 @@ export default function ContentReviewTab({ agentId, canReview }) {
                   <span style={{ fontSize: 12, color: 'var(--su-text-muted)' }}>
                     {selected.created_at ? new Date(selected.created_at).toLocaleString('pt-BR') : ''}
                   </span>
+                  {selected.status === 'COMPLETED' && (
+                    <Button
+                      variant="ghost" size="sm" icon="download" loading={exporting}
+                      style={{ marginLeft: 'auto' }}
+                      title="Baixar esta revisão em PDF"
+                      onClick={handleExport}
+                    >
+                      Exportar PDF
+                    </Button>
+                  )}
                 </div>
                 <ReviewDetail review={selected} />
               </div>
