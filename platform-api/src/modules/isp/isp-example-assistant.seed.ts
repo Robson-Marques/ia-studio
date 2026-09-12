@@ -10,7 +10,7 @@
 // por enquanto; a Frente B a tornara estrutural (coluna identification + gate).
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { IspExampleRepository, AUTOREPLY_WF_NAME } from './isp-example.repository';
+import { IspExampleRepository } from './isp-example.repository';
 
 const AGENT_NAME = 'Atendimento (exemplo ISP)';
 
@@ -197,23 +197,10 @@ export class IspExampleAssistantSeed implements OnApplicationBootstrap {
           this.logger.log(`Conteúdo do assistente-exemplo atualizado (${CONTENT_VERSION}) na org ${organizationId}.`);
         }
 
-        // Fluxo-companheiro "IA responde no WhatsApp" (DRAFT, inerte). Só nasce
-        // se há um assistente pra apontar e nunca foi semeado antes (não
-        // ressuscita se o usuário apagou o fluxo).
-        if (agentId && !(await this.repository.autoreplyWasSeeded(organizationId))) {
-          const wf = await this.repository.autoreplyWorkflowExists(organizationId, AUTOREPLY_WF_NAME);
-          if (!wf) {
-            await this.repository.createAutoreplyWorkflow({
-              organizationId,
-              workspaceId: scope.workspace_id,
-              environmentId: scope.environment_id,
-              name: AUTOREPLY_WF_NAME,
-              agentId,
-            });
-            this.logger.log(`Fluxo "IA responde no WhatsApp" (exemplo) criado na organização ${organizationId}.`);
-          }
-          await this.repository.markAutoreplySeeded(organizationId);
-        }
+        // Antes, aqui nascia um fluxo-exemplo "IA responde no WhatsApp" (com o nó
+        // AGENT). A IA não mora mais dentro de fluxo — ela atende por intenção,
+        // vinculada ao número (WhatsApp → Números). Então não semeamos mais esse
+        // fluxo. O fluxo segue existindo para automações de outros fins.
       }
     } catch (e) {
       // Seed nunca derruba o boot.

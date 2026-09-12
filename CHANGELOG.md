@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.84 - 2026-09-12 (Assistente que conduz: tirar a IA de dentro do fluxo — Checkpoint 5 da frente)
+
+Sem `db push`. `platform-api` + `platform-admin`. **O fluxo NÃO é removido** — ele continua para automações de outros fins. O que sai é só a **IA embutida no fluxo**, que não é mais necessária (a IA atende por intenção, pelo vínculo).
+
+- **Removido o nó "Assistente de IA" (AGENT)** do motor de automação (`agent.nodes.ts`) e seu registro no AiModule. A IA não é mais um passo de fluxo.
+- **Removida a tela "Atendimento por IA"** (casca do fluxo `ia-whatsapp`: ligava/desligava publicando o fluxo-exemplo) — junto com o item de menu e a rota. Substituída pelo vínculo em WhatsApp → Números.
+- **Seed**: o fluxo-exemplo "IA responde no WhatsApp" não é mais semeado (novas orgs não nascem com a IA dentro de um fluxo). O fluxo segue existindo para automações genéricas.
+- **Intocados**: o motor de fluxo, Agendamentos, Templates de automação, Monitoramento, webhooks e o sininho de notificações — tudo de automação de outros fins continua igual.
+
+Observação para este ambiente: se já existe um fluxo-exemplo `ia-whatsapp` publicado, convém removê-lo (WhatsApp → antes em "Atendimento por IA"; agora direto em Automação → Fluxos), já que a IA agora atende pelo vínculo. Um fluxo antigo com o nó de assistente não executa mais esse passo.
+
 ## v0.10.83 - 2026-09-12 (Assistente que conduz: frontend — "Como conversa" + vincular número — Checkpoint 4 da frente)
 
 Sem `db push`. Só `platform-admin` (build do painel). Liga as telas ao que o backend (v0.10.80–82) já faz — **agora dá pra usar sem API**.

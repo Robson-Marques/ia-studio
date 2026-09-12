@@ -30,7 +30,6 @@ import EquipesFilas from './pages/WhatsApp/EquipesFilas';
 import EquipeEditor from './pages/WhatsApp/EquipeEditor';
 import FilaEditor from './pages/WhatsApp/FilaEditor';
 import Numeros from './pages/WhatsApp/Numeros';
-import AtendimentoIA from './pages/WhatsApp/AtendimentoIA';
 import Fluxos from './pages/Automacao/Fluxos';
 import FluxoNovo from './pages/Automacao/FluxoNovo';
 import FluxoImportar from './pages/Automacao/FluxoImportar';
@@ -124,7 +123,6 @@ export default function App() {
                 <Route path="/whatsapp/filas/nova" element={<PermissionRoute perm="comm.whatsapp.queues.manage"><FilaEditor /></PermissionRoute>} />
                 <Route path="/whatsapp/filas/:id" element={<PermissionRoute perm="comm.whatsapp.queues.read"><FilaEditor /></PermissionRoute>} />
                 <Route path="/whatsapp/numeros" element={<PermissionRoute perm="comm.whatsapp.numbers.read"><Numeros /></PermissionRoute>} />
-                <Route path="/whatsapp/atendimento-ia" element={<PermissionRoute perm="automation.workflows.read"><AtendimentoIA /></PermissionRoute>} />
                 <Route path="/automacao/fluxos" element={<PermissionRoute perm="automation.workflows.read"><Fluxos /></PermissionRoute>} />
                 {/* `novo` e `importar` vêm ANTES de `:id` — senão o React Router
                     casa a rota dinâmica primeiro e trata "novo" como um id. */}

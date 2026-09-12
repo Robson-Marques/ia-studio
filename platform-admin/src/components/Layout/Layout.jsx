@@ -59,7 +59,6 @@ const NAV = [
     label: 'IA Studio', icon: 'spark',
     children: [
       { label: 'Assistentes',       icon: 'bot',          path: '/ia/agentes',              perm: 'ai.agents.read' },
-      { label: 'Atendimento por IA', icon: 'bot',          path: '/whatsapp/atendimento-ia', perm: 'automation.workflows.read' },
       { label: 'Conhecimento',      icon: 'book',         path: '/ia/conhecimento',         perm: 'ai.knowledge.read' },
       { label: 'Pendências',     icon: 'check-circle', path: '/ia/aprovacoes',   perm: 'ai.approvals.read' },
       { label: 'Análise de atendimento', icon: 'search', path: '/ia/analise',    perm: 'ai.analysis.read' },
