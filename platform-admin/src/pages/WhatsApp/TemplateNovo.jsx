@@ -1,10 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   FormScreen, Card, FormGrid, Field, Input, TextArea, Select, Badge, Button, IconButton, useToast,
 } from '@studio-ux-ds/react';
-import { createTemplate, listNumbers } from '../../services/whatsapp';
+import { createTemplate, listNumbers, getTemplate, updateTemplate, pushEditTemplate } from '../../services/whatsapp';
 import { CATEGORY_LABEL, LANGUAGE_LABEL } from './Templates';
+
+// Componentes Meta → campos do formulário (inverso do buildComponents do back).
+function parseComponents(components) {
+  const out = { header_text: '', body_text: '', footer_text: '', buttons: [], examples: '' };
+  for (const c of Array.isArray(components) ? components : []) {
+    const type = String(c?.type || '').toUpperCase();
+    if (type === 'HEADER') out.header_text = c.text || '';
+    else if (type === 'BODY') {
+      out.body_text = c.text || '';
+      const ex = c.example?.body_text?.[0];
+      if (Array.isArray(ex)) out.examples = ex.join(', ');
+    } else if (type === 'FOOTER') out.footer_text = c.text || '';
+    else if (type === 'BUTTONS' && Array.isArray(c.buttons)) {
+      out.buttons = c.buttons.map((b) => ({ type: b.type || 'QUICK_REPLY', text: b.text || '', url: b.url || b.phone_number || '' }));
+    }
+  }
+  return out;
+}
 
 // WhatsApp/TemplateNovo — criar um template e mandar para análise da Meta (v0.10.9).
 //
@@ -31,20 +49,47 @@ const BUTTON_LABEL = {
 export default function TemplateNovo() {
   const toast = useToast();
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEdit = !!id;
   const [numbers, setNumbers] = useState([]);
   const [connectionId, setConnectionId] = useState('');
   const [form, setForm] = useState(EMPTY);
   const [examples, setExamples] = useState('');
+  const [status, setStatus] = useState(null); // status do template (edição)
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     listNumbers()
       .then((n) => {
         setNumbers(n);
-        if (n.length) setConnectionId((atual) => atual || n[0].id);
+        // Na criação, pré-seleciona o primeiro número; na edição o número vem
+        // do template (imutável) e não pode ser sobrescrito.
+        if (!isEdit && n.length) setConnectionId((atual) => atual || n[0].id);
       })
       .catch((err) => toast.error(err.message));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Edição: carrega o template e preenche o formulário.
+  useEffect(() => {
+    if (!id) return;
+    getTemplate(id)
+      .then((t) => {
+        setConnectionId(t.connection_id || '');
+        setStatus(t.status);
+        const parsed = parseComponents(t.components || []);
+        setForm({
+          name: t.name,
+          category: t.category,
+          language: t.language,
+          header_text: parsed.header_text,
+          body_text: parsed.body_text,
+          footer_text: parsed.footer_text,
+          buttons: parsed.buttons,
+        });
+        setExamples(parsed.examples);
+      })
+      .catch((err) => { toast.error(err.message); navigate('/whatsapp/templates'); });
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function setField(key, value) { setForm((f) => ({ ...f, [key]: value })); }
 
@@ -63,8 +108,8 @@ export default function TemplateNovo() {
   }
 
   async function handleSave() {
-    if (!connectionId) { toast.error('Escolha em qual número o template vai existir.'); return; }
-    if (!/^[a-z0-9_]+$/.test(form.name)) {
+    if (!isEdit && !connectionId) { toast.error('Escolha em qual número o template vai existir.'); return; }
+    if (!isEdit && !/^[a-z0-9_]+$/.test(form.name)) {
       toast.error('O nome aceita só letras minúsculas, números e _ (exemplo: boas_vindas).');
       return;
     }
@@ -74,33 +119,43 @@ export default function TemplateNovo() {
       toast.error(`A Meta exige um exemplo para cada variável — informe ${variaveis.length}, separados por vírgula.`);
       return;
     }
+    // Conteúdo comum (sem nome/idioma/conexão — imutáveis na edição).
+    const content = {
+      category: form.category,
+      header_text: form.header_text || undefined,
+      body_text: form.body_text,
+      footer_text: form.footer_text || undefined,
+      buttons: form.buttons.length
+        ? form.buttons.map((b) => ({
+          type: b.type,
+          text: b.text,
+          ...(b.type === 'URL' ? { url: b.url } : {}),
+          ...(b.type === 'PHONE_NUMBER' ? { phone_number: b.url } : {}),
+        }))
+        : undefined,
+      body_examples: exemplos.length ? exemplos : undefined,
+    };
     setSaving(true);
     try {
-      await createTemplate({
-        connection_id: connectionId,
-        name: form.name,
-        category: form.category,
-        language: form.language,
-        header_text: form.header_text || undefined,
-        body_text: form.body_text,
-        footer_text: form.footer_text || undefined,
-        buttons: form.buttons.length
-          ? form.buttons.map((b) => ({
-            type: b.type,
-            text: b.text,
-            ...(b.type === 'URL' ? { url: b.url } : {}),
-            ...(b.type === 'PHONE_NUMBER' ? { phone_number: b.url } : {}),
-          }))
-          : undefined,
-        body_examples: exemplos.length ? exemplos : undefined,
-      });
-      toast.success('Enviado para análise da Meta — a resposta costuma sair em minutos.');
-      navigate('/whatsapp/templates');
+      if (isEdit) {
+        if (status === 'DRAFT') {
+          await updateTemplate(id, content);
+          toast.success('Rascunho atualizado.');
+        } else {
+          await pushEditTemplate(id, content);
+          toast.success('Edição enviada para análise da Meta.');
+        }
+        navigate('/whatsapp/templates');
+      } else {
+        await createTemplate({ connection_id: connectionId, name: form.name, language: form.language, ...content });
+        toast.success('Enviado para análise da Meta — a resposta costuma sair em minutos.');
+        navigate('/whatsapp/templates');
+      }
     } catch (err) {
-      // Recusa da Meta deixa o template como rascunho aqui: a lista mostra o
-      // motivo, então vale mandar o usuário para lá em vez de só reclamar.
       toast.error(err.message);
-      navigate('/whatsapp/templates');
+      // Na criação, a recusa deixa o template como rascunho: a lista mostra o
+      // motivo, então vale ir pra lá. Na edição, fica para o usuário corrigir.
+      if (!isEdit) navigate('/whatsapp/templates');
     } finally {
       setSaving(false);
     }
@@ -109,28 +164,33 @@ export default function TemplateNovo() {
   return (
     <FormScreen
       bare
-      title="Novo template"
-      subtitle="Depois de aprovado pela Meta, este texto pode ser enviado a quem não respondeu nas últimas 24 horas."
+      title={isEdit ? 'Editar template' : 'Novo template'}
+      subtitle={isEdit
+        ? (status === 'DRAFT'
+          ? 'Edite o rascunho. Nome, idioma e número não mudam — para isso, crie outro template.'
+          : 'Este template já está na Meta. Ao salvar, a edição é reenviada para análise (volta a Pendente).')
+        : 'Depois de aprovado pela Meta, este texto pode ser enviado a quem não respondeu nas últimas 24 horas.'}
       onSubmit={handleSave}
       onCancel={() => navigate('/whatsapp/templates')}
-      submitLabel="Enviar para análise"
+      submitLabel={isEdit ? (status === 'DRAFT' ? 'Salvar rascunho' : 'Salvar e reenviar à Meta') : 'Enviar para análise'}
       saving={saving}
     >
       <div className="space-y-6">
       <Card>
         <div style={{ padding: 20 }} className="space-y-4">
           <FormGrid columns={2}>
-            <Field label="Em qual número" required hint="O template pertence ao número — não é compartilhado entre eles.">
-              <Select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}>
-                {!numbers.length && <option value="">nenhum número conectado</option>}
+            <Field label="Em qual número" required hint={isEdit ? 'O número não muda na edição.' : 'O template pertence ao número — não é compartilhado entre eles.'}>
+              <Select value={connectionId} disabled={isEdit} onChange={(e) => setConnectionId(e.target.value)}>
+                {!numbers.length && <option value="">{connectionId ? '—' : 'nenhum número conectado'}</option>}
                 {numbers.map((n) => (
                   <option key={n.id} value={n.id}>{n.name}{n.phone ? ` — ${n.phone}` : ''}</option>
                 ))}
               </Select>
             </Field>
-            <Field label="Nome" required hint="Só minúsculas, números e _ . Não pode ser reaproveitado depois de excluído.">
+            <Field label="Nome" required hint={isEdit ? 'O nome faz parte da identidade e não muda.' : 'Só minúsculas, números e _ . Não pode ser reaproveitado depois de excluído.'}>
               <Input
                 value={form.name}
+                disabled={isEdit}
                 onChange={(e) => setField('name', e.target.value.toLowerCase())}
                 placeholder="boas_vindas"
                 style={{ fontFamily: 'var(--su-font-mono, monospace)' }}
@@ -141,8 +201,8 @@ export default function TemplateNovo() {
                 {Object.entries(CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             </Field>
-            <Field label="Idioma" required>
-              <Select value={form.language} onChange={(e) => setField('language', e.target.value)}>
+            <Field label="Idioma" required hint={isEdit ? 'O idioma não muda na edição.' : undefined}>
+              <Select value={form.language} disabled={isEdit} onChange={(e) => setField('language', e.target.value)}>
                 {Object.entries(LANGUAGE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             </Field>

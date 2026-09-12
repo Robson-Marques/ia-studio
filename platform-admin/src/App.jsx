@@ -116,6 +116,7 @@ export default function App() {
                 <Route path="/whatsapp/conversas" element={<PermissionRoute perm={WHATSAPP_VIEW_PERMS}><Conversas /></PermissionRoute>} />
                 <Route path="/whatsapp/templates" element={<PermissionRoute perm="comm.whatsapp.templates.read"><Templates /></PermissionRoute>} />
                 <Route path="/whatsapp/templates/novo" element={<PermissionRoute perm="comm.whatsapp.templates.manage"><TemplateNovo /></PermissionRoute>} />
+                <Route path="/whatsapp/templates/:id/editar" element={<PermissionRoute perm="comm.whatsapp.templates.manage"><TemplateNovo /></PermissionRoute>} />
                 <Route path="/whatsapp/equipes" element={<PermissionRoute perm="comm.whatsapp.teams.read"><EquipesFilas /></PermissionRoute>} />
                 {/* `nova` antes de `:id` — senão a rota dinâmica casa primeiro. */}
                 <Route path="/whatsapp/equipes/nova" element={<PermissionRoute perm="comm.whatsapp.teams.manage"><EquipeEditor /></PermissionRoute>} />

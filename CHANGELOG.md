@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.79 - 2026-09-12 (WhatsApp Templates: UI — editar (rascunho e publicado) — Checkpoint 4b)
+
+Sem `db push`. Só `platform-admin` (build do painel).
+
+O formulário de template (`TemplateNovo`) ganhou **modo edição**, reaproveitado numa rota nova.
+
+- **Rota** `/whatsapp/templates/:id/editar` (mesma tela, modo edição). Ação **Editar** na lista.
+- Carrega o template, remonta os campos a partir dos componentes da Meta (cabeçalho/corpo/exemplos/rodapé/botões) e **trava nome, idioma e número** (identidade).
+- Ao salvar: **rascunho** → `PUT` (atualiza local); **publicado** → `push-edit` (reenvia à Meta, volta a Pendente). Título/subtítulo/rótulo do botão se adaptam ao caso.
+
+Faltam da UI de templates: **replicar entre números** e **vincular a evento** (próximo slice); e, no backend, só o `header-media`.
+
 ## v0.10.78 - 2026-09-12 (WhatsApp Templates: UI — qualidade e ações na lista — Checkpoint 4a)
 
 Sem `db push`. Só `platform-admin` (build do painel). Consome os endpoints das v0.10.74–77.

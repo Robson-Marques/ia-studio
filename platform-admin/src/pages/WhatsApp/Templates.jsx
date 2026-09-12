@@ -143,6 +143,13 @@ export default function Templates() {
     { key: 'synced_at', header: 'Sincronizado', render: (t) => (t.synced_at ? formatDateTime(t.synced_at) : '—') },
     ...(canManage ? [{ key: 'acoes', header: 'Ações', render: (t) => (
       <div className="flex items-center gap-1 justify-end">
+        <Button
+          variant="ghost" size="sm" icon="edit" disabled={acting}
+          title={isOnMeta(t) ? 'Editar e reenviar à Meta' : 'Editar rascunho'}
+          onClick={() => navigate(`/whatsapp/templates/${t.id}/editar`)}
+        >
+          Editar
+        </Button>
         <Button variant="ghost" size="sm" icon="copy" disabled={acting} title="Duplicar como rascunho" onClick={() => handleDuplicate(t)}>
           Duplicar
         </Button>
