@@ -12,6 +12,13 @@ export class WhatsappAssistantRepository {
     return this.prisma.commChannelAgent.findUnique({ where: { connection_id: connectionId } });
   }
 
+  /** Só o vínculo HABILITADO (hot path do condutor inbound). */
+  findEnabledByConnection(connectionId: string) {
+    return this.prisma.commChannelAgent.findFirst({
+      where: { connection_id: connectionId, is_enabled: true },
+    });
+  }
+
   /** Upsert por conexão: cria ou atualiza o assistente vinculado. */
   upsert(data: {
     organization_id: string;

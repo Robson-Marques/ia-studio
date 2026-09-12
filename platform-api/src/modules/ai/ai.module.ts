@@ -83,6 +83,9 @@ import { ContentReviewController } from './content-review/content-review.control
 // Nodes (integra com a Automacao)
 import { AgentNodes } from './nodes/agent.nodes';
 
+// Condutor embutido inbound → assistente (atende WhatsApp sem fluxo)
+import { WhatsappAssistantResponderService } from './responders/whatsapp-assistant-responder.service';
+
 // Seed
 import { AiSeedRepository } from './seed/ai-seed.repository';
 import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
@@ -152,6 +155,8 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     ContentReviewExportService,
     // Nodes
     AgentNodes,
+    // Condutor embutido inbound → assistente
+    WhatsappAssistantResponderService,
     // Seed
     AiSeedRepository,
     AiProvidersSeedService,

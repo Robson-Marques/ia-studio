@@ -56,6 +56,13 @@ export class WhatsappAssistantService {
     };
   }
 
+  /** Hot path do condutor inbound: id do assistente HABILITADO deste número, ou
+   *  null. Sem validações caras (o condutor já confere org/handler depois). */
+  async activeAgentId(connectionId: string): Promise<string | null> {
+    const row = await this.repository.findEnabledByConnection(connectionId);
+    return row?.agent_id ?? null;
+  }
+
   /** Vincula (ou troca) o assistente que atende este número. */
   async set(
     organizationId: string,

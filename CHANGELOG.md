@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.82 - 2026-09-12 (Assistente que conduz: condutor embutido inbound → IA — Checkpoint 3 da frente)
+
+Sem `db push`. Só `platform-api`. **É aqui que a IA passa a atender WhatsApp sem fluxo.**
+
+Quando chega uma mensagem num número com assistente vinculado e habilitado (v0.10.81) e com `auto_reply` ligado (v0.10.80), a IA responde direto — sem o usuário montar um fluxo.
+
+- **`WhatsappAssistantResponderService`** (no AiModule): escuta `whatsapp.inbound.message` e conduz. Reaproveita o que já existe — debounce por conversa (junta a rajada; tempo vem do "Como conversa" do assistente), histórico/continuidade, nota de cliente vinculado, `AgentRunnerService` (tool-calling, custo, aprovação), envio governado pelo orquestrador (janela de 24h, modo manual bloqueado) e `assignBot` ("atendido pela IA", sem roubar de humano).
+- **Não responde quando**: não há vínculo habilitado, `auto_reply` desligado, um humano está no comando (`current_handler=USER`), conversa em modo manual, ou chegou mensagem mais nova (o timer da mais nova responde).
+- **`split_paragraphs`**: quando ligado, manda a resposta em bolhas separadas (quebra por linha em branco).
+- **Interruptor** `WHATSAPP_ASSISTANT_RESPONDER` (default ligado) pra desligar sem deploy.
+- Caminho **paralelo e independente dos Fluxos** (porta do Aquapark: assistente conduz). Um número usa vínculo **ou** fluxo — não os dois. A demoção dos Fluxos é o próximo (v0.10.83).
+
 ## v0.10.81 - 2026-09-12 (Assistente que conduz: vínculo assistente↔número — Checkpoint 2 da frente)
 
 **Precisa de `db push`** (tabela nova `comm_channel_agents`). Só `platform-api`. Aditivo — ainda nada responde sozinho.
