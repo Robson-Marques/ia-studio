@@ -185,6 +185,53 @@ export async function syncTemplates(connectionId) {
   catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao sincronizar templates')); }
 }
 
+export async function getTemplate(id) {
+  try { const { data } = await api.get(`/comm/whatsapp/templates/${id}`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar o template')); }
+}
+
+// Edita um RASCUNHO local (conteúdo/categoria).
+export async function updateTemplate(id, body) {
+  try { const { data } = await api.put(`/comm/whatsapp/templates/${id}`, body); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao editar o template')); }
+}
+
+// Exclui o template LOCAL (bloqueia se ainda existe na Meta — use deleteTemplateOfficial).
+export async function deleteTemplate(id) {
+  try { const { data } = await api.delete(`/comm/whatsapp/templates/${id}`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao excluir o template')); }
+}
+
+// Liga/desliga o vínculo do template a um evento do sistema (event vazio desliga).
+export async function bindTemplateEvent(id, event) {
+  try { const { data } = await api.post(`/comm/whatsapp/templates/${id}/bind`, { event: event || undefined }); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao vincular o template')); }
+}
+
+// Duplica o template na mesma conexão (rascunho, nome novo).
+export async function duplicateTemplate(id) {
+  try { const { data } = await api.post(`/comm/whatsapp/templates/${id}/duplicate`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao duplicar o template')); }
+}
+
+// Replica o template como rascunho em outras conexões.
+export async function replicateTemplate(id, connectionIds) {
+  try { const { data } = await api.post(`/comm/whatsapp/templates/${id}/replicate`, { connection_ids: connectionIds }); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao replicar o template')); }
+}
+
+// Edita um template JÁ publicado direto na Meta (volta a análise).
+export async function pushEditTemplate(id, body) {
+  try { const { data } = await api.post(`/comm/whatsapp/templates/${id}/push-edit`, body); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao editar o template na Meta')); }
+}
+
+// Remove o template DA META e depois localmente.
+export async function deleteTemplateOfficial(id) {
+  try { const { data } = await api.post(`/comm/whatsapp/templates/${id}/delete-official`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao remover o template da Meta')); }
+}
+
 // ─── Números (conexões whatsapp-meta) ────────────────────────
 
 export async function listNumbers(params = {}) {

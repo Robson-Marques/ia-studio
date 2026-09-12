@@ -1,11 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListScreen, Badge, Button, Select, Field, useToast } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Select, Field, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
-import { listNumbers, listTemplates, syncTemplates } from '../../services/whatsapp';
+import {
+  listNumbers, listTemplates, syncTemplates,
+  duplicateTemplate, deleteTemplate, deleteTemplateOfficial,
+} from '../../services/whatsapp';
 import { TEMPLATE_STATUS } from './whatsapp.constants';
 import { statusToTone } from '../../lib/tone';
+
+// Nota de qualidade da Meta (v0.10.75): boa/atenção/ruim.
+const QUALITY = {
+  GREEN: { label: 'Boa', tone: 'success' },
+  YELLOW: { label: 'Atenção', tone: 'warning' },
+  RED: { label: 'Ruim', tone: 'danger' },
+  UNKNOWN: { label: '—', tone: 'neutral' },
+};
+
+// Template "vive na Meta" quando tem id de lá e não é rascunho/rejeitado.
+function isOnMeta(t) {
+  return !!t.meta_template_id && ['APPROVED', 'PENDING', 'PAUSED', 'DISABLED'].includes(t.status);
+}
 
 // WhatsApp/Templates — o catálogo de templates aprovados na Meta. Migrada pro DS
 // na v0.10.9.
@@ -32,6 +48,8 @@ export default function Templates() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [acting, setActing] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(null); // template alvo da exclusão
 
   const canManage = can('comm.whatsapp.templates.manage');
 
@@ -71,6 +89,36 @@ export default function Templates() {
     }
   }
 
+  async function handleDuplicate(t) {
+    if (acting) return;
+    setActing(true);
+    try {
+      await duplicateTemplate(t.id);
+      toast.success('Template duplicado como rascunho.');
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function confirmarExclusao() {
+    const t = confirmDel;
+    if (!t) return;
+    setActing(true);
+    try {
+      await (isOnMeta(t) ? deleteTemplateOfficial(t.id) : deleteTemplate(t.id));
+      toast.success(isOnMeta(t) ? 'Template removido da Meta e daqui.' : 'Template excluído.');
+      setConfirmDel(null);
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActing(false);
+    }
+  }
+
   const columns = [
     { key: 'name', header: 'Nome', render: (t) => (
       <div className="min-w-0">
@@ -86,9 +134,27 @@ export default function Templates() {
       const st = TEMPLATE_STATUS[t.status] || TEMPLATE_STATUS.PENDING;
       return <Badge tone={statusToTone(st.variant)}>{st.label}</Badge>;
     } },
+    { key: 'quality', header: 'Qualidade', render: (t) => {
+      const q = QUALITY[t.quality] || QUALITY.UNKNOWN;
+      return t.quality ? <Badge tone={q.tone}>{q.label}</Badge> : <span style={{ color: 'var(--su-text-muted)' }}>—</span>;
+    } },
     { key: 'category', header: 'Tipo', render: (t) => CATEGORY_LABEL[t.category] || t.category },
     { key: 'language', header: 'Idioma', render: (t) => LANGUAGE_LABEL[t.language] || t.language },
     { key: 'synced_at', header: 'Sincronizado', render: (t) => (t.synced_at ? formatDateTime(t.synced_at) : '—') },
+    ...(canManage ? [{ key: 'acoes', header: 'Ações', render: (t) => (
+      <div className="flex items-center gap-1 justify-end">
+        <Button variant="ghost" size="sm" icon="copy" disabled={acting} title="Duplicar como rascunho" onClick={() => handleDuplicate(t)}>
+          Duplicar
+        </Button>
+        <Button
+          variant="ghost" size="sm" icon="trash" disabled={acting}
+          title={isOnMeta(t) ? 'Remover da Meta e daqui' : 'Excluir'}
+          onClick={() => setConfirmDel(t)}
+        >
+          Excluir
+        </Button>
+      </div>
+    ) }] : []),
   ];
 
   const filterContent = (
@@ -123,9 +189,10 @@ export default function Templates() {
   );
 
   return (
+    <>
     <ListScreen
       title="Templates"
-      subtitle="Mensagens aprovadas pela Meta — as únicas que podem ser enviadas depois de 24h sem resposta do cliente. Template já publicado não se edita: para mudar o texto, crie outro com nome novo."
+      subtitle="Mensagens aprovadas pela Meta — as únicas que podem ser enviadas depois de 24h sem resposta do cliente. Dá para duplicar, replicar entre números e excluir; um template já publicado, quando editado, volta para análise da Meta."
       primaryAction={acoes}
       filterContent={filterContent}
       filtersActive={!!connectionId}
@@ -144,6 +211,19 @@ export default function Templates() {
       }}
       emptyFiltered={{ title: 'Nenhum template neste número', description: 'Troque o número no filtro, ou use Sincronizar para trazer os que já existem na Meta.', onClear: () => setConnectionId('') }}
     />
+    <ConfirmDialog
+      open={!!confirmDel}
+      danger
+      loading={acting}
+      title={confirmDel && isOnMeta(confirmDel) ? 'Remover template da Meta' : 'Excluir template'}
+      message={confirmDel && isOnMeta(confirmDel)
+        ? `Remover "${confirmDel.name}" da Meta e também daqui? Depois de removido, ele não pode mais ser enviado. A operação é definitiva.`
+        : `Excluir o template "${confirmDel?.name ?? ''}"? Ele sai do catálogo local (não estava publicado na Meta).`}
+      confirmLabel={confirmDel && isOnMeta(confirmDel) ? 'Remover da Meta' : 'Excluir'}
+      onClose={() => (acting ? null : setConfirmDel(null))}
+      onConfirm={confirmarExclusao}
+    />
+    </>
   );
 }
 

@@ -1,5 +1,18 @@
 # Changelog — IA Studio
 
+## v0.10.78 - 2026-09-12 (WhatsApp Templates: UI — qualidade e ações na lista — Checkpoint 4a)
+
+Sem `db push`. Só `platform-admin` (build do painel). Consome os endpoints das v0.10.74–77.
+
+Primeiro slice da UI de templates: a lista passa a mostrar os sinais novos e a permitir as ações.
+
+- **Coluna "Qualidade"** (Boa/Atenção/Ruim) a partir do webhook de qualidade da Meta.
+- **Coluna "Ações"** (só com `comm.whatsapp.templates.manage`): **Duplicar** (rascunho) e **Excluir** — a exclusão detecta se o template vive na Meta e, nesse caso, remove de lá e daqui (delete-official), com confirmação e texto próprio; senão, exclui só o local.
+- `services/whatsapp.js`: clientes dos novos endpoints (get/update/delete/bind/duplicate/replicate/push-edit/delete-official).
+- Corrige o texto da tela, que dizia que template não se edita nem se exclui — agora é possível.
+
+Próximos slices: editar rascunho / editar publicado (push-edit) por formulário, replicar entre números e vincular a evento.
+
 ## v0.10.77 - 2026-09-12 (WhatsApp Templates: editar publicado e remover da Meta — Checkpoint 3b)
 
 Sem `db push`. Só `platform-api`. Operações que tocam a Meta (Graph API).
