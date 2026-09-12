@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.10.76 - 2026-09-12 (WhatsApp Templates: duplicar e replicar — Checkpoint 3a)
+
+Sem `db push`. Só `platform-api`. Operações locais (não chamam a Meta).
+
+- **`POST :id/duplicate`** — copia o template na MESMA conexão como rascunho, com nome único (`<nome>_copia`, `_copia2`…).
+- **`POST :id/replicate`** (body `{ connection_ids: [...] }`) — cria o template como **rascunho** em outras conexões WhatsApp da organização; pula onde já existe (mesmo nome/idioma) e reporta o resultado por conexão. Não publica na Meta — o destino publica/sincroniza depois.
+
+Reuso de conteúdo entre números sem retrabalho. As operações que tocam a Meta — editar publicado (push-edit), remover da Meta (delete-official) e mídia de cabeçalho — ficam para o Checkpoint 3b (exigem operações novas no provider).
+
 ## v0.10.75 - 2026-09-12 (WhatsApp Templates: qualidade + categoria ao vivo por webhook — Checkpoint 2)
 
 **Com `db push`** (adiciona `quality` em `comm_whatsapp_templates`). Só `platform-api`.

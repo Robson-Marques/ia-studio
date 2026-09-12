@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { TemplateButtonDto } from './create-template.dto';
 
 /**
@@ -45,4 +45,12 @@ export class BindTemplateEventDto {
   @IsString()
   @MaxLength(80)
   event?: string;
+}
+
+/** Replica o template como rascunho em outras conexões WhatsApp. */
+export class ReplicateTemplateDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  connection_ids!: string[];
 }

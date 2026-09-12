@@ -9,7 +9,7 @@ import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { WhatsappTemplatesService } from './whatsapp-templates.service';
 import { CreateTemplateDto } from '../dto/create-template.dto';
-import { UpdateTemplateDto, BindTemplateEventDto } from '../dto/update-template.dto';
+import { UpdateTemplateDto, BindTemplateEventDto, ReplicateTemplateDto } from '../dto/update-template.dto';
 import { IsUUID } from 'class-validator';
 
 export class SyncTemplatesDto {
@@ -93,5 +93,26 @@ export class WhatsappTemplatesController {
     @Query('organization_id') orgQuery?: string,
   ) {
     return this.templates.bindEvent(resolveOrganizationId(user, orgQuery), id, dto.event ?? null);
+  }
+
+  @Post(':id/duplicate')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE)
+  duplicate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.templates.duplicate(resolveOrganizationId(user, orgQuery), id);
+  }
+
+  @Post(':id/replicate')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE)
+  replicate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ReplicateTemplateDto,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.templates.replicate(resolveOrganizationId(user, orgQuery), id, dto.connection_ids);
   }
 }

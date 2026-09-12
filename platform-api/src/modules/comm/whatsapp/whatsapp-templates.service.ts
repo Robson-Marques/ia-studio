@@ -2,7 +2,7 @@
 // spec Wizard Meta): criado no painel → publica na Meta (DRAFT → PENDING);
 // criado/alterado na Meta → aparece aqui no sync (status/razao de rejeicao).
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { CommTemplateStatus, Connection, WhatsappTemplate } from '@prisma/client';
+import { CommTemplateStatus, Connection, Prisma, WhatsappTemplate } from '@prisma/client';
 import { WhatsappTemplatesRepository } from './whatsapp-templates.repository';
 import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
 import { ConnectionsService } from '../../integration/connections/connections.service';
@@ -104,6 +104,105 @@ export class WhatsappTemplatesService {
       newValue: { event: normalized },
     });
     return updated;
+  }
+
+  // ─── Reuso: duplicar / replicar (local, como rascunho) ──
+
+  /** Duplica um template na MESMA conexão como rascunho, com nome único. */
+  async duplicate(organizationId: string, id: string): Promise<WhatsappTemplate> {
+    const src = await this.getById(organizationId, id);
+    const name = await this.uniqueCopyName(src.connection_id, src.name, src.language);
+    const copy = await this.repository.create(this.buildCopy(src, {
+      connectionId: src.connection_id,
+      workspaceId: src.workspace_id,
+      environmentId: src.environment_id,
+    }, name));
+    await this.audit.record({
+      action: 'comm.whatsapp.template.duplicate',
+      entityType: 'WhatsappTemplate',
+      entityId: copy.id,
+      organizationId,
+      newValue: { from: src.id, name },
+    });
+    return copy;
+  }
+
+  /** Replica um template como RASCUNHO em outras conexões WhatsApp da org. Não
+   *  publica na Meta — o destino publica/sincroniza depois. Pula onde já existe. */
+  async replicate(
+    organizationId: string,
+    id: string,
+    connectionIds: string[],
+  ): Promise<Array<{ connection_id: string; success: boolean; shared?: boolean; template_id?: string; message: string }>> {
+    const src = await this.getById(organizationId, id);
+    const results: Array<{ connection_id: string; success: boolean; shared?: boolean; template_id?: string; message: string }> = [];
+    for (const targetId of Array.from(new Set(connectionIds ?? []))) {
+      if (targetId === src.connection_id) {
+        results.push({ connection_id: targetId, success: true, shared: true, message: 'É a conexão de origem — o template já está aqui.' });
+        continue;
+      }
+      let target: Connection;
+      try {
+        target = await this.loadConnection(organizationId, targetId);
+      } catch {
+        results.push({ connection_id: targetId, success: false, message: 'Conexão WhatsApp não encontrada.' });
+        continue;
+      }
+      const existing = await this.repository.findByName(target.id, src.name, src.language);
+      if (existing) {
+        results.push({ connection_id: targetId, success: true, shared: true, template_id: existing.id, message: 'Já existe um template com este nome/idioma nesta conexão.' });
+        continue;
+      }
+      const created = await this.repository.create(this.buildCopy(src, {
+        connectionId: target.id,
+        workspaceId: target.workspace_id,
+        environmentId: target.environment_id,
+      }, src.name));
+      results.push({ connection_id: targetId, success: true, template_id: created.id, message: 'Rascunho criado — publique/sincronize para enviar à Meta.' });
+    }
+    await this.audit.record({
+      action: 'comm.whatsapp.template.replicate',
+      entityType: 'WhatsappTemplate',
+      entityId: id,
+      organizationId,
+      newValue: { targets: connectionIds },
+    });
+    return results;
+  }
+
+  /** Nome de cópia único na conexão: `<nome>_copia`, `_copia2`, ... */
+  private async uniqueCopyName(connectionId: string, baseName: string, language: string): Promise<string> {
+    const base = `${baseName}_copia`;
+    let name = base;
+    let n = 2;
+    // eslint-disable-next-line no-await-in-loop
+    while (await this.repository.findByName(connectionId, name, language)) {
+      name = `${base}${n}`;
+      n += 1;
+    }
+    return name;
+  }
+
+  private buildCopy(
+    src: WhatsappTemplate,
+    target: { connectionId: string; workspaceId: string; environmentId: string },
+    name: string,
+  ): Prisma.WhatsappTemplateUncheckedCreateInput {
+    return {
+      organization_id: src.organization_id,
+      workspace_id: target.workspaceId,
+      environment_id: target.environmentId,
+      connection_id: target.connectionId,
+      name,
+      language: src.language,
+      category: src.category,
+      status: 'DRAFT',
+      components: src.components as never,
+      is_system_template: false,
+      event: src.event,
+      buttons_json: src.buttons_json as never,
+      variable_map_json: src.variable_map_json as never,
+    };
   }
 
   // ─── Criacao local + publicacao na Meta ─────────────
