@@ -61,6 +61,7 @@ const EMPTY = {
   persona: { name: '', tone: '', emojis: false, emojis_ui: '', brevity: 'medium', rules_always: [], rules_never: [] },
   allowed_tools: [], knowledge_base_ids: [], memory_profile_ids: [], action_permissions: [],
   guardrails: { max_cost_usd_per_run: '', blocked_words: [], pii_redact: false },
+  conversation: { auto_reply: false, debounce_seconds: 12, split_paragraphs: false, supervised: false },
 };
 
 export default function AgenteEditor() {
@@ -153,6 +154,7 @@ export default function AgenteEditor() {
   const patchPersona = (p) => setForm((prev) => ({ ...prev, persona: { ...prev.persona, ...p } }));
   const patchGuard = (p) => setForm((prev) => ({ ...prev, guardrails: { ...prev.guardrails, ...p } }));
   const patchRoteiro = (p) => setForm((prev) => ({ ...prev, roteiro: { ...prev.roteiro, ...p } }));
+  const patchConversation = (p) => setForm((prev) => ({ ...prev, conversation: { ...prev.conversation, ...p } }));
 
   // Passos (na ordem) — adicionar / editar / mover / remover.
   const addPasso = () => patchRoteiro({ passos: [...(form.roteiro.passos || []), { titulo: '', descricao: '' }] });
@@ -251,6 +253,13 @@ export default function AgenteEditor() {
         guardrails: {
           ...form.guardrails,
           max_cost_usd_per_run: toNullable(form.guardrails.max_cost_usd_per_run),
+        },
+        conversation: {
+          auto_reply: !!form.conversation.auto_reply,
+          // Clampa 1..120; vazio/NaN volta pro padrão 12.
+          debounce_seconds: Math.min(120, Math.max(1, Number(form.conversation.debounce_seconds) || 12)),
+          split_paragraphs: !!form.conversation.split_paragraphs,
+          supervised: !!form.conversation.supervised,
         },
       };
       let saved;
@@ -413,6 +422,7 @@ export default function AgenteEditor() {
       )}
 
       {tab === 'quem' && (
+        <div className="space-y-4">
         <Card>
           <div style={{ padding: 20 }} className="space-y-4">
             <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
@@ -456,6 +466,46 @@ export default function AgenteEditor() {
             </Field>
           </div>
         </Card>
+
+        <Card>
+          <div style={{ padding: 20 }} className="space-y-4">
+            <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>Como conversa</p>
+            <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
+              Como o assistente conduz a conversa no WhatsApp. Vale quando ele está vinculado a um número (em WhatsApp → Números).
+            </p>
+            <Checkbox
+              id="conv-auto-reply"
+              label="Atender automaticamente (responder sozinho as mensagens recebidas)"
+              checked={!!form.conversation.auto_reply}
+              onChange={(e) => patchConversation({ auto_reply: e.target.checked })}
+            />
+            <FormGrid columns={2}>
+              <Field label="Espera antes de responder (segundos)" hint="Junta as mensagens enviadas em sequência antes de responder. Padrão 12, máximo 120.">
+                <NumericInput
+                  value={form.conversation.debounce_seconds}
+                  onChange={(v) => patchConversation({ debounce_seconds: v })}
+                  min={1}
+                  max={120}
+                  step={1}
+                  fullWidth
+                />
+              </Field>
+            </FormGrid>
+            <Checkbox
+              id="conv-split"
+              label="Quebrar a resposta em parágrafos curtos (bolhas separadas)"
+              checked={!!form.conversation.split_paragraphs}
+              onChange={(e) => patchConversation({ split_paragraphs: e.target.checked })}
+            />
+            <Checkbox
+              id="conv-supervised"
+              label="Modo supervisionado (atende sozinho enquanto não houver atendente humano)"
+              checked={!!form.conversation.supervised}
+              onChange={(e) => patchConversation({ supervised: e.target.checked })}
+            />
+          </div>
+        </Card>
+        </div>
       )}
 
       {tab === 'faz' && (
@@ -1047,6 +1097,10 @@ function hydrate(agent) {
       ...EMPTY.guardrails,
       ...guard,
       max_cost_usd_per_run: guard.max_cost_usd_per_run ?? '',
+    },
+    conversation: {
+      ...EMPTY.conversation,
+      ...(agent.conversation && typeof agent.conversation === 'object' ? agent.conversation : {}),
     },
   };
 }

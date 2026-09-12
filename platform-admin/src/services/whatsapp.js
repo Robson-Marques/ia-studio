@@ -246,6 +246,32 @@ export async function syncNumber(id) {
   catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao sincronizar o número')); }
 }
 
+// ─── Assistente do número (vínculo) ──────────────────────────
+
+// Vínculo atual do número (ou null): { connection_id, agent_id, agent_name, is_enabled }.
+export async function getNumberAssistant(id) {
+  try {
+    const { data } = await api.get(`/comm/whatsapp/numbers/${id}/assistant`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar o assistente do número')); }
+}
+
+// Vincula (ou troca) o assistente que atende o número.
+export async function setNumberAssistant(id, body) {
+  try {
+    const { data } = await api.put(`/comm/whatsapp/numbers/${id}/assistant`, body);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao vincular o assistente ao número')); }
+}
+
+// Desvincula o assistente (o número deixa de ter atendimento automático).
+export async function removeNumberAssistant(id) {
+  try {
+    const { data } = await api.delete(`/comm/whatsapp/numbers/${id}/assistant`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao desvincular o assistente')); }
+}
+
 // ─── Equipes e Filas ─────────────────────────────────────────
 
 export async function listTeams(includeInactive = false) {

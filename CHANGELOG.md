@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.10.83 - 2026-09-12 (Assistente que conduz: frontend — "Como conversa" + vincular número — Checkpoint 4 da frente)
+
+Sem `db push`. Só `platform-admin` (build do painel). Liga as telas ao que o backend (v0.10.80–82) já faz — **agora dá pra usar sem API**.
+
+- **Editor do assistente → aba "Quem é"**: novo bloco **"Como conversa"** — atender automaticamente, espera antes de responder (segundos, 1..120), quebrar em parágrafos curtos e modo supervisionado. Salva no campo `conversation` (entra no create/update, no snapshot de versão e no export).
+- **WhatsApp → Números**: coluna **"Assistente"** e ação **Vincular/Alterar** (só com `comm.whatsapp.assistant.manage`). Modal para escolher o assistente, ligar/pausar o atendimento automático (sem desvincular) e **Desvincular**. O botão não dispara a abertura da conexão (a linha continua indo pra conexão).
+- `services/whatsapp.js`: clientes de `get/put/delete` do vínculo (`/comm/whatsapp/numbers/:id/assistant`).
+
+Fluxo completo de uso: cria/ajusta o assistente, liga "atender automaticamente" em "Como conversa", e vincula o assistente ao número em Números. A IA passa a atender aquele número sem nenhum fluxo. Falta só a demoção dos Fluxos pro modo avançado (v0.10.84).
+
 ## v0.10.82 - 2026-09-12 (Assistente que conduz: condutor embutido inbound → IA — Checkpoint 3 da frente)
 
 Sem `db push`. Só `platform-api`. **É aqui que a IA passa a atender WhatsApp sem fluxo.**

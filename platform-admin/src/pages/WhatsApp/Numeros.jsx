@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Modal, Field, Select, Checkbox, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
-import { listNumbers, syncNumber } from '../../services/whatsapp';
+import {
+  listNumbers, syncNumber,
+  getNumberAssistant, setNumberAssistant, removeNumberAssistant,
+} from '../../services/whatsapp';
+import { listAgents } from '../../services/ai';
 import { MESSAGING_LIMIT_LABEL, QUALITY, formatPhone } from './whatsapp.constants';
 import { statusToTone } from '../../lib/tone';
 
@@ -48,6 +52,15 @@ export default function Numeros() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [q, setQ] = useState('');
+  // Vínculo assistente↔número (map connection_id → view).
+  const [bindings, setBindings] = useState({});
+  const [agents, setAgents] = useState([]);
+  const [modalNumber, setModalNumber] = useState(null); // número sendo editado
+  const [mAgentId, setMAgentId] = useState('');
+  const [mEnabled, setMEnabled] = useState(true);
+  const [savingBind, setSavingBind] = useState(false);
+
+  const canManageAssistant = can('comm.whatsapp.assistant.manage');
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -61,7 +74,9 @@ export default function Numeros() {
   async function load() {
     setLoading(true);
     try {
-      setItems(await listNumbers());
+      const numbers = await listNumbers();
+      setItems(numbers);
+      loadBindings(numbers);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -69,7 +84,65 @@ export default function Numeros() {
     }
   }
 
+  // Vínculo de cada número (para a coluna "Assistente"). Best-effort — um número
+  // sem vínculo simplesmente não aparece no mapa.
+  async function loadBindings(numbers) {
+    const results = await Promise.all(
+      (numbers || []).map((n) =>
+        getNumberAssistant(n.id).then((v) => [n.id, v]).catch(() => [n.id, null]),
+      ),
+    );
+    const map = {};
+    for (const [id, view] of results) if (view) map[id] = view;
+    setBindings(map);
+  }
+
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Vínculo assistente↔número ──────────────────────
+  async function openAssistantModal(number) {
+    setModalNumber(number);
+    const current = bindings[number.id];
+    setMAgentId(current?.agent_id || '');
+    setMEnabled(current?.is_enabled ?? true);
+    if (!agents.length) {
+      try {
+        const list = await listAgents();
+        setAgents(list.filter((a) => a.is_active));
+      } catch (err) { toast.error(err.message); }
+    }
+  }
+
+  async function saveAssistant() {
+    if (!modalNumber) return;
+    if (!mAgentId) { toast.error('Escolha um assistente.'); return; }
+    setSavingBind(true);
+    try {
+      await setNumberAssistant(modalNumber.id, { agent_id: mAgentId, is_enabled: mEnabled });
+      toast.success('Assistente vinculado ao número.');
+      setModalNumber(null);
+      await loadBindings(items);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingBind(false);
+    }
+  }
+
+  async function removeAssistant() {
+    if (!modalNumber) return;
+    setSavingBind(true);
+    try {
+      await removeNumberAssistant(modalNumber.id);
+      toast.success('Assistente desvinculado.');
+      setModalNumber(null);
+      await loadBindings(items);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingBind(false);
+    }
+  }
 
   async function handleSync(ids, clear) {
     setSyncing(true);
@@ -130,6 +203,25 @@ export default function Numeros() {
     } },
     { key: 'limit', header: 'Pode enviar', render: (n) => MESSAGING_LIMIT_LABEL[n.messaging_limit] || 'não informado pela Meta' },
     { key: 'templates', header: 'Templates', align: 'right', render: (n) => n.templates_count ?? 0 },
+    { key: 'assistant', header: 'Assistente', render: (n) => {
+      const b = bindings[n.id];
+      return (
+        <div className="flex items-center gap-2">
+          {b
+            ? <span style={{ fontSize: 13, color: 'var(--su-text-primary)' }}>{b.agent_name || 'assistente'}{b.is_enabled ? '' : ' (pausado)'}</span>
+            : <span style={{ color: 'var(--su-text-muted)' }}>—</span>}
+          {canManageAssistant && (
+            <Button
+              variant="ghost" size="sm" icon={b ? 'edit' : 'plus'}
+              title={b ? 'Alterar ou desvincular o assistente deste número' : 'Vincular um assistente de IA a este número'}
+              onClick={(e) => { e.stopPropagation(); openAssistantModal(n); }}
+            >
+              {b ? 'Alterar' : 'Vincular'}
+            </Button>
+          )}
+        </div>
+      );
+    } },
     { key: 'health', header: 'Última checagem', render: (n) => {
       if (n.last_health_ok === null || n.last_health_ok === undefined) return '—';
       return n.last_health_ok
@@ -158,6 +250,7 @@ export default function Numeros() {
   };
 
   return (
+    <>
     <ListScreen
       title="Números"
       subtitle="Os números de WhatsApp conectados à Meta. A sincronização automática roda a cada 10 minutos."
@@ -181,5 +274,47 @@ export default function Numeros() {
       }}
       emptyFiltered={{ title: 'Nenhum número encontrado', description: 'Nenhum número com esse nome ou telefone.', onClear: () => setQ('') }}
     />
+
+    <Modal
+      open={!!modalNumber}
+      onClose={() => (savingBind ? null : setModalNumber(null))}
+      title={modalNumber ? `Assistente de ${modalNumber.name}` : 'Assistente do número'}
+      maxWidth={520}
+      footer={
+        <div className="flex items-center gap-2" style={{ justifyContent: 'space-between', width: '100%' }}>
+          <span>
+            {modalNumber && bindings[modalNumber.id] && (
+              <Button variant="ghost" icon="trash" disabled={savingBind} onClick={removeAssistant}>
+                Desvincular
+              </Button>
+            )}
+          </span>
+          <span className="flex items-center gap-2">
+            <Button variant="secondary" disabled={savingBind} onClick={() => setModalNumber(null)}>Cancelar</Button>
+            <Button variant="primary" loading={savingBind} onClick={saveAssistant}>Salvar</Button>
+          </span>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <p style={{ fontSize: 13, color: 'var(--su-text-muted)', margin: 0 }}>
+          Este assistente atende sozinho as mensagens deste número. O comportamento (responder
+          automaticamente, tempo de espera, parágrafos) é configurado no próprio assistente, em IA → Assistentes → “Como conversa”.
+        </p>
+        <Field label="Assistente">
+          <Select value={mAgentId} onChange={(e) => setMAgentId(e.target.value)}>
+            <option value="">Escolha um assistente…</option>
+            {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </Select>
+        </Field>
+        <Checkbox
+          id="bind-enabled"
+          label="Atendimento automático ligado (desmarque para pausar sem desvincular)"
+          checked={mEnabled}
+          onChange={(e) => setMEnabled(e.target.checked)}
+        />
+      </div>
+    </Modal>
+    </>
   );
 }
