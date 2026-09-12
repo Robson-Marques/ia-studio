@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.10.75 - 2026-09-12 (WhatsApp Templates: qualidade + categoria ao vivo por webhook — Checkpoint 2)
+
+**Com `db push`** (adiciona `quality` em `comm_whatsapp_templates`). Só `platform-api`.
+
+Revisão do plano na comparação fina: **"importar da Meta" já estava coberto** — o nosso `sync` puxa TODOS os templates da WABA e faz upsert local; e o **status básico** (aprovado/recusado/pausado) já chegava ao vivo por webhook. O que faltava eram os OUTROS eventos de template que a Meta manda e a gente ignorava. Este checkpoint fecha isso:
+
+- **`message_template_quality_update`** → grava a **nota de qualidade** (GREEN/YELLOW/RED/UNKNOWN) no campo novo `quality`. Nota baixa degrada o número — sinal operacional que faltava.
+- **`template_category_update`** → quando a Meta troca a categoria do template sozinha, o nosso registro acompanha.
+- Sem endpoint novo: o webhook já roteia todo `change` para o `handleChange`; estes campos só passam a ser tratados (antes caíam no log genérico).
+
+Não portei o fluxo "importaveis/importar" do Aquapark — seria redundante com o `sync` (mesma lógica do painel de flags: o nosso já cobre de forma mais simples).
+
 ## v0.10.74 - 2026-09-11 (WhatsApp Templates: CRUD + vínculo a evento — Checkpoint 1)
 
 Sem `db push` (o modelo `WhatsappTemplate` já tinha os campos). Só `platform-api`.

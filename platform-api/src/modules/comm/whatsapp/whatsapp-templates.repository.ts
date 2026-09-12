@@ -87,6 +87,23 @@ export class WhatsappTemplatesRepository {
     });
   }
 
+  /** Atualiza campos vindos de webhook da Meta (categoria/qualidade) por nome. */
+  async updateMetaFieldsByName(
+    connectionId: string,
+    name: string,
+    language: string,
+    fields: { category?: string; quality?: string },
+  ): Promise<number> {
+    const data: Prisma.WhatsappTemplateUpdateManyMutationInput = { synced_at: new Date() };
+    if (fields.category) data.category = fields.category;
+    if (fields.quality) data.quality = fields.quality;
+    const result = await this.prisma.whatsappTemplate.updateMany({
+      where: { connection_id: connectionId, name, language },
+      data,
+    });
+    return result.count;
+  }
+
   async updateStatusByName(
     connectionId: string,
     name: string,

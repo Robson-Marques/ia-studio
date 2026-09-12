@@ -848,6 +848,9 @@ model WhatsappTemplate {
   components       Json               @default("[]")
   meta_template_id String?
   rejection_reason String?
+  // Nota de qualidade da Meta: GREEN | YELLOW | RED | UNKNOWN. Atualizada por
+  // webhook (message_template_quality_update). Nota baixa degrada o número.
+  quality          String?
   synced_at        DateTime?
   // ─── Catálogo de padrões prontos-pra-publicar (docs-as-code) ─────────
   // is_system_template = veio do SEED_CATALOG (não do CRUD do usuário). event =

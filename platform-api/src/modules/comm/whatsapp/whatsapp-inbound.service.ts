@@ -37,6 +37,11 @@ interface WebhookValue {
   message_template_name?: string;
   message_template_language?: string;
   reason?: string;
+  // message_template_quality_update / template_category_update
+  new_quality_score?: string;
+  quality_score?: string;
+  new_category?: string;
+  previous_category?: string;
 }
 
 @Injectable()
@@ -60,6 +65,14 @@ export class WhatsappInboundService {
     }
     if (field === 'message_template_status_update') {
       await this.handleTemplateStatus(connection, value);
+      return;
+    }
+    if (field === 'message_template_quality_update') {
+      await this.handleTemplateQuality(connection, value);
+      return;
+    }
+    if (field === 'template_category_update') {
+      await this.handleTemplateCategory(connection, value);
       return;
     }
     // Demais campos (phone_number_quality_update, account_update...) são
@@ -208,6 +221,42 @@ export class WhatsappInboundService {
       operation: 'webhook:template_status',
       status: IntegrationLogStatus.SUCCESS,
       responseMeta: { template: name, language, status, reason: value.reason ?? null },
+    });
+  }
+
+  // ─── Qualidade do template (GREEN/YELLOW/RED) ────────
+
+  private async handleTemplateQuality(connection: Connection, value: WebhookValue): Promise<void> {
+    const name = value.message_template_name;
+    const language = value.message_template_language ?? 'pt_BR';
+    const quality = String(value.new_quality_score ?? value.quality_score ?? '').toUpperCase();
+    if (!name || !['GREEN', 'YELLOW', 'RED', 'UNKNOWN'].includes(quality)) return;
+    await this.templates.updateMetaFieldsByName(connection.id, name, language, { quality });
+    await this.integrationLogs.record({
+      organizationId: connection.organization_id,
+      connectionId: connection.id,
+      direction: IntegrationDirection.INBOUND,
+      operation: 'webhook:template_quality',
+      status: IntegrationLogStatus.SUCCESS,
+      responseMeta: { template: name, language, quality },
+    });
+  }
+
+  // ─── Categoria trocada pela Meta ─────────────────────
+
+  private async handleTemplateCategory(connection: Connection, value: WebhookValue): Promise<void> {
+    const name = value.message_template_name;
+    const language = value.message_template_language ?? 'pt_BR';
+    const category = String(value.new_category ?? '').toUpperCase();
+    if (!name || !['MARKETING', 'UTILITY', 'AUTHENTICATION'].includes(category)) return;
+    await this.templates.updateMetaFieldsByName(connection.id, name, language, { category });
+    await this.integrationLogs.record({
+      organizationId: connection.organization_id,
+      connectionId: connection.id,
+      direction: IntegrationDirection.INBOUND,
+      operation: 'webhook:template_category',
+      status: IntegrationLogStatus.SUCCESS,
+      responseMeta: { template: name, language, category, previous: value.previous_category ?? null },
     });
   }
 }
