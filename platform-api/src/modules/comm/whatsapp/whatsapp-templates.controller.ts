@@ -115,4 +115,25 @@ export class WhatsappTemplatesController {
   ) {
     return this.templates.replicate(resolveOrganizationId(user, orgQuery), id, dto.connection_ids);
   }
+
+  @Post(':id/push-edit')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE)
+  pushEdit(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateTemplateDto,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.templates.pushEdit(resolveOrganizationId(user, orgQuery), id, dto);
+  }
+
+  @Post(':id/delete-official')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE)
+  deleteOfficial(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.templates.deleteOfficial(resolveOrganizationId(user, orgQuery), id);
+  }
 }

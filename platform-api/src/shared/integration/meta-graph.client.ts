@@ -93,6 +93,16 @@ export async function metaPost(
   return (res.data ?? {}) as Record<string, unknown>;
 }
 
+export async function metaDelete(token: string, path: string, context: string): Promise<Record<string, unknown>> {
+  const res = await httpRequest(`${META_GRAPH_BASE}/${path}`, {
+    method: 'DELETE',
+    headers: auth(token),
+    timeoutMs: 20_000,
+  });
+  throwIfError(res.status, res.ok, res.data, context);
+  return (res.data ?? {}) as Record<string, unknown>;
+}
+
 /**
  * Inscreve o app (dono do token) na WABA — PRE-REQUISITO pra RECEBER webhooks
  * de mensagem. Sem isso, a Meta verifica a URL mas nao encaminha os eventos
@@ -162,6 +172,30 @@ export function createWabaTemplate(
   template: { name: string; language: string; category: string; components: unknown[] },
 ): Promise<Record<string, unknown>> {
   return metaPost(token, `${wabaId}/message_templates`, template, 'criar template');
+}
+
+/**
+ * Edita um template já publicado (POST /{template_id}). A Meta só aceita alterar
+ * categoria/componentes (nome e idioma são imutáveis) e reenvia para análise.
+ */
+export function editWabaTemplate(
+  token: string,
+  templateId: string,
+  patch: { category?: string; components?: unknown[] },
+): Promise<Record<string, unknown>> {
+  return metaPost(token, `${templateId}`, patch, 'editar template');
+}
+
+/** Remove um template da WABA. Por hsm_id + name remove aquele idioma específico. */
+export function deleteWabaTemplate(
+  token: string,
+  wabaId: string,
+  params: { name: string; hsmId?: string },
+): Promise<Record<string, unknown>> {
+  const qs = params.hsmId
+    ? `name=${encodeURIComponent(params.name)}&hsm_id=${encodeURIComponent(params.hsmId)}`
+    : `name=${encodeURIComponent(params.name)}`;
+  return metaDelete(token, `${wabaId}/message_templates?${qs}`, 'excluir template');
 }
 
 // ─── Midia (download em 2 passos: metadata → binario) ──────────────────

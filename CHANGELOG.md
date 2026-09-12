@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.10.77 - 2026-09-12 (WhatsApp Templates: editar publicado e remover da Meta — Checkpoint 3b)
+
+Sem `db push`. Só `platform-api`. Operações que tocam a Meta (Graph API).
+
+- **`POST :id/push-edit`** — edita um template **já publicado** (categoria/componentes) direto na Meta e reenvia para análise (volta a `PENDING`). Bloqueia se o template ainda não está na Meta (aí é o PUT de rascunho).
+- **`POST :id/delete-official`** — remove o template **da Meta** (por nome + hsm_id) e, em seguida, localmente. Complementa o `DELETE :id` (que só apagava o local e bloqueava quando havia cópia na Meta).
+- **Provider Meta**: operações novas `editTemplate` e `deleteTemplate`; e no `meta-graph.client` os métodos `editWabaTemplate`, `deleteWabaTemplate` e o helper `metaDelete` (DELETE na Graph API).
+
+Falta do catálogo: `header-media` (mídia de cabeçalho — upload retomável da Meta, mais envolvido) e a **UI** grande de templates.
+
 ## v0.10.76 - 2026-09-12 (WhatsApp Templates: duplicar e replicar — Checkpoint 3a)
 
 Sem `db push`. Só `platform-api`. Operações locais (não chamam a Meta).

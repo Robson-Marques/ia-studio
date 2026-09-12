@@ -18,6 +18,8 @@ import {
 } from '../../../../shared/integration/provider.interface';
 import {
   createWabaTemplate,
+  editWabaTemplate,
+  deleteWabaTemplate,
   downloadMedia,
   getPhoneNumberInfo,
   listWabaPhoneNumbers,
@@ -57,6 +59,8 @@ export class WhatsappMetaProvider extends BaseProvider {
         'execute:sendRich',
         'execute:listTemplates',
         'execute:createTemplate',
+        'execute:editTemplate',
+        'execute:deleteTemplate',
         'execute:syncStatus',
         'execute:downloadMedia',
         'execute:markRead',
@@ -263,6 +267,23 @@ export class WhatsappMetaProvider extends BaseProvider {
           language: typeof p['language'] === 'string' ? (p['language'] as string) : 'pt_BR',
           category: typeof p['category'] === 'string' ? (p['category'] as string) : 'UTILITY',
           components: Array.isArray(p['components']) ? (p['components'] as unknown[]) : [],
+        });
+      }
+      case 'editTemplate': {
+        const templateId = String(p['template_id'] ?? '');
+        if (!templateId) throw new BadRequestException('editTemplate exige "template_id".');
+        return editWabaTemplate(token, templateId, {
+          ...(typeof p['category'] === 'string' ? { category: p['category'] as string } : {}),
+          ...(Array.isArray(p['components']) ? { components: p['components'] as unknown[] } : {}),
+        });
+      }
+      case 'deleteTemplate': {
+        if (!wabaId) throw new BadRequestException('Conexão sem WABA ID — não é possível excluir templates.');
+        const name = String(p['name'] ?? '');
+        if (!name) throw new BadRequestException('deleteTemplate exige "name".');
+        return deleteWabaTemplate(token, wabaId, {
+          name,
+          hsmId: typeof p['hsm_id'] === 'string' ? (p['hsm_id'] as string) : undefined,
         });
       }
       case 'markRead': {

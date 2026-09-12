@@ -106,6 +106,71 @@ export class WhatsappTemplatesService {
     return updated;
   }
 
+  // ─── Operações na Meta (push-edit / delete-official) ──
+
+  /** Edita um template JÁ publicado na Meta e o reenvia para análise (→ PENDING). */
+  async pushEdit(organizationId: string, id: string, dto: UpdateTemplateDto): Promise<WhatsappTemplate> {
+    const template = await this.getById(organizationId, id);
+    if (!template.meta_template_id) {
+      throw new BadRequestException('Este template ainda não está na Meta — edite o rascunho (PUT); ele publica no envio/sync.');
+    }
+    const components = this.buildComponents({
+      ...dto,
+      connection_id: template.connection_id,
+      name: template.name,
+      language: template.language,
+    } as CreateTemplateDto);
+    try {
+      await this.connections.execute(organizationId, template.connection_id, 'editTemplate', {
+        template_id: template.meta_template_id,
+        category: dto.category,
+        components,
+      });
+    } catch (e) {
+      throw new BadRequestException(`A Meta recusou a edição: ${(e as Error).message}`);
+    }
+    const updated = await this.repository.update(id, {
+      category: dto.category,
+      components: components as never,
+      status: 'PENDING',
+      rejection_reason: null,
+      synced_at: new Date(),
+    });
+    await this.audit.record({
+      action: 'comm.whatsapp.template.push_edit',
+      entityType: 'WhatsappTemplate',
+      entityId: id,
+      organizationId,
+      newValue: { category: dto.category },
+    });
+    return updated;
+  }
+
+  /** Remove o template da Meta (delete-official) e, em seguida, localmente. */
+  async deleteOfficial(organizationId: string, id: string): Promise<{ deleted: true }> {
+    const template = await this.getById(organizationId, id);
+    if (!template.meta_template_id) {
+      throw new BadRequestException('Este template não está na Meta — use a exclusão comum (DELETE).');
+    }
+    try {
+      await this.connections.execute(organizationId, template.connection_id, 'deleteTemplate', {
+        name: template.name,
+        hsm_id: template.meta_template_id,
+      });
+    } catch (e) {
+      throw new BadRequestException(`A Meta recusou a exclusão: ${(e as Error).message}`);
+    }
+    await this.repository.delete(id);
+    await this.audit.record({
+      action: 'comm.whatsapp.template.delete_official',
+      entityType: 'WhatsappTemplate',
+      entityId: id,
+      organizationId,
+      oldValue: { name: template.name, language: template.language, meta_template_id: template.meta_template_id },
+    });
+    return { deleted: true };
+  }
+
   // ─── Reuso: duplicar / replicar (local, como rascunho) ──
 
   /** Duplica um template na MESMA conexão como rascunho, com nome único. */
