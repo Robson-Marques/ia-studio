@@ -1,7 +1,7 @@
 // Números WhatsApp — visao das conexoes whatsapp-meta da organization com
 // qualidade/limite/status/health (painel da conexao, spec Wizard Meta) +
 // sync manual. A criacao de conexao continua no Connection Wizard (Fase 2).
-import { Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Connection } from '@prisma/client';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
@@ -11,8 +11,10 @@ import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { WhatsappSyncService } from './whatsapp-sync.service';
+import { WhatsappAssistantService } from './whatsapp-assistant.service';
 import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { SetChannelAssistantDto } from '../dto/set-channel-assistant.dto';
 
 @ApiTags('Comm — WhatsApp Números')
 @ApiBearerAuth()
@@ -22,6 +24,7 @@ export class WhatsappNumbersController {
     private readonly connections: ConnectionsRepository,
     private readonly sync: WhatsappSyncService,
     private readonly prisma: PrismaService,
+    private readonly assistant: WhatsappAssistantService,
   ) {}
 
   @Get()
@@ -56,6 +59,44 @@ export class WhatsappNumbersController {
       throw new NotFoundException('Conexão WhatsApp não encontrada.');
     }
     return this.sync.syncConnection(connection);
+  }
+
+  // ─── Vínculo assistente↔número ──────────────────────
+  // Qual assistente de IA atende sozinho este número. Leitura usa a mesma perm
+  // de ver números; vincular/desvincular exige a perm de gerência do vínculo.
+
+  @Get(':id/assistant')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ)
+  async getAssistant(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    const organizationId = resolveOrganizationId(user, orgQuery);
+    return this.assistant.get(organizationId, id);
+  }
+
+  @Put(':id/assistant')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE)
+  async setAssistant(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SetChannelAssistantDto,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    const organizationId = resolveOrganizationId(user, orgQuery);
+    return this.assistant.set(organizationId, id, dto.agent_id, dto.is_enabled ?? true, user.sub ?? null);
+  }
+
+  @Delete(':id/assistant')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE)
+  async removeAssistant(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    const organizationId = resolveOrganizationId(user, orgQuery);
+    return this.assistant.remove(organizationId, id);
   }
 
   private toView(connection: Connection, state?: { [k: string]: unknown } | null) {

@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.81 - 2026-09-12 (Assistente que conduz: vínculo assistente↔número — Checkpoint 2 da frente)
+
+**Precisa de `db push`** (tabela nova `comm_channel_agents`). Só `platform-api`. Aditivo — ainda nada responde sozinho.
+
+Diz **qual assistente atende qual número**. É o dado que o condutor embutido (próximo checkpoint) vai ler pra saber quem chamar.
+
+- **Tabela `CommChannelAgent`** (`comm_channel_agents`): um assistente por conexão WhatsApp (`connection_id` único), com `is_enabled` pra ligar/desligar sem desfazer o vínculo. Genérica — aponta pro assistente por id (FK solta), sem acoplar o schema de IA ao de comm.
+- **API** em `comm/whatsapp/numbers/:id/assistant`: `GET` (ver vínculo), `PUT` (vincular/trocar — valida que a conexão e o assistente são da org e que o assistente está ativo), `DELETE` (desvincular).
+- **Permissão** nova `comm.whatsapp.assistant.manage` ("Vincular assistente de IA ao número") — Administrador herda; leitura usa a permissão de ver números. Entra no grupo WhatsApp do editor de perfis.
+- **Sem ligar nada**: o vínculo existe, mas nenhuma mensagem é respondida por ele ainda — isso é o v0.10.82 (condutor embutido).
+
 ## v0.10.80 - 2026-09-12 (Assistente que conduz: "Como conversa" — Checkpoint 1 da frente)
 
 **Precisa de `db push`** (coluna nova em `ai_agents`). Só `platform-api`. Aditivo — nada muda de comportamento ainda.

@@ -59,6 +59,8 @@ export const PERMISSIONS = {
   COMM_WHATSAPP_TEMPLATES_READ: 'comm.whatsapp.templates.read',
   COMM_WHATSAPP_TEMPLATES_MANAGE: 'comm.whatsapp.templates.manage',
   COMM_WHATSAPP_NUMBERS_READ: 'comm.whatsapp.numbers.read',
+  // Vincular um assistente de IA a um número (quem atende sozinho o canal).
+  COMM_WHATSAPP_ASSISTANT_MANAGE: 'comm.whatsapp.assistant.manage',
 
   // ─── Automação (Fase 4 — Automation Platform) ───────
   AUTOMATION_WORKFLOWS_READ: 'automation.workflows.read',
@@ -202,6 +204,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       PERMISSIONS.COMM_WHATSAPP_TEMPLATES_READ,
       PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE,
       PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ,
+      PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE,
     ],
   },
   {
@@ -324,6 +327,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.COMM_WHATSAPP_TEMPLATES_READ]: 'Ver templates WhatsApp',
   [PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE]: 'Criar/sincronizar templates WhatsApp',
   [PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ]: 'Ver números WhatsApp conectados',
+  [PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE]: 'Vincular assistente de IA ao número',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_READ]: 'Ver fluxos de automação',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_WRITE]: 'Criar/editar fluxos de automação',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_PUBLISH]: 'Publicar/reverter versões de fluxo',

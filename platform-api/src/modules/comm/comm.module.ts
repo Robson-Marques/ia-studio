@@ -24,6 +24,8 @@ import { WhatsappBaileysController } from './whatsapp/whatsapp-baileys.controlle
 import { WhatsappInboxController } from './whatsapp/whatsapp-inbox.controller';
 import { WhatsappTemplatesController } from './whatsapp/whatsapp-templates.controller';
 import { WhatsappNumbersController } from './whatsapp/whatsapp-numbers.controller';
+import { WhatsappAssistantRepository } from './whatsapp/whatsapp-assistant.repository';
+import { WhatsappAssistantService } from './whatsapp/whatsapp-assistant.service';
 
 import { AttendanceRepository } from './attendance/attendance.repository';
 import { ChatEventsService } from './attendance/chat-events.service';
@@ -60,6 +62,8 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
     WhatsappSmartSendService,
     WhatsappTemplatesService,
     WhatsappSyncService,
+    WhatsappAssistantRepository,
+    WhatsappAssistantService,
     // Atendimento
     AttendanceRepository,
     ChatEventsService,
@@ -70,6 +74,6 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
   ],
   // Orchestrator + smart-send + email sao a porta de envio das Fases 4-7
   // (automacao/IA/notificacoes).
-  exports: [WhatsappOrchestratorService, WhatsappSmartSendService, WhatsappInboxService, ChatAssignmentService, EmailOrchestratorService, WhatsappBaileysRegistryService],
+  exports: [WhatsappOrchestratorService, WhatsappSmartSendService, WhatsappInboxService, ChatAssignmentService, EmailOrchestratorService, WhatsappBaileysRegistryService, WhatsappAssistantService],
 })
 export class CommModule {}

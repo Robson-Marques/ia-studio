@@ -753,6 +753,28 @@ model WhatsappChat {
   @@map("comm_whatsapp_chats")
 }
 
+// Vínculo assistente↔número (frente "assistente conduz sem fluxo"): diz qual
+// assistente de IA atende sozinho um canal (conexão WhatsApp). Um por conexão
+// (connection_id @unique). Genérico — o domínio comm aponta pro AiAgent por id
+// (FK solta, sem relação Prisma, pra não acoplar o schema de IA ao de comm). O
+// condutor embutido (próximo checkpoint) lê daqui qual assistente chamar.
+model CommChannelAgent {
+  id              String   @id @default(uuid())
+  organization_id String
+  workspace_id    String
+  environment_id  String
+  connection_id   String   @unique
+  agent_id        String
+  is_enabled      Boolean  @default(true)
+  created_by      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([organization_id, workspace_id, environment_id])
+  @@index([agent_id])
+  @@map("comm_channel_agents")
+}
+
 model WhatsappMessage {
   id              String               @id @default(uuid())
   organization_id String
