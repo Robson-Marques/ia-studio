@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.80 - 2026-09-12 (Assistente que conduz: "Como conversa" — Checkpoint 1 da frente)
+
+**Precisa de `db push`** (coluna nova em `ai_agents`). Só `platform-api`. Aditivo — nada muda de comportamento ainda.
+
+Início da frente "assistente conduz a conversa sem fluxo" (direção A — cirúrgica, decidida no relatório de alinhamento). Este checkpoint só adiciona a configuração; quem a lê é o condutor embutido (próximo checkpoint).
+
+- **Campo `conversation`** (Json) no assistente — o painel "Como conversa", genérico (porta do Aquapark): `auto_reply` (responde sozinho no canal), `debounce_seconds` (espera juntando o bloco de mensagens; padrão 12, faixa 1..120, reinicia a cada mensagem nova), `split_paragraphs` (quebra em parágrafos curtos), `supervised` (atende sozinho enquanto não há humano e pede apoio sem transferir).
+- **`agent-conversation.ts`**: parse/normalização com padrões seguros (espelha `agent-persona.ts`/`agent-roteiro.ts`). É só comportamento de runtime — **não** entra no system prompt.
+- Entra no CRUD (create/update), no snapshot de versão e no export/import do assistente.
+- **Sem ligar nada**: nenhum assistente responde automaticamente por conta deste checkpoint. O vínculo assistente↔número vem no v0.10.81 e o condutor embutido no v0.10.82.
+
 ## v0.10.79 - 2026-09-12 (WhatsApp Templates: UI — editar (rascunho e publicado) — Checkpoint 4b)
 
 Sem `db push`. Só `platform-admin` (build do painel).

@@ -130,6 +130,7 @@ export class AgentsService {
       memory_profile_ids: dto.memory_profile_ids ?? [],
       action_permissions: dto.action_permissions ?? [],
       guardrails: dto.guardrails === undefined ? undefined : (dto.guardrails as Prisma.InputJsonValue),
+      conversation: dto.conversation === undefined ? undefined : (dto.conversation as Prisma.InputJsonValue),
       created_by: createdBy,
     });
     await this.usage.increment(organizationId, dto.workspace_id, 'ai_agents');
@@ -167,6 +168,7 @@ export class AgentsService {
     if (dto.memory_profile_ids !== undefined) data.memory_profile_ids = dto.memory_profile_ids;
     if (dto.action_permissions !== undefined) data.action_permissions = dto.action_permissions;
     if (dto.guardrails !== undefined) data.guardrails = dto.guardrails as Prisma.InputJsonValue;
+    if (dto.conversation !== undefined) data.conversation = dto.conversation as Prisma.InputJsonValue;
     if (dto.is_active !== undefined) data.is_active = dto.is_active;
     const agent = await this.repository.update(id, data);
     await this.audit.record({
@@ -266,6 +268,7 @@ export class AgentsService {
       knowledge_base_ids: [],
       memory_profile_ids: [],
       guardrails: this.asObject(snap['guardrails']),
+      conversation: this.asObject(snap['conversation']),
     };
     const agent = await this.create(organizationId, createDto, createdBy, actor);
     await this.audit.record({
@@ -293,6 +296,7 @@ export class AgentsService {
       max_tokens: agent.max_tokens,
       persona: agent.persona,
       roteiro: (agent as AiAgent & { roteiro?: unknown }).roteiro,
+      conversation: (agent as AiAgent & { conversation?: unknown }).conversation,
       allowed_tools: agent.allowed_tools,
       knowledge_base_ids: agent.knowledge_base_ids,
       memory_profile_ids: agent.memory_profile_ids,

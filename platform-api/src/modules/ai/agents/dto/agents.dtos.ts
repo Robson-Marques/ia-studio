@@ -96,6 +96,11 @@ export class CreateAgentDto {
   @IsOptional()
   @IsObject()
   guardrails?: Record<string, unknown>;
+
+  /** "Como conversa": { auto_reply, debounce_seconds, split_paragraphs, supervised }. */
+  @IsOptional()
+  @IsObject()
+  conversation?: Record<string, unknown>;
 }
 
 export class UpdateAgentDto {
@@ -177,6 +182,11 @@ export class UpdateAgentDto {
   @IsOptional()
   @IsObject()
   guardrails?: Record<string, unknown>;
+
+  /** "Como conversa": { auto_reply, debounce_seconds, split_paragraphs, supervised }. */
+  @IsOptional()
+  @IsObject()
+  conversation?: Record<string, unknown>;
 
   @IsOptional()
   @IsBoolean()

@@ -1318,6 +1318,11 @@ model AiAgent {
   action_permissions String[] @default([])
   // { max_cost_usd_per_run?, blocked_words?[], pii_redact? }
   guardrails         Json?
+  // "Como conversa" (genérico, porta do Aquapark): como o assistente CONDUZ a
+  // conversa em um canal. { auto_reply?, debounce_seconds? (padrão 12, 1..120),
+  // split_paragraphs?, supervised? }. Normalizado em agent-conversation.ts. Só
+  // comportamento de runtime — não entra no prompt (o condutor lê daqui).
+  conversation       Json?
   current_version    Int      @default(0)
   is_active          Boolean  @default(true)
   created_by         String?
