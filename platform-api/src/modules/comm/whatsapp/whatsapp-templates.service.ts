@@ -393,7 +393,14 @@ export class WhatsappTemplatesService {
   /** Componentes no formato Meta a partir dos campos basicos do form. */
   private buildComponents(dto: CreateTemplateDto): unknown[] {
     const components: unknown[] = [];
-    if (dto.header_text) {
+    // Só UM cabeçalho por template: mídia (com handle) tem precedência sobre texto.
+    if (dto.header_format && dto.header_handle) {
+      components.push({
+        type: 'HEADER',
+        format: dto.header_format,
+        example: { header_handle: [dto.header_handle] },
+      });
+    } else if (dto.header_text) {
       components.push({ type: 'HEADER', format: 'TEXT', text: dto.header_text });
     }
     const body: Record<string, unknown> = { type: 'BODY', text: dto.body_text };
@@ -416,6 +423,32 @@ export class WhatsappTemplatesService {
       });
     }
     return components;
+  }
+
+  /** Sobe a mídia de EXEMPLO do cabeçalho (via provider → upload resumível da
+   *  Meta) e devolve o handle + o formato inferido do mime. O handle vai no DTO
+   *  de criar/editar como header_handle + header_format. */
+  async uploadHeaderMedia(
+    organizationId: string,
+    connectionId: string,
+    file: { data: Buffer; mimeType: string; filename: string },
+  ): Promise<{ handle: string; format: 'IMAGE' | 'VIDEO' | 'DOCUMENT' }> {
+    await this.loadConnection(organizationId, connectionId);
+    const mime = file.mimeType || '';
+    const format: 'IMAGE' | 'VIDEO' | 'DOCUMENT' = mime.startsWith('image/')
+      ? 'IMAGE'
+      : mime.startsWith('video/')
+        ? 'VIDEO'
+        : 'DOCUMENT';
+    const res = (await this.connections.execute(organizationId, connectionId, 'uploadTemplateMedia', {
+      data: file.data,
+      mime_type: mime,
+      filename: file.filename,
+    })) as { handle?: string };
+    if (!res?.handle) {
+      throw new BadRequestException('A Meta não retornou o handle da mídia — tente novamente.');
+    }
+    return { handle: res.handle, format };
   }
 
   private async loadConnection(organizationId: string, connectionId: string): Promise<Connection> {

@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.88 - 2026-09-13 (Templates header-media — parte 2: componente + endpoint de upload)
+
+Sem `db push`. Só `platform-api`. Continua a fundação da v0.10.87.
+
+- **Endpoint** `POST /comm/whatsapp/templates/header-media` (multipart: `file` + `connection_id`): sobe a amostra pela conexão (→ upload resumível da Meta) e devolve `{ handle, format }` (formato inferido do mime: imagem/vídeo/documento). Mesmo padrão multipart do upload de mídia da inbox.
+- **`buildComponents`**: cabeçalho de **mídia** quando vêm `header_format` + `header_handle` (`{ type: HEADER, format, example: { header_handle:[...] } }`); senão, o de texto. Só um cabeçalho por template — a mídia tem precedência.
+- **DTOs** (criar e editar): campos `header_format` (IMAGE/VIDEO/DOCUMENT) e `header_handle`.
+- Como o handle da Meta é de uso único (consumido na criação), o campo é para o momento de criar/editar — não é reutilizável depois.
+
+Próximo (parte 3, frontend): no formulário de template, escolher o tipo de cabeçalho (nenhum/texto/imagem/vídeo/documento), subir a amostra e mandar `header_format`+`header_handle` no salvar.
+
 ## v0.10.87 - 2026-09-13 (Templates header-media — parte 1: upload resumível + App ID)
 
 Sem `db push`. Só `platform-api`. Fundação para templates com **cabeçalho de mídia** (imagem/vídeo/documento). Aditivo — ainda não muda o fluxo de criação.

@@ -17,6 +17,15 @@ export class UpdateTemplateDto {
   @MaxLength(60)
   header_text?: string;
 
+  /** Cabeçalho de MÍDIA: formato + handle (upload em templates/header-media). Precede header_text. */
+  @IsOptional()
+  @IsIn(['IMAGE', 'VIDEO', 'DOCUMENT'])
+  header_format?: 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+
+  @IsOptional()
+  @IsString()
+  header_handle?: string;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(1024)

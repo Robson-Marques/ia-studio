@@ -54,6 +54,16 @@ export class CreateTemplateDto {
   @MaxLength(60)
   header_text?: string;
 
+  /** Cabeçalho de MÍDIA: formato + handle obtido no upload (POST templates/header-media).
+   *  Quando presente, tem precedência sobre header_text. Só um cabeçalho por template. */
+  @IsOptional()
+  @IsIn(['IMAGE', 'VIDEO', 'DOCUMENT'])
+  header_format?: 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+
+  @IsOptional()
+  @IsString()
+  header_handle?: string;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(1024)
