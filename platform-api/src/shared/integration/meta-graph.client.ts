@@ -272,6 +272,58 @@ export async function uploadMedia(
   }
 }
 
+// ─── Upload resumível para HEADER de mídia de template (retorna handle) ──
+// Um template HSM com cabeçalho de mídia (imagem/vídeo/documento) exige um
+// "handle" de exemplo, obtido pela Resumable Upload API (nível do App, não do
+// número):
+//   1) abre a sessão em POST /{app_id}/uploads?file_length&file_type&file_name;
+//   2) envia o binário para a sessão (Authorization: OAuth, file_offset: 0).
+// O handle volta em { h } e vai no componente HEADER como example.header_handle.
+// Requer o App ID da conexão (config.app_id).
+export async function uploadTemplateMediaHandle(
+  token: string,
+  appId: string,
+  file: { data: Buffer; mimeType: string; filename: string },
+): Promise<string> {
+  const qs =
+    `file_length=${file.data.length}` +
+    `&file_type=${encodeURIComponent(file.mimeType)}` +
+    `&file_name=${encodeURIComponent(file.filename)}`;
+  // 1) Abre a sessão de upload (retorna id no formato "upload:<sessão>").
+  const start = await metaPost(token, `${appId}/uploads?${qs}`, {}, 'abrir upload de mídia do template');
+  const sessionId = typeof start['id'] === 'string' ? (start['id'] as string) : '';
+  if (!sessionId) throw new MetaApiError('Meta Cloud API — abrir upload: resposta sem id de sessão.', null, 500);
+
+  // 2) Envia os bytes para a sessão. A Meta exige Authorization: OAuth (não
+  // Bearer) e o cabeçalho file_offset. Body = binário cru.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const res = await fetch(`${META_GRAPH_BASE}/${sessionId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `OAuth ${token}`,
+        file_offset: '0',
+        'Content-Type': file.mimeType || 'application/octet-stream',
+      },
+      body: new Uint8Array(file.data),
+      signal: controller.signal,
+    });
+    let data: unknown = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+    throwIfError(res.status, res.ok, data, 'enviar mídia do template');
+    const handle = (data as { h?: string })?.h;
+    if (!handle) throw new MetaApiError('Meta Cloud API — enviar mídia do template: resposta sem handle.', null, res.status);
+    return handle;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ─── Envio de mensagens ─────────────────────────────────────────────────
 
 /** Monta as variaveis posicionais do BODY de um template. */

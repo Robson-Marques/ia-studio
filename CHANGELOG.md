@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.10.87 - 2026-09-13 (Templates header-media — parte 1: upload resumível + App ID)
+
+Sem `db push`. Só `platform-api`. Fundação para templates com **cabeçalho de mídia** (imagem/vídeo/documento). Aditivo — ainda não muda o fluxo de criação.
+
+- **Cliente Graph** (`meta-graph.client.ts`): `uploadTemplateMediaHandle(token, appId, arquivo)` — faz o upload resumível da Meta em dois passos (abre a sessão em `/{app_id}/uploads`, envia os bytes com `Authorization: OAuth`) e devolve o **handle** que vai no componente HEADER (`example.header_handle`).
+- **Provider whatsapp-meta**: capability `execute:uploadTemplateMedia` + case novo (valida App ID e recebe o arquivo). O App ID entra nas credenciais lidas da conexão.
+- **Wizard da conexão**: campo **App ID** (opcional) nas credenciais Meta — necessário só para cabeçalho de mídia; o resto funciona sem ele. Como fica no `config` da conexão, **não tem migração**: preencha o App ID na conexão WhatsApp (Integrações) quando for usar mídia no cabeçalho.
+
+Próximo (parte 2): `buildComponents` aceitar cabeçalho de mídia + endpoint para subir o arquivo de exemplo e obter o handle. Depois (parte 3): o seletor de mídia no formulário de template.
+
 ## v0.10.86 - 2026-09-13 (WhatsApp Templates: vincular a evento — última fatia da UI)
 
 Sem `db push`. Só `platform-admin` (build do painel). Consome o endpoint `bind` (v0.10.74).

@@ -28,6 +28,7 @@ import {
   sendMessage,
   subscribeAppToWaba,
   uploadMedia,
+  uploadTemplateMediaHandle,
 } from '../../../../shared/integration/meta-graph.client';
 import { RichMessage, TemplateVariables } from '../../../../shared/integration/whatsapp.types';
 
@@ -35,6 +36,7 @@ interface MetaConnectionRefs {
   token: string;
   phoneNumberId: string;
   wabaId: string;
+  appId: string;
 }
 
 @Injectable()
@@ -61,6 +63,7 @@ export class WhatsappMetaProvider extends BaseProvider {
         'execute:createTemplate',
         'execute:editTemplate',
         'execute:deleteTemplate',
+        'execute:uploadTemplateMedia',
         'execute:syncStatus',
         'execute:downloadMedia',
         'execute:markRead',
@@ -90,6 +93,13 @@ export class WhatsappMetaProvider extends BaseProvider {
                 help: 'Identificador do número na Cloud API (usado pra rotear o webhook).',
               },
               { key: 'waba_id', label: 'WABA ID', type: 'text', required: true, help: 'WhatsApp Business Account ID.' },
+              {
+                key: 'app_id',
+                label: 'App ID',
+                type: 'text',
+                required: false,
+                help: 'ID do App Meta. Necessário só para templates com cabeçalho de mídia (imagem/vídeo/documento); o resto funciona sem ele.',
+              },
               { key: 'access_token', label: 'Access Token', type: 'password', secret: true, required: true },
               {
                 key: 'app_secret',
@@ -146,11 +156,12 @@ export class WhatsappMetaProvider extends BaseProvider {
     const config = (ctx.connection.config ?? {}) as Record<string, unknown>;
     const phoneNumberId = typeof config['phone_number_id'] === 'string' ? (config['phone_number_id'] as string) : '';
     const wabaId = typeof config['waba_id'] === 'string' ? (config['waba_id'] as string) : '';
+    const appId = typeof config['app_id'] === 'string' ? (config['app_id'] as string) : '';
     const token = (await ctx.secrets.get('access_token')) ?? '';
     if (!token || !phoneNumberId) {
       throw new BadRequestException('Conexão WhatsApp sem Access Token/Phone Number ID configurados.');
     }
-    return { token, phoneNumberId, wabaId };
+    return { token, phoneNumberId, wabaId, appId };
   }
 
   // ─── IProvider ──────────────────────────────────────
@@ -201,7 +212,7 @@ export class WhatsappMetaProvider extends BaseProvider {
   }
 
   override async execute(ctx: ProviderContext, operation: string, params: unknown): Promise<unknown> {
-    const { token, phoneNumberId, wabaId } = await this.refs(ctx);
+    const { token, phoneNumberId, wabaId, appId } = await this.refs(ctx);
     const p = (params ?? {}) as Record<string, unknown>;
 
     switch (operation) {
@@ -247,6 +258,23 @@ export class WhatsappMetaProvider extends BaseProvider {
         }
         const mediaId = await uploadMedia(token, phoneNumberId, { data, mimeType: mime, filename });
         return { media_id: mediaId };
+      }
+      case 'uploadTemplateMedia': {
+        // Sobe a mídia de EXEMPLO do cabeçalho de um template e devolve o handle
+        // (vai no componente HEADER como example.header_handle). Exige o App ID.
+        if (!appId) {
+          throw new BadRequestException(
+            'Conexão sem App ID — preencha o App ID na conexão WhatsApp (Integrações) para usar cabeçalho de mídia em templates.',
+          );
+        }
+        const mime = String(p['mime_type'] ?? '');
+        const filename = String(p['filename'] ?? 'arquivo');
+        const data = p['data'];
+        if (!mime || !Buffer.isBuffer(data)) {
+          throw new BadRequestException('uploadTemplateMedia exige "data" (Buffer), "mime_type" e "filename".');
+        }
+        const handle = await uploadTemplateMediaHandle(token, appId, { data, mimeType: mime, filename });
+        return { handle };
       }
       case 'sendRich': {
         const to = String(p['to'] ?? '');
