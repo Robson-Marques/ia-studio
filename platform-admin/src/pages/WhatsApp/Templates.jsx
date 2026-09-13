@@ -5,7 +5,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import {
   listNumbers, listTemplates, syncTemplates,
-  duplicateTemplate, replicateTemplate, deleteTemplate, deleteTemplateOfficial,
+  duplicateTemplate, replicateTemplate, bindTemplateEvent, deleteTemplate, deleteTemplateOfficial,
 } from '../../services/whatsapp';
 import { TEMPLATE_STATUS } from './whatsapp.constants';
 import { statusToTone } from '../../lib/tone';
@@ -17,6 +17,15 @@ const QUALITY = {
   RED: { label: 'Ruim', tone: 'danger' },
   UNKNOWN: { label: '—', tone: 'neutral' },
 };
+
+// Eventos do sistema (mesma fonte do gatilho de fluxo). O vínculo aqui é um
+// MARCADOR local ("este template serve para tal acontecimento") — documentação,
+// não um gatilho automático.
+const EVENTOS = [
+  { value: 'whatsapp.inbound.message', label: 'Chegou uma mensagem de WhatsApp' },
+  { value: 'ai.agent.run.completed', label: 'Um assistente terminou um atendimento' },
+];
+const EVENTO_LABEL = Object.fromEntries(EVENTOS.map((e) => [e.value, e.label]));
 
 // Template "vive na Meta" quando tem id de lá e não é rascunho/rejeitado.
 function isOnMeta(t) {
@@ -52,6 +61,8 @@ export default function Templates() {
   const [confirmDel, setConfirmDel] = useState(null); // template alvo da exclusão
   const [replicar, setReplicar] = useState(null); // template alvo da replicação
   const [alvos, setAlvos] = useState([]); // connection_ids escolhidos no modal
+  const [vincular, setVincular] = useState(null); // template alvo do vínculo a evento
+  const [eventoSel, setEventoSel] = useState(''); // evento escolhido no modal
 
   const canManage = can('comm.whatsapp.templates.manage');
 
@@ -138,6 +149,27 @@ export default function Templates() {
     }
   }
 
+  function abrirVincular(t) {
+    setVincular(t);
+    setEventoSel(t.event || '');
+  }
+
+  async function confirmarVincular() {
+    const t = vincular;
+    if (!t) return;
+    setActing(true);
+    try {
+      await bindTemplateEvent(t.id, eventoSel || null);
+      toast.success(eventoSel ? 'Template marcado para o evento.' : 'Vínculo de evento removido.');
+      setVincular(null);
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActing(false);
+    }
+  }
+
   async function confirmarExclusao() {
     const t = confirmDel;
     if (!t) return;
@@ -162,6 +194,9 @@ export default function Templates() {
         </p>
         {t.rejection_reason && (
           <p style={{ fontSize: 11, margin: 0, color: 'var(--su-danger-fg)' }}>{t.rejection_reason}</p>
+        )}
+        {t.event && (
+          <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>Evento: {EVENTO_LABEL[t.event] || t.event}</p>
         )}
       </div>
     ) },
@@ -194,6 +229,13 @@ export default function Templates() {
           onClick={() => abrirReplicar(t)}
         >
           Replicar
+        </Button>
+        <Button
+          variant="ghost" size="sm" icon="bell" disabled={acting}
+          title="Marcar para qual acontecimento este template serve"
+          onClick={() => abrirVincular(t)}
+        >
+          Evento
         </Button>
         <Button
           variant="ghost" size="sm" icon="trash" disabled={acting}
@@ -304,6 +346,30 @@ export default function Templates() {
             <p style={{ fontSize: 13, color: 'var(--su-text-muted)', margin: 0 }}>Não há outro número conectado para replicar.</p>
           )}
         </div>
+      </div>
+    </Modal>
+    <Modal
+      open={!!vincular}
+      onClose={() => (acting ? null : setVincular(null))}
+      title={vincular ? `Evento de "${vincular.name}"` : 'Vincular a evento'}
+      maxWidth={520}
+      footer={
+        <div className="flex items-center gap-2" style={{ justifyContent: 'flex-end', width: '100%' }}>
+          <Button variant="secondary" disabled={acting} onClick={() => setVincular(null)}>Cancelar</Button>
+          <Button variant="primary" loading={acting} onClick={confirmarVincular}>Salvar</Button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <p style={{ fontSize: 13, color: 'var(--su-text-muted)', margin: 0 }}>
+          Marca para qual acontecimento este template serve. É uma etiqueta de organização — não dispara envio sozinho.
+        </p>
+        <Field label="Acontecimento">
+          <Select value={eventoSel} onChange={(e) => setEventoSel(e.target.value)}>
+            <option value="">Nenhum (desvincular)</option>
+            {EVENTOS.map((ev) => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
+          </Select>
+        </Field>
       </div>
     </Modal>
     </>

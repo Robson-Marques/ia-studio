@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.10.86 - 2026-09-13 (WhatsApp Templates: vincular a evento — última fatia da UI)
+
+Sem `db push`. Só `platform-admin` (build do painel). Consome o endpoint `bind` (v0.10.74).
+
+- Ação **Evento** na lista de templates (com `comm.whatsapp.templates.manage`): modal com um Select dos acontecimentos do sistema (mesma lista do gatilho de fluxo — "chegou mensagem de WhatsApp", "assistente terminou atendimento") + "Nenhum" para desvincular. O evento marcado aparece embaixo do nome do template.
+- **É um marcador/etiqueta**, não um gatilho automático: hoje nada dispara envio a partir dele (a auto-resposta por fluxo saiu na v0.10.84 e o condutor da IA não usa esse campo). Serve pra organizar/documentar a intenção do template; um fluxo pode usá-lo como referência.
+
+Com isso a **UI de Templates está completa**: criar, editar (rascunho e publicado/push-edit), qualidade, duplicar, replicar entre números, vincular a evento e excluir/remover da Meta. No backend, resta só o `header-media` (cabeçalho com imagem/vídeo/documento, via upload resumível da Meta).
+
 ## v0.10.85 - 2026-09-13 (WhatsApp Templates: replicar entre números)
 
 Sem `db push`. Só `platform-admin` (build do painel). Consome o endpoint `replicate` (v0.10.76) — backend já pronto.
