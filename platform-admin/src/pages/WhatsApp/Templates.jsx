@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListScreen, Badge, Button, Select, Field, ConfirmDialog, useToast } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Select, Field, Checkbox, Modal, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import {
   listNumbers, listTemplates, syncTemplates,
-  duplicateTemplate, deleteTemplate, deleteTemplateOfficial,
+  duplicateTemplate, replicateTemplate, deleteTemplate, deleteTemplateOfficial,
 } from '../../services/whatsapp';
 import { TEMPLATE_STATUS } from './whatsapp.constants';
 import { statusToTone } from '../../lib/tone';
@@ -50,6 +50,8 @@ export default function Templates() {
   const [syncing, setSyncing] = useState(false);
   const [acting, setActing] = useState(false);
   const [confirmDel, setConfirmDel] = useState(null); // template alvo da exclusão
+  const [replicar, setReplicar] = useState(null); // template alvo da replicação
+  const [alvos, setAlvos] = useState([]); // connection_ids escolhidos no modal
 
   const canManage = can('comm.whatsapp.templates.manage');
 
@@ -95,6 +97,39 @@ export default function Templates() {
     try {
       await duplicateTemplate(t.id);
       toast.success('Template duplicado como rascunho.');
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActing(false);
+    }
+  }
+
+  function abrirReplicar(t) {
+    setReplicar(t);
+    setAlvos([]);
+  }
+
+  function toggleAlvo(id) {
+    setAlvos((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function confirmarReplicar() {
+    const t = replicar;
+    if (!t || !alvos.length) return;
+    setActing(true);
+    try {
+      const results = await replicateTemplate(t.id, alvos);
+      const criados = results.filter((r) => r.success && !r.shared).length;
+      const jaTinham = results.filter((r) => r.success && r.shared).length;
+      const falhas = results.filter((r) => !r.success).length;
+      const partes = [];
+      if (criados) partes.push(`${criados} rascunho(s) criado(s)`);
+      if (jaTinham) partes.push(`${jaTinham} número(s) já tinham`);
+      if (falhas) partes.push(`${falhas} falhou(aram)`);
+      toast.success(`Replicação: ${partes.join(', ') || 'nada a fazer'}. Sincronize o número de destino para enviar à Meta.`);
+      setReplicar(null);
+      setAlvos([]);
       await load();
     } catch (err) {
       toast.error(err.message);
@@ -152,6 +187,13 @@ export default function Templates() {
         </Button>
         <Button variant="ghost" size="sm" icon="copy" disabled={acting} title="Duplicar como rascunho" onClick={() => handleDuplicate(t)}>
           Duplicar
+        </Button>
+        <Button
+          variant="ghost" size="sm" icon="copy" disabled={acting || numbers.length < 2}
+          title={numbers.length < 2 ? 'Conecte outro número para replicar' : 'Replicar como rascunho para outros números'}
+          onClick={() => abrirReplicar(t)}
+        >
+          Replicar
         </Button>
         <Button
           variant="ghost" size="sm" icon="trash" disabled={acting}
@@ -230,6 +272,40 @@ export default function Templates() {
       onClose={() => (acting ? null : setConfirmDel(null))}
       onConfirm={confirmarExclusao}
     />
+    <Modal
+      open={!!replicar}
+      onClose={() => (acting ? null : setReplicar(null))}
+      title={replicar ? `Replicar "${replicar.name}"` : 'Replicar template'}
+      maxWidth={520}
+      footer={
+        <div className="flex items-center gap-2" style={{ justifyContent: 'flex-end', width: '100%' }}>
+          <Button variant="secondary" disabled={acting} onClick={() => setReplicar(null)}>Cancelar</Button>
+          <Button variant="primary" loading={acting} disabled={!alvos.length} onClick={confirmarReplicar}>
+            Replicar para {alvos.length || 'nenhum'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <p style={{ fontSize: 13, color: 'var(--su-text-muted)', margin: 0 }}>
+          Cria uma cópia como rascunho nos números escolhidos. Depois, sincronize cada número para enviar à análise da Meta. Números que já tiverem um template com este nome são ignorados.
+        </p>
+        <div className="space-y-1">
+          {numbers.filter((n) => !replicar || n.id !== replicar.connection_id).map((n) => (
+            <Checkbox
+              key={n.id}
+              id={`alvo-${n.id}`}
+              label={`${n.name}${n.phone ? ` — ${n.phone}` : ''}`}
+              checked={alvos.includes(n.id)}
+              onChange={() => toggleAlvo(n.id)}
+            />
+          ))}
+          {numbers.filter((n) => !replicar || n.id !== replicar.connection_id).length === 0 && (
+            <p style={{ fontSize: 13, color: 'var(--su-text-muted)', margin: 0 }}>Não há outro número conectado para replicar.</p>
+          )}
+        </div>
+      </div>
+    </Modal>
     </>
   );
 }

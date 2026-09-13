@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.10.85 - 2026-09-13 (WhatsApp Templates: replicar entre números)
+
+Sem `db push`. Só `platform-admin` (build do painel). Consome o endpoint `replicate` (v0.10.76) — backend já pronto.
+
+- Ação **Replicar** na lista de templates (com `comm.whatsapp.templates.manage`): abre um modal para escolher um ou mais números de destino (exclui o número de origem) e cria a cópia como **rascunho** em cada um. O resumo diz quantos foram criados, quantos já tinham e quantas falhas.
+- O botão fica desabilitado quando só há um número conectado (não há para onde replicar).
+- Depois de replicar, é só **Sincronizar** o número de destino para enviar o rascunho à análise da Meta.
+
+Falta da UI de templates só **vincular a evento** (o serviço `bindTemplateEvent` já existe); e, no backend, o `header-media`.
+
 ## v0.10.84 - 2026-09-12 (Assistente que conduz: tirar a IA de dentro do fluxo — Checkpoint 5 da frente)
 
 Sem `db push`. `platform-api` + `platform-admin`. **O fluxo NÃO é removido** — ele continua para automações de outros fins. O que sai é só a **IA embutida no fluxo**, que não é mais necessária (a IA atende por intenção, pelo vínculo).
