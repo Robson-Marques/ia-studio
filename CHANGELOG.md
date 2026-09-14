@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.10.89 - 2026-09-14 (Templates header-media — parte 3: seletor de cabeçalho no formulário)
+
+Sem `db push`. Só `platform-admin` (build do painel). Fecha o header-media (partes 1–2 no backend).
+
+- No formulário de template, o campo **Cabeçalho** virou um seletor: **Nenhum / Texto / Imagem / Vídeo / Documento**.
+- Para mídia: campo de upload da **amostra** — sobe pelo endpoint `header-media` (usa a conexão) e guarda o handle; ao salvar, vai como `header_format` + `header_handle`. Aceita o tipo escolhido (imagem/vídeo/pdf) e desabilita enquanto sobe ou sem número escolhido.
+- **Edição**: detecta se o template já tem cabeçalho de mídia e pré-seleciona o tipo; como o handle da Meta é de uso único, pede reenviar a amostra para republicar.
+- `services/whatsapp.js`: `uploadTemplateHeaderMedia(connection_id, file)` (multipart, connection_id antes do arquivo).
+
+Pré-requisito para funcionar: **App ID preenchido** na conexão WhatsApp (Integrações) — vide v0.10.87. Com isso, a frente de Templates fica completa (incl. cabeçalho de mídia).
+
 ## v0.10.88 - 2026-09-13 (Templates header-media — parte 2: componente + endpoint de upload)
 
 Sem `db push`. Só `platform-api`. Continua a fundação da v0.10.87.

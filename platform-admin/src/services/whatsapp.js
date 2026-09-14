@@ -232,6 +232,22 @@ export async function deleteTemplateOfficial(id) {
   catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao remover o template da Meta')); }
 }
 
+// Sobe a amostra do cabeçalho de mídia (imagem/vídeo/documento) e devolve
+// { handle, format } pro criar/editar. connection_id ANTES do arquivo (mesma
+// regra do @fastify/multipart do upload da inbox).
+export async function uploadTemplateHeaderMedia(connectionId, file) {
+  try {
+    const form = new FormData();
+    form.append('connection_id', connectionId);
+    form.append('file', file, file.name || 'amostra');
+    const { data } = await api.post('/comm/whatsapp/templates/header-media', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+    return data; // { handle, format }
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao subir a mídia do cabeçalho')); }
+}
+
 // ─── Números (conexões whatsapp-meta) ────────────────────────
 
 export async function listNumbers(params = {}) {

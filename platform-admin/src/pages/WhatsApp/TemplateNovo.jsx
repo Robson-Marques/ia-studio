@@ -3,16 +3,19 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   FormScreen, Card, FormGrid, Field, Input, TextArea, Select, Badge, Button, IconButton, useToast,
 } from '@studio-ux-ds/react';
-import { createTemplate, listNumbers, getTemplate, updateTemplate, pushEditTemplate } from '../../services/whatsapp';
+import { createTemplate, listNumbers, getTemplate, updateTemplate, pushEditTemplate, uploadTemplateHeaderMedia } from '../../services/whatsapp';
 import { CATEGORY_LABEL, LANGUAGE_LABEL } from './Templates';
 
 // Componentes Meta → campos do formulário (inverso do buildComponents do back).
 function parseComponents(components) {
-  const out = { header_text: '', body_text: '', footer_text: '', buttons: [], examples: '' };
+  const out = { header_text: '', header_format: '', body_text: '', footer_text: '', buttons: [], examples: '' };
   for (const c of Array.isArray(components) ? components : []) {
     const type = String(c?.type || '').toUpperCase();
-    if (type === 'HEADER') out.header_text = c.text || '';
-    else if (type === 'BODY') {
+    if (type === 'HEADER') {
+      const fmt = String(c?.format || '').toUpperCase();
+      if (fmt === 'IMAGE' || fmt === 'VIDEO' || fmt === 'DOCUMENT') out.header_format = fmt;
+      else out.header_text = c.text || '';
+    } else if (type === 'BODY') {
       out.body_text = c.text || '';
       const ex = c.example?.body_text?.[0];
       if (Array.isArray(ex)) out.examples = ex.join(', ');
@@ -57,6 +60,13 @@ export default function TemplateNovo() {
   const [examples, setExamples] = useState('');
   const [status, setStatus] = useState(null); // status do template (edição)
   const [saving, setSaving] = useState(false);
+  // Cabeçalho: 'none' | 'text' | 'IMAGE' | 'VIDEO' | 'DOCUMENT'.
+  const [headerType, setHeaderType] = useState('none');
+  const [headerHandle, setHeaderHandle] = useState(''); // handle da amostra (uso único da Meta)
+  const [headerFileName, setHeaderFileName] = useState('');
+  const [uploadingHeader, setUploadingHeader] = useState(false);
+
+  const isMediaHeader = (t) => t === 'IMAGE' || t === 'VIDEO' || t === 'DOCUMENT';
 
   useEffect(() => {
     listNumbers()
@@ -87,6 +97,9 @@ export default function TemplateNovo() {
           buttons: parsed.buttons,
         });
         setExamples(parsed.examples);
+        setHeaderType(parsed.header_format ? parsed.header_format : (parsed.header_text ? 'text' : 'none'));
+        setHeaderHandle('');
+        setHeaderFileName('');
       })
       .catch((err) => { toast.error(err.message); navigate('/whatsapp/templates'); });
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -107,6 +120,25 @@ export default function TemplateNovo() {
     setField('buttons', form.buttons.map((b, idx) => (idx === i ? { ...b, [key]: value } : b)));
   }
 
+  async function handleHeaderFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite reescolher o mesmo arquivo
+    if (!file) return;
+    if (!connectionId) { toast.error('Escolha o número antes de subir a mídia.'); return; }
+    setUploadingHeader(true);
+    try {
+      const res = await uploadTemplateHeaderMedia(connectionId, file);
+      setHeaderHandle(res.handle);
+      setHeaderFileName(file.name || 'amostra');
+      if (res.format) setHeaderType(res.format);
+      toast.success('Mídia enviada.');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploadingHeader(false);
+    }
+  }
+
   async function handleSave() {
     if (!isEdit && !connectionId) { toast.error('Escolha em qual número o template vai existir.'); return; }
     if (!isEdit && !/^[a-z0-9_]+$/.test(form.name)) {
@@ -119,10 +151,15 @@ export default function TemplateNovo() {
       toast.error(`A Meta exige um exemplo para cada variável — informe ${variaveis.length}, separados por vírgula.`);
       return;
     }
+    if (isMediaHeader(headerType) && !headerHandle) {
+      toast.error('Suba a mídia do cabeçalho (imagem, vídeo ou documento) antes de salvar.');
+      return;
+    }
     // Conteúdo comum (sem nome/idioma/conexão — imutáveis na edição).
     const content = {
       category: form.category,
-      header_text: form.header_text || undefined,
+      ...(headerType === 'text' && form.header_text ? { header_text: form.header_text } : {}),
+      ...(isMediaHeader(headerType) && headerHandle ? { header_format: headerType, header_handle: headerHandle } : {}),
       body_text: form.body_text,
       footer_text: form.footer_text || undefined,
       buttons: form.buttons.length
@@ -208,9 +245,46 @@ export default function TemplateNovo() {
             </Field>
           </FormGrid>
 
-          <Field label="Cabeçalho" hint="Uma linha em destaque no topo. Opcional, até 60 caracteres.">
-            <Input value={form.header_text} onChange={(e) => setField('header_text', e.target.value)} maxLength={60} />
+          <Field label="Cabeçalho" hint="Opcional. Um destaque no topo: texto ou mídia (imagem, vídeo ou documento).">
+            <Select value={headerType} onChange={(e) => setHeaderType(e.target.value)}>
+              <option value="none">Nenhum</option>
+              <option value="text">Texto</option>
+              <option value="IMAGE">Imagem</option>
+              <option value="VIDEO">Vídeo</option>
+              <option value="DOCUMENT">Documento</option>
+            </Select>
           </Field>
+
+          {headerType === 'text' && (
+            <Field label="Texto do cabeçalho" hint="Uma linha, até 60 caracteres.">
+              <Input value={form.header_text} onChange={(e) => setField('header_text', e.target.value)} maxLength={60} />
+            </Field>
+          )}
+
+          {isMediaHeader(headerType) && (
+            <Field label="Mídia do cabeçalho (amostra)" hint="A Meta usa uma amostra para aprovar o modelo. No envio real, a mídia pode ser trocada.">
+              <div className="space-y-2">
+                <input
+                  type="file"
+                  accept={headerType === 'IMAGE' ? 'image/*' : headerType === 'VIDEO' ? 'video/*' : 'application/pdf'}
+                  onChange={handleHeaderFile}
+                  disabled={uploadingHeader || !connectionId}
+                />
+                {!connectionId && (
+                  <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }}>Escolha o número acima antes de subir a mídia.</p>
+                )}
+                {uploadingHeader && (
+                  <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }}>Enviando…</p>
+                )}
+                {headerHandle && !uploadingHeader && (
+                  <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-primary)' }}>Amostra pronta: {headerFileName}</p>
+                )}
+                {isEdit && !headerHandle && !uploadingHeader && (
+                  <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }}>Reenvie a amostra para salvar (o envio anterior não é reutilizável).</p>
+                )}
+              </div>
+            </Field>
+          )}
 
           <Field
             label="Corpo da mensagem"
