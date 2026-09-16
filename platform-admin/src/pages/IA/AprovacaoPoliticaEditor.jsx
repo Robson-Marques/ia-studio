@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { FormScreen, Field, Input, Select, TextArea, Checkbox, useToast } from '@studio-ux-ds/react';
 import { createApprovalPolicy } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { APPROVAL_TARGET_TYPES } from './ia.constants';
 
 // IA/AprovacaoPoliticaEditor — página de criação de política de aprovação
@@ -21,7 +20,6 @@ export default function AprovacaoPoliticaEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const canDecide = can('ai.approvals.decide');
 
@@ -54,8 +52,6 @@ export default function AprovacaoPoliticaEditor() {
         target_type: form.target_type,
         condition,
         is_active: form.is_active,
-        workspace_id: workspaceId || undefined,
-        environment_id: environmentId || undefined,
       });
       toast.success('Política criada.');
       navigate('/ia/aprovacoes');

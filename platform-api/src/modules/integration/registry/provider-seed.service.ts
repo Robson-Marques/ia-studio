@@ -1,6 +1,6 @@
 // Seed dos ProviderDefinition no boot (create-if-missing, idempotente).
 // Fonte: metadata() das implementacoes registradas + catalogo-only.
-// Nunca sobrescreve definicao existente — curadoria posterior e pelo Console
+// Nunca sobrescreve definição existente — catálogo local preserva adaptações
 // (diretriz 43). EXCECAO pontual (REFRESH_KEYS): quando um provider que era
 // catalogo-only ganha implementacao real (whatsapp-meta na Fase 3), o wizard
 // mudou de forma — a definicao e atualizada UMA vez a partir do metadata().

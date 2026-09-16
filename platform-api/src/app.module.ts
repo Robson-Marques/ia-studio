@@ -15,7 +15,6 @@ import { JwtAuthGuard } from './shared/auth/jwt-auth.guard';
 import { PermissionsGuard } from './shared/auth/permissions.guard';
 
 import { CoreAuthModule } from './modules/core/auth/core-auth.module';
-import { InstallationDomainsModule } from './modules/core/organizations/organizations.module';
 import { UsersModule } from './modules/core/users/users.module';
 import { InvitesModule } from './modules/core/invites/invites.module';
 import { ProfilesModule } from './modules/core/profiles/profiles.module';
@@ -56,7 +55,6 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
     BrokerModule,
     EventsModule,
     CoreAuthModule,
-    InstallationDomainsModule,
     UsersModule,
     InvitesModule,
     ProfilesModule,
@@ -73,8 +71,7 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
     ResourceModule,
     DevtoolsModule,
     DeveloperModule,
-    // Fase 8 (FINAL): Atualizacao/Backup/Restauracao (infra global do Console)
-    // e Dashboards consolidados read-only (diretriz 34).
+    // Administração local: atualização/backup/restauração e resumo dedicado.
     SystemModule,
     DashboardsModule,
     SeedModule,

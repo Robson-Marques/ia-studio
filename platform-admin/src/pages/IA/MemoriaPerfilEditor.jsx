@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { FormScreen, FormGrid, Field, Input, Select, NumericInput, TextArea, useToast } from '@studio-ux-ds/react';
 import { getMemoryProfile, createMemoryProfile, updateMemoryProfile } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { MEMORY_SCOPES } from './ia.constants';
 
 // IA/MemoriaPerfilEditor — criar/editar perfil de memória (v0.9.88).
@@ -28,7 +27,6 @@ export default function MemoriaPerfilEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const isEdit = !!id;
   const canWrite = can('ai.memory.write');
@@ -70,9 +68,6 @@ export default function MemoriaPerfilEditor() {
   async function handleSave() {
     if (!canWrite) { toast.error('Sem permissão.'); return; }
     if (!form.name.trim()) { toast.error('Informe o nome do perfil.'); return; }
-    if (!isEdit && (!workspaceId || !environmentId)) {
-      toast.error('Selecione um workspace e um ambiente no topo.'); return;
-    }
     setSaving(true);
     try {
       const toNullable = (v) => (v === '' || v === null || v === undefined) ? null : Number(v);
@@ -88,7 +83,7 @@ export default function MemoriaPerfilEditor() {
         toast.success('Perfil atualizado.');
         navigate(`/ia/memoria/${id}`);
       } else {
-        await createMemoryProfile({ ...body, workspace_id: workspaceId, environment_id: environmentId });
+        await createMemoryProfile(body);
         toast.success('Perfil criado.');
         navigate('/ia/memoria');
       }

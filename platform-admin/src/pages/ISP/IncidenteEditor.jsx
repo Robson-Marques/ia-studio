@@ -8,7 +8,6 @@ import {
 } from '../../services/isp';
 import { listConnections } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { INCIDENT_STATUS, INCIDENT_MODES, SCOPE_FIELDS } from './isp.constants';
 
 // ISP/IncidenteEditor — o incidente inteiro numa rota (v0.9.92).
@@ -44,7 +43,6 @@ export default function IncidenteEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const canWrite = can('isp.incidents.write');
   const canActivate = can('isp.incidents.activate');
@@ -93,11 +91,11 @@ export default function IncidenteEditor() {
 
   useEffect(() => {
     let alive = true;
-    listConnections({ workspace_id: workspaceId || undefined, environment_id: environmentId || undefined })
+    listConnections()
       .then((r) => { if (alive) setConnections((r.items || []).filter((c) => c.provider_key === 'altarede')); })
       .catch(() => { if (alive) setConnections([]); });
     return () => { alive = false; };
-  }, [workspaceId, environmentId]);
+  }, []);
 
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
   const patchScope = (k, v) => setForm((prev) => ({ ...prev, scope: { ...prev.scope, [k]: v } }));
@@ -109,7 +107,6 @@ export default function IncidenteEditor() {
     if (!canWrite) { toast.error('Sem permissão.'); return; }
     if (!form.title.trim()) { toast.error('Informe o título.'); setTab('info'); return; }
     if (!form.connection_id) { toast.error('Selecione a conexão do provedor.'); setTab('info'); return; }
-    if (!isEdit && (!workspaceId || !environmentId)) { toast.error('Selecione workspace e ambiente no topo.'); return; }
 
     const scope = {};
     for (const f of SCOPE_FIELDS) {
@@ -138,7 +135,7 @@ export default function IncidenteEditor() {
         toast.success('Incidente atualizado.');
         loadIncident();
       } else {
-        const saved = await createIncident({ ...body, workspace_id: workspaceId, environment_id: environmentId });
+        const saved = await createIncident(body);
         toast.success('Incidente criado — agora resolva os afetados.');
         // Vai pra rota do incidente novo (sem recarregar) pra liberar a aba
         // Afetados e as ações de estado imediatamente.

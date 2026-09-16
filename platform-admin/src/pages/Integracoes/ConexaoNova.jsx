@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Screen, WizardScreen, PageHeader, Card, Field, Input, Select, Button, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import { getMarketplace, createConnection } from '../../services/integrations';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
 import { statusMeta } from './integration.constants';
 import GoogleOAuthButton from './GoogleOAuthButton';
@@ -31,7 +30,6 @@ export default function ConexaoNova() {
   const navigate = useNavigate();
   const toast = useToast();
   const [searchParams] = useSearchParams();
-  const { workspace, environment, workspaceId, environmentId } = useWorkspace();
 
   const [providers, setProviders] = useState([]);
   const [carregandoProviders, setCarregandoProviders] = useState(true);
@@ -96,10 +94,6 @@ export default function ConexaoNova() {
   }
 
   async function salvar() {
-    if (!workspaceId || !environmentId) {
-      toast.error('Escolha o workspace e o ambiente no topo do painel — a conexão precisa saber onde vale.');
-      return;
-    }
     setSalvando(true);
     try {
       const config = {};
@@ -115,8 +109,6 @@ export default function ConexaoNova() {
       const criada = await createConnection({
         provider_key: provider.key,
         name: nome.trim(),
-        workspace_id: workspaceId,
-        environment_id: environmentId,
         config,
         secrets,
       });
@@ -242,8 +234,7 @@ export default function ConexaoNova() {
           ) : (
             <>
               <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
-                A conexão vai ser criada em <strong>{workspace?.name || 'workspace'}</strong> /{' '}
-                <strong>{environment?.name || environment?.kind || 'ambiente'}</strong>. As senhas e chaves vão para o
+                A conexão vai ser criada nesta instalação. As senhas e chaves vão para o
                 cofre cifradas, e o teste de acesso roda em seguida — se não passar, a conexão é criada mesmo assim e você
                 conserta sem refazer tudo.
               </p>

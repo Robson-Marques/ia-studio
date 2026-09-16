@@ -16,15 +16,18 @@ set -euo pipefail
 ARCHIVE="${1:?uso: restore-full.sh <arquivo.tar.gz> [restore_id]}"
 RESTORE_ID="${2:-}"
 
-APP_DIR="/opt/iastudio"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 API_DIR="$APP_DIR/platform-api"
 STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$API_DIR/.env"
 
 [ -f "$ARCHIVE" ] || { echo "Pacote nao encontrado: $ARCHIVE"; exit 1; }
 
 set -a; . "$ENV_FILE"; set +a
+: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância}"
+: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da instância}"
+: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da instância}"
 
 WORK="$(mktemp -d)"
 
@@ -33,7 +36,7 @@ WORK="$(mktemp -d)"
 # (segredos podem ter mudado na restauracao).
 restart_app() {
   cd "$API_DIR"
-  pm2 delete iastudio-api iastudio-worker >/dev/null 2>&1 || true
+  pm2 delete "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
   pm2 start "$SCRIPT_DIR/ecosystem.config.js" >/dev/null 2>&1 || true
   pm2 save >/dev/null 2>&1 || true
   rm -rf "$WORK"
@@ -52,7 +55,7 @@ tar -xzf "$ARCHIVE" -C "$WORK"
 
 # 2) Para a app antes de mexer no banco.
 cd "$API_DIR"
-pm2 stop iastudio-api iastudio-worker >/dev/null 2>&1 || true
+pm2 stop "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
 
 # 3) Recria o schema do banco e restaura o dump.
 #    Zera o schema public e recarrega — o dump plain recria as tabelas.

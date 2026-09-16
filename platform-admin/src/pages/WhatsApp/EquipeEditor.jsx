@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FormScreen, Card, FormGrid, FormRow, Field, Input, Select, Badge, Button, IconButton, Switch, EmptyState, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import {
   addTeamMember, createTeam, listAttendanceUsers, listQueues, listTeams,
   removeTeamMember, updateTeam,
@@ -23,7 +22,6 @@ export default function EquipeEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const isEdit = !!id;
   const canManage = can('comm.whatsapp.teams.manage');
@@ -71,10 +69,6 @@ export default function EquipeEditor() {
 
   async function handleSave() {
     if (!name.trim()) { toast.error('Dê um nome à equipe.'); return; }
-    if (!isEdit && (!workspaceId || !environmentId)) {
-      toast.error('Escolha um workspace e um ambiente no topo da tela antes de criar.');
-      return;
-    }
     setSaving(true);
     try {
       if (isEdit) {
@@ -88,8 +82,6 @@ export default function EquipeEditor() {
         await createTeam({
           name: name.trim(),
           description: description.trim() || undefined,
-          workspace_id: workspaceId,
-          environment_id: environmentId,
         });
         toast.success('Equipe criada. Vincule uma fila padrão para ela receber transferências.');
       }

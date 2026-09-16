@@ -16,20 +16,15 @@ export const PERMISSIONS = {
   CORE_PROFILES_READ: 'core.profiles.read',
   CORE_PROFILES_WRITE: 'core.profiles.write',
 
-  // ─── Workspaces e ambientes ─────────────────────────
-  CORE_WORKSPACES_READ: 'core.workspaces.read',
-  CORE_WORKSPACES_WRITE: 'core.workspaces.write',
-  CORE_ENVIRONMENTS_READ: 'core.environments.read',
-  CORE_ENVIRONMENTS_WRITE: 'core.environments.write',
-
   // ─── Auditoria / Configuracoes ──────────────────────
   CORE_AUDIT_READ: 'core.audit.read',
   CORE_SETTINGS_READ: 'core.settings.read',
   CORE_SETTINGS_WRITE: 'core.settings.write',
 
-  // ─── Minha Conta (diretriz 42) ──────────────────────
-  ACCOUNT_READ: 'account.read',
-  LICENSE_READ: 'license.read',
+  // ─── Administração da instalação ────────────────────
+  // Manutenção que afeta a aplicação inteira: update, backup, restore e
+  // feature flags. A autorização é exclusivamente a ACL local desta permissão.
+  SYSTEM_MAINTAIN: 'system.maintain',
 
   // ─── Integrações (Fase 2 — Integration Manager) ─────
   INTEGRATIONS_MARKETPLACE_READ: 'integrations.marketplace.read',
@@ -92,8 +87,6 @@ export const PERMISSIONS = {
   AI_TOOLS_WRITE: 'ai.tools.write',
   AI_APPROVALS_READ: 'ai.approvals.read',
   AI_APPROVALS_DECIDE: 'ai.approvals.decide',
-  AI_COSTS_READ: 'ai.costs.read',
-  AI_COSTS_MANAGE: 'ai.costs.manage',
   AI_MCP_READ: 'ai.mcp.read',
   AI_MCP_WRITE: 'ai.mcp.write',
   AI_PROVIDERS_READ: 'ai.providers.read',
@@ -146,28 +139,14 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
-    key: 'workspaces',
-    label: 'Workspaces e Ambientes',
-    permissions: [
-      PERMISSIONS.CORE_WORKSPACES_READ,
-      PERMISSIONS.CORE_WORKSPACES_WRITE,
-      PERMISSIONS.CORE_ENVIRONMENTS_READ,
-      PERMISSIONS.CORE_ENVIRONMENTS_WRITE,
-    ],
-  },
-  {
     key: 'governance',
     label: 'Auditoria e Configurações',
     permissions: [
       PERMISSIONS.CORE_AUDIT_READ,
       PERMISSIONS.CORE_SETTINGS_READ,
       PERMISSIONS.CORE_SETTINGS_WRITE,
+      PERMISSIONS.SYSTEM_MAINTAIN,
     ],
-  },
-  {
-    key: 'account',
-    label: 'Minha Conta',
-    permissions: [PERMISSIONS.ACCOUNT_READ, PERMISSIONS.LICENSE_READ],
   },
   {
     key: 'integrations',
@@ -242,8 +221,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       PERMISSIONS.AI_TOOLS_WRITE,
       PERMISSIONS.AI_APPROVALS_READ,
       PERMISSIONS.AI_APPROVALS_DECIDE,
-      PERMISSIONS.AI_COSTS_READ,
-      PERMISSIONS.AI_COSTS_MANAGE,
       PERMISSIONS.AI_MCP_READ,
       PERMISSIONS.AI_MCP_WRITE,
       PERMISSIONS.AI_PROVIDERS_READ,
@@ -293,15 +270,10 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.CORE_INVITES_WRITE]: 'Criar/revogar convites',
   [PERMISSIONS.CORE_PROFILES_READ]: 'Ver perfis de acesso',
   [PERMISSIONS.CORE_PROFILES_WRITE]: 'Criar/editar perfis de acesso',
-  [PERMISSIONS.CORE_WORKSPACES_READ]: 'Ver workspaces',
-  [PERMISSIONS.CORE_WORKSPACES_WRITE]: 'Criar/editar workspaces',
-  [PERMISSIONS.CORE_ENVIRONMENTS_READ]: 'Ver ambientes',
-  [PERMISSIONS.CORE_ENVIRONMENTS_WRITE]: 'Criar/editar ambientes',
   [PERMISSIONS.CORE_AUDIT_READ]: 'Ver trilha de auditoria',
   [PERMISSIONS.CORE_SETTINGS_READ]: 'Ver configurações',
   [PERMISSIONS.CORE_SETTINGS_WRITE]: 'Alterar configurações',
-  [PERMISSIONS.ACCOUNT_READ]: 'Ver Minha Conta',
-  [PERMISSIONS.LICENSE_READ]: 'Ver licença e consumo',
+  [PERMISSIONS.SYSTEM_MAINTAIN]: 'Administrar atualização, backup e restauração da instalação',
   [PERMISSIONS.INTEGRATIONS_MARKETPLACE_READ]: 'Ver marketplace de conectores',
   [PERMISSIONS.INTEGRATIONS_MARKETPLACE_MANAGE]: 'Instalar/desinstalar conectores',
   [PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ]: 'Ver conexões',
@@ -353,8 +325,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.AI_TOOLS_WRITE]: 'Criar/editar ferramentas',
   [PERMISSIONS.AI_APPROVALS_READ]: 'Ver aprovações e políticas de IA',
   [PERMISSIONS.AI_APPROVALS_DECIDE]: 'Aprovar/rejeitar ações e gerenciar políticas',
-  [PERMISSIONS.AI_COSTS_READ]: 'Ver custos e consumo de IA',
-  [PERMISSIONS.AI_COSTS_MANAGE]: 'Gerenciar orçamentos de IA',
   [PERMISSIONS.AI_MCP_READ]: 'Ver servidores MCP',
   [PERMISSIONS.AI_MCP_WRITE]: 'Cadastrar/sincronizar servidores MCP',
   [PERMISSIONS.AI_PROVIDERS_READ]: 'Ver provedores e conexões de IA',
@@ -380,14 +350,14 @@ export interface SystemProfileDef {
   permissions: string[];
 }
 
-// Perfis de sistema criados no provisionamento de cada organization.
+// Perfis de sistema criados no provisionamento de cada instância.
 // Administrador = todas; Operador = somente leitura (*.read);
 // Atendente WhatsApp = operacao da Central de Atendimento (Fase 3);
 // Operador de Automação = opera fluxos/execuções sem publicar (Fase 4).
 export const SYSTEM_PROFILES: SystemProfileDef[] = [
   {
     name: 'Administrador',
-    description: 'Acesso total à organização',
+    description: 'Acesso total à instância',
     permissions: ALL_PERMISSIONS,
   },
   {
@@ -437,7 +407,6 @@ export const SYSTEM_PROFILES: SystemProfileDef[] = [
       PERMISSIONS.AI_MEMORY_WRITE,
       PERMISSIONS.AI_TOOLS_READ,
       PERMISSIONS.AI_APPROVALS_READ,
-      PERMISSIONS.AI_COSTS_READ,
       PERMISSIONS.AI_ANALYSIS_READ,
       PERMISSIONS.AI_ANALYSIS_RUN,
     ],
@@ -454,7 +423,7 @@ export const SYSTEM_PROFILES: SystemProfileDef[] = [
   },
   {
     name: 'Desenvolvedor',
-    description: 'Mapeia recursos, explora dados e usa Console/Chaves de API',
+    description: 'Mapeia recursos, explora dados e usa bancada/Chaves de API',
     permissions: [
       PERMISSIONS.RESOURCE_MAPPINGS_READ,
       PERMISSIONS.RESOURCE_MAPPINGS_WRITE,

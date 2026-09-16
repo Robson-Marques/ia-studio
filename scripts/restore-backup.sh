@@ -9,15 +9,18 @@
 set -euo pipefail
 
 DUMP="${1:?uso: restore-backup.sh <arquivo.sql|.sql.gz>}"
-APP_DIR="/opt/iastudio"
-API_DIR="$APP_DIR/platform-api"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+API_DIR="$APP_DIR/platform-api"
 
 [ -f "$DUMP" ] || { echo "Dump nao encontrado: $DUMP"; exit 1; }
 set -a; . "$API_DIR/.env"; set +a
+: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância}"
+: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da instância}"
+: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da instância}"
 
 echo "[restore-backup] Parando PM2..."
-pm2 stop iastudio-api iastudio-worker >/dev/null 2>&1 || true
+pm2 stop "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
 
 echo "[restore-backup] Recriando schema e restaurando o dump..."
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
@@ -29,5 +32,5 @@ esac
 
 echo "[restore-backup] Subindo PM2..."
 cd "$API_DIR"
-pm2 reload "$SCRIPT_DIR/ecosystem.config.js" || pm2 restart iastudio-api iastudio-worker
+pm2 reload "$SCRIPT_DIR/ecosystem.config.js" || pm2 restart "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER"
 echo "[restore-backup] Concluido."

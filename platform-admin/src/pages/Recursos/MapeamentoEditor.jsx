@@ -167,8 +167,6 @@ export default function MapeamentoEditor() {
           field_map: fieldMap,
           description: form.description.trim() || undefined,
           is_active: form.is_active,
-          workspace_id: conexao?.workspace_id || undefined,
-          environment_id: conexao?.environment_id || undefined,
         });
         toast.success('Mapeamento criado.');
       }

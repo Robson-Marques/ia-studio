@@ -5,7 +5,6 @@ import {
   listAutomationTemplates, createAutomationTemplate, updateAutomationTemplate,
 } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { CHANNEL_LABEL } from './automation.constants';
 import { extractTemplateVars } from './template.helpers';
 
@@ -23,7 +22,6 @@ export default function TemplateEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const isEdit = !!id;
   const canWrite = can('automation.templates.write');
@@ -37,7 +35,7 @@ export default function TemplateEditor() {
 
   useEffect(() => {
     if (!isEdit) return;
-    listAutomationTemplates({ environment_id: environmentId || undefined })
+    listAutomationTemplates()
       .then(({ items }) => {
         const found = items.find((t) => t.id === id);
         if (!found) {
@@ -62,10 +60,6 @@ export default function TemplateEditor() {
   async function handleSave() {
     if (!name.trim()) { toast.error('Dê um nome ao template.'); return; }
     if (!body.trim()) { toast.error('Escreva o conteúdo da mensagem.'); return; }
-    if (!isEdit && (!workspaceId || !environmentId)) {
-      toast.error('Escolha um workspace e um ambiente no topo da tela antes de criar.');
-      return;
-    }
     setSaving(true);
     try {
       if (isEdit) {
@@ -80,8 +74,6 @@ export default function TemplateEditor() {
           channel,
           subject: subject.trim() || undefined,
           body,
-          workspace_id: workspaceId,
-          environment_id: environmentId,
         });
       }
       toast.success(isEdit ? 'Template atualizado.' : 'Template criado.');

@@ -41,11 +41,10 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 
 Estas responsabilidades **existem** no IA Studio mas ainda não têm especialidade catalogada — quando o próximo pedido tocar em uma delas, o alinhador retornará `especialidade não catalogada` e recomendará a criação. Ficam registradas aqui como lacuna conhecida:
 
-- **Backend / API multi-tenant** (`platform-api`): modelagem de domínio, `organization_id`, ACL, eventos. *(A fatia de **tenancy/domínios/subdomínios** já está coberta por `ia-studio.tenant-domains@1.0.0`; o restante — ACL, eventos, outras entidades — segue lacuna.)*
-- **Console SaaS** (`platform-console`): backoffice interno (gestão de orgs, planos, uso). *(A **gestão de domínios por org** entra por `ia-studio.tenant-domains@1.0.0`; planos/uso/demais seguem lacuna.)*
+- **Backend / API dedicada** (`platform-api`): modelagem de domínio local, ACL, eventos e operação por instância. A antiga especialidade de tenancy/domínios foi aposentada junto com o SaaS.
 - **Runtime de assistentes**: prompts operacionais, tools, knowledge base, memória, workflows — regras próprias, **não confundir** com este framework (que governa pedidos humanos de desenvolvimento).
 - **Integrações externas** (Meta, Google, gateways, etc.) — se surgirem novas. *(A fatia de **conectores WhatsApp** — Meta/YCloud/Baileys + coexistência — já está coberta por `ia-studio.whatsapp-connectors@1.0.0`.)*
-- **Segurança / privacidade** (LGPD, retenção, backup, ACL multi-tenant).
+- **Segurança / privacidade** (LGPD, retenção, backup, ACL local).
 - **Documentação / continuidade** (handoff, changelog, dívida técnica).
 
 ## Registro de revisão

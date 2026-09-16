@@ -3,7 +3,6 @@ import { Card, Badge, Button, EmptyState, Spinner, Modal, Field, Select, useToas
 import { listAttendanceAnalyses, analyzeAttendanceChat } from '../../services/ai';
 import { listChats } from '../../services/whatsapp';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 
 // IA Studio › Análise de atendimento (Checkpoint 1b). Porte do "Aprendizados" do
 // Aquapark, genérico: sob pedido, a IA analisa uma conversa e devolve melhorias
@@ -27,7 +26,6 @@ function chatLabel(chat) {
 export default function AnaliseAtendimento() {
   const toast = useToast();
   const { can } = usePermissions();
-  const { environmentId } = useWorkspace();
   const canRun = can('ai.analysis.run');
 
   const [items, setItems] = useState(null);
@@ -42,7 +40,7 @@ export default function AnaliseAtendimento() {
   async function load() {
     setLoading(true);
     try {
-      setItems(await listAttendanceAnalyses({ environment_id: environmentId || undefined }));
+      setItems(await listAttendanceAnalyses());
     } catch (err) {
       toast.error(err.message);
       setItems([]);
@@ -51,19 +49,19 @@ export default function AnaliseAtendimento() {
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Conversas para o seletor — carrega ao abrir o modal (as mais recentes).
   useEffect(() => {
     if (!modalOpen) return undefined;
     let vivo = true;
     setLoadingChats(true);
-    listChats({ environment_id: environmentId || undefined, take: 200 })
+    listChats({ take: 200 })
       .then(({ items: list }) => { if (vivo) setChats(Array.isArray(list) ? list : []); })
       .catch((err) => { if (vivo) toast.error(err.message); })
       .finally(() => { if (vivo) setLoadingChats(false); });
     return () => { vivo = false; };
-  }, [modalOpen, environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [modalOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function abrirModal() {
     setChatId('');

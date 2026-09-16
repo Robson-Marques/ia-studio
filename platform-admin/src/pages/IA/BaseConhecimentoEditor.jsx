@@ -6,7 +6,6 @@ import {
 import { createKnowledgeBase } from '../../services/ai';
 import { listConnections } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 
 // IA/BaseConhecimentoEditor — criação de base de conhecimento (v0.9.89).
 // Promovido a rota porque o form tem TextArea de Descrição — a regra do Modal
@@ -31,7 +30,6 @@ export default function BaseConhecimentoEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const canWrite = can('ai.knowledge.write');
 
@@ -50,16 +48,11 @@ export default function BaseConhecimentoEditor() {
   async function handleSave() {
     if (!canWrite) { toast.error('Sem permissão.'); return; }
     if (!form.name.trim()) { toast.error('Informe o nome da base.'); return; }
-    if (!workspaceId || !environmentId) {
-      toast.error('Selecione um workspace e um ambiente no topo.'); return;
-    }
     setSaving(true);
     try {
       const base = await createKnowledgeBase({
         name: form.name.trim(),
         description: form.description.trim() || undefined,
-        workspace_id: workspaceId,
-        environment_id: environmentId,
         embedding_connection_id: form.embedding_connection_id || null,
         embedding_model: form.embedding_model.trim() || 'text-embedding-3-small',
         chunk_size: form.chunk_size,

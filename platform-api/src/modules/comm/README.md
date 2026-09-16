@@ -24,7 +24,7 @@ Canal WhatsApp **oficial-only (Meta Cloud API)**, portado do Aquapark e adaptado
 | `whatsapp/whatsapp-numbers.controller.ts` | Painel **Números**: conexões whatsapp-meta com qualidade/limite/status/health + sync manual. |
 | `attendance/` | **Central de Atendimento**: `chat-assignment.service` (claim/release/transfer/close/reopen/takeover com **lock otimista** — 2º concorrente recebe 409 — e trilha `comm_whatsapp_chat_events`), `reply-gate.service` (claim implícito; conversa de outro → 409 `NEEDS_TAKEOVER_CONFIRMATION` → reenvio com `confirm_takeover`), `chat-scope.resolver` (cache 30s), state machine `OPEN ↔ IN_PROGRESS → CLOSED` (reopen → sempre OPEN), equipes/filas/membros com **soft-delete** + checagem de integridade. |
 
-## Tabelas (`comm_*`, todas com organization_id + workspace_id + environment_id)
+## Tabelas (`comm_*`, locais à instância dedicada)
 
 `comm_whatsapp_chats`, `comm_whatsapp_messages`, `comm_whatsapp_chat_events`, `comm_whatsapp_templates`, `comm_whatsapp_sync_state`, `comm_attendance_teams`, `comm_attendance_queues`, `comm_attendance_members`.
 

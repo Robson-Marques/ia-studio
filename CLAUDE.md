@@ -36,8 +36,8 @@ A plataforma é totalmente genérica e orientada a integrações. A primeira sol
 └── platform-admin/          # React 18 + Vite + Tailwind — PAINEL DA INSTÂNCIA DEDICADA
 ```
 
-`platform-console/` é código legado SaaS e deve sair no slice de superfícies da
-Capability; não criar dependências novas nele.
+O antigo `platform-console/` foi aposentado no S3 da Capability dedicada. Não
+reintroduza telas comerciais ou uma segunda superfície administrativa.
 
 ## 🔒 BANCO DE DADOS
 - Cada instância terá PostgreSQL + pgvector próprios. `schema.prisma` é a fonte única da verdade.
@@ -64,7 +64,7 @@ Capability; não criar dependências novas nele.
 - Um arquivo responde UMA pergunta (regra de coesão do Aquapark). Lógica em service; DB só via repository; DTOs com class-validator; sem `any`; Logger do Nest (nunca console.log).
 
 ## 🔐 ACL
-- Permissões `dominio.acao` em `permissions.constants.ts` (catálogo único). Guards: `JwtAuthGuard` global + `PermissionsGuard` + `@RequirePermissions`. Há um único ator: usuário local da instância; `PLATFORM_ADMIN` e o guard do Console são legado SaaS e devem ser removidos.
+- Permissões `dominio.acao` em `permissions.constants.ts` (catálogo único). Guards: `JwtAuthGuard` global + `PermissionsGuard` + `@RequirePermissions`. Há um único ator: usuário local da instância; não reintroduzir `PLATFORM_ADMIN` nem guard de Console SaaS.
 - Todo endpoint sensível tem `@RequirePermissions`; todo botão tem `can()` no front; perm nova exige: constante + grupo + label no front + perfis de sistema.
 - Mutations sensíveis: `@Auditable` com diff valor antigo→novo + IP + user-agent (redact de password/token/secret/api_key/cpf).
 

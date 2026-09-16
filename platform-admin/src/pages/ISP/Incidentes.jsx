@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { listIncidents } from '../../services/isp';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { INCIDENT_STATUS, INCIDENT_MODE_LABEL } from './isp.constants';
 
 // ISP/Incidentes — 1ª tela da família ISP migrada pro DS (v0.9.92).
@@ -23,7 +22,6 @@ export default function Incidentes() {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -39,10 +37,7 @@ export default function Incidentes() {
   async function load() {
     setLoading(true);
     try {
-      const { items: list } = await listIncidents({
-        workspace_id: workspaceId || undefined,
-        environment_id: environmentId || undefined,
-      });
+      const { items: list } = await listIncidents();
       setItems(list);
     } catch (err) {
       toast.error(err.message);
@@ -51,7 +46,7 @@ export default function Incidentes() {
     }
   }
 
-  useEffect(() => { load(); }, [workspaceId, environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const columns = [
     { key: 'title', header: 'Título', render: (it) => (

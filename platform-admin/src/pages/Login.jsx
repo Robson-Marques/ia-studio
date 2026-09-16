@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { AuthScreen, AuthLink, Field, Input, Button, Checkbox, DSIcon, useToast } from '@studio-ux-ds/react';
 import { useAuth } from '../context/AuthContext';
-import { getTenantContext } from '../services/tenant';
 
 // Login — instancia o **molde de acesso do DS** (`AuthScreen`, DS v1.2.40), que é
 // a materialização em React do padrão que já existia em `examples/login.html`.
@@ -15,7 +14,7 @@ import { getTenantContext } from '../services/tenant';
 //
 // O que o produto decide (e o molde não impõe): quais campos, o que dizer no
 // painel, e **não ter entrada por Google/Microsoft** — o IA Studio autentica por
-// e-mail e senha da organização, então o divisor "ou continue com" do exemplo não
+// e-mail e senha local, então o divisor "ou continue com" do exemplo não
 // se aplica aqui. O molde não obriga: aquilo é conteúdo, isto é arranjo.
 export default function Login() {
   const toast = useToast();
@@ -25,23 +24,9 @@ export default function Login() {
   const [senha, setSenha] = useState('');
   const [manterConectado, setManterConectado] = useState(true);
 
-  // White-label por ENDEREÇO: quando a URL acessada pertence a um cliente, a
-  // tela veste a marca dele. Endereço não cadastrado (ou instalação de domínio
-  // único, que é o caso hoje) → `null` e fica a identidade da plataforma.
-  // Não bloqueia a tela: o formulário renderiza na hora, a marca chega depois.
-  const [tenant, setTenant] = useState(null);
-  useEffect(() => {
-    let vivo = true;
-    getTenantContext().then((ctx) => { if (vivo) setTenant(ctx); });
-    return () => { vivo = false; };
-  }, []);
-
   if (isAuthenticated) return <Navigate to="/" replace />;
 
-  const org = tenant?.organization ?? null;
-  const branding = (org?.branding && typeof org.branding === 'object') ? org.branding : {};
-  const marcaNome = branding.name || org?.name || 'IA Studio';
-  const logoUrl = branding.logo_url || branding.logo || null;
+  const marcaNome = 'IA Studio';
 
   async function entrar(e) {
     e.preventDefault();
@@ -61,9 +46,7 @@ export default function Login() {
     <AuthScreen
       brand={{
         name: marcaNome,
-        logo: logoUrl
-          ? <img src={logoUrl} alt="" style={{ height: 20, width: 'auto', display: 'block' }} />
-          : <DSIcon name="spark" size="sm" />,
+        logo: <DSIcon name="spark" size="sm" />,
       }}
       welcome="Bem-vindo de volta."
       pitch="Assistentes, automações e atendimento num só lugar. Entre para continuar de onde parou."
@@ -74,7 +57,7 @@ export default function Login() {
       ]}
       footer={`© ${new Date().getFullYear()} ${marcaNome} · Todos os direitos reservados`}
       title="Entrar na sua conta"
-      subtitle={org ? `Acesso de ${marcaNome}. Use o e-mail cadastrado.` : 'Use o e-mail cadastrado pela sua organização.'}
+      subtitle="Use o e-mail cadastrado nesta instalação."
     >
       <form onSubmit={entrar} className="space-y-4">
         <Field label="E-mail">
@@ -96,13 +79,13 @@ export default function Login() {
             autoComplete="current-password"
           />
           {/* Ainda não há fluxo de recuperação por e-mail: quem administra a
-              organização redefine a senha em Pessoas. O link diz isso em vez de
+              instalação redefine a senha em Pessoas. O link diz isso em vez de
               prometer um e-mail que não vai chegar. */}
           <AuthLink
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              toast.info('Peça a quem administra a organização para redefinir sua senha em Pessoas e convites.');
+              toast.info('Peça a quem administra a instalação para redefinir sua senha em Pessoas e convites.');
             }}
           >
             Esqueci a senha?

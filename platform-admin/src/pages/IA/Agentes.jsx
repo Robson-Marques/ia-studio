@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { listAgents, exportAgent, listAgentVersions } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { formatDateTime } from './ia.constants';
 import AgentVersionsModal from './editor/AgentVersionsModal';
 
@@ -18,7 +17,6 @@ export default function Agentes() {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -31,7 +29,7 @@ export default function Agentes() {
   async function load() {
     setLoading(true);
     try {
-      const { items: list } = await listAgents({ environment_id: environmentId || undefined });
+      const { items: list } = await listAgents();
       setItems(list);
     } catch (err) {
       toast.error(err.message);
@@ -40,7 +38,7 @@ export default function Agentes() {
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byId = (agentId) => items.find((a) => a.id === agentId);
 
@@ -143,7 +141,7 @@ export default function Agentes() {
         filterActive={!!q.trim()}
         emptyNew={{
           icon: 'user',
-          title: 'Nenhum assistente neste ambiente',
+          title: 'Nenhum assistente nesta instalação',
           description: 'Crie um assistente e configure quem ele é, o que faz e o que pode fazer.',
           action: newAgentBtn,
         }}

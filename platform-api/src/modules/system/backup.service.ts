@@ -1,4 +1,4 @@
-// Backup e Restauracao (Fase 8). Lista/gera/baixa/sobe/exclui pacotes e dispara
+// Backup e restauração locais. Lista/gera/baixa/sobe/exclui pacotes e dispara
 // a restauracao completa. 1 operacao por vez (lock via system_restores RUNNING).
 // Guarda anti path-traversal em TODO nome de arquivo (resolveBackupPath).
 // Restauracao roda via systemd-run (fora da arvore do PM2 — evita treekill).
@@ -15,7 +15,7 @@ import type { ReadStream } from 'node:fs';
 import * as path from 'node:path';
 import { SystemRepository } from './system.repository';
 import { AuditLogService } from '../../shared/audit/audit-log.service';
-import { backupDir, resolveBackupPath, scriptsDir } from './system.paths';
+import { backupDir, instanceId, resolveBackupPath, scriptsDir } from './system.paths';
 
 export interface BackupFileInfo {
   file: string;
@@ -176,7 +176,13 @@ export class BackupService {
     // registrar o file_name e fechar a row.
     let out = '';
     try {
-      const child = spawn('bash', [script], { detached: true, cwd: scriptsDir() });
+      const child = spawn('bash', [script], {
+        detached: true,
+        cwd: scriptsDir(),
+        // Explicita o ambiente da instância para o script, mesmo quando a
+        // estratégia de carregamento de .env mudar no processo Nest.
+        env: process.env,
+      });
       child.stdout?.on('data', (d: Buffer) => {
         out += d.toString();
       });
@@ -208,7 +214,11 @@ export class BackupService {
     try {
       const child = spawn(
         'systemd-run',
-        ['--unit', `iastudio-restore-${restoreId}`, '--collect', 'bash', script, archivePath, restoreId],
+        [
+          '--unit', `iastudio-${instanceId()}-restore-${restoreId}`,
+          '--collect',
+          'bash', script, archivePath, restoreId,
+        ],
         { detached: true, stdio: 'ignore', cwd: scriptsDir() },
       );
       child.on('error', (err) => {

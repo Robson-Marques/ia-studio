@@ -1,7 +1,7 @@
 # Módulo `system/` — Atualização, Backup e Restauração (Fase 8)
 
-Infra **global da instância** (sem tenant). Todas as rotas são exclusivas do
-Console (`@PlatformAdminOnly()` + `@Controller('console/system')`). Os serviços
+Infra **local da instância** (sem tenant). Todas as rotas são exclusivas da
+administração local (`system.maintain` + `@Controller('system')`). Os serviços
 disparam os scripts de `scripts/` via `child_process.spawn` (detached); o log ao
 vivo é gravado direto na row do banco pelo próprio script (upgrade) ou pelo
 callback do spawn (backup).
@@ -10,18 +10,18 @@ callback do spawn (backup).
 
 | Método | Rota | O que faz |
 |---|---|---|
-| GET | `/console/system/version` | Versão atual (tag do HEAD ou `## vX.Y.Z` do CHANGELOG) + tags disponíveis > atual. Cache 5min. |
-| POST | `/console/system/upgrade` | `{version}` → cria row `system_upgrades` RUNNING + spawn `upgrade.sh <tag> <id>`. **202**. |
-| GET | `/console/system/upgrade/current` | Status + `log_lines` ao vivo (polling 2s). Marca `orphaned` se RUNNING > 10min. |
-| GET | `/console/system/upgrade/history` | Últimas 20 atualizações. |
-| POST | `/console/system/upgrade/release-lock` | Lock órfão (>10min) → marca FAILED sem reverter nada. |
-| GET | `/console/system/backups` | Lista pacotes (`.tar.gz`/`.sql`/`.sql.gz`) com tamanho e data. |
-| GET | `/console/system/backups/current` | Operação de backup/restore em andamento (se houver). |
-| POST | `/console/system/backups` | Gera backup completo (spawn `backup-full.sh`, row `system_restores` kind=BACKUP). **202**. |
-| GET | `/console/system/backups/:file/download` | Stream do arquivo (Content-Disposition attachment). Guard anti path-traversal. |
-| POST | `/console/system/backups/upload` | Upload multipart (`@fastify/multipart`). Nome validado (path-traversal). **201**. |
-| DELETE | `/console/system/backups/:file` | Exclui um pacote. Guard anti path-traversal. |
-| POST | `/console/system/restore` | `{file}` → restaura backup completo via `restore-full.sh` (systemd-run). **202**. |
+| GET | `/system/version` | Versão atual (tag do HEAD ou `## vX.Y.Z` do CHANGELOG) + tags disponíveis > atual. Cache 5min. |
+| POST | `/system/upgrade` | `{version}` → cria row `system_upgrades` RUNNING + spawn `upgrade.sh <tag> <id>`. **202**. |
+| GET | `/system/upgrade/current` | Status + `log_lines` ao vivo (polling 2s). Marca `orphaned` se RUNNING > 10min. |
+| GET | `/system/upgrade/history` | Últimas 20 atualizações. |
+| POST | `/system/upgrade/release-lock` | Lock órfão (>10min) → marca FAILED sem reverter nada. |
+| GET | `/system/backups` | Lista pacotes (`.tar.gz`/`.sql`/`.sql.gz`) com tamanho e data. |
+| GET | `/system/backups/current` | Operação de backup/restore em andamento (se houver). |
+| POST | `/system/backups` | Gera backup completo (spawn `backup-full.sh`, row `system_restores` kind=BACKUP). **202**. |
+| GET | `/system/backups/:file/download` | Stream do arquivo (Content-Disposition attachment). Guard anti path-traversal. |
+| POST | `/system/backups/upload` | Upload multipart (`@fastify/multipart`). Nome validado (path-traversal). **201**. |
+| DELETE | `/system/backups/:file` | Exclui um pacote. Guard anti path-traversal. |
+| POST | `/system/restore` | `{file}` → restaura backup completo via `restore-full.sh` (systemd-run). **202**. |
 
 ## Decisões
 
@@ -29,7 +29,7 @@ callback do spawn (backup).
   (`findRunningUpgrade`). Backup/Restore: row `system_restores` RUNNING
   (`findRunningRestore`). Um novo pedido enquanto há RUNNING → **409**.
 - **Lock órfão.** Se um upgrade fica RUNNING > 10min (`ORPHAN_MS`), o
-  `current` retorna `orphaned=true` e o Console mostra o banner "Liberar lock".
+  `current` retorna `orphaned=true` e a administração local mostra o banner "Liberar lock".
   `release-lock` marca **FAILED** sem tocar no processo nem reverter dados.
 - **Leitura da versão.** `git describe --tags --exact-match` (se o HEAD aponta
   numa tag `vX.Y.Z`), com fallback para o primeiro `## vX.Y.Z` do `CHANGELOG.md`.
@@ -49,5 +49,6 @@ callback do spawn (backup).
 
 ## Envs
 
-`IASTUDIO_SCRIPTS_DIR` (default `/opt/iastudio/scripts`), `IASTUDIO_BACKUP_DIR`
-(default `/opt/iastudio-backups`), `IASTUDIO_APP_DIR` (default `/opt/iastudio`).
+`IASTUDIO_INSTANCE_ID`, `IASTUDIO_SCRIPTS_DIR`, `IASTUDIO_BACKUP_DIR`,
+`IASTUDIO_APP_DIR`, `IASTUDIO_PM2_API` e `IASTUDIO_PM2_WORKER` são definidos
+pela instalação. Não há caminho, processo ou backup global de fallback.

@@ -1,26 +1,10 @@
-// Dashboards consolidados (Fase 8). Read-only (diretriz 34).
-//   * GET /console/dashboards/overview → visao global (Console/platform-admin).
-//   * GET /dashboards/summary          → resumo org-scoped (painel do cliente).
+// Dashboard dedicado (read-only). O painel local consulta o resumo da própria
+// instalação; não há agregação por organizações.
 import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { InstallationAdminOnly } from '../../shared/auth/permissions.decorator';
 import { RequirePermissions } from '../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../shared/permissions.constants';
 import { DashboardsService } from './dashboards.service';
-
-@ApiTags('Console — Dashboards')
-@ApiBearerAuth()
-@InstallationAdminOnly()
-@Controller('console/dashboards')
-export class ConsoleDashboardsController {
-  constructor(private readonly dashboards: DashboardsService) {}
-
-  @Get('overview')
-  @ApiOperation({ summary: 'Visão global da instância (orgs, execuções, IA, WhatsApp, e-mails, conexões, filas)' })
-  overview() {
-    return this.dashboards.overview();
-  }
-}
 
 @ApiTags('Dashboards')
 @ApiBearerAuth()

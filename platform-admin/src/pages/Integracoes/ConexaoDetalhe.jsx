@@ -8,7 +8,6 @@ import {
   getBaileysPairingQr, reconnectBaileys, restartBaileysPairing,
 } from '../../services/whatsappBaileys';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { formatDateTime } from '../../lib/format';
 import { statusMeta, RESOURCE_KIND_LABELS, prettifyProviderKey } from './integration.constants';
 import GoogleOAuthButton from './GoogleOAuthButton';
@@ -33,7 +32,6 @@ export default function ConexaoDetalhe() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaces } = useWorkspace();
 
   const podeEscrever = can('integrations.connections.write');
   const podeVerLogs = can('integrations.logs.read');
@@ -166,14 +164,6 @@ export default function ConexaoDetalhe() {
     }
   }
 
-  const escopo = useMemo(() => {
-    if (!conexao) return '—';
-    const ws = workspaces.find((w) => w.id === conexao.workspace_id);
-    if (!ws) return '—';
-    const env = (ws.environments || []).find((e) => e.id === conexao.environment_id);
-    return env ? `${ws.name} / ${env.name || env.kind || ''}` : ws.name;
-  }, [conexao, workspaces]);
-
   if (!conexao) return null;
 
   const meta = statusMeta(conexao.status);
@@ -212,7 +202,7 @@ export default function ConexaoDetalhe() {
     <DetailScreen
       back={{ label: 'Voltar para conexões', onClick: () => navigate('/integracoes/conexoes') }}
       title={conexao.name}
-      subtitle={`${prettifyProviderKey(conexao.provider_key)} · ${escopo}`}
+      subtitle={prettifyProviderKey(conexao.provider_key)}
       actions={
         <>
           {podeEscrever && (
@@ -260,7 +250,6 @@ export default function ConexaoDetalhe() {
                     </span>
                   ) },
                   { key: 'Conector', value: prettifyProviderKey(conexao.provider_key) },
-                  { key: 'Onde vale', value: escopo },
                   { key: 'Prioridade', value: `${conexao.priority ?? 0} — quando há mais de uma conexão do mesmo tipo, a maior é usada primeiro` },
                   { key: 'Conectada em', value: conexao.connected_at ? formatDateTime(conexao.connected_at) : '—' },
                   { key: 'Última verificação', value: conexao.last_health_at ? formatDateTime(conexao.last_health_at) : 'nunca testada' },

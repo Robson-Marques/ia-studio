@@ -7,10 +7,9 @@ import api, {
 // AuthContext do Painel do Cliente.
 //
 // login  → POST /auth/login {email,password} → { token, user }
-// me     → GET /auth/me → { user, organization, workspaces, permissions, license }
+// me     → GET /auth/me → { user, permissions }
 //
-// `me` fica disponivel pro app inteiro (workspaces alimentam o seletor do
-// Header; permissions alimentam o usePermissions; license alimenta Dashboard).
+// `me` fica disponível para a ACL e identificação local da instalação.
 
 const AuthContext = createContext(null);
 
@@ -71,7 +70,7 @@ export function AuthProvider({ children }) {
       const finalUser = u || { email };
       setUser(finalUser);
       setStoredUser(finalUser);
-      // Carrega o contexto completo (workspaces, permissions, license).
+      // Carrega o contexto completo de sessão e permissões locais.
       try { await refreshMe(); } catch { /* nao bloqueia o login */ }
       return finalUser;
     } catch (err) {

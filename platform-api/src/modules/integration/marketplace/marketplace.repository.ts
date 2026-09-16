@@ -27,18 +27,6 @@ export class MarketplaceRepository {
     return this.prisma.providerDefinition.findUnique({ where: { key } });
   }
 
-  findDefinitionById(id: string) {
-    return this.prisma.providerDefinition.findUnique({ where: { id } });
-  }
-
-  createDefinition(data: Prisma.ProviderDefinitionCreateInput) {
-    return this.prisma.providerDefinition.create({ data });
-  }
-
-  updateDefinition(id: string, data: Prisma.ProviderDefinitionUpdateInput) {
-    return this.prisma.providerDefinition.update({ where: { id }, data });
-  }
-
   // ─── ProviderInstall (da instância) ─────────────────
   findInstalls() {
     return this.prisma.providerInstall.findMany();

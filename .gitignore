@@ -15,6 +15,7 @@ build/
 !**/.env.example
 ecosystem.config.js
 **/ecosystem.config.js
+!scripts/ecosystem.config.js
 
 # ─── Prisma ─────────────────────────────────────
 # (o schema.prisma É versionado; o client gerado não)

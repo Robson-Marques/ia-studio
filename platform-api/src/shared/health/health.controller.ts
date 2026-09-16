@@ -1,7 +1,7 @@
 // Health check publico (GET /api/v1/health) — usado por nginx/monitoramento e
 // pelo install.sh pra confirmar que a API subiu. Sem auth (@Public pula o JWT
 // global). Nao toca banco: responde vivo/uptime. Health de dependencias
-// (Postgres/Redis/conexoes) fica nos dashboards do Console.
+// (Postgres/Redis/conexões) fica na observabilidade local da instância.
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/public.decorator';

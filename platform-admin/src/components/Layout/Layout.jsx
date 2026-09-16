@@ -1,26 +1,23 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AppShell, Badge, DSIcon, ConfirmDialog } from '@studio-ux-ds/react';
 import { useAuth } from '../../context/AuthContext';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getNotificationsInbox } from '../../services/automation';
 
-// Layout — casca principal do painel do cliente. Adota o AppShell do Studio UX
+// Layout — casca principal da instância dedicada. Adota o AppShell do Studio UX
 // (passo 2 da expansão de adoção, 2026-07-24). Substitui a dupla Sidebar+Header
 // legada — que vive no histórico do git, não em arquivo `.legacy` ao lado.
 // O piloto isolado /studio-ux-demo continua funcionando dentro desta
 // casca — o tema DS já vive lá.
 //
 // Slots do AppShell usados:
-//   brand           — logo "IA Studio · Painel do Cliente"
+//   brand           — logo do IA Studio local
 //   nav             — sections com groups do menu (idêntico ao legado, agora no formato do DS)
 //   version         — "vX.Y.Z" no rodapé da sidebar (passivo, apenas indicativo)
 //   breadcrumb      — array [{label, href?}] derivado do path
-//   topbarContext   — seletor de workspace + badge de ambiente
 //   user            — { name, initials, email }
-//   userMenuItems   — Minha conta + Trocar senha + Sair (o Claro/Escuro e Personalizar
+//   userMenuItems   — Trocar senha + Sair (o Claro/Escuro e Personalizar
 //                     são adicionados automaticamente pelo AppShell)
 //   onNotifications — navega direto para /automacao/notificacoes (ADR: sinal
 //                     acionável, sem duplicar dropdown do sino antigo)
@@ -33,8 +30,7 @@ import { getNotificationsInbox } from '../../services/automation';
 //     declarando o seu glifo. Não há mais tradução "por proximidade" de outra
 //     biblioteca — e desde a v0.10.22 nenhum arquivo do painel importa ícone de
 //     fora: o catálogo cobre navegação, ação, dados, status e mídia/gravação.
-//   * Multi-tenant branding não existe hoje na plataforma — quando existir, o
-//     Customize/AppShell aceitará accent/tema por organização.
+//   * Identidade visual pertence à própria instância, sem branding por tenant.
 
 
 // Estrutura do menu. Cada item declara **o glifo do DS direto** (`icon`), não um
@@ -62,7 +58,6 @@ const NAV = [
       { label: 'Conhecimento',      icon: 'book',         path: '/ia/conhecimento',         perm: 'ai.knowledge.read' },
       { label: 'Pendências',     icon: 'check-circle', path: '/ia/aprovacoes',   perm: 'ai.approvals.read' },
       { label: 'Análise de atendimento', icon: 'search', path: '/ia/analise',    perm: 'ai.analysis.read' },
-      { label: 'Custos',         icon: 'coin',         path: '/ia/custos',       perm: 'ai.costs.read' },
       { label: 'Ajustes gerais', icon: 'sliders',      path: '/ia/ajustes',      perm: ['ai.tools.read', 'ai.memory.read'] },
     ],
   },
@@ -112,7 +107,7 @@ const NAV = [
   {
     label: 'Desenvolvedor', icon: 'terminal',
     children: [
-      { label: 'Bancada de testes', icon: 'code', path: '/desenvolvedor/console',  perm: 'devtools.use' },
+      { label: 'Bancada de testes', icon: 'code', path: '/desenvolvedor/bancada',  perm: 'devtools.use' },
       { label: 'Chaves de API',     icon: 'key',  path: '/desenvolvedor/api-keys', perm: 'developer.apikeys.read' },
     ],
   },
@@ -121,9 +116,8 @@ const NAV = [
     children: [
       { label: 'Pessoas e convites',      icon: 'users',       path: '/usuarios',    perm: 'core.users.read' },
       { label: 'Perfis de acesso',        icon: 'shield',      path: '/perfis',      perm: 'core.profiles.read' },
-      { label: 'Workspaces e ambientes',  icon: 'boxes',       path: '/workspaces',  perm: 'core.workspaces.read' },
       { label: 'Auditoria',               icon: 'history',     path: '/auditoria',   perm: 'core.audit.read' },
-      { label: 'Minha conta',             icon: 'credit-card', path: '/minha-conta' },
+      { label: 'Administração da instalação', icon: 'settings', path: '/administracao/instalacao', perm: 'system.maintain' },
     ],
   },
 ];
@@ -134,9 +128,8 @@ const BREADCRUMBS = {
   '/':            'Dashboard',
   '/usuarios':    'Configurações / Pessoas e convites',
   '/perfis':      'Configurações / Perfis de acesso',
-  '/workspaces':  'Configurações / Workspaces e ambientes',
   '/auditoria':   'Configurações / Auditoria',
-  '/minha-conta': 'Configurações / Minha conta',
+  '/administracao/instalacao': 'Configurações / Administração da instalação',
   '/conta/senha': 'Configurações / Trocar senha',
   '/integracoes/marketplace': 'Integrações / Marketplace',
   '/integracoes/conexoes':    'Integrações / Conexões',
@@ -156,11 +149,10 @@ const BREADCRUMBS = {
   '/ia/conhecimento': 'IA Studio / Conhecimento',
   '/ia/aprovacoes':   'IA Studio / Pendências',
   '/ia/analise':      'IA Studio / Análise de atendimento',
-  '/ia/custos':       'IA Studio / Custos',
   '/ia/ajustes':      'IA Studio / Ajustes gerais',
   '/recursos/mapeamentos':  'Recursos / Mapeamentos',
   '/recursos/explorer':     'Recursos / Explorador',
-  '/desenvolvedor/console': 'Desenvolvedor / Bancada de testes',
+  '/desenvolvedor/bancada': 'Desenvolvedor / Bancada de testes',
   '/desenvolvedor/api-keys':'Desenvolvedor / Chaves de API',
   '/studio-ux-demo':        'Studio UX (piloto)',
 };
@@ -253,14 +245,6 @@ function buildBreadcrumb(pathname) {
   });
 }
 
-// `tone` direto (papel semântico do DS), não nome de cor: é o mesmo caminho de
-// saída da ponte `lib/tone.js` que as telas já seguem.
-const ENV_BADGE = {
-  PRODUCTION:  { label: 'Produção',        tone: 'success' },
-  STAGING:     { label: 'Homologação',     tone: 'warning' },
-  DEVELOPMENT: { label: 'Desenvolvimento', tone: 'info' },
-};
-
 // Hook — contador de notificações não-lidas. Polling 30s (mesma frequência do
 // sino legado). Silencia erros: polling não pode virar chuva de toast.
 function useNotificationsUnread() {
@@ -295,22 +279,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const [confirmarSaida, setConfirmarSaida] = useState(false);
   const { can } = usePermissions();
-  const { workspaces, workspace, environment, selectWorkspace, selectEnvironment } = useWorkspace();
   const unread = useNotificationsUnread();
-  const [wsOpen, setWsOpen] = useState(false);
-  // Ref no botão do picker + posição fixa do dropdown. O AppShell tem
-  // `overflow: hidden` nos ancestrais (.su-appshell, .su-appshell__main),
-  // o que corta qualquer dropdown `position: absolute`. Solução: renderizar
-  // o menu via createPortal no <body>, com posição fixed calculada a partir
-  // do getBoundingClientRect do botão.
-  const wsButtonRef = useRef(null);
-  const [wsMenuPos, setWsMenuPos] = useState(null);
-  function toggleWsMenu() {
-    if (wsOpen) { setWsOpen(false); return; }
-    const rect = wsButtonRef.current?.getBoundingClientRect();
-    if (rect) setWsMenuPos({ top: rect.bottom + 6, left: rect.left });
-    setWsOpen(true);
-  }
 
   // Constrói `nav` no formato do AppShell (sections + items; grupo colapsável).
   // Filtragem por permissão: item sem perm sempre aparece; item com perm só se
@@ -349,113 +318,7 @@ export default function Layout() {
     return items;
   }, [location.pathname, can, navigate]);
 
-  // Fecha o dropdown de workspace ao clicar fora. Como o menu agora vive num
-  // portal (fora do container do botão), o teste "clicou fora" precisa
-  // verificar TANTO o botão QUANTO o próprio menu — se o target não estiver
-  // dentro de nenhum dos dois, fecha.
-  useEffect(() => {
-    if (!wsOpen) return;
-    function onDoc(e) {
-      const btn = wsButtonRef.current;
-      const menu = document.getElementById('ws-picker-menu');
-      const inside = (btn && btn.contains(e.target)) || (menu && menu.contains(e.target));
-      if (!inside) setWsOpen(false);
-    }
-    // Fecha também em scroll/resize (posição do fixed pode ficar deslocada).
-    function onWinChange() { setWsOpen(false); }
-    document.addEventListener('mousedown', onDoc);
-    window.addEventListener('scroll', onWinChange, true);
-    window.addEventListener('resize', onWinChange);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      window.removeEventListener('scroll', onWinChange, true);
-      window.removeEventListener('resize', onWinChange);
-    };
-  }, [wsOpen]);
-
   const breadcrumb = buildBreadcrumb(location.pathname);
-
-  const envInfo = environment
-    ? (ENV_BADGE[environment.kind] || { label: environment.name || environment.kind, tone: 'neutral' })
-    : null;
-
-  // Workspace picker + badge de ambiente — vive no topbarContext do AppShell.
-  // O menu abre via Portal (fora do container com overflow: hidden do AppShell).
-  const topbarContext = workspaces.length > 0 ? (
-    <button
-      ref={wsButtonRef}
-      onClick={toggleWsMenu}
-      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors min-h-[36px]"
-      style={{ border: '1px solid var(--su-border-default)', color: 'var(--su-text-secondary)', backgroundColor: 'var(--su-surface-sunken)' }}
-      title="Selecionar workspace"
-    >
-      <span className="max-w-[140px] md:max-w-[200px] truncate font-medium">
-        {workspace?.name || 'Workspace'}
-      </span>
-      {envInfo && <Badge tone={envInfo.tone}>{envInfo.label}</Badge>}
-    </button>
-  ) : null;
-
-  // Menu do picker — renderizado via Portal para escapar do overflow: hidden
-  // do AppShell. Posição fixed calculada em toggleWsMenu().
-  const workspaceMenu = wsOpen && wsMenuPos && workspaces.length > 0 ? createPortal(
-    <div
-      id="ws-picker-menu"
-      className="w-72 rounded-xl shadow-xl overflow-hidden"
-      style={{
-        position: 'fixed',
-        top: wsMenuPos.top,
-        left: wsMenuPos.left,
-        zIndex: 1000,
-        backgroundColor: 'var(--su-surface-raised)',
-        border: '1px solid var(--su-border-default)',
-      }}
-    >
-      <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--su-text-muted)' }}>
-        Workspaces
-      </p>
-      <div className="max-h-72 overflow-y-auto pb-2">
-        {workspaces.map((w) => (
-          <div key={w.id}>
-            <button
-              onClick={() => { selectWorkspace(w.id); setWsOpen(false); }}
-              className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2"
-              style={{
-                color: w.id === workspace?.id ? 'var(--su-action)' : 'var(--su-text-secondary)',
-                backgroundColor: w.id === workspace?.id ? 'var(--su-surface-sunken)' : 'transparent',
-              }}
-            >
-              <span className="flex-1 truncate font-medium">{w.name}</span>
-            </button>
-            {w.id === workspace?.id && (w.environments || []).length > 0 && (
-              <div className="pl-4 pr-3 pb-1 flex flex-wrap gap-1">
-                {w.environments.map((e) => {
-                  const info = ENV_BADGE[e.kind] || { label: e.name || e.kind, variant: 'gray' };
-                  const on = e.id === environment?.id;
-                  return (
-                    <button
-                      key={e.id}
-                      onClick={() => { selectEnvironment(e.id); setWsOpen(false); }}
-                      className="text-[11px] px-2 py-1 rounded-md transition-colors"
-                      style={{
-                        border: '1px solid var(--su-border-default)',
-                        backgroundColor: on ? 'var(--su-surface-sunken)' : 'transparent',
-                        color: on ? 'var(--su-text-primary)' : 'var(--su-text-muted)',
-                        fontWeight: on ? 600 : 400,
-                      }}
-                    >
-                      {info.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>,
-    document.body,
-  ) : null;
 
   const userForShell = {
     name: user?.name || user?.email || 'Conta',
@@ -464,7 +327,6 @@ export default function Layout() {
   };
 
   const userMenuItems = [
-    { icon: 'user', label: 'Minha conta', onClick: () => navigate('/minha-conta') },
     { icon: 'lock', label: 'Trocar senha', onClick: () => navigate('/conta/senha') },
   ];
 
@@ -486,7 +348,7 @@ export default function Layout() {
       </div>
       <div className="min-w-0">
         <p className="text-sm font-bold leading-tight truncate" style={{ color: 'var(--su-text-primary)' }}>IA Studio</p>
-        <p className="text-[10px] leading-tight" style={{ color: 'var(--su-text-muted)' }}>Painel do Cliente</p>
+        <p className="text-[10px] leading-tight" style={{ color: 'var(--su-text-muted)' }}>Instância dedicada</p>
       </div>
     </div>
   );
@@ -508,7 +370,6 @@ export default function Layout() {
         // `100dvh - 8.5rem` à mão — número que erra sempre que a barra de cima
         // muda de altura, e erra diferente no mobile.
         fullBleed={FULL_BLEED_PATHS.some((p) => location.pathname.startsWith(p))}
-        topbarContext={topbarContext}
         user={userForShell}
         userMenuItems={userMenuItems}
         onNotifications={() => navigate('/automacao/monitoramento?tab=notificacoes')}
@@ -518,8 +379,6 @@ export default function Layout() {
       >
         <Outlet />
       </AppShell>
-      {workspaceMenu}
-
       {/* Sair encerra a sessão de verdade — e vivia num item de menu que fecha no
           clique, ao lado de "Minha conta" e "Trocar senha". Um clique errado
           derrubava a sessão de quem estava no meio de um cadastro. Confirmar é o

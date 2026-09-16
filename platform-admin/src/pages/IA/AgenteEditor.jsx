@@ -8,7 +8,6 @@ import {
 } from '../../services/ai';
 import { listConnections } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import {
   AGENT_MODELS, PERSONA_TONES, PERSONA_EMOJIS, PERSONA_BREVITY,
   RUN_STATUS, formatTokens, formatUsd,
@@ -69,7 +68,6 @@ export default function AgenteEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const canWrite = can('ai.agents.write');
   const canExecute = can('ai.agents.execute');
@@ -231,7 +229,6 @@ export default function AgenteEditor() {
     if (!canWrite) { toast.error('Sem permissão.'); return; }
     if (!form.name.trim()) { toast.error('Dê um nome ao assistente (aba "Visão geral").'); setTab('visao'); return; }
     if (!form.model.trim()) { toast.error('Escolha o modelo em "Ajustes avançados" (dentro de Visão geral).'); setTab('visao'); setAdvExpanded(true); return; }
-    if (!savedId && (!workspaceId || !environmentId)) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
     setSaving(true);
     try {
       const body = {
@@ -264,7 +261,7 @@ export default function AgenteEditor() {
       };
       let saved;
       if (savedId) saved = await updateAgent(savedId, body);
-      else saved = await createAgent({ ...body, workspace_id: workspaceId, environment_id: environmentId });
+      else saved = await createAgent(body);
 
       const id = saved?.id || savedId;
       setSavedId(id);

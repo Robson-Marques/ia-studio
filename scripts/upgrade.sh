@@ -4,7 +4,7 @@
 # Aplica um upgrade de versao (git tag) com backup automatico, build e restart.
 # Roda como ROOT no servidor (repo em /opt/iastudio).
 #
-# Disparado pelo painel de Atualizacao do Console (spawn detached), que ja criou
+# Disparado pelo painel local de Administração da instalação (spawn detached), que ja criou
 # a row em system_upgrades (status=RUNNING) e chama com args POSICIONAIS:
 #     bash scripts/upgrade.sh <tag> <upgrade_id>
 # (tambem aceita --to / --upgrade-id / --repo-path para uso manual)
@@ -24,6 +24,7 @@ set -euo pipefail
 # Copiando pra /tmp e reexecutando de la, o arquivo em execucao nao e mais o que
 # o git substitui. Idempotente via UPGRADE_SELF_COPIED.
 if [ "${UPGRADE_SELF_COPIED:-}" != "1" ]; then
+  export IASTUDIO_UPGRADE_SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
   _self_copy="/tmp/iastudio-upgrade-$$.sh"
   cp -- "$0" "$_self_copy"
   export UPGRADE_SELF_COPIED=1
@@ -31,7 +32,8 @@ if [ "${UPGRADE_SELF_COPIED:-}" != "1" ]; then
 fi
 
 # ---------- ARGS (posicionais OU flags) ----------
-TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="/opt/iastudio"; DO_RESTART=1
+SCRIPT_DIR="${IASTUDIO_UPGRADE_SOURCE_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"; DO_RESTART=1
 POS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,11 +53,7 @@ done
 
 API_DIR="$REPO_PATH/platform-api"
 ADMIN_DIR="$REPO_PATH/platform-admin"
-CONSOLE_DIR="$REPO_PATH/platform-console"
-BACKUP_DIR="${IASTUDIO_BACKUP_DIR:-/opt/iastudio-backups}"
 ENV_FILE="$API_DIR/.env"
-CRED_FILE="/root/.iastudio-credentials"
-mkdir -p "$BACKUP_DIR"
 
 [ ! -f "$ENV_FILE" ] && echo "ERRO: .env nao encontrado em $ENV_FILE" && exit 1
 DATABASE_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//;s/^'\''//;s/'\''$//')
@@ -72,10 +70,10 @@ set -a
 source "$ENV_FILE"
 set +a
 
-# Modo/dominios pra rebuildar os fronts com a mesma URL da API/base do install.
-MODE="single"; DOMAIN=""; DOMAIN_API=""
-# shellcheck disable=SC1090
-[ -f "$CRED_FILE" ] && source "$CRED_FILE" 2>/dev/null || true
+: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da instância}"
+: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da instância}"
+BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da instância}"
+mkdir -p "$BACKUP_DIR"
 
 # pm2 spawn herda NODE_ENV=production -> npm pula devDependencies (tsc/vite
 # quebram). Forcamos development pro build ter @types/* e as ferramentas.
@@ -180,7 +178,7 @@ npx prisma generate 2>>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISM
 log_db "API_BUILD" "nest build"
 npm run build 2>/tmp/iastudio_build.err >/dev/null || mark_failed "API_BUILD" "nest build falhou: $(tail -c 800 /tmp/iastudio_build.err)"
 
-# Helper de build de front (usa MODE/dominios do .iastudio-credentials).
+# Helper de build do painel local.
 build_front() {
   local dir="$1"; local api_url="$2"; local base="$3"; local step="$4"
   [ ! -f "$dir/package.json" ] && { log_db "$step" "front ausente ($dir) — pulado"; return 0; }
@@ -193,51 +191,27 @@ build_front() {
   VITE_API_URL="$api_url" npm run build -- --base="$base" 2>/tmp/iastudio_build.err >/dev/null || mark_failed "$step" "vite build falhou: $(tail -c 800 /tmp/iastudio_build.err)"
 }
 
-# URLs iguais as do install (single = relativo; multi = dominio da API).
-if [ "$MODE" = "single" ]; then
-  ADMIN_API="/api/v1"; ADMIN_BASE="/"
-  CONSOLE_API="/api/v1"; CONSOLE_BASE="/console/"
-else
-  ADMIN_API="https://${DOMAIN_API}/api/v1"; ADMIN_BASE="/"
-  CONSOLE_API="https://${DOMAIN_API}/api/v1"; CONSOLE_BASE="/"
-fi
+# Painel e API vivem no domínio exclusivo da instância dedicada.
+ADMIN_API="/api/v1"; ADMIN_BASE="/"
 
 # ---------- 8-9) ADMIN ----------
 log_db "ADMIN_BUILD" "npm install + vite build (platform-admin)"
 build_front "$ADMIN_DIR" "$ADMIN_API" "$ADMIN_BASE" "ADMIN_BUILD"
 log_db "ADMIN_BUILD" "painel do cliente publicado"
 
-# ---------- 10) CONSOLE ----------
-# Duas saidas: `dist` (base principal — /console/ no modo single) e `dist-root`
-# (base=/), usada quando o Console tem DOMINIO DEDICADO cadastrado em Enderecos.
-# Base do Vite/basename do router sao definidos em build — um dist so nao serve
-# os dois casos. O npm install acontece uma vez (dentro do build_front).
-log_db "CONSOLE_BUILD" "npm install + vite build (platform-console)"
-build_front "$CONSOLE_DIR" "$CONSOLE_API" "$CONSOLE_BASE" "CONSOLE_BUILD"
-rm -rf "$CONSOLE_DIR/dist-root"
-if [ "$CONSOLE_BASE" = "/" ]; then
-  cp -r "$CONSOLE_DIR/dist" "$CONSOLE_DIR/dist-root"
-else
-  cd "$CONSOLE_DIR"
-  VITE_API_URL="$CONSOLE_API" npm run build -- --base="/" --outDir=dist-root \
-    2>/tmp/iastudio_build.err >/dev/null \
-    || mark_failed "CONSOLE_BUILD" "vite build (dist-root) falhou: $(tail -c 800 /tmp/iastudio_build.err)"
-fi
-log_db "CONSOLE_BUILD" "console publicado (dist + dist-root)"
-
-# ---------- 11) ROTATE_BACKUPS (mantem 7) ----------
+# ---------- 10) ROTATE_BACKUPS (mantem 7) ----------
 log_db "ROTATE_BACKUPS" "mantendo os 7 backups mais recentes"
 ls -1t "$BACKUP_DIR"/iastudio_db_*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
 log_db "ROTATE_BACKUPS" "rotacao concluida"
 
-# ---------- 12) MARK_SUCCESS (antes do restart) ----------
+# ---------- 11) MARK_SUCCESS (antes do restart) ----------
 log_db "DONE" "Upgrade aplicado ($FROM_VERSION -> $TO_VERSION)"
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL
 UPDATE system_upgrades SET status='SUCCESS', finished_at=now() WHERE id = '$UPGRADE_ID';
 SQL
 trap - ERR
 
-# ---------- 13) RESTART ----------
+# ---------- 12) RESTART ----------
 # WORKER PRIMEIRO, API POR ULTIMO — e cada um em seu proprio comando. O worker
 # roda o assistente/crons e registra as tools em memoria: se ele nao reiniciar,
 # codigo/tool novos NUNCA entram (bug real: o worker ficou 19h sem reiniciar
@@ -246,14 +220,14 @@ trap - ERR
 # (mesmo detached) — por isso ele fica por ULTIMO, quando o worker ja pegou o
 # codigo novo. Um comando combinado deixava o worker de fora num restart parcial.
 if [ "$DO_RESTART" -eq 1 ]; then
-  echo "[RESTART] pm2 restart iastudio-worker"
-  pm2 restart iastudio-worker --update-env 2>/dev/null \
-    || pm2 start "$API_DIR/ecosystem.config.js" --only iastudio-worker 2>/dev/null \
-    || echo "AVISO: restart do iastudio-worker retornou nao-zero (verifique pm2 list)"
-  echo "[RESTART] pm2 restart iastudio-api"
-  pm2 restart iastudio-api --update-env 2>/dev/null \
-    || pm2 start "$API_DIR/ecosystem.config.js" --only iastudio-api 2>/dev/null \
-    || echo "AVISO: restart do iastudio-api retornou nao-zero (verifique pm2 list)"
+  echo "[RESTART] pm2 restart $IASTUDIO_PM2_WORKER"
+  pm2 restart "$IASTUDIO_PM2_WORKER" --update-env 2>/dev/null \
+    || pm2 start "$SCRIPT_DIR/ecosystem.config.js" --only "$IASTUDIO_PM2_WORKER" 2>/dev/null \
+    || echo "AVISO: restart do $IASTUDIO_PM2_WORKER retornou nao-zero (verifique pm2 list)"
+  echo "[RESTART] pm2 restart $IASTUDIO_PM2_API"
+  pm2 restart "$IASTUDIO_PM2_API" --update-env 2>/dev/null \
+    || pm2 start "$SCRIPT_DIR/ecosystem.config.js" --only "$IASTUDIO_PM2_API" 2>/dev/null \
+    || echo "AVISO: restart do $IASTUDIO_PM2_API retornou nao-zero (verifique pm2 list)"
 else
   echo "[RESTART] pulado (--no-restart)"
 fi

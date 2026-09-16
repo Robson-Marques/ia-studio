@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FormScreen, FormGrid, Field, Input, Select, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { createQueue, listQueues, listTeams, updateQueue } from '../../services/whatsapp';
 
 // WhatsApp/FilaEditor — uma fila de atendimento (v0.10.9).
@@ -24,7 +23,6 @@ export default function FilaEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const isEdit = !!id;
   const canManage = can('comm.whatsapp.queues.manage');
@@ -60,10 +58,6 @@ export default function FilaEditor() {
 
   async function handleSave() {
     if (!name.trim()) { toast.error('Dê um nome à fila.'); return; }
-    if (!isEdit && (!workspaceId || !environmentId)) {
-      toast.error('Escolha um workspace e um ambiente no topo da tela antes de criar.');
-      return;
-    }
     setSaving(true);
     try {
       const body = {
@@ -75,7 +69,7 @@ export default function FilaEditor() {
         await updateQueue(id, body);
         toast.success('Fila atualizada.');
       } else {
-        await createQueue({ ...body, workspace_id: workspaceId, environment_id: environmentId });
+        await createQueue(body);
         toast.success('Fila criada.');
       }
       navigate('/whatsapp/equipes');

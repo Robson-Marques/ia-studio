@@ -6,7 +6,6 @@ import {
   listMcpServers, createMcpServer, syncMcpServer, getMcpServerTools,
 } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { MCP_TRANSPORTS, formatDateTime } from './ia.constants';
 
 // IA/Ferramentas — migração pro DS (v0.9.87, 2026-07-24).
@@ -130,7 +129,6 @@ export function CatalogTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }
 export function McpTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }) {
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -143,7 +141,7 @@ export function McpTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }) {
   async function load() {
     setLoading(true);
     try {
-      const { items: list } = await listMcpServers({ environment_id: environmentId || undefined });
+      const { items: list } = await listMcpServers();
       setItems(list);
     } catch (err) {
       toast.error(err.message);
@@ -152,7 +150,7 @@ export function McpTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }) {
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSync(server) {
     setSyncing(server.id);
@@ -282,8 +280,6 @@ export function McpTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }) {
       <McpServerModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        workspaceId={workspaceId}
-        environmentId={environmentId}
         onSaved={() => { setCreateOpen(false); load(); }}
       />
 
@@ -345,7 +341,7 @@ export function McpTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }) {
   );
 }
 
-function McpServerModal({ open, onClose, onSaved, workspaceId, environmentId }) {
+function McpServerModal({ open, onClose, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState({ name: '', transport: 'HTTP', endpoint: '', is_active: false });
   const [saving, setSaving] = useState(false);
@@ -358,7 +354,6 @@ function McpServerModal({ open, onClose, onSaved, workspaceId, environmentId }) 
 
   async function handleSave() {
     if (!form.name.trim()) { toast.error('Informe o nome.'); return; }
-    if (!workspaceId || !environmentId) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
     setSaving(true);
     try {
       await createMcpServer({
@@ -366,8 +361,6 @@ function McpServerModal({ open, onClose, onSaved, workspaceId, environmentId }) 
         transport: form.transport,
         endpoint: form.endpoint.trim() || undefined,
         is_active: form.is_active,
-        workspace_id: workspaceId,
-        environment_id: environmentId,
       });
       toast.success('Servidor MCP cadastrado.');
       onSaved();

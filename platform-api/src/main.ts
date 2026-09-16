@@ -17,7 +17,7 @@ async function bootstrap(): Promise<void> {
     { rawBody: true },
   );
 
-  // Fase 8: upload de pacotes de backup (multipart/form-data) no Console.
+  // Upload de pacotes de backup (multipart/form-data) na administração local.
   // Registrado no Fastify subjacente; limite generoso (backups grandes).
   // Se o plugin nao estiver instalado, apenas loga um aviso — o endpoint de
   // upload responde 400 informando que o multipart esta indisponivel.
@@ -46,7 +46,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // CORS por env (paineis platform-admin e platform-console em dev).
+  // CORS por env para o painel local em desenvolvimento.
   const isProd = process.env['NODE_ENV'] === 'production';
   const corsEnv = (process.env['CORS_ORIGINS'] ?? '')
     .split(',')
@@ -66,7 +66,7 @@ async function bootstrap(): Promise<void> {
   // OpenAPI/Swagger gerado desde a Fase 1 (diretriz 14).
   const swaggerConfig = new DocumentBuilder()
     .setTitle('IA Studio API')
-    .setDescription('API da plataforma IA Studio (SaaS multi-tenant) — Fase 1: Core, Licensing e Billing')
+    .setDescription('API da instância dedicada IA Studio')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
-import { WorkspaceProvider } from './context/WorkspaceContext';
 import ProtectedRoute, { PermissionRoute } from './components/ProtectedRoute';
 import Layout from './components/Layout/Layout';
 
@@ -14,9 +13,7 @@ import ContaSenha from './pages/ContaSenha';
 import Usuarios from './pages/Usuarios';
 import PerfisAcesso from './pages/PerfisAcesso';
 import PerfilEditor from './pages/PerfilEditor';
-import Workspaces from './pages/Workspaces';
 import Auditoria from './pages/Auditoria';
-import MinhaConta from './pages/MinhaConta';
 import Marketplace from './pages/Integracoes/Marketplace';
 import Conexoes from './pages/Integracoes/Conexoes';
 import ConexaoNova from './pages/Integracoes/ConexaoNova';
@@ -55,7 +52,6 @@ import AjustesGerais from './pages/IA/AjustesGerais';
 import Aprovacoes from './pages/IA/Aprovacoes';
 import AprovacaoDetalhe from './pages/IA/AprovacaoDetalhe';
 import AprovacaoPoliticaEditor from './pages/IA/AprovacaoPoliticaEditor';
-import Custos from './pages/IA/Custos';
 import AnaliseAtendimento from './pages/IA/AnaliseAtendimento';
 import Incidentes from './pages/ISP/Incidentes';
 import IncidenteEditor from './pages/ISP/IncidenteEditor';
@@ -67,6 +63,7 @@ import ConsoleDev from './pages/Desenvolvedor/Console';
 import ApiKeys from './pages/Desenvolvedor/ApiKeys';
 import StudioUxDemo from './pages/StudioUxDemo';
 import Aviso from './pages/Aviso';
+import AdministracaoInstalacao from './pages/AdministracaoInstalacao';
 
 const WHATSAPP_VIEW_PERMS = [
   'comm.whatsapp.view.assigned',
@@ -79,8 +76,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <WorkspaceProvider>
-          <BrowserRouter>
+        <BrowserRouter>
             <Routes>
               {/* Publicas */}
               <Route path="/login" element={<Login />} />
@@ -101,9 +97,8 @@ export default function App() {
                 {/* `novo` antes de `:id` — senão a rota dinâmica trata "novo" como um id. */}
                 <Route path="/perfis/novo" element={<PermissionRoute perm="core.profiles.write"><PerfilEditor /></PermissionRoute>} />
                 <Route path="/perfis/:id" element={<PermissionRoute perm="core.profiles.read"><PerfilEditor /></PermissionRoute>} />
-                <Route path="/workspaces" element={<PermissionRoute perm="core.workspaces.read"><Workspaces /></PermissionRoute>} />
                 <Route path="/auditoria" element={<PermissionRoute perm="core.audit.read"><Auditoria /></PermissionRoute>} />
-                <Route path="/minha-conta" element={<MinhaConta />} />
+                <Route path="/administracao/instalacao" element={<PermissionRoute perm="system.maintain"><AdministracaoInstalacao /></PermissionRoute>} />
                 <Route path="/conta/senha" element={<ContaSenha />} />
                 <Route path="/integracoes/marketplace" element={<PermissionRoute perm="integrations.marketplace.read"><Marketplace /></PermissionRoute>} />
                 <Route path="/integracoes/conexoes" element={<PermissionRoute perm="integrations.connections.read"><Conexoes /></PermissionRoute>} />
@@ -163,7 +158,6 @@ export default function App() {
                 <Route path="/ia/aprovacoes" element={<PermissionRoute perm="ai.approvals.read"><Aprovacoes /></PermissionRoute>} />
                 <Route path="/ia/aprovacoes/politicas/nova" element={<PermissionRoute perm="ai.approvals.decide"><AprovacaoPoliticaEditor /></PermissionRoute>} />
                 <Route path="/ia/aprovacoes/:id" element={<PermissionRoute perm="ai.approvals.read"><AprovacaoDetalhe /></PermissionRoute>} />
-                <Route path="/ia/custos" element={<PermissionRoute perm="ai.costs.read"><Custos /></PermissionRoute>} />
                 <Route path="/ia/analise" element={<PermissionRoute perm="ai.analysis.read"><AnaliseAtendimento /></PermissionRoute>} />
                 <Route path="/isp/incidentes" element={<PermissionRoute perm="isp.incidents.read"><Incidentes /></PermissionRoute>} />
                 <Route path="/isp/incidentes/novo" element={<PermissionRoute perm="isp.incidents.write"><IncidenteEditor /></PermissionRoute>} />
@@ -176,7 +170,7 @@ export default function App() {
                 <Route path="/recursos/mapeamentos/novo" element={<PermissionRoute perm="resource.mappings.write"><MapeamentoEditor /></PermissionRoute>} />
                 <Route path="/recursos/mapeamentos/:id" element={<PermissionRoute perm="resource.mappings.read"><MapeamentoEditor /></PermissionRoute>} />
                 <Route path="/recursos/explorer" element={<PermissionRoute perm="resource.explore.read"><Explorer /></PermissionRoute>} />
-                <Route path="/desenvolvedor/console" element={<PermissionRoute perm="devtools.use"><ConsoleDev /></PermissionRoute>} />
+                <Route path="/desenvolvedor/bancada" element={<PermissionRoute perm="devtools.use"><ConsoleDev /></PermissionRoute>} />
                 <Route path="/desenvolvedor/api-keys" element={<PermissionRoute perm="developer.apikeys.read"><ApiKeys /></PermissionRoute>} />
                 <Route path="/studio-ux-demo" element={<StudioUxDemo />} />
 
@@ -187,8 +181,7 @@ export default function App() {
                 <Route path="*" element={<Aviso motivo="nao-encontrado" />} />
               </Route>
             </Routes>
-          </BrowserRouter>
-        </WorkspaceProvider>
+        </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
   );

@@ -76,7 +76,7 @@ install/upgrade/backup/restore/uninstall dessa instância. Falha de A não afeta
 | S0 — Recovery e contrato | Baseline, Capability Map, RFC e contrato local | decisão do produto | concluído neste slice |
 | S1 — núcleo dedicado | Modelo de dados alvo, exportação seletiva controlada, auth/ACL/eventos locais e retirada do tenant context | política de dados decidida | concluído — gate transversal 100%, sem bloqueantes nas cinco camadas |
 | S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | pendente |
-| S3 — superfícies dedicadas | Remoção de Console e UI/rotas/contextos SaaS; painel local | S1 e S2 | pendente |
+| S3 — superfícies dedicadas | Migração de atualização/backup/restauração para a administração local; remoção de Console e UI/rotas/contextos SaaS | S1 | concluído — matriz e gate em `saas-to-dedicated-s3-console-matrix.md` |
 | S4 — instâncias no mesmo host | Install/upgrade/backup/restore/uninstall isolados | S1 e contratos de runtime finais | pendente |
 | S5 — Acceptance | Evidência integrada e documentação viva | S1–S4 | pendente |
 

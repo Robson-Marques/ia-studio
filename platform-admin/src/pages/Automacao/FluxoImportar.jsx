@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormScreen, Field, TextArea, useToast } from '@studio-ux-ds/react';
 import { importWorkflow } from '../../services/automation';
-import { useWorkspace } from '../../context/WorkspaceContext';
 
 // Automação/FluxoImportar — recria um fluxo a partir do arquivo exportado (v0.10.2).
 //
@@ -13,16 +12,11 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 export default function FluxoImportar() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const [json, setJson] = useState('');
   const [saving, setSaving] = useState(false);
 
   async function handleImport() {
-    if (!workspaceId || !environmentId) {
-      toast.error('Escolha um workspace e um ambiente no topo da tela antes de importar.');
-      return;
-    }
     let data;
     try {
       data = JSON.parse(json);
@@ -32,7 +26,7 @@ export default function FluxoImportar() {
     }
     setSaving(true);
     try {
-      const workflow = await importWorkflow({ workspace_id: workspaceId, environment_id: environmentId, data });
+      const workflow = await importWorkflow({ data });
       toast.success('Fluxo importado — confira os passos antes de publicar.');
       navigate(`/automacao/fluxos/${workflow.id}`);
     } catch (err) {

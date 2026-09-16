@@ -6,7 +6,23 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-09-14.
+> Última atualização: 2026-09-15.
+
+## Checkpoint S3 — Console SaaS → administração local
+
+S3 está **concluído**. A matriz de decisão e a evidência do corte estão em
+[`docs/capabilities/saas-to-dedicated-s3-console-matrix.md`](capabilities/saas-to-dedicated-s3-console-matrix.md): as funções operacionais de atualização,
+backup e restauração foram migradas para `platform-admin` em
+**Configurações → Administração da instalação**, com autorização local
+`system.maintain`; as superfícies comerciais e de plataforma foram removidas.
+O gate `scripts/migration/verify-console-retirement.sh` passou, sem
+`platform-console`, rota, menu, endpoint, build, publicação ou vhost `/console/`
+ativo. Não houve tag, release ou deploy.
+
+S1 permanece **100% concluído**. A Capability geral segue **`in-progress`**:
+o próximo slice é S2, PostgreSQL dedicado limpo e migração seletiva auditável;
+S4 (instalação e isolamento de múltiplas instâncias) continua pendente e não
+integra este checkpoint.
 
 ## 🏗️ Conversão SaaS → instalação dedicada — Capability ativa
 

@@ -1,4 +1,4 @@
-// Feature Flags (diretriz 6): flag global + overrides segmentados.
+// Feature Flags locais da instalação + overrides por usuário/perfil.
 // Precedência da avaliação: user > profile > flag global.
 // Flag expirada (expires_at < agora) avalia como DESABILITADA.
 // Cache em memoria 30s (avaliacao em runtime nao pode custar query por request).
@@ -32,7 +32,7 @@ export class FeatureFlagsService {
     private readonly audit: AuditLogService,
   ) {}
 
-  // ─── CRUD (Console) ─────────────────────────────────
+  // ─── CRUD administrativo local ───────────────────────
   findAll() {
     return this.repository.findAll();
   }

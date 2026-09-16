@@ -4,11 +4,10 @@ import { RegistryModule } from '../registry/registry.module';
 import { MarketplaceRepository } from './marketplace.repository';
 import { MarketplaceService } from './marketplace.service';
 import { MarketplaceController } from './marketplace.controller';
-import { MarketplaceConsoleController } from './marketplace-console.controller';
 
 @Module({
   imports: [RegistryModule],
-  controllers: [MarketplaceController, MarketplaceConsoleController],
+  controllers: [MarketplaceController],
   providers: [MarketplaceRepository, MarketplaceService],
   exports: [MarketplaceService],
 })

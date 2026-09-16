@@ -5,8 +5,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
-import { ALL_PERMISSIONS } from '../permissions.constants';
-import { INSTALLATION_ADMIN_KEY, PERMISSIONS_KEY } from './permissions.decorator';
+import { PERMISSIONS_KEY } from './permissions.decorator';
 import { AuthenticatedUser, RequestWithUser } from './auth.types';
 
 interface CachedPerms {
@@ -29,11 +28,7 @@ export class PermissionsGuard implements CanActivate {
       ctx.getHandler(),
       ctx.getClass(),
     ]);
-    const installationAdminOnly = this.reflector.getAllAndOverride<boolean>(INSTALLATION_ADMIN_KEY, [
-      ctx.getHandler(),
-      ctx.getClass(),
-    ]);
-    if ((!required || required.length === 0) && !installationAdminOnly) return true;
+    if (!required || required.length === 0) return true;
 
     const req = ctx.switchToHttp().getRequest<RequestWithUser>();
     const user = req.user as AuthenticatedUser | undefined;
@@ -42,11 +37,6 @@ export class PermissionsGuard implements CanActivate {
     const perms = await this.loadEffectivePermissions(user.sub);
     user.permissions = perms; // expoe ACL efetiva pra enforcement fino em services
 
-    if (installationAdminOnly && !ALL_PERMISSIONS.every((permission) => perms.includes(permission))) {
-      throw new ForbiddenException('Acesso restrito ao administrador desta instalação.');
-    }
-
-    if (!required || required.length === 0) return true;
     const hasAny = required.some((p) => perms.includes(p));
     if (!hasAny) {
       throw new ForbiddenException(`Permissão necessária: ${required.join(' ou ')}.`);

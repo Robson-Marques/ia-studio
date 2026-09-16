@@ -9,7 +9,7 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 | Pasta | Responde a pergunta |
 |---|---|
 | `registry/` | "Quais implementações IProvider existem e como resolvê-las por key?" |
-| `marketplace/` | "Quais conectores existem no catálogo e quais a organization instalou?" |
+| `marketplace/` | "Quais conectores existem no catálogo local e quais estão instalados nesta instância?" |
 | `connections/` | "Como criar/testar/operar as Instances e registrar seus logs de integração?" |
 | `secrets/` | "Onde vivem as credenciais cifradas e quem pode acessá-las?" |
 | `storage/` | "Como qualquer módulo grava/lê arquivos (Local ou S3)?" |
@@ -18,7 +18,7 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 
 - `ProviderRegistryService`: mapa em memória `key → IProvider`. Proibido switch por `provider_key` fora daqui.
 - Interface única em `src/shared/integration/provider.interface.ts`: `metadata() / connect / disconnect / health / execute(operation, params) / discover` com `ctx = { connection, secrets: SecretsAccessor, logger }`.
-- `ProviderSeedService` (boot, create-if-missing): semeia `ProviderDefinition` (`integration_providers`) a partir do `metadata()` das implementações + `provider-catalog.ts` (whatsapp-meta, catálogo-only até a Fase 3). Nunca sobrescreve — curadoria posterior é do Console.
+- `ProviderSeedService` (boot, create-if-missing): semeia `ProviderDefinition` (`integration_providers`) a partir do `metadata()` das implementações + `provider-catalog.ts`. O catálogo é local à instância.
 - Implementações da Fase 2 (`registry/providers/`):
   - **altarede** (ERP): stub HTTP genérico — `execute` chama a API com appkey/token do Secret. Operações: `cliente.dados`, `financeiro.boleto_aberto`, `cliente.acesso`, `cliente.desbloqueio`, `os.cadastrar`, `conectividade.listar_com_status`.
   - **openai / anthropic** (AI): health = GET `/v1/models` com a API Key; `discover` lista modelos.
@@ -30,7 +30,9 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 
 - `GET /api/v1/marketplace` — catálogo com flag `installed` + `has_implementation`, filtros `category`/`search`. Perm `integrations.marketplace.read`.
 - `POST /api/v1/marketplace/:key/install|uninstall` — perm `integrations.marketplace.manage`. Uninstall bloqueado se houver conexão não-DISABLED do provider.
-- Console: `GET/POST/PATCH /api/v1/console/marketplace` — curadoria de `ProviderDefinition` (`@PlatformAdminOnly`). `key` é imutável.
+- Curadoria de `ProviderDefinition` não faz parte de uma instalação dedicada.
+  O painel local só consome o catálogo e instala/desinstala as integrações que
+  pertencem à própria instância.
 
 ## connections/ (diretriz 52 + Connection Wizard)
 

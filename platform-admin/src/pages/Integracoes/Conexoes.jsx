@@ -5,7 +5,6 @@ import {
   listConnections, changeConnectionState, testConnection, getMarketplace,
 } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { formatDateTime } from '../../lib/format';
 import { statusMeta, STATE_ACTIONS, prettifyProviderKey } from './integration.constants';
 
@@ -40,7 +39,6 @@ export default function Conexoes() {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { workspaces } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [items, setItems] = useState([]);
@@ -85,17 +83,6 @@ export default function Conexoes() {
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const providerName = (key) => providerNames[key] || prettifyProviderKey(key);
-
-  const scopeName = useMemo(() => {
-    const map = new Map();
-    workspaces.forEach((ws) => {
-      (ws.environments || []).forEach((env) => {
-        map.set(`${ws.id}:${env.id}`, `${ws.name} / ${env.name || env.kind || ''}`);
-      });
-      map.set(`${ws.id}:`, ws.name);
-    });
-    return (c) => map.get(`${c.workspace_id}:${c.environment_id}`) || map.get(`${c.workspace_id}:`) || '—';
-  }, [workspaces]);
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -159,7 +146,6 @@ export default function Conexoes() {
         </p>
       </div>
     ) },
-    { key: 'scope', header: 'Onde vale', render: (c) => scopeName(c) },
     { key: 'tags', header: 'Etiquetas', render: (c) => (
       (c.tags || []).length
         ? <div className="flex gap-1 flex-wrap">{c.tags.map((t) => <Badge key={t} tone="info">{t}</Badge>)}</div>

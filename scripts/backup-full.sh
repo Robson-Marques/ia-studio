@@ -15,12 +15,14 @@
 # =============================================================================
 set -euo pipefail
 
-APP_DIR="/opt/iastudio"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 API_DIR="$APP_DIR/platform-api"
-BACKUP_DIR="${IASTUDIO_BACKUP_DIR:-/opt/iastudio-backups}"
-STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
 
 set -a; . "$API_DIR/.env"; set +a
+: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância}"
+BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da instância}"
+STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
 
 STAMP="$(date '+%Y%m%d-%H%M%S')"
 NAME="${1:-full-${STAMP}}"

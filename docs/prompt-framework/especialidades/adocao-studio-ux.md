@@ -50,7 +50,6 @@ Pedido aprovado que envolva:
 ## Limites e quando NÃO usar
 
 - **Não** use para adotar tudo em uma única frente, mesmo com autorização para "aceitar quebra visual" — a herança `workflow.consuming-system-adoption@1.0.0` proíbe (o antipattern está registrado lá).
-- **Não** use para o `platform-console` (backoffice interno do SaaS) — hoje está fora deste escopo; se um dia for adotado, cria-se `ia-studio.studio-ux-adoption-console@1.0.0` ou expande esta task com decisão explícita.
 - **Não** use para `platform-api` — é backend; adoção de DS só faz sentido no frontend.
 - **Não** use para desenvolver novo componente no adapter do DS — isso é `studio-ux.web-adapter-and-storybook@1.0.0` no repo do Studio UX.
 - **Não** confunda com runtime de assistentes do produto (prompts, tools, knowledge base, memória, workflows) — esses vivem no runtime da plataforma e seguem regras próprias.
@@ -65,7 +64,7 @@ Pedido aprovado que envolva:
 4. **Histórico local da adoção** (crítico — este projeto já começou): [`docs/adocao-studio-ux.md`](../../adocao-studio-ux.md), [`ESTADO-e-handoff atual`](../../ESTADO-e-handoff.md), [`CHANGELOG`](../../../CHANGELOG.md) entrada `v0.9.79` (piloto isolado em `/studio-ux-demo`).
 5. Estado real do `platform-admin`: `platform-admin/package.json` (adapter instalado — usa o GitLab da Nivoo via `.npmrc` com `GITLAB_PACKAGE_TOKEN`; confirmar se ainda é), `platform-admin/src/main.jsx` (tokens/components CSS já importados? `configureTheme`/`applyTheme` chamados?), `platform-admin/src/App.jsx` (roteador — a rota `/studio-ux-demo` está isolada), `platform-admin/src/components/Layout/*` (casca atual), `platform-admin/src/pages/StudioUxDemo.jsx` (piloto — ver o que já foi feito).
 6. Callsites do padrão a substituir (grep exaustivo no `platform-admin/src/` antes de propor mapeamento): componentes locais equivalentes a Modal, Tabs, Table, ConfirmDialog, FormField, Toast, StatCard etc.
-7. **Contexto multi-tenant**: como o `platform-admin` resolve branding/theming por organização hoje — o Customize embutido do `AppShell` aceita accent/tema/layout/idioma; se cada org tem accent próprio, o Customize precisa ser combinado com o resolver de branding tenant.
+7. **Contexto dedicado**: confirmar que tema e identidade pertencem somente à instalação local; o Customize do `AppShell` não recebe resolver de tenant.
 
 ## Processo
 
@@ -74,7 +73,7 @@ Pedido aprovado que envolva:
 3. **Mapear callsites** do padrão a substituir no `platform-admin/src/`. Sem mapa, não avança.
 4. **Escolher tela/módulo piloto de expansão**: casca do `platform-admin` (Layout + navbar + região de conteúdo) é o candidato natural — o piloto atual `/studio-ux-demo` é rota isolada; expandir a casca para as demais rotas é a evolução direta. Decidir a **primeira tela de conteúdo** ("Assistentes"? "Painel"?) que renderiza dentro da casca nova requer decisão do dono.
 5. **Identificar conflitos** entre regras do DS e padrões do `platform-admin` (modal empilhado, wizard-em-modal, componentes de outra família visual). Cada um vira decisão: (a) refactor no `platform-admin`, (b) exceção documentada, (c) frente arquitetural separada (`ia-studio.arquitetura-mudanca-transversal@x.y.z` — não catalogada ainda; requer criação por `workflow.specialty-creation` quando necessária).
-6. **ADR curto** — seja num arquivo próprio (`docs/adr/adocao-studio-ux-fase-2.md` ou nome equivalente) OU acrescentando ao `docs/adocao-studio-ux.md` existente: estratégia de coexistência, ordem de migração, rollback por callsite, decisão sobre multi-tenant theming.
+6. **ADR curto** — seja num arquivo próprio (`docs/adr/adocao-studio-ux-fase-2.md` ou nome equivalente) OU acrescentando ao `docs/adocao-studio-ux.md` existente: estratégia de coexistência, ordem de migração, rollback por callsite e identidade local.
 7. **Portar o piloto de expansão** (casca) mantendo o piloto original `/studio-ux-demo` intacto e as outras rotas funcionais com o padrão atual (coexistência).
 8. **Validação humana** do piloto de expansão antes de propagar.
 9. **Propagação por família** (uma sub-frente por família de tela), cada uma com checkpoint.
@@ -84,7 +83,7 @@ Pedido aprovado que envolva:
 
 - **Mapa de callsites** do padrão em substituição, com prioridade.
 - **Estratégia de coexistência** (piloto original + casca nova + rotas antigas convivendo).
-- **Estratégia multi-tenant**: como o Customize/branding por organização combina com o `AppShell`.
+- **Estratégia de identidade local**: como o Customize da instalação combina com o `AppShell`.
 - **Ordem de migração** (casca → primeira tela → famílias → remoção).
 - **Rollback** por callsite.
 - **Conflitos** identificados e decisão para cada um.
@@ -100,10 +99,10 @@ Pedido aprovado que envolva:
 | Componente local ainda em uso | Coexistência preservada; local continua funcional em callsites não migrados |
 | Sweep mecânico ("substituir todos `Modal` por `DSModal`") | Recusado; sweep é 1 arquivo por vez com validação |
 | Piloto `/studio-ux-demo` ignorado | Recusado; decisões já tomadas ali são o ponto de partida |
-| Branding multi-tenant por organização | Estratégia explícita no ADR — Customize combinado com resolver de branding |
+| Branding da instalação | Estratégia explícita no ADR — Customize local, sem resolver de tenant |
 | Piloto de expansão ainda não validado por humano | Recusado; propagação bloqueada até `ok` explícito |
 | Casca migrada antes de piloto CRUD | Aceito — casca é pré-requisito; cada tela ainda precisa de sub-frente |
-| Tocar `platform-console` ou `platform-api` | Recusado; escopo desta task é só `platform-admin` |
+| Tocar `platform-api` | Recusado; escopo desta task é só `platform-admin` |
 
 ## Registro de revisão
 

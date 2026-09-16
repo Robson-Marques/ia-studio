@@ -32,11 +32,11 @@ do produto.
 | Dimensão | Estado | Evidência | Leitura para a Capability |
 |---|---|---|---|
 | Visão e limites | existente | `README.md`, `CLAUDE.md`, decisão do produto | O destino dedicado está definido; o código atual diverge. |
-| Módulos e fronteiras | existente | `platform-api/src/app.module.ts` | Monólito modular com API, workers e três superfícies atuais. |
+| Módulos e fronteiras | existente | `platform-api/src/app.module.ts` | Monólito modular com API, workers e painel local. |
 | Dados e relações | existente | `platform-api/prisma/schema.prisma` | Hierarquia SaaS e escopos atingem entidades operacionais. |
 | Auth e ACL | existente | `shared/auth/*`, `permissions.constants.ts` | JWT e ACL existem; dois atores e tenant context são SaaS. |
 | Integrações/eventos | existente | `modules/integration`, `shared/events` | Registry, Secrets, Storage, Event Bus e BullMQ são preserváveis. |
-| Superfícies | existente | `platform-admin`, `platform-console` | Console é SaaS; admin é a superfície da instância. |
+| Superfícies | existente | `platform-admin` | O painel local é a única superfície administrativa da instância. |
 | Infraestrutura | parcial | `scripts/*`, deploy | Nomes globais impedem coexistência segura de instalações. |
 | Observabilidade/auditoria | existente | `shared/audit`, logs, system | Devem se tornar locais à instância. |
 | Estratégia de testes | parcial | documentação e código inspecionados | Cada slice exige evidência proporcional; Acceptance é integrada no fim. |
@@ -117,8 +117,7 @@ possuem Capability Contract e Acceptance registrados.
 
 - Capability: `docs/capabilities/saas-to-dedicated-installation.md`.
 - Decisão: `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md`.
-- Estado real: `platform-api/`, `platform-admin/`, `platform-console/` e
-  `scripts/`.
+- Estado real: `platform-api/`, `platform-admin/` e `scripts/`.
 - ISP atual: `platform-api/src/modules/isp/README.md`.
 
 Atualizar este Baseline a cada slice estrutural; ele descreve estado e fronteiras

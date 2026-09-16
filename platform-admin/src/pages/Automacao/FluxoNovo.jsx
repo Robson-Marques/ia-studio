@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormScreen, Field, Input, TextArea, useToast } from '@studio-ux-ds/react';
 import { createWorkflow } from '../../services/automation';
-import { useWorkspace } from '../../context/WorkspaceContext';
 
 // Automação/FluxoNovo — cadastro de um fluxo vazio (v0.10.2).
 //
@@ -13,7 +12,6 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 export default function FluxoNovo() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -22,17 +20,11 @@ export default function FluxoNovo() {
 
   async function handleSave() {
     if (!name.trim()) { toast.error('Dê um nome ao fluxo.'); return; }
-    if (!workspaceId || !environmentId) {
-      toast.error('Escolha um workspace e um ambiente no topo da tela antes de criar.');
-      return;
-    }
     setSaving(true);
     try {
       const workflow = await createWorkflow({
         name: name.trim(),
         description: description.trim() || undefined,
-        workspace_id: workspaceId,
-        environment_id: environmentId,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       });
       toast.success('Fluxo criado — agora monte os passos.');
