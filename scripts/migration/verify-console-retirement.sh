@@ -18,12 +18,12 @@ fi
 # Código em execução não pode conservar a superfície antiga. Documentos de
 # recuperação/RFC/matriz ficam fora deste gate por registrarem a decisão.
 if rg -n -i 'platform-console|/console/' platform-api/src platform-admin/src scripts \
-  -g '!scripts/migration/verify-console-retirement.sh'; then
+  -g '!scripts/migration/verify-*.sh'; then
   fail 'referência ativa ao Console ou ao vhost /console/ encontrada.'
 fi
 
 if rg -n 'CONSOLE_BUILD|CONSOLE_DIR|dist-root|domains-sync' scripts \
-  -g '!scripts/migration/verify-console-retirement.sh'; then
+  -g '!scripts/migration/verify-*.sh'; then
   fail 'resíduo de build/publicação/vhost do Console encontrado nos scripts.'
 fi
 

@@ -59,3 +59,14 @@ Uso: --instance-id <cliente-slug>. O identificador é obrigatório e nunca é
 inferido de host, banco, diretório ou variável global.
 EOF
 }
+
+acquire_instance_lock() {
+  [ "${IASTUDIO_INSTANCE_LOCK_HELD:-}" = "$IASTUDIO_INSTANCE_ID" ] && return 0
+  command -v flock >/dev/null || fail_instance 'flock é obrigatório para serializar a operação da instância.'
+  mkdir -p /var/lock
+  # O id já foi validado por set_instance; o lock nunca é compartilhado entre
+  # clientes e impede dois install/upgrade/restore concorrentes da mesma base.
+  exec 9>"/var/lock/iastudio-${IASTUDIO_INSTANCE_ID}.lock"
+  flock -n 9 || fail_instance "já existe uma operação em andamento para a instância $IASTUDIO_INSTANCE_ID."
+  export IASTUDIO_INSTANCE_LOCK_HELD="$IASTUDIO_INSTANCE_ID"
+}

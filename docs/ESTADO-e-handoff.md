@@ -24,6 +24,32 @@ o próximo slice é S2, PostgreSQL dedicado limpo e migração seletiva auditáv
 S4 (instalação e isolamento de múltiplas instâncias) continua pendente e não
 integra este checkpoint.
 
+Atualização de 2026-09-15 (S2 em andamento): runtime, auditoria e respondente
+WhatsApp não conservam mais contratos SaaS residuais; o gate
+`verify-operational-dedicated.sh` passa. A exportação da fonte histórica agora
+registra seleção, contagem e checksum por tabela e o verificador independente
+recusa NDJSON com campos sensíveis. A importação permanece deliberadamente
+inexecutada: faltam backup completo verificável, seleção operacional aprovada
+e o artefato exportado real da instância ISP. Não há importação automática,
+SQL de restauração ou inferência de relações filhas.
+
+O procedimento de S2 já separa `backup-saas-historical.sh` do backup da nova
+instalação: o snapshot histórico, incluindo segredos, é verificável e serve
+somente a rollback da fonte SaaS; sua política proíbe restore no dedicado.
+
+Atualização de 2026-09-15 (S4 em andamento): install, provisionamento, upgrade,
+backup, restore e uninstall recebem lock por instância; banco/role, Redis,
+processos PM2, diretório, storage, backup e vhost são derivados do
+`instance-id`. O antigo uninstall global foi substituído por remoção confirmada
+da instância indicada, sem apagar dependências do host ou outros clientes. O
+gate estático `verify-instance-isolation.sh` passou para `isp-a` e `loja-b`.
+Ainda falta a prova no servidor de duas instalações reais e operações cruzadas
+sem efeito.
+
+Progresso da Capability (S1–S5; S0 é Recovery e não entra no denominador):
+S1 100%, S2 50%, S3 100%, S4 50%, S5 0%; geral **60%**. A Capability segue
+`in-progress`, sem tag, release ou deploy após o checkpoint S3.
+
 ## 🏗️ Conversão SaaS → instalação dedicada — Capability ativa
 
 O modelo aprovado é uma instância independente por cliente, não SaaS

@@ -20,13 +20,11 @@ done
 [ -n "$INSTANCE_ID" ] || { instance_usage >&2; exit 2; }
 set_instance "$INSTANCE_ID"
 load_instance_config "$INSTANCE_ID"
+acquire_instance_lock
 
 API_DIR="$IASTUDIO_APP_DIR/platform-api"
 [ -f "$API_DIR/prisma/schema.prisma" ] || fail_instance "schema não encontrado em $API_DIR"
 [ -n "${DATABASE_URL:-}" ] || fail_instance 'DATABASE_URL ausente na configuração da instância.'
-
-tables="$(psql "$DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_tables WHERE schemaname = 'public';")"
-[ "$tables" = '0' ] || fail_instance "o banco dedicado precisa estar vazio; encontrou $tables tabela(s)."
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -40,6 +38,13 @@ transaction="$work/transaction.sql"
 cat > "$transaction" <<EOF
 BEGIN;
 SELECT pg_advisory_xact_lock(hashtext('iastudio:dedicated-schema:${IASTUDIO_INSTANCE_ID}'));
+DO \$\$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public') THEN
+    RAISE EXCEPTION 'o banco dedicado precisa estar vazio';
+  END IF;
+END
+\$\$;
 CREATE TABLE IF NOT EXISTS system_schema_migrations (
   id text PRIMARY KEY,
   checksum_sha256 text NOT NULL,

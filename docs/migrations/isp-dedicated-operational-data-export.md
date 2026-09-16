@@ -29,16 +29,22 @@ schema SaaS e sem copiar segredos. Ele é parte do S1 da Capability
 | `AUTOMATION_CONFIGURATION` | fluxos, agendas, calendários e templates | Importador futuro precisa revisar referências e estados ativos. |
 
 Relações filhas que não carregam `organization_id` não são inferidas pelo
-exportador. Elas entram somente quando o importador dedicado tiver uma regra de
-mapeamento, integridade e auditoria própria.
+exportador: ele recusa a seleção dessa tabela. Elas entram somente quando o
+importador dedicado tiver uma regra de mapeamento, integridade e auditoria
+própria — nunca por join ou fallback implícito.
 
 ## Execução controlada
 
-1. Gere o backup completo da origem e guarde o arquivo fora do destino.
+1. Gere e valide o backup histórico da origem com
+   `backup-saas-historical.sh` e `verify-saas-historical-backup.sh`; guarde o
+   arquivo fora do destino. Esse backup contém segredos exclusivamente para
+   rollback da fonte SaaS e nunca pode ser restaurado na instância dedicada.
 2. Crie um arquivo de seleção com as chaves aprovadas, uma por linha.
 3. Execute o exportador com a `SOURCE_DATABASE_URL` apenas no ambiente de origem.
-4. Arquive o diretório gerado e valide `source-backup.sha256`, `checksums.sha256`
-   e `manifest.json` antes de qualquer importação.
+4. Arquive o diretório gerado e execute
+   `scripts/migration/verify-isp-operational-export.sh --input-dir <diretório> --source-backup <backup>`.
+   O verificador confere backup, manifesto, seleção, contagens, checksums,
+   NDJSON e ausência de nomes de campos sensíveis antes de qualquer importação.
 
 Exemplo de seleção deliberada:
 

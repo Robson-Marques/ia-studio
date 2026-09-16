@@ -39,6 +39,7 @@ while (($#)); do
 done
 [ -n "$INSTANCE_ID" ] && [ -n "$DOMAIN" ] && [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] && [ -n "$REDIS_DB" ] || { usage >&2; exit 2; }
 set_instance "$INSTANCE_ID"
+acquire_instance_lock
 [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || fail_instance 'domínio inválido.'
 [[ "$ADMIN_EMAIL" =~ ^[^@]+@[^@]+\.[^@]+$ ]] || fail_instance 'e-mail administrativo inválido.'
 [[ ${#ADMIN_PASSWORD} -ge 8 ]] || fail_instance 'senha administrativa precisa ter ao menos 8 caracteres.'
@@ -66,6 +67,11 @@ DB_PASS="$(openssl rand -hex 24)"
 JWT_SECRET="$(openssl rand -hex 32)"
 ENCRYPTION_KEY="$(openssl rand -hex 32)"
 PORT="$((3000 + REDIS_DB))"
+
+# O arquivo é lido tanto por dotenv quanto pelos scripts operacionais. Aspas
+# simples tornam a senha do administrador um valor, nunca código ao carregar o
+# .env; apóstrofos são escapados no formato POSIX/dotenv.
+env_value() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 mkdir -p "$INSTANCE_CONFIG_BASE" "$IASTUDIO_DATA_DIR" "$IASTUDIO_STORAGE_DIR" "$IASTUDIO_BACKUP_DIR" "/var/log/iastudio/$INSTANCE_ID"
 chmod 700 "$INSTANCE_CONFIG_BASE" "$IASTUDIO_DATA_DIR" "$IASTUDIO_STORAGE_DIR" "$IASTUDIO_BACKUP_DIR"
 
@@ -90,8 +96,8 @@ REDIS_URL=redis://127.0.0.1:6379/$REDIS_DB
 DATABASE_URL=postgresql://$IASTUDIO_DB_USER:$DB_PASS@127.0.0.1:5432/$IASTUDIO_DB_NAME?schema=public
 JWT_SECRET=$JWT_SECRET
 ENCRYPTION_KEY=$ENCRYPTION_KEY
-INSTALLATION_ADMIN_EMAIL=$ADMIN_EMAIL
-INSTALLATION_ADMIN_PASSWORD=$ADMIN_PASSWORD
+INSTALLATION_ADMIN_EMAIL=$(env_value "$ADMIN_EMAIL")
+INSTALLATION_ADMIN_PASSWORD=$(env_value "$ADMIN_PASSWORD")
 STORAGE_DRIVER=local
 STORAGE_LOCAL_PATH=$IASTUDIO_STORAGE_DIR
 PORT=$PORT
@@ -106,13 +112,21 @@ rsync -a --delete --exclude='.git' --exclude='node_modules' --exclude='dist' --e
 cp "$IASTUDIO_CONFIG_FILE" "$IASTUDIO_APP_DIR/platform-api/.env"
 chmod 600 "$IASTUDIO_APP_DIR/platform-api/.env"
 
-bash "$IASTUDIO_APP_DIR/scripts/provision-dedicated-schema.sh" --instance-id "$IASTUDIO_INSTANCE_ID"
 unset NPM_CONFIG_PRODUCTION
-(cd "$IASTUDIO_APP_DIR/platform-api" && npm install && npm run build)
+(cd "$IASTUDIO_APP_DIR/platform-api" && npm install)
+# `migrate diff` usa o Prisma recém-instalado; somente depois materializamos o
+# schema vazio, sob advisory lock, e compilamos a API.
+bash "$IASTUDIO_APP_DIR/scripts/provision-dedicated-schema.sh" --instance-id "$IASTUDIO_INSTANCE_ID"
+(cd "$IASTUDIO_APP_DIR/platform-api" && npm run build)
 (cd "$IASTUDIO_APP_DIR/platform-admin" && npm install && npm run build)
 
-IASTUDIO_INSTANCE_ID="$IASTUDIO_INSTANCE_ID" IASTUDIO_APP_DIR="$IASTUDIO_APP_DIR" IASTUDIO_LOG_DIR="/var/log/iastudio/$INSTANCE_ID" \
-  pm2 start "$IASTUDIO_APP_DIR/scripts/ecosystem.config.js"
+# PM2 avalia ecosystem.config.js antes de o Nest carregar dotenv; portanto o
+# contrato integral da instância precisa estar no ambiente deste comando.
+set -a
+# shellcheck disable=SC1090
+. "$IASTUDIO_CONFIG_FILE"
+set +a
+IASTUDIO_LOG_DIR="/var/log/iastudio/$INSTANCE_ID" pm2 start "$IASTUDIO_APP_DIR/scripts/ecosystem.config.js"
 pm2 save
 
 cat > "/etc/nginx/sites-available/$IASTUDIO_NGINX_SITE" <<EOF

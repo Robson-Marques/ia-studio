@@ -2,7 +2,7 @@
 # ============================================================
 # IA Studio - upgrade.sh v1.0
 # Aplica um upgrade de versao (git tag) com backup automatico, build e restart.
-# Roda como ROOT no servidor (repo em /opt/iastudio).
+# Roda como ROOT no diretório exclusivo da instância.
 #
 # Disparado pelo painel local de Administração da instalação (spawn detached), que ja criou
 # a row em system_upgrades (status=RUNNING) e chama com args POSICIONAIS:
@@ -70,10 +70,19 @@ set -a
 source "$ENV_FILE"
 set +a
 
+: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância}"
 : "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da instância}"
 : "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da instância}"
 BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da instância}"
 mkdir -p "$BACKUP_DIR"
+
+# Serializa upgrades/restore/provision da mesma instalação. Não há lock global:
+# instâncias distintas podem operar sem compartilhar processo, banco ou backup.
+# shellcheck disable=SC1091
+. "$REPO_PATH/scripts/lib/instance.sh"
+set_instance "$IASTUDIO_INSTANCE_ID"
+[ "$IASTUDIO_APP_DIR" = "$REPO_PATH" ] || { echo 'ERRO: .env não pertence ao repo da instância.' >&2; exit 1; }
+acquire_instance_lock
 
 # pm2 spawn herda NODE_ENV=production -> npm pula devDependencies (tsc/vite
 # quebram). Forcamos development pro build ter @types/* e as ferramentas.

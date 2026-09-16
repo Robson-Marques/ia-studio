@@ -1,6 +1,6 @@
-// Webhook publico da Meta Cloud API — rota UNICA multi-tenant:
+// Webhook público da Meta Cloud API — rota única da instância dedicada:
 //   GET  /api/webhooks/whatsapp  → verificacao (hub.verify_token de QUALQUER
-//                                  conexao whatsapp-meta ativa, todas as orgs)
+//                                  conexão whatsapp-meta ativa da instalação)
 //   POST /api/webhooks/whatsapp  → eventos; roteia pela config.phone_number_id
 //                                  (indexada por provider_key) e valida HMAC
 //                                  x-hub-signature-256 com o app_secret DA

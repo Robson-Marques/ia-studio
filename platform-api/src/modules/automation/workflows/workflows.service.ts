@@ -275,7 +275,7 @@ export class WorkflowsService {
   }
 
   /**
-   * Cria a execucao (QUEUED) + metering + enfileira no broker.
+   * Cria a execução (QUEUED) e a enfileira no broker.
    * Retorna a execucao pre-existente quando o source_event_id ja rodou
    * (idempotencia por evento).
    */

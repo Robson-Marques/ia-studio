@@ -1,6 +1,6 @@
 // Scheduler (diretriz 12): sincroniza o agendamento persistido com o trigger
 // da versao PUBLICADA + preview das proximas execucoes + calendarios
-// (feriados/dias uteis) por organization.
+// (feriados/dias úteis) da instância.
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, Workflow } from '@prisma/client';
 import { SchedulesRepository } from './schedules.repository';

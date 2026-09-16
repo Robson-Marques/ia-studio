@@ -136,7 +136,7 @@ export class ConnectionsService {
   }
 
   // ─── Atualizacao (nome/tags/prioridade + credenciais) ─
-  // provider_key/workspace/environment NUNCA mudam aqui. config faz merge
+  // provider_key nunca muda aqui. config faz merge
   // shallow no atual; secrets grava so as chaves nao-vazias (mantem o resto).
   async update(id: string, dto: UpdateConnectionDto) {
     const before = await this.findById(id);

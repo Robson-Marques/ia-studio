@@ -10,9 +10,13 @@ alvo de `db push`, restore ou upgrade.
 | `install.sh` | Encaminha para a instalação dedicada. |
 | `install-dedicated.sh` | Cria uma instância com `--instance-id`, domínio, administrador e Redis explícitos. |
 | `provision-dedicated-schema.sh` | Inicializa o schema limpo da instância informada. |
+| `uninstall.sh` / `uninstall-dedicated.sh` | Remove somente a instância confirmada; nunca dependências ou recursos de outros clientes. |
 | `upgrade.sh` | Atualiza API e painel local; não constrói nem publica Console. |
 | `backup-full.sh` / `restore-full.sh` | Backup e restauração completos da instância. |
 | `migration/export-isp-operational-data.sh` | Exportação seletiva e somente leitura da base histórica. |
+| `migration/backup-saas-historical.sh` / `verify-saas-historical-backup.sh` | Snapshot verificável da fonte SaaS, exclusivo para rollback e nunca restaurável no dedicado. |
+| `migration/verify-isp-operational-export.sh` | Valida backup, manifesto, checksums, NDJSON e ausência de chaves sensíveis antes da revisão para importação. |
+| `migration/verify-instance-isolation.sh` | Gate S4 estático de recursos e locks exclusivos para dois IDs de instância. |
 | `migration/verify-dedicated-cut.sh` | Gate estrutural S1. |
 | `migration/verify-console-retirement.sh` | Gate S3 de retirada do Console e preservação da manutenção local. |
 
@@ -33,3 +37,7 @@ A operação normal começa no painel local, em **Configurações → Administra
 instalação**. O backend dispara `upgrade.sh` ou os scripts de backup/restauração,
 e o painel acompanha o log persistido. Falha é registrada; não há fallback
 silencioso nem reversão destrutiva automática.
+
+Install, provisionamento, upgrade, backup e restauração usam lock por
+`instance-id`. Uma operação concorrente na mesma instalação falha de forma
+explícita; instâncias diferentes não disputam o mesmo lock.

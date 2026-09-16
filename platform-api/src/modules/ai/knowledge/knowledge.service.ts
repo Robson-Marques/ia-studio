@@ -1,5 +1,5 @@
 // Knowledge Service (RAG): CRUD de bases/documentos + ingestao (parse → chunk →
-// embed) + query topK. Limite 'ai_knowledge_bases' (Licensing) na criacao.
+// embed) + query topK.
 // Ingestao sincrona simplificada (V1): o documento vira READY ao fim; erros
 // marcam FAILED. Storage via StorageService (PDF/DOCX).
 import {

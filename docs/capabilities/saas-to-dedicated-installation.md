@@ -75,9 +75,9 @@ install/upgrade/backup/restore/uninstall dessa instância. Falha de A não afeta
 |---|---|---|---|
 | S0 — Recovery e contrato | Baseline, Capability Map, RFC e contrato local | decisão do produto | concluído neste slice |
 | S1 — núcleo dedicado | Modelo de dados alvo, exportação seletiva controlada, auth/ACL/eventos locais e retirada do tenant context | política de dados decidida | concluído — gate transversal 100%, sem bloqueantes nas cinco camadas |
-| S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | pendente |
+| S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | em andamento — gate local e exportação seletiva verificável; importação real depende da seleção operacional aprovada |
 | S3 — superfícies dedicadas | Migração de atualização/backup/restauração para a administração local; remoção de Console e UI/rotas/contextos SaaS | S1 | concluído — matriz e gate em `saas-to-dedicated-s3-console-matrix.md` |
-| S4 — instâncias no mesmo host | Install/upgrade/backup/restore/uninstall isolados | S1 e contratos de runtime finais | pendente |
+| S4 — instâncias no mesmo host | Install/upgrade/backup/restore/uninstall isolados | S1 e contratos de runtime finais | em andamento — isolamento estático e locks por instância aprovados; falta prova com duas instalações reais no host |
 | S5 — Acceptance | Evidência integrada e documentação viva | S1–S4 | pendente |
 
 S1 é o corte estrutural concluído: dados, autenticação, ACL, API e eventos foram
@@ -95,6 +95,18 @@ O encadeamento executável e os limites da alteração estão em
 [`saas-to-dedicated-s1-cut-manifest.md`](saas-to-dedicated-s1-cut-manifest.md).
 Ele registra o fan-out como uma única unidade de mudança; não substitui os
 critérios de Acceptance nem segmenta a remoção por arquivo.
+
+S2 usa `scripts/migration/verify-operational-dedicated.sh` para impedir que
+contratos executáveis retomem organização/workspace/ambiente, tenant ou
+Licensing/Billing. A única referência de organização permitida fica no
+exportador histórico, que é somente leitura e é validado antes de revisão por
+`verify-isp-operational-export.sh`; ela nunca entra na aplicação dedicada.
+
+S4 usa `scripts/migration/verify-instance-isolation.sh` como gate estático: ele
+deriva recursos de dois IDs distintos e exige banco/role, Redis, PM2, diretório,
+vhost e lock exclusivos, além de schema inicial `--from-empty` sob advisory
+lock. A prova final ainda requer criar e operar duas instâncias reais no mesmo
+host, sem cruzamento de dados ou processos.
 
 ## Critérios de Acceptance
 

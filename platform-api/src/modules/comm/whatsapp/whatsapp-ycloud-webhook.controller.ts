@@ -1,4 +1,4 @@
-// Webhook público da YCloud (Checkpoint 2b) — rota multi-tenant:
+// Webhook público da YCloud (Checkpoint 2b) — rota da instância dedicada:
 //   POST /api/webhooks/whatsapp/ycloud
 // A YCloud assina cada evento com HMAC-SHA256 (header `YCloud-Signature:
 // t=<unix>,s=<hex>`). Como uma mesma URL pode servir várias conexões, resolvemos

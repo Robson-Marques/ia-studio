@@ -118,7 +118,7 @@ export class WhatsappAssistantResponderService {
     }
 
     // Continuidade: turnos anteriores (tira o atual, que vai no input).
-    const history = await this.loadHistory(organizationId, chatId);
+    const history = await this.loadHistory(chatId);
     const linkedNote = this.linkedNote(chat);
     const input = linkedNote ? `${linkedNote}\n\n${content}` : content;
 
@@ -161,11 +161,8 @@ export class WhatsappAssistantResponderService {
 
   /** Histórico da conversa (antiga→nova) menos a última (a atual, que vai no
    *  input). Best-effort: falha vira "sem histórico". */
-  private async loadHistory(
-    organizationId: string,
-    chatId: string,
-  ): Promise<{ role: 'user' | 'assistant'; content: string }[] | undefined> {
-    const rows = await this.inbox.listMessages(organizationId, chatId, 16).catch(() => []);
+  private async loadHistory(chatId: string): Promise<{ role: 'user' | 'assistant'; content: string }[] | undefined> {
+    const rows = await this.inbox.listMessages(chatId, 16).catch(() => []);
     if (!rows.length) return undefined;
     const chrono = rows.slice(0, -1);
     const history = chrono

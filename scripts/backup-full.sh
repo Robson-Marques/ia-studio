@@ -2,7 +2,7 @@
 # =============================================================================
 # IA Studio — backup COMPLETO de migracao (root, sem sudo).
 # Gera um unico .tar.gz contendo:
-#   * db.sql               → dump logico do iastudio_db (pg_dump plain).
+#   * db.sql               → dump lógico do banco da instância (pg_dump plain).
 #   * storage/             → arquivos do Storage Manager (uploads/midias).
 #   * manifest.json        → metadados + SEGREDOS do .env necessarios para
 #                            decifrar os secrets no destino (ENCRYPTION_KEY,
@@ -23,6 +23,11 @@ set -a; . "$API_DIR/.env"; set +a
 : "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância}"
 BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da instância}"
 STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib/instance.sh"
+set_instance "$IASTUDIO_INSTANCE_ID"
+[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || { echo 'Configuração não pertence ao diretório da instância.' >&2; exit 1; }
+acquire_instance_lock
 
 STAMP="$(date '+%Y%m%d-%H%M%S')"
 NAME="${1:-full-${STAMP}}"

@@ -1,8 +1,8 @@
 // Catálogo NATIVO de templates HSM do sistema (docs-as-code). São garantidos por
-// organização no boot (upsert por template_name na conexão WhatsApp padrão da
-// org). O usuário só revisa e publica na Meta pela aba "Templates do Sistema".
+// instalação no boot (upsert por template_name na conexão WhatsApp padrão).
+// O usuário só revisa e publica na Meta pela aba "Templates do Sistema".
 // Padrão portado do Aquapark (`whatsapp-template-catalog`), adaptado ao
-// multi-tenant do IA Studio. Ver CLAUDE.md → "TEMPLATES HSM — REGRA OBRIGATÓRIA".
+// instância dedicada do IA Studio. Ver CLAUDE.md → "TEMPLATES HSM — REGRA OBRIGATÓRIA".
 //
 // REGRA DE OURO: todo novo emissor automático fora da janela de 24h nasce COM a
 // sua linha aqui (com a `action` do botão quando houver link de acesso).

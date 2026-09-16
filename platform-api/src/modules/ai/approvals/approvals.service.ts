@@ -112,8 +112,8 @@ export class ApprovalsService {
   }
 
   /**
-   * Executa de fato a ação aprovada, reconstruindo o escopo do run guardado no
-   * context (workspace/ambiente/scopeKeys) e com bypass do gate (runApproved).
+   * Executa de fato a ação aprovada, reconstruindo o contexto local do run
+   * guardado em `scopeKeys` e com bypass do gate (runApproved).
    */
   private async executeApproved(approval: AiActionApproval): Promise<void> {
     const ctxJson = (approval.context ?? {}) as unknown as {

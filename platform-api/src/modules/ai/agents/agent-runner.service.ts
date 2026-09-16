@@ -1,5 +1,5 @@
 // AgentRunnerService — LOOP de tool-calling (porta do Aquapark, adaptado ao
-// multi-tenant e a Connections AI). Fluxo:
+// instalação dedicada e as Connections AI). Fluxo:
 //   1) carrega agente (versao publicada) + resolve provider (connection fixa OU
 //      orchestrator);
 //   2) compila system prompt (base + persona + RAG + memoria);

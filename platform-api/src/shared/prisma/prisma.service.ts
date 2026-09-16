@@ -1,4 +1,4 @@
-// Porta unica de conexao ao PostgreSQL (iastudio_db).
+// Porta única de conexão ao PostgreSQL exclusivo da instância.
 // Acesso a dados SEMPRE via repositories que injetam este service.
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';

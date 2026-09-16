@@ -1,5 +1,5 @@
 // Acesso de dados da revisão de conteúdo (Checkpoint diffs de Assistentes).
-// Multi-tenant: agente e fontes filtrados por organização.
+// Instância dedicada: agente e fontes pertencem ao mesmo banco local.
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';

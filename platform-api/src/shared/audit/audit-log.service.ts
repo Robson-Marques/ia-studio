@@ -15,10 +15,6 @@ export interface AuditRecordInput {
   action: string;
   entityType: string;
   entityId?: string;
-  /** @deprecated Durante S1 o valor e ignorado; o log pertence a instancia. */
-  organizationId?: string | null;
-  /** @deprecated Durante S1 o valor e ignorado; o log pertence a instancia. */
-  workspaceId?: string | null;
   oldValue?: unknown;
   newValue?: unknown;
   params?: unknown;

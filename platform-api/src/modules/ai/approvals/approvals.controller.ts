@@ -30,7 +30,7 @@ export class ApprovalsController {
     return this.approvals.listApprovals({ status });
   }
 
-  /** Lista politicas de aprovacao (filtro por workspace). */
+  /** Lista políticas de aprovação locais. */
   @Get('policies')
   @RequirePermissions(PERMISSIONS.AI_APPROVALS_READ)
   listPolicies(

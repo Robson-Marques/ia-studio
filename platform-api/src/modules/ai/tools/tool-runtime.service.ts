@@ -65,8 +65,8 @@ export class ToolRuntimeService {
         requestedBy: null,
         target: toolKey,
         // Guarda os args E o escopo do run — ao APROVAR, a ação é executada de
-        // verdade (ToolRuntime.runApproved) e precisa do mesmo escopo (workspace/
-        // ambiente/scopeKeys) pra resolver conexão etc.
+        // verdade (ToolRuntime.runApproved) e precisa do mesmo contexto local
+        // (scopeKeys) para resolver conexão etc.
         context: {
           arguments: args,
           scope: {

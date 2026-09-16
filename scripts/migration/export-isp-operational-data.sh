@@ -82,12 +82,30 @@ sha256sum "$BACKUP_ARCHIVE" > "$OUTPUT_DIR/source-backup.sha256"
 export_table() {
   local table="$1"
   local output="$OUTPUT_DIR/${table}.ndjson"
-  # table vem apenas do mapa interno; organization_id delimita a origem SaaS.
+  local has_scope row_count checksum
+  # Não inferir filhas por joins implícitos. O conjunto só pode sair quando a
+  # própria tabela histórica possui o delimitador da origem. Relações sem essa
+  # coluna exigem regra de mapeamento e auditoria próprias.
+  has_scope="$(psql "$SOURCE_DATABASE_URL" -X -A -t -q -v ON_ERROR_STOP=1 \
+    -v table_name="$table" \
+    -c "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = :'table_name' AND column_name = 'organization_id');")"
+  [ "$has_scope" = 't' ] || {
+    echo "Tabela histórica sem organization_id explícito: $table. Não inferir relações filhas; crie uma regra de mapeamento auditável." >&2
+    exit 2
+  }
+
+  # table vem apenas do mapa interno; organization_id delimita a fonte SaaS.
   psql "$SOURCE_DATABASE_URL" -X -A -t -q -v ON_ERROR_STOP=1 \
     -v source_organization_id="$SOURCE_ORGANIZATION_ID" \
     -c "SELECT row_to_json(record)::text FROM \"${table}\" AS record WHERE record.organization_id = :'source_organization_id' ORDER BY record.id;" \
     > "$output"
-  sha256sum "$output" >> "$OUTPUT_DIR/checksums.sha256"
+  row_count="$(wc -l < "$output" | tr -d '[:space:]')"
+  checksum="$(sha256sum "$output" | cut -d' ' -f1)"
+  (
+    cd "$OUTPUT_DIR"
+    sha256sum "$(basename "$output")"
+  ) >> "$OUTPUT_DIR/checksums.sha256"
+  printf '{"table":"%s","rows":%s,"sha256":"%s"}\n' "$table" "$row_count" "$checksum" >> "$OUTPUT_DIR/records.ndjson"
 }
 
 declare -A exported=()
@@ -99,6 +117,17 @@ for key in "${selected[@]}"; do
   done
 done
 
+(
+  cd "$OUTPUT_DIR"
+  sha256sum records.ndjson
+) >> "$OUTPUT_DIR/checksums.sha256"
+
+datasets_json=''
+while IFS= read -r key || [ -n "$key" ]; do
+  [ -n "$datasets_json" ] && datasets_json+=','
+  datasets_json+="\"$key\""
+done < "$OUTPUT_DIR/selection.txt"
+
 cat > "$OUTPUT_DIR/manifest.json" <<EOF
 {
   "kind": "iastudio-isp-operational-export",
@@ -108,6 +137,8 @@ cat > "$OUTPUT_DIR/manifest.json" <<EOF
   "source_backup_sha256": "$(cut -d' ' -f1 "$OUTPUT_DIR/source-backup.sha256")",
   "selection_file_sha256": "$(sha256sum "$SELECTION_FILE" | cut -d' ' -f1)",
   "format": "ndjson",
+  "datasets": [$datasets_json],
+  "records_sha256": "$(sha256sum "$OUTPUT_DIR/records.ndjson" | cut -d' ' -f1)",
   "contains_secrets": false,
   "import_policy": "mapped-import-into-clean-dedicated-schema"
 }

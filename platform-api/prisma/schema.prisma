@@ -2,7 +2,7 @@
 // Nunca aplicar este schema contra a base SaaS histórica: a instância ISP nasce
 // limpa após backup/exportação verificáveis. A materialização em PostgreSQL e
 // a migration auditável pertencem ao slice de implantação dedicado.
-// Namespacing: core_*, licensing_*, billing_*, integration_*, comm_*, system_*.
+// Namespacing: core_*, integration_*, comm_*, automation_*, ai_*, isp_*, system_*.
 
 generator client {
   provider        = "prisma-client-js"
