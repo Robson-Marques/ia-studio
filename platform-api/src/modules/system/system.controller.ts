@@ -1,5 +1,5 @@
 // Console — Atualizacao, Backup e Restauracao (Fase 8). Rotas exclusivas do
-// Console (@PlatformAdminOnly). Infra global da instancia: sem tenant.
+// Console do administrador local. Infra global da instancia: sem tenant.
 // Auditoria de upgrade/backup/restore fica nos services (@Auditable/audit.record).
 import {
   BadRequestException,
@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { PlatformAdminOnly } from '../../shared/auth/platform-admin.guard';
+import { InstallationAdminOnly } from '../../shared/auth/permissions.decorator';
 import { CurrentUserId } from '../../shared/auth/current-user.decorator';
 import { VersionService } from './version.service';
 import { UpgradeService } from './upgrade.service';
@@ -25,7 +25,7 @@ import { StartUpgradeDto, RestoreDto } from './dto/system.dtos';
 
 @ApiTags('Console — System (Atualização/Backup)')
 @ApiBearerAuth()
-@PlatformAdminOnly()
+@InstallationAdminOnly()
 @Controller('console/system')
 export class SystemController {
   constructor(

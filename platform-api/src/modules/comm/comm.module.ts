@@ -4,7 +4,6 @@
 // claim/transfer/takeover). Ver README.md deste diretorio.
 import { Module } from '@nestjs/common';
 import { IntegrationModule } from '../integration/integration.module';
-import { LicensingModule } from '../licensing/licensing.module';
 
 import { WhatsappChatsRepository } from './whatsapp/whatsapp-chats.repository';
 import { WhatsappTemplatesRepository } from './whatsapp/whatsapp-templates.repository';
@@ -37,7 +36,7 @@ import { AttendanceController } from './attendance/attendance.controller';
 import { AttendanceAdminController } from './attendance/attendance-admin.controller';
 
 @Module({
-  imports: [IntegrationModule, LicensingModule],
+  imports: [IntegrationModule],
   controllers: [
     WhatsappWebhookController,
     WhatsappYcloudWebhookController,

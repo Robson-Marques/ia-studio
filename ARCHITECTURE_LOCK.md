@@ -1,6 +1,13 @@
 # ARCHITECTURE_LOCK.md — Congelamento da Arquitetura V1
 
-**Data do congelamento:** 02/07/2026 · **Status: CONGELADA** · Autoridade: Robson (product owner)
+**Data do congelamento:** 02/07/2026 · **Status: substituída para a conversão dedicada** · Autoridade: Robson (product owner)
+
+> A decisão posterior do product owner substitui o congelamento SaaS para a
+> Capability `ia-studio.capability.saas-to-dedicated-installation`, registrada em
+> `docs/capabilities/saas-to-dedicated-installation.md` e decidida pela
+> `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md`. Este arquivo continua
+> sendo evidência do estado recuperado, não autorização para ampliar ou preservar
+> contratos SaaS incompatíveis com a conversão.
 
 ## Declaração
 

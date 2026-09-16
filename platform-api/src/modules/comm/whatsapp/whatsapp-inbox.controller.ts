@@ -8,7 +8,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { WhatsappInboxService, ChatTab, MediaKind } from './whatsapp-inbox.service';
 import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
 import { SendChatMessageDto } from '../dto/send-chat-message.dto';
@@ -50,19 +49,15 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('tab') tab?: ChatTab,
     @Query('status') status?: CommChatStatus,
-    @Query('environment_id') environmentId?: string,
     @Query('connection_id') connectionId?: string,
     @Query('search') search?: string,
     @Query('take') take?: string,
     @Query('skip') skip?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     return this.inbox.listChats({
-      organizationId: resolveOrganizationId(user, orgQuery),
       user,
       tab,
       status,
-      environmentId,
       connectionId,
       search,
       take: take ? Number(take) : undefined,
@@ -77,14 +72,11 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: CommChatStatus,
     @Query('search') search?: string,
-    @Query('environment_id') environmentId?: string,
     @Query('connection_id') connectionId?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.countChatsByScope(resolveOrganizationId(user, orgQuery), user, {
+    return this.inbox.countChatsByScope(user, {
       status,
       search,
-      environmentId,
       connectionId,
     });
   }
@@ -94,9 +86,8 @@ export class WhatsappInboxController {
   getChat(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.getChat(resolveOrganizationId(user, orgQuery), id);
+    return this.inbox.getChat(id);
   }
 
   /** Desvincula o cliente deste WhatsApp (ação do atendente). */
@@ -105,9 +96,8 @@ export class WhatsappInboxController {
   unlinkCustomer(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.unlinkCustomer(resolveOrganizationId(user, orgQuery), id);
+    return this.inbox.unlinkCustomer(id);
   }
 
   @Get('chats/:id/messages')
@@ -117,10 +107,8 @@ export class WhatsappInboxController {
     @Param('id') id: string,
     @Query('take') take?: string,
     @Query('before') before?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     return this.inbox.listMessages(
-      resolveOrganizationId(user, orgQuery),
       id,
       take ? Number(take) : undefined,
       before,
@@ -132,9 +120,8 @@ export class WhatsappInboxController {
   windowState(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.windowState(resolveOrganizationId(user, orgQuery), id);
+    return this.inbox.windowState(id);
   }
 
   @Post('chats/:id/read')
@@ -142,9 +129,8 @@ export class WhatsappInboxController {
   markRead(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.markRead(resolveOrganizationId(user, orgQuery), id);
+    return this.inbox.markRead(id);
   }
 
   @Post('chats/:id/typing')
@@ -152,9 +138,8 @@ export class WhatsappInboxController {
   typing(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.sendTyping(resolveOrganizationId(user, orgQuery), id);
+    return this.inbox.sendTyping(id);
   }
 
   @Post('chats/:id/send')
@@ -163,9 +148,8 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: SendChatMessageDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.send(resolveOrganizationId(user, orgQuery), user, id, dto);
+    return this.inbox.send(user, id, dto);
   }
 
   /**
@@ -181,7 +165,6 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Req() req: FastifyRequest,
-    @Query('organization_id') orgQuery?: string,
   ) {
     // @fastify/multipart registrado no bootstrap. Le o arquivo + campos anexos.
     const reqAny = req as FastifyRequest & {
@@ -220,7 +203,7 @@ export class WhatsappInboxController {
     }
     const buffer = await data.toBuffer();
 
-    return this.inbox.uploadAndSendMedia(resolveOrganizationId(user, orgQuery), user, id, {
+    return this.inbox.uploadAndSendMedia(user, id, {
       kind: rawKind as MediaKind,
       data: buffer,
       mimeType: data.mimetype || 'application/octet-stream',
@@ -236,9 +219,8 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.downloadMedia(resolveOrganizationId(user, orgQuery), id, mediaId);
+    return this.inbox.downloadMedia(id, mediaId);
   }
 
   /**
@@ -250,13 +232,9 @@ export class WhatsappInboxController {
   orchestratorSend(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: OrchestratorSendDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
     return this.orchestrator.send(
       {
-        organizationId: resolveOrganizationId(user, orgQuery),
-        workspaceId: dto.workspace_id,
-        environmentId: dto.environment_id,
         phone: dto.phone,
         criteria: dto.criteria,
         sender: `user:${user.sub}`,
@@ -272,9 +250,8 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() body: { connection_id?: string | null },
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.setManualChannel(resolveOrganizationId(user, orgQuery), id, body?.connection_id ?? null);
+    return this.inbox.setManualChannel(id, body?.connection_id ?? null);
   }
 
   /** Canais manuais elegíveis para esta conversa. */
@@ -283,8 +260,7 @@ export class WhatsappInboxController {
   listManualChannels(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.listManualChannels(resolveOrganizationId(user, orgQuery), id);
+    return this.inbox.listManualChannels(id);
   }
 }

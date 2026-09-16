@@ -13,12 +13,6 @@ import { WhatsappBaileysRuntime } from './connectors/whatsapp-baileys.runtime';
 import { BAILEYS_PROVIDER_KEYS, WhatsappProviderKey } from './connectors/connector.types';
 import { RichMessage } from '../../../shared/integration/whatsapp.types';
 
-export interface BaileysScope {
-  organizationId: string;
-  workspaceId?: string;
-  environmentId?: string;
-}
-
 @Injectable()
 export class WhatsappBaileysRegistryService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(WhatsappBaileysRegistryService.name);
@@ -70,9 +64,6 @@ export class WhatsappBaileysRegistryService implements OnApplicationBootstrap, O
         saveAuthState: (serialized: string) =>
           this.sessions.save({
             connectionId: connection.id,
-            organizationId: connection.organization_id,
-            workspaceId: connection.workspace_id,
-            environmentId: connection.environment_id,
             serialized,
           }),
         clearAuthState: () => this.sessions.clear(connection.id),
@@ -94,11 +85,10 @@ export class WhatsappBaileysRegistryService implements OnApplicationBootstrap, O
     return runtime;
   }
 
-  private async resolveBaileys(connectionId: string, organizationId: string): Promise<Connection> {
+  private async resolveBaileys(connectionId: string): Promise<Connection> {
     const connection = await this.connections.findById(connectionId);
     if (
       !connection ||
-      connection.organization_id !== organizationId ||
       !BAILEYS_PROVIDER_KEYS.includes(connection.provider_key as WhatsappProviderKey)
     ) {
       throw new NotFoundException('Conexão Baileys não encontrada.');
@@ -108,21 +98,21 @@ export class WhatsappBaileysRegistryService implements OnApplicationBootstrap, O
 
   // ─── API usada pelo controller ──────────────────────
 
-  async getPairingQr(connectionId: string, organizationId: string): Promise<{ status: string; qr_image: string | null }> {
-    const connection = await this.resolveBaileys(connectionId, organizationId);
+  async getPairingQr(connectionId: string): Promise<{ status: string; qr_image: string | null }> {
+    const connection = await this.resolveBaileys(connectionId);
     const runtime = await this.ensureStarted(connection);
     return runtime.getPairingQr();
   }
 
-  async reconnect(connectionId: string, organizationId: string): Promise<{ ok: boolean }> {
-    const connection = await this.resolveBaileys(connectionId, organizationId);
+  async reconnect(connectionId: string): Promise<{ ok: boolean }> {
+    const connection = await this.resolveBaileys(connectionId);
     const runtime = await this.ensureStarted(connection);
     await runtime.reconnect();
     return { ok: true };
   }
 
-  async restartPairing(connectionId: string, organizationId: string): Promise<{ ok: boolean }> {
-    const connection = await this.resolveBaileys(connectionId, organizationId);
+  async restartPairing(connectionId: string): Promise<{ ok: boolean }> {
+    const connection = await this.resolveBaileys(connectionId);
     const runtime = this.runtimes.get(connection.id) ?? this.build(connection);
     await runtime.restartPairing();
     return { ok: true };
@@ -131,13 +121,12 @@ export class WhatsappBaileysRegistryService implements OnApplicationBootstrap, O
   // ─── Envio de notificação interna (usado por outros módulos) ──
 
   /**
-   * Envia um aviso interno pelo número Baileys interno ATIVO da organização.
+   * Envia um aviso interno pelo número Baileys interno ATIVO da instalação.
    * Texto apenas. Lança se não houver número interno ativo.
    */
-  async sendInternalNotification(scope: BaileysScope, to: string, text: string): Promise<{ providerMessageId: string | null }> {
-    const all = await this.connections.findAllByOrg(scope.organizationId, {
+  async sendInternalNotification(to: string, text: string): Promise<{ providerMessageId: string | null }> {
+    const all = await this.connections.findAll({
       providerKey: 'whatsapp-baileys-internal',
-      environmentId: scope.environmentId,
     });
     const active = all.find((c) => c.is_active);
     if (!active) throw new BadRequestException('Nenhum número interno (Baileys) ativo configurado.');
@@ -148,10 +137,9 @@ export class WhatsappBaileysRegistryService implements OnApplicationBootstrap, O
 
   /**
    * Envia por um canal Baileys específico (usado pela inbox no modo manual).
-   * `connectionId` deve ser uma conexão Baileys (interno ou manual) da org.
+   * `connectionId` deve ser uma conexão Baileys (interno ou manual) local.
    */
   async sendViaBaileysConnection(
-    organizationId: string,
     connectionId: string,
     to: string,
     message: RichMessage,
@@ -159,7 +147,6 @@ export class WhatsappBaileysRegistryService implements OnApplicationBootstrap, O
     const connection = await this.connections.findById(connectionId);
     if (
       !connection ||
-      connection.organization_id !== organizationId ||
       !BAILEYS_PROVIDER_KEYS.includes(connection.provider_key as WhatsappProviderKey)
     ) {
       throw new NotFoundException('Canal Baileys não encontrado.');

@@ -4,16 +4,13 @@
 // gerenciado pelo usuário — é o estado do socket (creds + chaves Signal),
 // atualizado a cada rotação de chave. Por isso mora em tabela própria
 // (comm_whatsapp_baileys_sessions), 1 por conexão, com o blob cifrado em repouso
-// (AES-256-GCM via shared/crypto, o mesmo do Secrets Manager). Multi-tenant.
+// (AES-256-GCM via shared/crypto, o mesmo do Secrets Manager). Local à instalação.
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { decrypt, encrypt } from '../../../shared/crypto/crypto.util';
 
 export interface SaveBaileysSessionInput {
   connectionId: string;
-  organizationId: string;
-  workspaceId: string;
-  environmentId: string;
   serialized: string;
 }
 
@@ -38,9 +35,6 @@ export class WhatsappBaileysSessionRepository {
       where: { connection_id: input.connectionId },
       create: {
         connection_id: input.connectionId,
-        organization_id: input.organizationId,
-        workspace_id: input.workspaceId,
-        environment_id: input.environmentId,
         auth_state: encrypted,
       },
       update: { auth_state: encrypted },

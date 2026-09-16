@@ -17,6 +17,7 @@
 // usa um OU outro (a demoção dos Fluxos vem no próximo checkpoint).
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { AiAgent } from '@prisma/client';
 import { EventEnvelope } from '../../../shared/events/event-envelope';
 import { WHATSAPP_INBOUND_EVENT } from '../../comm/whatsapp/whatsapp-inbound.service';
 import { WhatsappAssistantService } from '../../comm/whatsapp/whatsapp-assistant.service';
@@ -63,7 +64,7 @@ export class WhatsappAssistantResponderService {
     const payload = (envelope.payload ?? {}) as InboundPayload;
     const chatId = payload.chat_id;
     const connectionId = payload.connection_id;
-    if (!chatId || !connectionId || !envelope.organization_id) return;
+    if (!chatId || !connectionId) return;
 
     try {
       // Número tem assistente habilitado? (1 query — hot path.)
@@ -71,7 +72,7 @@ export class WhatsappAssistantResponderService {
       if (!agentId) return;
 
       const agent = await this.agentsRepo.findById(agentId);
-      if (!agent || !agent.is_active || agent.organization_id !== envelope.organization_id) return;
+      if (!agent || !agent.is_active) return;
 
       const conv = parseConversation((agent as { conversation?: unknown }).conversation);
       if (!conv.auto_reply) return; // vínculo existe, mas o atendimento automático está desligado
@@ -82,7 +83,7 @@ export class WhatsappAssistantResponderService {
       const ms = Math.max(1, conv.debounce_seconds) * 1000;
       const timer = setTimeout(() => {
         this.debounce.delete(chatId);
-        void this.respond(envelope, agentId, conv).catch((e) =>
+        void this.respond(envelope, agent, conv).catch((e) =>
           this.logger.warn(`Condutor (chat ${chatId}): ${(e as Error).message}`),
         );
       }, ms);
@@ -92,8 +93,7 @@ export class WhatsappAssistantResponderService {
     }
   }
 
-  private async respond(envelope: EventEnvelope, agentId: string, conv: AgentConversation): Promise<void> {
-    const organizationId = envelope.organization_id;
+  private async respond(envelope: EventEnvelope, agent: AiAgent, conv: AgentConversation): Promise<void> {
     const payload = (envelope.payload ?? {}) as InboundPayload;
     const chatId = payload.chat_id as string;
     const connectionId = payload.connection_id as string;
@@ -102,11 +102,11 @@ export class WhatsappAssistantResponderService {
     if (!phone || !content) return; // sem telefone/texto não há o que responder (mídia pura fica pro humano)
 
     // Chegou mensagem mais nova nesta conversa? Deixa o timer dela responder.
-    const lastIn = await this.inbox.lastIncomingExternalId(organizationId, chatId).catch(() => null);
+    const lastIn = await this.inbox.lastIncomingExternalId(chatId).catch(() => null);
     if (payload.external_id && lastIn && lastIn !== payload.external_id) return;
 
     // Estado ATUAL da conversa (pode ter mudado durante a espera).
-    const chat = await this.inbox.getChat(organizationId, chatId).catch(() => null);
+    const chat = await this.inbox.getChat(chatId).catch(() => null);
     if (!chat) return;
     // Humano no comando → a IA não responde por cima. Modo manual → idem.
     if (chat.current_handler_type === 'USER') return;
@@ -114,7 +114,7 @@ export class WhatsappAssistantResponderService {
 
     // UX: marca como lida (tick azul) e mostra "digitando…". Best-effort.
     if (payload.external_id) {
-      await this.orchestrator.markRead(organizationId, connectionId, payload.external_id, { typing: true }).catch(() => undefined);
+      await this.orchestrator.markRead(connectionId, payload.external_id, { typing: true }).catch(() => undefined);
     }
 
     // Continuidade: turnos anteriores (tira o atual, que vai no input).
@@ -136,19 +136,14 @@ export class WhatsappAssistantResponderService {
     }
 
     // A IA assume a conversa (BOT) — não rouba de humano (assignBot confere).
-    await this.assignment.assignBot(organizationId, chatId, agentId).catch(() => undefined);
+    await this.assignment.assignBot(chatId, agent.id).catch(() => undefined);
 
     // Envio governado pelo orquestrador (janela de 24h / modo manual já tratados
     // lá). O cliente acabou de escrever, então estamos dentro da janela.
-    const scope = {
-      organizationId,
-      workspaceId: envelope.workspace_id ?? undefined,
-      environmentId: envelope.environment_id ?? undefined,
-    };
     const parts = conv.split_paragraphs ? this.splitParagraphs(text) : [text];
     for (const body of parts) {
       await this.orchestrator.send(
-        { ...scope, phone, criteria: { connectionId }, sender: 'bot' },
+        { phone, criteria: { connectionId }, sender: 'bot' },
         { kind: 'text', body },
       );
     }

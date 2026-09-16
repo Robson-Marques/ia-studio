@@ -43,11 +43,9 @@ export interface ChatView extends WhatsappChat {
 }
 
 export interface ListChatsArgs {
-  organizationId: string;
   user: AuthenticatedUser;
   tab?: ChatTab;
   status?: CommChatStatus;
-  environmentId?: string;
   connectionId?: string;
   search?: string;
   take?: number;
@@ -83,8 +81,6 @@ export class WhatsappInboxService {
     const combined = this.buildTabVisibilityWhere(scope, tab);
 
     const { items, total } = await this.chats.listChats({
-      organizationId: args.organizationId,
-      environmentId: args.environmentId,
       status: args.status,
       connectionId: args.connectionId,
       search: args.search,
@@ -139,17 +135,14 @@ export class WhatsappInboxService {
    * contagem usa exatamente o mesmo WHERE que a aba correspondente na listagem.
    */
   async countChatsByScope(
-    organizationId: string,
     user: AuthenticatedUser,
-    opts: { status?: CommChatStatus; search?: string; environmentId?: string; connectionId?: string } = {},
+    opts: { status?: CommChatStatus; search?: string; connectionId?: string } = {},
   ): Promise<{ mine: number; unassigned: number; ia: number; team: number; all: number }> {
     const scope = await this.scopeResolver.resolve(user);
     const tabs: ChatTab[] = ['mine', 'unassigned', 'ia', 'team', 'all'];
     const [mine, unassigned, ia, team, all] = await Promise.all(
       tabs.map((tab) =>
         this.chats.countChats({
-          organizationId,
-          environmentId: opts.environmentId,
           status: opts.status,
           connectionId: opts.connectionId,
           search: opts.search,
@@ -160,9 +153,9 @@ export class WhatsappInboxService {
     return { mine, unassigned, ia, team, all };
   }
 
-  async getChat(organizationId: string, chatId: string): Promise<ChatView> {
+  async getChat(chatId: string): Promise<ChatView> {
     const chat = await this.chats.findChatById(chatId);
-    if (!chat || chat.organization_id !== organizationId) throw new NotFoundException('Conversa não encontrada.');
+    if (!chat) throw new NotFoundException('Conversa não encontrada.');
     let handlerName: string | null = null;
     if (chat.current_handler_type === 'BOT') {
       handlerName = 'IA';
@@ -176,11 +169,10 @@ export class WhatsappInboxService {
   /** Vincula o cliente (titular do cadastro) a este WhatsApp — grava o CPF/ref/
    *  nome no chat. Trocável: outro CPF re-vincula. Usado pela tool da IA. */
   async linkCustomer(
-    organizationId: string,
     chatId: string,
     data: { document?: string | null; ref?: string | null; name?: string | null },
   ): Promise<WhatsappChat> {
-    await this.getChat(organizationId, chatId); // ownership
+    await this.getChat(chatId);
     return this.chats.updateChat(chatId, {
       linked_customer_document: data.document ?? null,
       linked_customer_ref: data.ref ?? null,
@@ -190,8 +182,8 @@ export class WhatsappInboxService {
   }
 
   /** Desvincula o cliente deste WhatsApp (ação do atendente). */
-  async unlinkCustomer(organizationId: string, chatId: string): Promise<WhatsappChat> {
-    await this.getChat(organizationId, chatId); // ownership
+  async unlinkCustomer(chatId: string): Promise<WhatsappChat> {
+    await this.getChat(chatId);
     return this.chats.updateChat(chatId, {
       linked_customer_document: null,
       linked_customer_ref: null,
@@ -200,8 +192,8 @@ export class WhatsappInboxService {
     });
   }
 
-  async listMessages(organizationId: string, chatId: string, take = 50, before?: string): Promise<WhatsappMessage[]> {
-    await this.getChat(organizationId, chatId); // ownership
+  async listMessages(chatId: string, take = 50, before?: string): Promise<WhatsappMessage[]> {
+    await this.getChat(chatId);
     const beforeDate = before ? new Date(before) : undefined;
     const messages = await this.chats.listMessages(chatId, take, beforeDate);
     return messages.reverse(); // ordem cronologica pra UI
@@ -210,33 +202,33 @@ export class WhatsappInboxService {
   // Último wamid de mensagem RECEBIDA do cliente (ignora as de saída) — usado
   // pelo debounce do assistente pra não se auto-descartar por causa da própria
   // resposta que acabou de enviar. Best-effort.
-  async lastIncomingExternalId(organizationId: string, chatId: string): Promise<string | null> {
-    await this.getChat(organizationId, chatId); // ownership
+  async lastIncomingExternalId(chatId: string): Promise<string | null> {
+    await this.getChat(chatId);
     const anchor = await this.chats.findLastIncomingAnchor(chatId);
     return anchor?.external_id ?? null;
   }
 
-  async markRead(organizationId: string, chatId: string): Promise<WhatsappChat> {
-    await this.getChat(organizationId, chatId);
+  async markRead(chatId: string): Promise<WhatsappChat> {
+    await this.getChat(chatId);
     // Recibo de leitura no WhatsApp do cliente (tick azul) — sem "digitando"
     // (o atendente só abriu a conversa). Best-effort: nunca quebra a leitura local.
-    await this.orchestrator.markReadByChat(organizationId, chatId, { typing: false }).catch(() => undefined);
+    await this.orchestrator.markReadByChat(chatId, { typing: false }).catch(() => undefined);
     return this.chats.markRead(chatId);
   }
 
   // Dispara "digitando…" no WhatsApp do cliente enquanto o atendente escreve.
   // A Meta ancora no wamid da última incoming; some ao enviar a resposta ou em
   // ~25s. Best-effort (é UX): devolve {ok} sem lançar.
-  async sendTyping(organizationId: string, chatId: string): Promise<{ ok: boolean }> {
-    await this.getChat(organizationId, chatId);
-    await this.orchestrator.markReadByChat(organizationId, chatId, { typing: true }).catch(() => undefined);
+  async sendTyping(chatId: string): Promise<{ ok: boolean }> {
+    await this.getChat(chatId);
+    await this.orchestrator.markReadByChat(chatId, { typing: true }).catch(() => undefined);
     return { ok: true };
   }
 
   // ─── Janela de 24h ──────────────────────────────────
 
-  async windowState(organizationId: string, chatId: string): Promise<{ state: WindowState; expires_at: string | null }> {
-    const chat = await this.getChat(organizationId, chatId);
+  async windowState(chatId: string): Promise<{ state: WindowState; expires_at: string | null }> {
+    const chat = await this.getChat(chatId);
     const state = computeWindowState(chat.last_inbound_at);
     const expiresAt = chat.last_inbound_at
       ? new Date(chat.last_inbound_at.getTime() + 24 * 60 * 60 * 1000).toISOString()
@@ -247,16 +239,15 @@ export class WhatsappInboxService {
   // ─── Envio (reply gate + janela + orchestrator) ─────
 
   async send(
-    organizationId: string,
     user: AuthenticatedUser,
     chatId: string,
     dto: SendChatMessageDto,
   ): Promise<{ wamid: string | null; via: 'text' | 'media' | 'template' }> {
-    const chat = await this.getChat(organizationId, chatId);
+    const chat = await this.getChat(chatId);
     const message = this.buildRichMessage(dto);
     const via: 'text' | 'media' | 'template' =
       message.kind === 'template' ? 'template' : message.kind === 'text' ? 'text' : 'media';
-    const result = await this.deliver(organizationId, user, chat, message, dto.confirm_takeover === true, via === 'template');
+    const result = await this.deliver(user, chat, message, dto.confirm_takeover === true, via === 'template');
     return { wamid: result.wamid, via };
   }
 
@@ -266,12 +257,11 @@ export class WhatsappInboxService {
    * 24h + takeover 409). Nao duplica a logica de envio — reusa deliver().
    */
   async uploadAndSendMedia(
-    organizationId: string,
     user: AuthenticatedUser,
     chatId: string,
     args: UploadMediaArgs,
   ): Promise<{ wamid: string | null; via: 'media' }> {
-    const chat = await this.getChat(organizationId, chatId);
+    const chat = await this.getChat(chatId);
     if (chat.manual_connection_id) {
       throw new BadRequestException('O envio de mídia gravada não está disponível no canal manual. Envie por link ou use o número oficial.');
     }
@@ -289,18 +279,18 @@ export class WhatsappInboxService {
     // Reply gate + janela ANTES do upload (evita subir binario que a Meta
     // recusaria depois). loadChatConnection valida a conexao ativa.
     const scope = await this.scopeResolver.resolve(user);
-    await this.replyGate.assertCanReply(organizationId, chat, scope, args.confirmTakeover === true);
+    await this.replyGate.assertCanReply(chat, scope, args.confirmTakeover === true);
     if (computeWindowState(chat.last_inbound_at) !== 'within') {
       throw new ConflictException(
         'Janela de 24h expirada — a Meta só aceita template aprovado. Selecione um template para reabrir a conversa.',
       );
     }
-    const connection = await this.loadChatConnection(organizationId, chat);
+    const connection = await this.loadChatConnection(chat);
 
     // Sobe o binario e recebe o media_id (caminho separado do execute()).
     let mediaId: string;
     try {
-      const uploaded = await this.connections.uploadMedia(organizationId, connection.id, {
+      const uploaded = await this.connections.uploadMedia(connection.id, {
         data: args.data,
         mimeType: args.mimeType,
         filename: args.filename,
@@ -319,7 +309,7 @@ export class WhatsappInboxService {
     };
     // Reaproveita o mesmo envio (ja passou pelo reply gate/janela acima, mas
     // deliver revalida — barato e mantem uma porta unica de envio).
-    const result = await this.deliver(organizationId, user, chat, message, args.confirmTakeover === true, false);
+    const result = await this.deliver(user, chat, message, args.confirmTakeover === true, false);
     return { wamid: result.wamid, via: 'media' };
   }
 
@@ -329,7 +319,6 @@ export class WhatsappInboxService {
    * passam por aqui — sem duplicar a logica de 24h/takeover.
    */
   private async deliver(
-    organizationId: string,
     user: AuthenticatedUser,
     chat: ChatView,
     message: RichMessage,
@@ -339,7 +328,7 @@ export class WhatsappInboxService {
     const scope = await this.scopeResolver.resolve(user);
 
     // Reply gate: claim implicito / takeover confirmado / 403 / 409.
-    await this.replyGate.assertCanReply(organizationId, chat, scope, confirmTakeover);
+    await this.replyGate.assertCanReply(chat, scope, confirmTakeover);
 
     // Coexistência: conversa em modo manual → envia pelo canal Baileys manual
     // (sem janela de 24h, sem Meta). Templates não se aplicam ao canal manual.
@@ -348,14 +337,12 @@ export class WhatsappInboxService {
         throw new BadRequestException('O canal manual não envia modelos. Volte ao número oficial para usar um modelo.');
       }
       const sent = await this.baileys.sendViaBaileysConnection(
-        organizationId,
         chat.manual_connection_id,
         chat.phone,
         message,
       );
       // Registra o outbound na MESMA conversa (origem oficial preservada em connection_id).
       await this.chats.createMessage({
-        organization_id: organizationId,
         chat_id: chat.id,
         connection_id: chat.connection_id,
         external_id: sent.providerMessageId,
@@ -389,7 +376,7 @@ export class WhatsappInboxService {
       }
     }
 
-    const connection = await this.loadChatConnection(organizationId, chat);
+    const connection = await this.loadChatConnection(chat);
     try {
       const result = await this.orchestrator.sendViaConnection(connection, chat.phone, message, `user:${user.sub}`);
       // SLA: primeira resposta humana (idempotente — so grava se null).
@@ -414,12 +401,11 @@ export class WhatsappInboxService {
   // ─── Midia inbound (proxy de download da Meta) ──────
 
   async downloadMedia(
-    organizationId: string,
     chatId: string,
     mediaId: string,
   ): Promise<{ base64: string; mime: string }> {
-    const chat = await this.getChat(organizationId, chatId);
-    const result = (await this.connections.execute(organizationId, chat.connection_id, 'downloadMedia', {
+    const chat = await this.getChat(chatId);
+    const result = (await this.connections.execute(chat.connection_id, 'downloadMedia', {
       media_id: mediaId,
     })) as { base64: string; mime: string } | null;
     if (!result) throw new NotFoundException('Mídia não encontrada na Meta (pode ter expirado).');
@@ -450,9 +436,9 @@ export class WhatsappInboxService {
     return { kind: 'text', body: text };
   }
 
-  private async loadChatConnection(organizationId: string, chat: WhatsappChat): Promise<Connection> {
+  private async loadChatConnection(chat: WhatsappChat): Promise<Connection> {
     const connection = await this.connectionsRepository.findById(chat.connection_id);
-    if (!connection || connection.organization_id !== organizationId || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
+    if (!connection || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
       throw new NotFoundException('Conexão da conversa não encontrada.');
     }
     if (connection.status !== 'ACTIVE') {
@@ -464,13 +450,13 @@ export class WhatsappInboxService {
   // ─── Coexistência: canal manual (Baileys) ───────────
 
   /** Liga/desliga o modo manual da conversa. connectionId null = volta ao oficial. */
-  async setManualChannel(organizationId: string, chatId: string, connectionId: string | null): Promise<WhatsappChat> {
-    const chat = await this.getChat(organizationId, chatId);
+  async setManualChannel(chatId: string, connectionId: string | null): Promise<WhatsappChat> {
+    const chat = await this.getChat(chatId);
     if (!connectionId) {
       return this.chats.updateChat(chatId, { manual_connection_id: null });
     }
     const manual = await this.connectionsRepository.findById(connectionId);
-    if (!manual || manual.organization_id !== organizationId || manual.provider_key !== 'whatsapp-baileys-manual' || !manual.is_active) {
+    if (!manual || manual.provider_key !== 'whatsapp-baileys-manual' || !manual.is_active) {
       throw new NotFoundException('Canal manual Baileys não encontrado ou inativo.');
     }
     // Integridade da coexistência: o canal manual deve acompanhar a conexão oficial DESTA conversa.
@@ -482,9 +468,9 @@ export class WhatsappInboxService {
   }
 
   /** Canais manuais elegíveis para esta conversa (ativos e vinculados à conexão oficial dela). */
-  async listManualChannels(organizationId: string, chatId: string): Promise<Array<{ id: string; name: string; status: string }>> {
-    const chat = await this.getChat(organizationId, chatId);
-    const all = await this.connectionsRepository.findAllByOrg(organizationId, { providerKey: 'whatsapp-baileys-manual' });
+  async listManualChannels(chatId: string): Promise<Array<{ id: string; name: string; status: string }>> {
+    const chat = await this.getChat(chatId);
+    const all = await this.connectionsRepository.findAll({ providerKey: 'whatsapp-baileys-manual' });
     return all
       .filter((c) => c.is_active)
       .filter((c) => {

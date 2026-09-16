@@ -25,12 +25,8 @@ import { SecretsService } from '../secrets/secrets.service';
 import { MarketplaceService } from '../marketplace/marketplace.service';
 import { ProviderRegistryService } from '../registry/provider-registry.service';
 import { CATALOG_ONLY_PROVIDERS } from '../registry/provider-catalog';
-import { LimitsService } from '../../licensing/limits.service';
-import { UsageService } from '../../licensing/usage.service';
 import { AuditLogService, redactSensitive } from '../../../shared/audit/audit-log.service';
 import { getRequestStore } from '../../../shared/audit/request-context';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { assertSameOrg, validateWorkspaceScope } from '../../../shared/auth/tenant.util';
 import {
   HealthResult,
   ProviderContext,
@@ -56,50 +52,29 @@ export class ConnectionsService {
     private readonly secrets: SecretsService,
     private readonly marketplace: MarketplaceService,
     private readonly registry: ProviderRegistryService,
-    private readonly limits: LimitsService,
-    private readonly usage: UsageService,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // ─── Leitura ────────────────────────────────────────
-  findAll(organizationId: string, filters: { workspaceId?: string; environmentId?: string }) {
-    return this.repository.findAllByOrg(organizationId, filters);
+  findAll() {
+    return this.repository.findAll();
   }
 
-  async findById(organizationId: string, id: string): Promise<Connection> {
+  async findById(id: string): Promise<Connection> {
     const connection = await this.repository.findById(id);
     if (!connection) throw new NotFoundException('Conexão não encontrada.');
-    assertSameOrg(connection.organization_id, organizationId);
     return connection;
   }
 
-  async findLogs(organizationId: string, id: string, take = 50) {
-    await this.findById(organizationId, id); // ownership
-    return this.integrationLogs.findByConnection(organizationId, id, take);
+  async findLogs(id: string, take = 50) {
+    await this.findById(id);
+    return this.integrationLogs.findByConnection(id, take);
   }
 
   // ─── Criacao via wizard ─────────────────────────────
-  async create(organizationId: string, dto: CreateConnectionDto, createdBy: string | null) {
-    // Escopo (diretriz 4): workspace/ambiente validados contra a org.
-    await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
-
+  async create(dto: CreateConnectionDto, createdBy: string | null) {
     // Provider instalado + ativo no marketplace.
-    const definition = await this.marketplace.assertInstalled(organizationId, dto.provider_key);
-
-    // Enforcement de limite (diretriz 19): metrica estrutural 'connections'.
-    const currentCount = await this.repository.countByOrg(organizationId);
-    await this.limits.assertCountWithin(organizationId, 'connections', currentCount);
-
-    // Metrica adicional POR PROVIDER declarada no metadata() (ex.: o
-    // whatsapp-meta conta 'whatsapp_numbers' — 1 conexao = 1 numero).
-    if (this.registry.has(dto.provider_key)) {
-      const countMetric = this.registry.get(dto.provider_key).metadata().countMetric;
-      if (countMetric) {
-        const providerCount = await this.repository.countByOrgProvider(organizationId, dto.provider_key);
-        await this.limits.assertCountWithin(organizationId, countMetric, providerCount);
-      }
-    }
+    const definition = await this.marketplace.assertInstalled(dto.provider_key);
 
     // Higiene: campo marcado como secret no wizard NUNCA entra no config.
     const config = this.stripSecretFields(dto.config ?? {}, definition);
@@ -109,9 +84,6 @@ export class ConnectionsService {
     let secretId: string | null = null;
     if (Object.keys(secretValues).length > 0) {
       const secret = await this.secrets.create({
-        organizationId,
-        workspaceId: dto.workspace_id,
-        environmentId: dto.environment_id,
         name: `${dto.name} — credenciais (${dto.provider_key})`,
         kind: this.resolveSecretKind(dto.provider_key),
         values: secretValues,
@@ -121,9 +93,6 @@ export class ConnectionsService {
     }
 
     let connection = await this.repository.create({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       provider_key: dto.provider_key,
       name: dto.name,
       status: 'PENDING_AUTH',
@@ -153,20 +122,14 @@ export class ConnectionsService {
       });
     }
 
-    // Metering (diretriz 40).
-    await this.usage.increment(organizationId, dto.workspace_id, 'connections');
-
     await this.audit.record({
       action: 'integration.connection.create',
       entityType: 'Connection',
       entityId: connection.id,
-      organizationId,
-      workspaceId: dto.workspace_id,
       newValue: {
         name: connection.name,
         provider_key: connection.provider_key,
         status: connection.status,
-        environment_id: connection.environment_id,
       },
     });
     return connection;
@@ -175,8 +138,8 @@ export class ConnectionsService {
   // ─── Atualizacao (nome/tags/prioridade + credenciais) ─
   // provider_key/workspace/environment NUNCA mudam aqui. config faz merge
   // shallow no atual; secrets grava so as chaves nao-vazias (mantem o resto).
-  async update(organizationId: string, id: string, dto: UpdateConnectionDto) {
-    const before = await this.findById(organizationId, id);
+  async update(id: string, dto: UpdateConnectionDto) {
+    const before = await this.findById(id);
     const data: Prisma.ConnectionUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.tags !== undefined) data.tags = dto.tags;
@@ -185,7 +148,7 @@ export class ConnectionsService {
     // Config: merge shallow (novos valores sobrescrevem, mantem os nao
     // enviados). Higiene: remove qualquer campo secreto que tenha vazado.
     if (dto.config !== undefined) {
-      const definition = await this.marketplace.assertInstalled(organizationId, before.provider_key);
+      const definition = await this.marketplace.assertInstalled(before.provider_key);
       const incoming = this.stripSecretFields(dto.config, definition);
       const currentConfig = (before.config ?? {}) as Record<string, unknown>;
       data.config = { ...currentConfig, ...incoming } as Prisma.InputJsonValue;
@@ -205,9 +168,6 @@ export class ConnectionsService {
           await this.secrets.mergeValues(before.secret_id, provided);
         } else {
           const created = await this.secrets.create({
-            organizationId,
-            workspaceId: before.workspace_id,
-            environmentId: before.environment_id,
             name: `${before.name} — credenciais (${before.provider_key})`,
             kind: this.resolveSecretKind(before.provider_key),
             values: provided,
@@ -222,7 +182,6 @@ export class ConnectionsService {
       action: 'integration.connection.update',
       entityType: 'Connection',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name, tags: before.tags, priority: before.priority },
       newValue: {
         name: connection.name,
@@ -236,8 +195,8 @@ export class ConnectionsService {
   }
 
   // ─── Estado (enable/disable/maintenance) ────────────
-  async changeState(organizationId: string, id: string, action: ConnectionStateAction) {
-    const connection = await this.findById(organizationId, id);
+  async changeState(id: string, action: ConnectionStateAction) {
+    const connection = await this.findById(id);
     const target = STATE_ACTION_TARGET[action];
     assertConnectionTransition(connection.status, target);
 
@@ -251,7 +210,6 @@ export class ConnectionsService {
       action: `integration.connection.${action}`,
       entityType: 'Connection',
       entityId: id,
-      organizationId,
       oldValue: { status: connection.status },
       newValue: { status: updated.status },
     });
@@ -259,8 +217,8 @@ export class ConnectionsService {
   }
 
   // ─── Teste de saude ─────────────────────────────────
-  async test(organizationId: string, id: string) {
-    const connection = await this.findById(organizationId, id);
+  async test(id: string) {
+    const connection = await this.findById(id);
     if (!this.registry.has(connection.provider_key)) {
       throw new BadRequestException('Conector sem implementação nesta fase — teste indisponível.');
     }
@@ -270,7 +228,6 @@ export class ConnectionsService {
 
     const updated = await this.applyHealthResult(connection, result);
     await this.integrationLogs.record({
-      organizationId,
       connectionId: id,
       direction: IntegrationDirection.OUTBOUND,
       operation: 'health',
@@ -284,8 +241,9 @@ export class ConnectionsService {
   }
 
   // ─── Execucao de operacao ───────────────────────────
-  async execute(organizationId: string, id: string, operation: string, params: unknown) {
-    const connection = await this.findById(organizationId, id);
+  async execute(id: string, operation: string, params: unknown) {
+    const connection = await this.repository.findById(id);
+    if (!connection) throw new NotFoundException('Conexão não encontrada.');
     if (connection.status !== 'ACTIVE') {
       throw new ConflictException('Conexão não está ativa — teste/reative antes de executar operações.');
     }
@@ -297,7 +255,6 @@ export class ConnectionsService {
       const durationMs = Date.now() - startedAt;
       await this.repository.update(id, { last_used_at: new Date() });
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation,
@@ -322,7 +279,6 @@ export class ConnectionsService {
           .catch(() => undefined);
       }
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation,
@@ -345,8 +301,8 @@ export class ConnectionsService {
    * mais o IntegrationLog. Serve pra UI preencher ids que o usuario nao deve
    * digitar a mao (ex.: `id_assunto` da OS no IXC).
    */
-  async discover(organizationId: string, id: string) {
-    const connection = await this.findById(organizationId, id);
+  async discover(id: string) {
+    const connection = await this.findById(id);
     if (!this.registry.has(connection.provider_key)) {
       throw new BadRequestException('Conector sem implementação — descoberta de recursos indisponível.');
     }
@@ -361,7 +317,6 @@ export class ConnectionsService {
       const durationMs = Date.now() - startedAt;
       await this.repository.update(id, { last_sync_at: new Date() });
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation: 'discover',
@@ -374,7 +329,6 @@ export class ConnectionsService {
     } catch (e) {
       const durationMs = Date.now() - startedAt;
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation: 'discover',
@@ -394,11 +348,10 @@ export class ConnectionsService {
    * O provider whatsapp-meta expoe a operacao 'uploadMedia'.
    */
   async uploadMedia(
-    organizationId: string,
     id: string,
     file: { data: Buffer; mimeType: string; filename: string },
   ): Promise<{ media_id: string }> {
-    const connection = await this.findById(organizationId, id);
+    const connection = await this.findById(id);
     if (connection.status !== 'ACTIVE') {
       throw new ConflictException('Conexão não está ativa — teste/reative antes de enviar mídia.');
     }
@@ -409,7 +362,6 @@ export class ConnectionsService {
       const result = (await provider.execute(ctx, 'uploadMedia', file)) as { media_id?: string };
       await this.repository.update(id, { last_used_at: new Date() });
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation: 'uploadMedia',
@@ -424,7 +376,6 @@ export class ConnectionsService {
       return { media_id: result.media_id };
     } catch (e) {
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation: 'uploadMedia',
@@ -458,9 +409,6 @@ export class ConnectionsService {
       await this.secrets.updateOauth(secretId, tokens, meta);
     } else {
       const created = await this.secrets.create({
-        organizationId: connection.organization_id,
-        workspaceId: connection.workspace_id,
-        environmentId: connection.environment_id,
         name: `${connection.name} — OAuth (${connection.provider_key})`,
         kind: SecretKind.OAUTH,
         values: tokens,
@@ -481,7 +429,6 @@ export class ConnectionsService {
     });
 
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId,
       direction: IntegrationDirection.OUTBOUND,
       operation: 'oauth.callback',
@@ -493,8 +440,6 @@ export class ConnectionsService {
       action: 'integration.connection.oauth',
       entityType: 'Connection',
       entityId: connectionId,
-      organizationId: connection.organization_id,
-      workspaceId: connection.workspace_id,
       newValue: { status: 'ACTIVE', account: meta.account },
     });
     return updated;
@@ -528,7 +473,6 @@ export class ConnectionsService {
       result = { ok: false, detail: (e as Error).message };
     }
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId: connection.id,
       direction: IntegrationDirection.OUTBOUND,
       operation: 'connect',

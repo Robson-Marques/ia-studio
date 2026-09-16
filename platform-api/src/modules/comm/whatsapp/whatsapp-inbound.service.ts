@@ -78,7 +78,6 @@ export class WhatsappInboundService {
     // Demais campos (phone_number_quality_update, account_update...) são
     // absorvidos pelo sync contínuo (~10 min); registra a chegada no log.
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId: connection.id,
       direction: IntegrationDirection.INBOUND,
       operation: `webhook:${field}`,
@@ -108,9 +107,6 @@ export class WhatsappInboundService {
       const ts = typeof raw['timestamp'] === 'string' ? new Date(Number(raw['timestamp']) * 1000) : new Date();
 
       const chat = await this.chats.upsertChat({
-        organizationId: connection.organization_id,
-        workspaceId: connection.workspace_id,
-        environmentId: connection.environment_id,
         connectionId: connection.id,
         phone: from,
         contactName,
@@ -120,7 +116,6 @@ export class WhatsappInboundService {
       });
 
       await this.chats.createMessage({
-        organization_id: connection.organization_id,
         chat_id: chat.id,
         connection_id: connection.id,
         external_id: externalId,
@@ -133,16 +128,13 @@ export class WhatsappInboundService {
       });
 
       // Conversa encerrada + cliente voltou a falar → reabre (SYSTEM).
-      await this.assignment.reopenByInbound(connection.organization_id, chat.id).catch(() => null);
+      await this.assignment.reopenByInbound(chat.id).catch(() => null);
 
       // Evento no envelope padrao (diretriz 7) via Event Bus (Fase 4):
       // persiste (dedup por wamid), emite no EventEmitter2 (compat com os
       // assinantes sincronos) e enfileira no broker pros workers.
       await this.eventBus.publish({
         event: WHATSAPP_INBOUND_EVENT,
-        organization_id: connection.organization_id,
-        workspace_id: connection.workspace_id,
-        environment_id: connection.environment_id,
         trace_id: randomUUID(),
         source_event_id: externalId,
         occurred_at: ts.toISOString(),
@@ -185,7 +177,6 @@ export class WhatsappInboundService {
           `Entrega FALHOU wamid=${s.id} recipient=${s.recipient_id} detalhe=${errorDetail ?? 'desconhecido'}`,
         );
         await this.integrationLogs.record({
-          organizationId: connection.organization_id,
           connectionId: connection.id,
           direction: IntegrationDirection.INBOUND,
           operation: 'webhook:message_failed',
@@ -215,7 +206,6 @@ export class WhatsappInboundService {
     if (!status) return;
     await this.templates.updateStatusByName(connection.id, name, language, status, value.reason ?? null);
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId: connection.id,
       direction: IntegrationDirection.INBOUND,
       operation: 'webhook:template_status',
@@ -233,7 +223,6 @@ export class WhatsappInboundService {
     if (!name || !['GREEN', 'YELLOW', 'RED', 'UNKNOWN'].includes(quality)) return;
     await this.templates.updateMetaFieldsByName(connection.id, name, language, { quality });
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId: connection.id,
       direction: IntegrationDirection.INBOUND,
       operation: 'webhook:template_quality',
@@ -251,7 +240,6 @@ export class WhatsappInboundService {
     if (!name || !['MARKETING', 'UTILITY', 'AUTHENTICATION'].includes(category)) return;
     await this.templates.updateMetaFieldsByName(connection.id, name, language, { category });
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId: connection.id,
       direction: IntegrationDirection.INBOUND,
       operation: 'webhook:template_category',

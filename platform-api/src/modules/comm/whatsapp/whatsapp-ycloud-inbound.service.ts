@@ -85,7 +85,6 @@ export class WhatsappYcloudInboundService {
 
     // Demais eventos: registra a chegada e ignora.
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId: connection.id,
       direction: IntegrationDirection.INBOUND,
       operation: `webhook:ycloud:${type || 'desconhecido'}`,
@@ -177,9 +176,6 @@ export class WhatsappYcloudInboundService {
         chatId = existingChat.id;
       } else {
         const created = await this.chats.upsertChat({
-          organizationId: connection.organization_id,
-          workspaceId: connection.workspace_id,
-          environmentId: connection.environment_id,
           connectionId: connection.id,
           phone: n.customerPhone,
           contactName: n.contactName,
@@ -190,9 +186,6 @@ export class WhatsappYcloudInboundService {
       }
     } else {
       const chat = await this.chats.upsertChat({
-        organizationId: connection.organization_id,
-        workspaceId: connection.workspace_id,
-        environmentId: connection.environment_id,
         connectionId: connection.id,
         phone: n.customerPhone,
         contactName: n.contactName,
@@ -204,7 +197,6 @@ export class WhatsappYcloudInboundService {
     }
 
     await this.chats.createMessage({
-      organization_id: connection.organization_id,
       chat_id: chatId,
       connection_id: connection.id,
       external_id: n.externalId,
@@ -224,13 +216,10 @@ export class WhatsappYcloudInboundService {
 
     // Conversa encerrada + cliente voltou a falar → reabre (SYSTEM).
     if (n.direction === CommMessageDirection.INCOMING) {
-      await this.assignment.reopenByInbound(connection.organization_id, chatId).catch(() => null);
+      await this.assignment.reopenByInbound(chatId).catch(() => null);
 
       await this.eventBus.publish({
         event: WHATSAPP_INBOUND_EVENT,
-        organization_id: connection.organization_id,
-        workspace_id: connection.workspace_id,
-        environment_id: connection.environment_id,
         trace_id: randomUUID(),
         source_event_id: n.externalId,
         occurred_at: n.ts.toISOString(),

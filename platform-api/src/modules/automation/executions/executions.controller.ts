@@ -7,7 +7,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { ExecutionsService } from './executions.service';
 
 @ApiTags('Automation — Executions')
@@ -19,7 +18,6 @@ export class ExecutionsController {
   @Get()
   @RequirePermissions(PERMISSIONS.AUTOMATION_EXECUTIONS_READ)
   findAll(
-    @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: ExecutionStatus,
     @Query('workflow_id') workflowId?: string,
     @Query('trace_id') traceId?: string,
@@ -27,10 +25,8 @@ export class ExecutionsController {
     @Query('to') to?: string,
     @Query('take') take?: string,
     @Query('skip') skip?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     return this.executions.findAll(
-      resolveOrganizationId(user, orgQuery),
       {
         status,
         workflowId,
@@ -46,11 +42,9 @@ export class ExecutionsController {
   @Get(':id')
   @RequirePermissions(PERMISSIONS.AUTOMATION_EXECUTIONS_READ)
   findById(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.executions.findById(resolveOrganizationId(user, orgQuery), id);
+    return this.executions.findById(id);
   }
 
   @Post(':id/retry')
@@ -58,9 +52,8 @@ export class ExecutionsController {
   retry(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.executions.retry(resolveOrganizationId(user, orgQuery), id, user.sub);
+    return this.executions.retry(id, user.sub);
   }
 
   @Post(':id/cancel')
@@ -68,8 +61,7 @@ export class ExecutionsController {
   cancel(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.executions.cancel(resolveOrganizationId(user, orgQuery), id);
+    return this.executions.cancel(id);
   }
 }

@@ -26,10 +26,10 @@ export class IncidentLookupService {
    * Retorna o incidente ativo que cobre o cliente (por customer_ref/login/cpf),
    * ou null. Match por target incluido no incidente ATIVO.
    */
-  async activeFor(organizationId: string, customerRef: string): Promise<IncidentInfo | null> {
+  async activeFor(customerRef: string): Promise<IncidentInfo | null> {
     const ref = customerRef.trim().toLowerCase();
     if (!ref) return null;
-    const actives = await this.repository.findActive(organizationId);
+    const actives = await this.repository.findActive();
     for (const incident of actives) {
       const hit = incident.targets.some(
         (t) => t.included && t.customer_ref.trim().toLowerCase() === ref,

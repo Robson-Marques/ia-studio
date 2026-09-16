@@ -1,19 +1,16 @@
 // Dashboards consolidados (Fase 8). Read-only (diretriz 34).
 //   * GET /console/dashboards/overview → visao global (Console/platform-admin).
 //   * GET /dashboards/summary          → resumo org-scoped (painel do cliente).
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PlatformAdminOnly } from '../../shared/auth/platform-admin.guard';
+import { InstallationAdminOnly } from '../../shared/auth/permissions.decorator';
 import { RequirePermissions } from '../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../shared/permissions.constants';
-import { CurrentUser } from '../../shared/auth/current-user.decorator';
-import { AuthenticatedUser } from '../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../shared/auth/tenant.util';
 import { DashboardsService } from './dashboards.service';
 
 @ApiTags('Console — Dashboards')
 @ApiBearerAuth()
-@PlatformAdminOnly()
+@InstallationAdminOnly()
 @Controller('console/dashboards')
 export class ConsoleDashboardsController {
   constructor(private readonly dashboards: DashboardsService) {}
@@ -33,8 +30,8 @@ export class DashboardsController {
 
   @Get('summary')
   @RequirePermissions(PERMISSIONS.CORE_SETTINGS_READ)
-  @ApiOperation({ summary: 'Resumo consolidado da organização (read-only)' })
-  summary(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
-    return this.dashboards.summary(resolveOrganizationId(user, orgQuery));
+  @ApiOperation({ summary: 'Resumo consolidado da instalação (read-only)' })
+  summary() {
+    return this.dashboards.summary();
   }
 }

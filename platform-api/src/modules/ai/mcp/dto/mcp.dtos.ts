@@ -7,12 +7,6 @@ export class CreateMcpServerDto {
   @MaxLength(120)
   name!: string;
 
-  @IsString()
-  workspace_id!: string;
-
-  @IsString()
-  environment_id!: string;
-
   @IsEnum(McpTransport)
   transport!: McpTransport;
 

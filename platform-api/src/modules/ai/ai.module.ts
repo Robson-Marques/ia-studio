@@ -47,11 +47,6 @@ import { ApprovalPolicyService } from './approvals/approval-policy.service';
 import { ApprovalsService } from './approvals/approvals.service';
 import { ApprovalsController } from './approvals/approvals.controller';
 
-// Costs
-import { CostsRepository } from './costs/costs.repository';
-import { CostsService } from './costs/costs.service';
-import { CostsController } from './costs/costs.controller';
-
 // Collaboration
 import { CollaborationRepository } from './collaboration/collaboration.repository';
 import { CollaborationService } from './collaboration/collaboration.service';
@@ -94,7 +89,6 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     KnowledgeController,
     ToolsController,
     ApprovalsController,
-    CostsController,
     CollaborationController,
     McpController,
     AgentsController,
@@ -129,9 +123,6 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     ApprovalsRepository,
     ApprovalPolicyService,
     ApprovalsService,
-    // Costs
-    CostsRepository,
-    CostsService,
     // Collaboration
     CollaborationRepository,
     CollaborationService,

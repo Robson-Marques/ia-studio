@@ -6,9 +6,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Connection } from '@prisma/client';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
-import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { WhatsappSyncService } from './whatsapp-sync.service';
 import { WhatsappAssistantService } from './whatsapp-assistant.service';
@@ -30,18 +28,11 @@ export class WhatsappNumbersController {
   @Get()
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ)
   async list(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('environment_id') environmentId?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    const organizationId = resolveOrganizationId(user, orgQuery);
-    const items = await this.connections.findAllByOrg(organizationId, {
+    const items = await this.connections.findAll({
       providerKey: WHATSAPP_PROVIDER_KEY,
-      environmentId,
     });
-    const states = await this.prisma.whatsappSyncState.findMany({
-      where: { organization_id: organizationId },
-    });
+    const states = await this.prisma.whatsappSyncState.findMany();
     const stateByConnection = new Map(states.map((s) => [s.connection_id, s]));
     return items.map((c) => this.toView(c, stateByConnection.get(c.id)));
   }
@@ -49,13 +40,10 @@ export class WhatsappNumbersController {
   @Post(':id/sync')
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ, PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
   async syncNow(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    const organizationId = resolveOrganizationId(user, orgQuery);
     const connection = await this.connections.findById(id);
-    if (!connection || connection.organization_id !== organizationId || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
+    if (!connection || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
       throw new NotFoundException('Conexão WhatsApp não encontrada.');
     }
     return this.sync.syncConnection(connection);
@@ -68,12 +56,9 @@ export class WhatsappNumbersController {
   @Get(':id/assistant')
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ)
   async getAssistant(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    const organizationId = resolveOrganizationId(user, orgQuery);
-    return this.assistant.get(organizationId, id);
+    return this.assistant.get(id);
   }
 
   @Put(':id/assistant')
@@ -82,21 +67,16 @@ export class WhatsappNumbersController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: SetChannelAssistantDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    const organizationId = resolveOrganizationId(user, orgQuery);
-    return this.assistant.set(organizationId, id, dto.agent_id, dto.is_enabled ?? true, user.sub ?? null);
+    return this.assistant.set(id, dto.agent_id, dto.is_enabled ?? true, user.sub ?? null);
   }
 
   @Delete(':id/assistant')
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE)
   async removeAssistant(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    const organizationId = resolveOrganizationId(user, orgQuery);
-    return this.assistant.remove(organizationId, id);
+    return this.assistant.remove(id);
   }
 
   private toView(connection: Connection, state?: { [k: string]: unknown } | null) {
@@ -108,8 +88,6 @@ export class WhatsappNumbersController {
       status_detail: connection.status_detail,
       tags: connection.tags,
       priority: connection.priority,
-      workspace_id: connection.workspace_id,
-      environment_id: connection.environment_id,
       phone_number_id: config['phone_number_id'] ?? null,
       waba_id: config['waba_id'] ?? null,
       department: config['department'] ?? null,

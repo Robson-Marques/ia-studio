@@ -5,8 +5,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { AutomationTemplate, Prisma, TemplateChannel } from '@prisma/client';
 import { TemplatesRepository } from './templates.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { assertSameOrg, validateWorkspaceScope } from '../../../shared/auth/tenant.util';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 
@@ -40,26 +38,20 @@ export class TemplatesService {
   constructor(
     private readonly repository: TemplatesRepository,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
-  findAll(organizationId: string, filters: { workspaceId?: string; environmentId?: string; channel?: TemplateChannel }) {
-    return this.repository.findAllByOrg(organizationId, filters);
+  findAll(filters: { channel?: TemplateChannel }) {
+    return this.repository.findAll(filters);
   }
 
-  async findById(organizationId: string, id: string): Promise<AutomationTemplate> {
+  async findById(id: string): Promise<AutomationTemplate> {
     const template = await this.repository.findById(id);
     if (!template) throw new NotFoundException('Template não encontrado.');
-    assertSameOrg(template.organization_id, organizationId);
     return template;
   }
 
-  async create(organizationId: string, dto: CreateTemplateDto, createdBy: string | null) {
-    await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
+  async create(dto: CreateTemplateDto, createdBy: string | null) {
     const template = await this.repository.create({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       name: dto.name,
       channel: dto.channel,
       subject: dto.subject,
@@ -71,14 +63,13 @@ export class TemplatesService {
       action: 'automation.template.create',
       entityType: 'AutomationTemplate',
       entityId: template.id,
-      organizationId,
       newValue: { name: template.name, channel: template.channel },
     });
     return template;
   }
 
-  async update(organizationId: string, id: string, dto: UpdateTemplateDto) {
-    const before = await this.findById(organizationId, id);
+  async update(id: string, dto: UpdateTemplateDto) {
+    const before = await this.findById(id);
     const template = await this.repository.update(id, {
       name: dto.name ?? undefined,
       subject: dto.subject ?? undefined,
@@ -89,29 +80,27 @@ export class TemplatesService {
       action: 'automation.template.update',
       entityType: 'AutomationTemplate',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name, subject: before.subject },
       newValue: { name: template.name, subject: template.subject },
     });
     return template;
   }
 
-  async remove(organizationId: string, id: string) {
-    const before = await this.findById(organizationId, id);
+  async remove(id: string) {
+    const before = await this.findById(id);
     await this.repository.delete(id);
     await this.audit.record({
       action: 'automation.template.delete',
       entityType: 'AutomationTemplate',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name, channel: before.channel },
     });
     return { deleted: true };
   }
 
   /** Render de um template persistido com dados arbitrarios. */
-  async render(organizationId: string, id: string, data: Record<string, unknown>) {
-    const template = await this.findById(organizationId, id);
+  async render(id: string, data: Record<string, unknown>) {
+    const template = await this.findById(id);
     return {
       template_id: template.id,
       channel: template.channel,

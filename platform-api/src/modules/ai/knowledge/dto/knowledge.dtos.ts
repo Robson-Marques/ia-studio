@@ -17,12 +17,6 @@ export class CreateKnowledgeBaseDto {
   @MaxLength(120)
   name!: string;
 
-  @IsString()
-  workspace_id!: string;
-
-  @IsString()
-  environment_id!: string;
-
   @IsOptional()
   @IsString()
   @MaxLength(500)

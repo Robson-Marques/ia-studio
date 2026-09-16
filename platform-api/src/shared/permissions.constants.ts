@@ -3,8 +3,8 @@
 // de sistema atualizados (SYSTEM_PROFILES). Administrador herda tudo via
 // ALL_PERMISSIONS automaticamente.
 //
-// Ator de plataforma (is_platform_admin) tem bypass total no PermissionsGuard —
-// este catalogo governa apenas usuarios de organization.
+// O catálogo governa exclusivamente usuários locais da instância; não existe
+// bypass de plataforma nem escopo de organização.
 
 export const PERMISSIONS = {
   // ─── Usuarios e acessos ─────────────────────────────

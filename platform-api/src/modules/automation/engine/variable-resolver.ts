@@ -1,7 +1,7 @@
 // Variable Resolver — funcoes PURAS de interpolacao {{namespace.path}} nas
 // configs dos nos (mecanica portada do Aquapark). Namespaces da Fase 4:
 // input.* (payload do gatilho), vars.<nodeId>.* (saidas de nos anteriores),
-// workflow.*, env.* (organization/workspace/environment) e now (ISO).
+// workflow.* e now (ISO).
 const TOKEN_RE = /\{\{\s*([\w.[\]-]+)\s*\}\}/g;
 const WHOLE_RE = /^\{\{\s*([\w.[\]-]+)\s*\}\}$/;
 
@@ -9,7 +9,6 @@ export interface VariableContext {
   workflow: { id: string; name: string; version: number };
   input: unknown;
   vars: Record<string, unknown>;
-  env: { organization_id: string; workspace_id: string; environment_id: string };
   now: string;
   [key: string]: unknown;
 }
@@ -20,19 +19,11 @@ export function buildVariableContext(args: {
   version: number;
   input: unknown;
   vars: Record<string, unknown>;
-  organizationId: string;
-  workspaceId: string;
-  environmentId: string;
 }): VariableContext {
   return {
     workflow: { id: args.workflowId, name: args.workflowName, version: args.version },
     input: args.input ?? {},
     vars: args.vars ?? {},
-    env: {
-      organization_id: args.organizationId,
-      workspace_id: args.workspaceId,
-      environment_id: args.environmentId,
-    },
     now: new Date().toISOString(),
   };
 }
@@ -129,7 +120,7 @@ export function extractTokens(value: unknown): string[] {
   return Array.from(out);
 }
 
-export const KNOWN_NAMESPACES = ['input', 'vars', 'workflow', 'env', 'now'];
+export const KNOWN_NAMESPACES = ['input', 'vars', 'workflow', 'now'];
 
 /** Tokens com namespace desconhecido (aviso no publish). */
 export function unknownTokens(value: unknown): string[] {

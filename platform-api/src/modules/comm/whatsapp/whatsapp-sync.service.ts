@@ -56,7 +56,6 @@ export class WhatsappSyncService {
     try {
       // 1) Status do numero na Meta (display name, qualidade, limite).
       const info = (await this.connections.execute(
-        connection.organization_id,
         connection.id,
         'syncStatus',
         {},
@@ -81,9 +80,6 @@ export class WhatsappSyncService {
       const state = await this.prisma.whatsappSyncState.upsert({
         where: { connection_id: connection.id },
         create: {
-          organization_id: connection.organization_id,
-          workspace_id: connection.workspace_id,
-          environment_id: connection.environment_id,
           connection_id: connection.id,
           phone_number: info.display_phone_number ?? null,
           display_name: info.verified_name ?? null,
@@ -122,7 +118,6 @@ export class WhatsappSyncService {
       // 6) Mudanca relevante → IntegrationLog dedicado.
       if (qualityChanged) {
         await this.integrationLogs.record({
-          organizationId: connection.organization_id,
           connectionId: connection.id,
           direction: IntegrationDirection.INBOUND,
           operation: 'sync:quality_changed',
@@ -140,9 +135,6 @@ export class WhatsappSyncService {
         .upsert({
           where: { connection_id: connection.id },
           create: {
-            organization_id: connection.organization_id,
-            workspace_id: connection.workspace_id,
-            environment_id: connection.environment_id,
             connection_id: connection.id,
             last_error: (e as Error).message,
           },

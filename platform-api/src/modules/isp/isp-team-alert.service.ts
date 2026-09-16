@@ -52,14 +52,14 @@ export class IspTeamAlertService {
    * sao responsabilidade do chamador (IspIncidentsService.registerDetectedAnomaly).
    */
   async alert(incident: IspIncident, opts: { stats?: TeamAlertStats } = {}): Promise<TeamAlertResult> {
-    const cfg = await this.osConfig.getPlantaoConfig(incident.organization_id);
+    const cfg = await this.osConfig.getPlantaoConfig();
     const body = this.buildBody(incident, opts.stats);
 
     if (!cfg.team_id) {
       return this.fallbackInApp(incident, body, 'Equipe de plantão não configurada.');
     }
 
-    const recipients = await this.repository.findPlantaoRecipients(incident.organization_id, cfg.team_id);
+    const recipients = await this.repository.findPlantaoRecipients(cfg.team_id);
     if (recipients.length === 0) {
       return this.fallbackInApp(incident, body, 'Nenhum membro elegível (telefone + opt-in) na equipe de plantão.');
     }
@@ -75,9 +75,6 @@ export class IspTeamAlertService {
     for (const r of recipients) {
       try {
         const { via } = await this.smartSend.send({
-          organizationId: incident.organization_id,
-          workspaceId: incident.workspace_id,
-          environmentId: incident.environment_id,
           phone: r.phone,
           text: body,
           template: cfg.template,
@@ -88,7 +85,6 @@ export class IspTeamAlertService {
         if (via === 'skipped') result.skipped += 1;
         else result.sent += 1;
         await this.repository.createTeamAlert({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           user_id: r.user_id,
           phone: r.phone,
@@ -100,7 +96,6 @@ export class IspTeamAlertService {
       } catch (e) {
         result.failed += 1;
         await this.repository.createTeamAlert({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           user_id: r.user_id,
           phone: r.phone,
@@ -126,10 +121,7 @@ export class IspTeamAlertService {
   private async fallbackInApp(incident: IspIncident, body: string, reason: string): Promise<TeamAlertResult> {
     try {
       await this.notifications.notify({
-        organizationId: incident.organization_id,
-        workspaceId: incident.workspace_id,
-        environmentId: incident.environment_id,
-        recipient: { user_id: '' }, // broadcast in-app pra org
+        recipient: { user_id: '' }, // broadcast in-app da instância
         title: 'Possível incidente de rede',
         body: `${body}\n\n(${reason})`,
       });

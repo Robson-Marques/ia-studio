@@ -35,7 +35,7 @@ export class PlatformNodes implements OnModuleInit {
             vars: ctx.vars,
             ...((ctx.config['data'] ?? {}) as Record<string, unknown>),
           };
-          const rendered = await this.templates.render(ctx.organizationId, templateId, data);
+          const rendered = await this.templates.render(templateId, data);
           await ctx.log('info', `template renderizado (${rendered.channel}).`);
           return { handle: 'success', output: rendered };
         } catch (e) {
@@ -67,9 +67,6 @@ export class PlatformNodes implements OnModuleInit {
         }
         const result = await this.eventBus.publish({
           event,
-          organization_id: ctx.organizationId,
-          workspace_id: ctx.workspaceId,
-          environment_id: ctx.environmentId,
           trace_id: ctx.traceId,
           source_event_id: `${ctx.executionId}:publish:${event}`,
           occurred_at: new Date().toISOString(),

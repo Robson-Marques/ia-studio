@@ -46,10 +46,10 @@ export class IspOsConfigService {
     private readonly settings: SettingsService,
   ) {}
 
-  /** Mapa setor→fila (Suporte/Financeiro) da organização. */
-  async getQueueMapping(organizationId: string): Promise<QueueMapping> {
-    const suporte = await this.settings.getValue(organizationId, ISP_QUEUE_SETTING_KEYS.suporte);
-    const financeiro = await this.settings.getValue(organizationId, ISP_QUEUE_SETTING_KEYS.financeiro);
+  /** Mapa setor→fila (Suporte/Financeiro) da instalação. */
+  async getQueueMapping(): Promise<QueueMapping> {
+    const suporte = await this.settings.getLocalValue(ISP_QUEUE_SETTING_KEYS.suporte);
+    const financeiro = await this.settings.getLocalValue(ISP_QUEUE_SETTING_KEYS.financeiro);
     return {
       suporte: typeof suporte === 'string' && suporte ? suporte : null,
       financeiro: typeof financeiro === 'string' && financeiro ? financeiro : null,
@@ -57,36 +57,36 @@ export class IspOsConfigService {
   }
 
   /** Grava o mapa setor→fila. Valor vazio/null = "não configurado". */
-  async setQueueMapping(organizationId: string, mapping: Partial<QueueMapping>): Promise<QueueMapping> {
+  async setQueueMapping(mapping: Partial<QueueMapping>): Promise<QueueMapping> {
     if (mapping.suporte !== undefined) {
-      await this.settings.set(organizationId, ISP_QUEUE_SETTING_KEYS.suporte, mapping.suporte ?? '');
+      await this.settings.setLocal(ISP_QUEUE_SETTING_KEYS.suporte, mapping.suporte ?? '');
     }
     if (mapping.financeiro !== undefined) {
-      await this.settings.set(organizationId, ISP_QUEUE_SETTING_KEYS.financeiro, mapping.financeiro ?? '');
+      await this.settings.setLocal(ISP_QUEUE_SETTING_KEYS.financeiro, mapping.financeiro ?? '');
     }
-    return this.getQueueMapping(organizationId);
+    return this.getQueueMapping();
   }
 
   /** Máximo de boletos em aberto que a IA envia (0 = sem limite). Determinístico. */
-  async getBoletoMax(organizationId: string): Promise<number> {
-    const raw = await this.settings.getValue(organizationId, ISP_BOLETO_MAX_SETTING_KEY);
+  async getBoletoMax(): Promise<number> {
+    const raw = await this.settings.getLocalValue(ISP_BOLETO_MAX_SETTING_KEY);
     if (typeof raw !== 'string' || !raw.trim()) return ISP_BOLETO_MAX_DEFAULT;
     const n = Number.parseInt(raw, 10);
     return Number.isFinite(n) && n >= 0 ? n : ISP_BOLETO_MAX_DEFAULT;
   }
 
   /** Grava o máximo de boletos. Aceita 0 (todos) até um teto de segurança (20). */
-  async setBoletoMax(organizationId: string, max: number): Promise<number> {
+  async setBoletoMax(max: number): Promise<number> {
     const n = Number.isFinite(max) ? Math.trunc(max) : ISP_BOLETO_MAX_DEFAULT;
     if (n < 0 || n > 20) throw new BadRequestException('Informe um número entre 0 (todos) e 20.');
-    await this.settings.set(organizationId, ISP_BOLETO_MAX_SETTING_KEY, String(n));
+    await this.settings.setLocal(ISP_BOLETO_MAX_SETTING_KEY, String(n));
     return n;
   }
 
   /** Config do link público de pagamento (TTL em horas + URL pública base). */
-  async getPagamentoConfig(organizationId: string): Promise<{ ttl_horas: number; base_url: string }> {
-    const ttl = await this.settings.getValue(organizationId, ISP_PAGAMENTO_TTL_SETTING_KEY);
-    const base = await this.settings.getValue(organizationId, ISP_PAGAMENTO_BASE_URL_SETTING_KEY);
+  async getPagamentoConfig(): Promise<{ ttl_horas: number; base_url: string }> {
+    const ttl = await this.settings.getLocalValue(ISP_PAGAMENTO_TTL_SETTING_KEY);
+    const base = await this.settings.getLocalValue(ISP_PAGAMENTO_BASE_URL_SETTING_KEY);
     const n = typeof ttl === 'string' ? Number.parseInt(ttl, 10) : NaN;
     return {
       ttl_horas: Number.isFinite(n) && n > 0 ? n : ISP_PAGAMENTO_TTL_DEFAULT,
@@ -96,28 +96,27 @@ export class IspOsConfigService {
 
   /** Grava TTL (1..168h) e URL pública (http/https). Valores vazios = limpar. */
   async setPagamentoConfig(
-    organizationId: string,
     cfg: { ttl_horas?: number; base_url?: string },
   ): Promise<{ ttl_horas: number; base_url: string }> {
     if (cfg.ttl_horas !== undefined) {
       const n = Math.trunc(Number(cfg.ttl_horas));
       if (!Number.isFinite(n) || n <= 0 || n > 168) throw new BadRequestException('Validade inválida (1 a 168 horas).');
-      await this.settings.set(organizationId, ISP_PAGAMENTO_TTL_SETTING_KEY, String(n));
+      await this.settings.setLocal(ISP_PAGAMENTO_TTL_SETTING_KEY, String(n));
     }
     if (cfg.base_url !== undefined) {
       const url = String(cfg.base_url).trim();
       if (url && !/^https?:\/\//i.test(url)) throw new BadRequestException('A URL pública deve começar com http:// ou https://.');
-      await this.settings.set(organizationId, ISP_PAGAMENTO_BASE_URL_SETTING_KEY, url.replace(/\/$/, ''));
+      await this.settings.setLocal(ISP_PAGAMENTO_BASE_URL_SETTING_KEY, url.replace(/\/$/, ''));
     }
-    return this.getPagamentoConfig(organizationId);
+    return this.getPagamentoConfig();
   }
 
   /** Config do alerta de incidente à equipe de plantão. */
-  async getPlantaoConfig(organizationId: string): Promise<PlantaoConfig> {
-    const team = await this.settings.getValue(organizationId, ISP_PLANTAO_TEAM_SETTING_KEY);
-    const limiar = await this.settings.getValue(organizationId, ISP_PLANTAO_LIMIAR_SETTING_KEY);
-    const template = await this.settings.getValue(organizationId, ISP_PLANTAO_TEMPLATE_SETTING_KEY);
-    const cooldown = await this.settings.getValue(organizationId, ISP_PLANTAO_COOLDOWN_SETTING_KEY);
+  async getPlantaoConfig(): Promise<PlantaoConfig> {
+    const team = await this.settings.getLocalValue(ISP_PLANTAO_TEAM_SETTING_KEY);
+    const limiar = await this.settings.getLocalValue(ISP_PLANTAO_LIMIAR_SETTING_KEY);
+    const template = await this.settings.getLocalValue(ISP_PLANTAO_TEMPLATE_SETTING_KEY);
+    const cooldown = await this.settings.getLocalValue(ISP_PLANTAO_COOLDOWN_SETTING_KEY);
     const limiarN = typeof limiar === 'string' ? Number.parseInt(limiar, 10) : NaN;
     const cooldownN = typeof cooldown === 'string' ? Number.parseInt(cooldown, 10) : NaN;
     return {
@@ -130,41 +129,39 @@ export class IspOsConfigService {
 
   /** Grava a config do plantão. Valores vazios = limpar (equipe/template). */
   async setPlantaoConfig(
-    organizationId: string,
     cfg: { team_id?: string | null; limiar_pct?: number; template?: string | null; cooldown_min?: number },
   ): Promise<PlantaoConfig> {
     if (cfg.team_id !== undefined) {
-      await this.settings.set(organizationId, ISP_PLANTAO_TEAM_SETTING_KEY, cfg.team_id ?? '');
+      await this.settings.setLocal(ISP_PLANTAO_TEAM_SETTING_KEY, cfg.team_id ?? '');
     }
     if (cfg.limiar_pct !== undefined) {
       const n = Math.trunc(Number(cfg.limiar_pct));
       if (!Number.isFinite(n) || n < 1 || n > 100) throw new BadRequestException('Limiar inválido (1 a 100%).');
-      await this.settings.set(organizationId, ISP_PLANTAO_LIMIAR_SETTING_KEY, String(n));
+      await this.settings.setLocal(ISP_PLANTAO_LIMIAR_SETTING_KEY, String(n));
     }
     if (cfg.template !== undefined) {
-      await this.settings.set(organizationId, ISP_PLANTAO_TEMPLATE_SETTING_KEY, (cfg.template ?? '').trim());
+      await this.settings.setLocal(ISP_PLANTAO_TEMPLATE_SETTING_KEY, (cfg.template ?? '').trim());
     }
     if (cfg.cooldown_min !== undefined) {
       const n = Math.trunc(Number(cfg.cooldown_min));
       if (!Number.isFinite(n) || n < 0 || n > 1440) throw new BadRequestException('Cooldown inválido (0 a 1440 minutos).');
-      await this.settings.set(organizationId, ISP_PLANTAO_COOLDOWN_SETTING_KEY, String(n));
+      await this.settings.setLocal(ISP_PLANTAO_COOLDOWN_SETTING_KEY, String(n));
     }
-    return this.getPlantaoConfig(organizationId);
+    return this.getPlantaoConfig();
   }
 
-  private async resolveConnectionId(organizationId: string, connectionId?: string): Promise<string> {
+  private async resolveConnectionId(connectionId?: string): Promise<string> {
     if (connectionId) return connectionId;
-    const conn = await this.resolver.resolve({ organizationId });
+    const conn = await this.resolver.resolve({});
     return conn.id;
   }
 
   /** Lista setores e assuntos do ERP (via Descobrir recursos da conexão). */
   async discover(
-    organizationId: string,
     connectionId?: string,
   ): Promise<{ connection_id: string; setores: DiscoveredOption[]; assuntos: DiscoveredOption[] }> {
-    const connId = await this.resolveConnectionId(organizationId, connectionId);
-    const result = await this.connections.discover(organizationId, connId);
+    const connId = await this.resolveConnectionId(connectionId);
+    const result = await this.connections.discover(connId);
     const resources = result?.resources ?? [];
     const pick = (kind: string): DiscoveredOption[] =>
       resources.filter((r) => r.kind === kind).map((r) => ({ id: r.id, name: r.name }));
@@ -176,12 +173,12 @@ export class IspOsConfigService {
     };
   }
 
-  list(organizationId: string, connectionId: string) {
-    return this.repo.listByConnection(organizationId, connectionId);
+  list(connectionId: string) {
+    return this.repo.listByConnection(connectionId);
   }
 
   /** Salva o conjunto de pares. Garante NO MÁXIMO um padrão (o 1º marcado). */
-  async save(organizationId: string, connectionId: string, createdBy: string | null, pairs: OsConfigPair[]) {
+  async save(connectionId: string, createdBy: string | null, pairs: OsConfigPair[]) {
     if (!connectionId) throw new BadRequestException('Informe a conexão.');
     let defaultSeen = false;
     const normalized = pairs
@@ -191,11 +188,11 @@ export class IspOsConfigService {
         if (isDefault) defaultSeen = true;
         return { ...p, is_default: isDefault };
       });
-    return this.repo.replaceForConnection(organizationId, connectionId, createdBy, normalized);
+    return this.repo.replaceForConnection(connectionId, createdBy, normalized);
   }
 
   /** Par padrão de suporte (pra IA abrir a OS). Null = não configurado. */
-  defaultForSupport(organizationId: string, connectionId: string) {
-    return this.repo.defaultForConnection(organizationId, connectionId);
+  defaultForSupport(connectionId: string) {
+    return this.repo.defaultForConnection(connectionId);
   }
 }

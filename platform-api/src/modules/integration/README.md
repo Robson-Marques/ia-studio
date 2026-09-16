@@ -34,7 +34,7 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 
 ## connections/ (diretriz 52 + Connection Wizard)
 
-- `POST /connections` `{ provider_key, name, workspace_id, environment_id, config, secrets }` → valida escopo (tenant.util) → exige provider instalado → `LimitsService.assertCountWithin('connections')` → cria Secret (campos secretos do wizard **nunca** entram no `config`; defesa extra: `stripSecretFields` pelo `wizard_schema`) → Connection `PENDING_AUTH` → `connect()`+`health()` → `ACTIVE`/`ERROR`. Metering `UsageService.increment('connections')`.
+- `POST /connections` `{ provider_key, name, config, secrets }` → exige provider instalado → cria Secret (campos secretos do wizard **nunca** entram no `config`; defesa extra: `stripSecretFields` pelo `wizard_schema`) → Connection `PENDING_AUTH` → `connect()`+`health()` → `ACTIVE`/`ERROR`.
 - `PATCH /connections/:id` — nome/tags/prioridade. `PATCH /connections/:id/state` `{ action: enable|disable|maintenance }` — via `assertConnectionTransition` (`connection-state.machine.ts`). DISABLED/MAINTENANCE são estados "do usuário": health não os sobrepõe.
 - `POST /connections/:id/test` — health → atualiza `last_health_at/last_health_ok/status`.
 - `POST /connections/:id/execute` `{ operation, params }` — perm `integrations.connections.execute`; exige status ACTIVE; grava `IntegrationLog` (direção, operação, status, `duration_ms`, metas com redact, `trace_id`) — diretriz 55.

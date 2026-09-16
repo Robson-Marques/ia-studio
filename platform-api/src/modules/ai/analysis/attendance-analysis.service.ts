@@ -14,7 +14,6 @@ import {
 } from './attendance-analysis.helpers';
 import { AiOrchestratorService } from '../orchestrator/ai-orchestrator.service';
 import { LlmProviderService, ResolvedLlmConnection } from '../providers/llm-provider.service';
-import { CostsService } from '../costs/costs.service';
 
 const ANALYSIS_TEMPERATURE = 0.1;
 const ANALYSIS_MAX_TOKENS = 2_000;
@@ -38,15 +37,14 @@ export class AttendanceAnalysisService {
     private readonly repository: AttendanceAnalysisRepository,
     private readonly orchestrator: AiOrchestratorService,
     private readonly llm: LlmProviderService,
-    private readonly costs: CostsService,
   ) {}
 
-  list(organizationId: string, environmentId?: string) {
-    return this.repository.listAnalyses(organizationId, environmentId);
+  list() {
+    return this.repository.listAnalyses();
   }
 
-  async analyzeChat(organizationId: string, chatId: string, actor?: AnalysisActor) {
-    const chat = await this.repository.findChatForAnalysis(organizationId, chatId);
+  async analyzeChat(chatId: string, actor?: AnalysisActor) {
+    const chat = await this.repository.findChatForAnalysis(chatId);
     if (!chat) throw new NotFoundException('Conversa não encontrada.');
 
     // O transcript vem em ordem desc do banco; a análise trabalha em ordem
@@ -56,18 +54,9 @@ export class AttendanceAnalysisService {
       throw new BadRequestException('Escolha uma conversa com ao menos duas mensagens de texto para analisar.');
     }
 
-    // Gate de orçamento de IA (diretriz 17) antes de gastar tokens.
-    const blocked = await this.costs.isBlocked(organizationId, chat.workspace_id).catch(() => false);
-    if (blocked) {
-      throw new BadRequestException('Orçamento de IA excedido — análise bloqueada pela política ativa.');
-    }
-
-    // Resolve a conexão de IA da org (por prioridade); o modelo sai da conexão
+    // Resolve a conexão de IA local por prioridade; o modelo sai da conexão
     // ou do default por tipo. O 2º arg de resolve() é só dica de custo.
-    const resolved = await this.orchestrator.resolve(
-      { organizationId, workspaceId: chat.workspace_id, environmentId: chat.environment_id },
-      DEFAULT_MODEL_BY_KIND[AiProviderKind.OPENAI] as string,
-    );
+    const resolved = await this.orchestrator.resolve(DEFAULT_MODEL_BY_KIND[AiProviderKind.OPENAI] as string);
     const model = this.resolveAnalysisModel(resolved);
 
     const traceId = randomUUID();
@@ -84,26 +73,10 @@ export class AttendanceAnalysisService {
 
       const suggestions = parseLearningAnalysis(result.content);
       const created = await this.repository.createSuggestions({
-        organizationId,
-        workspaceId: chat.workspace_id,
-        environmentId: chat.environment_id,
         chatId: chat.id,
         traceId,
         createdBy: actor?.userId ?? null,
         suggestions,
-      });
-
-      // Custo agregado (nunca lança).
-      await this.costs.record({
-        organizationId,
-        workspaceId: chat.workspace_id,
-        environmentId: chat.environment_id,
-        providerKind: result.providerKind,
-        model,
-        promptTokens: result.usage.promptTokens,
-        completionTokens: result.usage.completionTokens,
-        costUsd: result.costUsd,
-        traceId,
       });
 
       return { trace_id: traceId, chat_id: chat.id, contact_name: chat.contact_name, suggestions: created };

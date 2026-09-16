@@ -16,7 +16,6 @@ export interface ApprovalContext {
 }
 
 export interface EvaluateParams {
-  organizationId: string;
   targetType: string;
   context: ApprovalContext;
 }
@@ -44,8 +43,8 @@ export class ApprovalPolicyService {
    * Sem politica ativa casando → { required:false, policy:null }.
    */
   async evaluate(params: EvaluateParams): Promise<EvaluateResult> {
-    const { organizationId, targetType, context } = params;
-    const policies = await this.repository.findActivePolicies(organizationId);
+    const { targetType, context } = params;
+    const policies = await this.repository.findActivePolicies();
 
     for (const policy of policies) {
       if (policy.target_type !== targetType) continue;

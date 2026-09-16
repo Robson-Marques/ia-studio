@@ -1,12 +1,10 @@
-// Flags globais e overrides: gestao pelo Console (@PlatformAdminOnly).
-// GET /flags/effective: qualquer usuario autenticado resolve as flags pro
-// proprio contexto (org do JWT + workspace do header x-workspace-id).
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/common';
+// Flags da instalação e overrides locais. GET /flags/effective resolve pelo
+// usuário e perfil autenticados, sem escopo recebido por header.
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { PlatformAdminOnly } from '../../../shared/auth/platform-admin.guard';
+import { InstallationAdminOnly } from '../../../shared/auth/permissions.decorator';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
-import { AuthenticatedUser, RequestWithUser } from '../../../shared/auth/auth.types';
-import { getWorkspaceIdHeader } from '../../../shared/auth/tenant.util';
+import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { FeatureFlagsService } from './feature-flags.service';
 import { CreateFlagDto } from './dto/create-flag.dto';
 import { UpdateFlagDto } from './dto/update-flag.dto';
@@ -20,47 +18,45 @@ export class FlagsController {
 
   // ─── Avaliacao pro ator logado ──────────────────────
   @Get('flags/effective')
-  effective(@CurrentUser() user: AuthenticatedUser, @Req() req: RequestWithUser) {
+  effective(@CurrentUser() user: AuthenticatedUser) {
     return this.flags.effectiveFor({
-      organizationId: user.organization_id,
-      workspaceId: getWorkspaceIdHeader(req) ?? null,
       userId: user.sub,
       profileId: user.profile_id,
     });
   }
 
   // ─── Console (globais) ──────────────────────────────
-  @PlatformAdminOnly()
+  @InstallationAdminOnly()
   @Get('console/flags')
   findAll() {
     return this.flags.findAll();
   }
 
-  @PlatformAdminOnly()
+  @InstallationAdminOnly()
   @Get('console/flags/:id')
   findById(@Param('id') id: string) {
     return this.flags.findById(id);
   }
 
-  @PlatformAdminOnly()
+  @InstallationAdminOnly()
   @Post('console/flags')
   create(@Body() dto: CreateFlagDto) {
     return this.flags.create(dto);
   }
 
-  @PlatformAdminOnly()
+  @InstallationAdminOnly()
   @Patch('console/flags/:id')
   update(@Param('id') id: string, @Body() dto: UpdateFlagDto) {
     return this.flags.update(id, dto);
   }
 
-  @PlatformAdminOnly()
+  @InstallationAdminOnly()
   @Post('console/flags/:id/overrides')
   addOverride(@Param('id') id: string, @Body() dto: CreateOverrideDto) {
     return this.flags.addOverride(id, dto);
   }
 
-  @PlatformAdminOnly()
+  @InstallationAdminOnly()
   @Delete('console/flags/:id/overrides/:overrideId')
   removeOverride(@Param('id') id: string, @Param('overrideId') overrideId: string) {
     return this.flags.removeOverride(id, overrideId);

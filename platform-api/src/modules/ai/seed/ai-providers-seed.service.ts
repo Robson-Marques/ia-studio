@@ -3,7 +3,7 @@
 //   2) cria (create-if-missing) os ProviderDefinition categoria AI que ainda
 //      nao existem (openai/anthropic ja vem da Fase 2; aqui: gemini, ollama,
 //      openrouter, groq, deepseek, mistral) com wizardSchema (api_key + base_url);
-//   3) semeia as tools builtin no catalogo (ai_tools) de cada organization.
+//   3) semeia as tools builtin no catálogo local (ai_tools).
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Prisma, ProviderCategory } from '@prisma/client';
 import { AiSeedRepository } from './ai-seed.repository';
@@ -74,46 +74,42 @@ export class AiProvidersSeedService implements OnApplicationBootstrap {
         this.logger.log(`ProviderDefinition AI semeado: ${seed.key}`);
       }
 
-      // 3) Tools builtin no catalogo de cada organization (idempotente).
-      const orgs = await this.repository.listOrganizationIds();
+      // 3) Tools builtin no catálogo local (idempotente).
       const builtin = this.toolRegistry.all();
-      for (const org of orgs) {
-        for (const def of builtin) {
-          const existing = await this.repository.findTool(org.id, def.key);
-          if (existing) {
-            // Tool builtin é definida NO CÓDIGO — o código é a fonte da verdade.
-            // Sincroniza os campos code-owned (inclui requires_approval): assim
-            // mudar o flag no registry PROPAGA pro catálogo (antes era
-            // create-if-missing e o valor antigo ficava preso no banco — foi o que
-            // deixou o abrir_os "aguardando aprovação" mesmo com o código em false).
-            // NÃO toca em is_active (o usuário pode ter desligado a tool). Aprovação
-            // é opt-in por Política, não pelo flag da tool builtin.
-            await this.repository.updateTool(org.id, def.key, {
-              name: def.name,
-              description: def.description,
-              category: def.category,
-              input_schema: (def.input_schema ?? {}) as Prisma.InputJsonValue,
-              builtin_handler: def.key,
-              requires_approval: def.requires_approval ?? false,
-              timeout_ms: def.timeout_ms ?? 20000,
-            });
-            continue;
-          }
-          await this.repository.createTool({
-            organization_id: org.id,
-            key: def.key,
+      for (const def of builtin) {
+        const existing = await this.repository.findTool(def.key);
+        if (existing) {
+          // Tool builtin é definida NO CÓDIGO — o código é a fonte da verdade.
+          // Sincroniza os campos code-owned (inclui requires_approval): assim
+          // mudar o flag no registry PROPAGA pro catálogo (antes era
+          // create-if-missing e o valor antigo ficava preso no banco — foi o que
+          // deixou o abrir_os "aguardando aprovação" mesmo com o código em false).
+          // NÃO toca em is_active (o usuário pode ter desligado a tool). Aprovação
+          // é opt-in por Política, não pelo flag da tool builtin.
+          await this.repository.updateTool(def.key, {
             name: def.name,
             description: def.description,
             category: def.category,
             input_schema: (def.input_schema ?? {}) as Prisma.InputJsonValue,
-            builtin: true,
             builtin_handler: def.key,
             requires_approval: def.requires_approval ?? false,
             timeout_ms: def.timeout_ms ?? 20000,
           });
+          continue;
         }
+        await this.repository.createTool({
+          key: def.key,
+          name: def.name,
+          description: def.description,
+          category: def.category,
+          input_schema: (def.input_schema ?? {}) as Prisma.InputJsonValue,
+          builtin: true,
+          builtin_handler: def.key,
+          requires_approval: def.requires_approval ?? false,
+          timeout_ms: def.timeout_ms ?? 20000,
+        } as Prisma.AiToolUncheckedCreateInput);
       }
-      this.logger.log(`Tools builtin semeadas em ${orgs.length} organização(ões).`);
+      this.logger.log(`Tools builtin semeadas na instância dedicada.`);
     } catch (e) {
       this.logger.error(`Seed de IA falhou: ${(e as Error).message}`);
     }

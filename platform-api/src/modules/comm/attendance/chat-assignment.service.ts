@@ -1,5 +1,5 @@
 // Coracao da Central de Atendimento (portado do Aquapark, adaptado ao
-// multi-tenant): claim / release / transfer / close / reopen / takeover.
+// instalação dedicada): claim / release / transfer / close / reopen / takeover.
 // Regras congeladas: lock otimista (a 1a persistencia vence, a 2a recebe 409);
 // owner nunca e humano; humano e sempre current_handler; transfer p/ usuario
 // preserva owner/team/queue e vai a IN_PROGRESS; release preserva owner/team/
@@ -30,11 +30,9 @@ export class ChatAssignmentService {
 
   // ─── Guards internos ────────────────────────────────
 
-  private async loadOr404(organizationId: string, chatId: string): Promise<WhatsappChat> {
+  private async loadLocalOr404(chatId: string): Promise<WhatsappChat> {
     const chat = await this.chats.findChatById(chatId);
-    if (!chat || chat.organization_id !== organizationId) {
-      throw new NotFoundException('Conversa não encontrada.');
-    }
+    if (!chat) throw new NotFoundException('Conversa não encontrada.');
     return chat;
   }
 
@@ -52,8 +50,8 @@ export class ChatAssignmentService {
 
   // ─── CLAIM ──────────────────────────────────────────
 
-  async claim(organizationId: string, chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
-    const chat = await this.loadOr404(organizationId, chatId);
+  async claim(chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
+    const chat = await this.loadLocalOr404(chatId);
     if (chat.attendance_status === CommChatStatus.CLOSED) {
       throw new ConflictException('Conversa encerrada. Reabra primeiro.');
     }
@@ -80,9 +78,8 @@ export class ChatAssignmentService {
       },
     );
     if (count === 0) throw new ConflictException('Conversa já foi assumida por outro atendente.');
-    const after = await this.loadOr404(organizationId, chatId);
+    const after = await this.loadLocalOr404(chatId);
     await this.events.record({
-      organizationId,
       chatId,
       eventType: 'CLAIMED',
       actorUserId: scope.userId,
@@ -96,7 +93,7 @@ export class ChatAssignmentService {
   // Chamado pelo fluxo quando a IA responde: a conversa passa a mostrar
   // "atendido pela IA" (current_handler_type=BOT). NÃO rouba de humano — se um
   // atendente está no comando (USER), a IA não assume. Best-effort: não lança.
-  async assignBot(organizationId: string, chatId: string, botId: string): Promise<void> {
+  async assignBot(chatId: string, botId: string): Promise<void> {
     const now = new Date();
     await this.chats
       .updateChatConditional(
@@ -134,17 +131,16 @@ export class ChatAssignmentService {
   // atendente da fila assumir. A mensagem de "aguarde" a própria IA envia na
   // resposta dela (não é envio de sistema — não fura o reply gate).
   async handoffToQueue(
-    organizationId: string,
     chatId: string,
     queueId: string,
     reason?: string,
   ): Promise<WhatsappChat> {
-    const chat = await this.loadOr404(organizationId, chatId);
+    const chat = await this.loadLocalOr404(chatId);
     if (chat.attendance_status === CommChatStatus.CLOSED) {
       throw new ConflictException('Conversa encerrada. Reabra primeiro.');
     }
     const queue = await this.repository.findQueueById(queueId);
-    if (!queue || queue.organization_id !== organizationId || !queue.is_active) {
+    if (!queue || !queue.is_active) {
       throw new ConflictException('Fila inexistente ou inativa.');
     }
     assertChatAttendanceTransition(chat.attendance_status, CommChatStatus.OPEN);
@@ -163,12 +159,11 @@ export class ChatAssignmentService {
       },
     );
     if (count === 0) throw new ConflictException(RACE_MESSAGE);
-    const after = await this.loadOr404(organizationId, chatId);
+    const after = await this.loadLocalOr404(chatId);
     await this.events.record({
-      organizationId,
       chatId,
       eventType: 'TRANSFERRED',
-      actorType: 'BOT',
+      actor_kind: 'BOT',
       reason: reason ?? null,
       before: snapshotChat(chat),
       after: snapshotChat(after),
@@ -179,8 +174,8 @@ export class ChatAssignmentService {
 
   // ─── RELEASE ────────────────────────────────────────
 
-  async release(organizationId: string, chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
-    const chat = await this.loadOr404(organizationId, chatId);
+  async release(chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
+    const chat = await this.loadLocalOr404(chatId);
     if (chat.attendance_status === CommChatStatus.CLOSED) {
       throw new ConflictException('Conversa encerrada. Reabra antes de qualquer alteração.');
     }
@@ -200,9 +195,8 @@ export class ChatAssignmentService {
       },
     );
     if (count === 0) throw new ConflictException(RACE_MESSAGE);
-    const after = await this.loadOr404(organizationId, chatId);
+    const after = await this.loadLocalOr404(chatId);
     await this.events.record({
-      organizationId,
       chatId,
       eventType: 'RELEASED',
       actorUserId: scope.userId,
@@ -215,13 +209,12 @@ export class ChatAssignmentService {
   // ─── TRANSFER ───────────────────────────────────────
 
   async transfer(
-    organizationId: string,
     chatId: string,
     scope: AttendanceScope,
     target: TransferTarget,
     reason?: string,
   ): Promise<WhatsappChat> {
-    const chat = await this.loadOr404(organizationId, chatId);
+    const chat = await this.loadLocalOr404(chatId);
     if (chat.attendance_status === CommChatStatus.CLOSED) {
       throw new ConflictException('Conversa encerrada. Reabra primeiro.');
     }
@@ -231,7 +224,7 @@ export class ChatAssignmentService {
     let noop = false;
     if (target.type === 'user') {
       const active = await this.repository.findUserActive(target.id);
-      if (!active || active.organization_id !== organizationId) {
+      if (!active) {
         throw new ConflictException('Usuário alvo inexistente ou inativo.');
       }
       noop = this.isHandler(chat, target.id);
@@ -245,7 +238,7 @@ export class ChatAssignmentService {
       };
     } else if (target.type === 'queue') {
       const queue = await this.repository.findQueueById(target.id);
-      if (!queue || queue.organization_id !== organizationId || !queue.is_active) {
+      if (!queue || !queue.is_active) {
         throw new ConflictException('Fila inexistente ou inativa.');
       }
       noop = chat.owner_type === 'QUEUE' && chat.owner_id === queue.id && !chat.current_handler_id;
@@ -262,7 +255,7 @@ export class ChatAssignmentService {
     } else {
       // team → sempre pela fila padrao da equipe.
       const team = await this.repository.findTeamById(target.id);
-      if (!team || team.organization_id !== organizationId || !team.is_active) {
+      if (!team || !team.is_active) {
         throw new ConflictException('Equipe inexistente ou inativa.');
       }
       if (!team.default_queue_id) {
@@ -292,9 +285,8 @@ export class ChatAssignmentService {
       data,
     );
     if (count === 0) throw new ConflictException(RACE_MESSAGE);
-    const after = await this.loadOr404(organizationId, chatId);
+    const after = await this.loadLocalOr404(chatId);
     await this.events.record({
-      organizationId,
       chatId,
       eventType: 'TRANSFERRED',
       actorUserId: scope.userId,
@@ -309,12 +301,11 @@ export class ChatAssignmentService {
   // ─── CLOSE ──────────────────────────────────────────
 
   async close(
-    organizationId: string,
     chatId: string,
     scope: AttendanceScope,
     reason?: string,
   ): Promise<WhatsappChat> {
-    const chat = await this.loadOr404(organizationId, chatId);
+    const chat = await this.loadLocalOr404(chatId);
     if (chat.attendance_status === CommChatStatus.CLOSED) return chat; // no-op idempotente
     if (!scope.can.close) throw new ForbiddenException('Sem permissão para encerrar conversas.');
     // Só barra quando um HUMANO está no comando. Encerrar uma conversa que a IA
@@ -340,9 +331,8 @@ export class ChatAssignmentService {
       },
     );
     if (count === 0) throw new ConflictException(RACE_MESSAGE);
-    const after = await this.loadOr404(organizationId, chatId);
+    const after = await this.loadLocalOr404(chatId);
     await this.events.record({
-      organizationId,
       chatId,
       eventType: 'CLOSED',
       actorUserId: scope.userId,
@@ -355,29 +345,28 @@ export class ChatAssignmentService {
 
   // ─── REOPEN ─────────────────────────────────────────
 
-  async reopen(organizationId: string, chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
-    const chat = await this.loadOr404(organizationId, chatId);
+  async reopen(chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
+    const chat = await this.loadLocalOr404(chatId);
     if (chat.attendance_status !== CommChatStatus.CLOSED) return chat; // no-op
     if (!scope.isSuper && !this.isSupervisorOf(scope, chat) && !this.isHandler(chat, scope.userId) && !scope.can.close) {
       throw new ForbiddenException('Sem permissão para reabrir esta conversa.');
     }
-    return this.reopenInternal(organizationId, chatId, chat, scope.userId, 'USER');
+    return this.reopenInternal(chatId, chat, scope.userId, 'USER');
   }
 
   /** Reabertura automatica por inbound (SYSTEM). Preserva handler existente. */
-  async reopenByInbound(organizationId: string, chatId: string): Promise<WhatsappChat | null> {
+  async reopenByInbound(chatId: string): Promise<WhatsappChat | null> {
     const chat = await this.chats.findChatById(chatId);
-    if (!chat || chat.organization_id !== organizationId) return null;
+    if (!chat) return null;
     if (chat.attendance_status !== CommChatStatus.CLOSED) return null;
-    return this.reopenInternal(organizationId, chatId, chat, null, 'SYSTEM');
+    return this.reopenInternal(chatId, chat, null, 'SYSTEM');
   }
 
   private async reopenInternal(
-    organizationId: string,
     chatId: string,
     chat: WhatsappChat,
     actorUserId: string | null,
-    actorType: 'USER' | 'SYSTEM',
+    actorKind: 'USER' | 'SYSTEM',
   ): Promise<WhatsappChat> {
     assertChatAttendanceTransition(CommChatStatus.CLOSED, CommChatStatus.OPEN);
     const count = await this.chats.updateChatConditional(
@@ -386,14 +375,13 @@ export class ChatAssignmentService {
       // SEMPRE OPEN; current_handler PRESERVADO.
       { attendance_status: CommChatStatus.OPEN, closed_at: null },
     );
-    if (count === 0) return this.loadOr404(organizationId, chatId); // alguem ja reabriu
-    const after = await this.loadOr404(organizationId, chatId);
+    if (count === 0) return this.loadLocalOr404(chatId); // alguem ja reabriu
+    const after = await this.loadLocalOr404(chatId);
     await this.events.record({
-      organizationId,
       chatId,
       eventType: 'REOPENED',
       actorUserId,
-      actorType,
+      actor_kind: actorKind,
       before: snapshotChat(chat),
       after: snapshotChat(after),
     });
@@ -404,8 +392,8 @@ export class ChatAssignmentService {
   // Chamado pelo reply gate quando um nao-handler (com reply.team/all) confirma
   // "assumir ao responder" numa conversa que JA tem handler humano diferente.
 
-  async takeover(organizationId: string, chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
-    const chat = await this.loadOr404(organizationId, chatId);
+  async takeover(chatId: string, scope: AttendanceScope): Promise<WhatsappChat> {
+    const chat = await this.loadLocalOr404(chatId);
     if (chat.attendance_status === CommChatStatus.CLOSED) {
       throw new ConflictException('Conversa encerrada. Reabra primeiro.');
     }
@@ -427,9 +415,8 @@ export class ChatAssignmentService {
       },
     );
     if (count === 0) throw new ConflictException(RACE_MESSAGE);
-    const after = await this.loadOr404(organizationId, chatId);
+    const after = await this.loadLocalOr404(chatId);
     await this.events.record({
-      organizationId,
       chatId,
       eventType: 'TAKEOVER',
       actorUserId: scope.userId,
@@ -439,4 +426,5 @@ export class ChatAssignmentService {
     });
     return after;
   }
+
 }

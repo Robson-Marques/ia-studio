@@ -8,7 +8,6 @@ import { ResourceRepository } from './resource.repository';
 import { ResourceMapperService, CanonicalRecord } from './resource-mapper.service';
 
 export interface ExploreArgs {
-  organizationId: string;
   connectionId: string;
   resourceType: string;
   /** Filtro de busca livre (repassado como parametro para a operacao). */
@@ -38,9 +37,8 @@ export class ResourceExplorerService {
   ) {}
 
   async explore(args: ExploreArgs): Promise<ExploreResult> {
-    const connection = await this.connections.findById(args.organizationId, args.connectionId);
+    const connection = await this.connections.findById(args.connectionId);
     const mapping = await this.repository.findActiveForResource(
-      args.organizationId,
       connection.provider_key,
       connection.id,
       args.resourceType,
@@ -56,12 +54,7 @@ export class ResourceExplorerService {
     const params: Record<string, unknown> = { ...(args.params ?? {}) };
     if (args.query) params['query'] = args.query;
 
-    const raw = await this.connections.execute(
-      args.organizationId,
-      connection.id,
-      mapping.source_operation,
-      params,
-    );
+    const raw = await this.connections.execute(connection.id, mapping.source_operation, params);
 
     const rows = this.extractRows(raw);
     const records = this.mapper.toCanonicalList(mapping, rows);

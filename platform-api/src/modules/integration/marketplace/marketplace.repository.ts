@@ -39,20 +39,18 @@ export class MarketplaceRepository {
     return this.prisma.providerDefinition.update({ where: { id }, data });
   }
 
-  // ─── ProviderInstall (por organization) ─────────────
-  findInstallsByOrg(organizationId: string) {
-    return this.prisma.providerInstall.findMany({ where: { organization_id: organizationId } });
+  // ─── ProviderInstall (da instância) ─────────────────
+  findInstalls() {
+    return this.prisma.providerInstall.findMany();
   }
 
-  findInstall(organizationId: string, providerKey: string) {
-    return this.prisma.providerInstall.findUnique({
-      where: { organization_id_provider_key: { organization_id: organizationId, provider_key: providerKey } },
-    });
+  findInstall(providerKey: string) {
+    return this.prisma.providerInstall.findFirst({ where: { provider_key: providerKey } });
   }
 
-  createInstall(organizationId: string, providerKey: string, installedBy: string | null) {
+  createInstall(providerKey: string, installedBy: string | null) {
     return this.prisma.providerInstall.create({
-      data: { organization_id: organizationId, provider_key: providerKey, installed_by: installedBy },
+      data: { provider_key: providerKey, installed_by: installedBy },
     });
   }
 
@@ -60,11 +58,10 @@ export class MarketplaceRepository {
     return this.prisma.providerInstall.delete({ where: { id } });
   }
 
-  /** Conexoes NAO desativadas do provider na org (bloqueia uninstall). */
-  countActiveConnections(organizationId: string, providerKey: string) {
+  /** Conexões não desativadas do provider local (bloqueia uninstall). */
+  countActiveConnections(providerKey: string) {
     return this.prisma.connection.count({
       where: {
-        organization_id: organizationId,
         provider_key: providerKey,
         status: { not: 'DISABLED' },
       },

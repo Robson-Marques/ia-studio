@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateDomainDto {
   /**
@@ -13,11 +13,6 @@ export class CreateDomainDto {
   @IsOptional()
   @IsString()
   label?: string;
-
-  /** Org dona do host. Ausente/null = host da PLATAFORMA (Console/API/painel base). */
-  @IsOptional()
-  @IsUUID()
-  organization_id?: string | null;
 
   /** Qual superficie o host serve. Default ADMIN (painel do cliente). */
   @IsOptional()

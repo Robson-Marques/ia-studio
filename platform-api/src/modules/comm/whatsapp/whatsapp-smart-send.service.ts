@@ -6,15 +6,12 @@
 //   - texto livre recusado com 131047 → backstop no template (a janela local
 //     estava desatualizada; o codigo da Meta e autoritativo).
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  WhatsappOrchestratorService,
-  OrchestratorScope,
-} from './whatsapp-orchestrator.service';
+import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
 import { MetaApiError, META_REENGAGEMENT_CODE } from '../../../shared/integration/meta-graph.client';
 import { SendCriteria, TemplateVariables } from '../../../shared/integration/whatsapp.types';
 import { normalizePhone } from './whatsapp.helpers';
 
-export interface SmartSendArgs extends OrchestratorScope {
+export interface SmartSendArgs {
   phone: string;
   criteria?: SendCriteria;
   /** Texto livre (usado DENTRO da janela de 24h). */
@@ -42,13 +39,7 @@ export class WhatsappSmartSendService {
     const phone = normalizePhone(args.phone);
     if (!phone) return { via: 'skipped' };
     const language = args.language ?? 'pt_BR';
-    const scope: OrchestratorScope = {
-      organizationId: args.organizationId,
-      workspaceId: args.workspaceId,
-      environmentId: args.environmentId,
-    };
-
-    const connection = await this.orchestrator.resolveConnection(scope, args.criteria);
+    const connection = await this.orchestrator.resolveConnection(args.criteria);
     const state = await this.orchestrator.windowState(connection.id, phone);
 
     // Fora da janela (sabido): direto ao template, sem tentar texto livre.
@@ -63,7 +54,7 @@ export class WhatsappSmartSendService {
     // Dentro da janela: texto livre.
     try {
       await this.orchestrator.send(
-        { ...scope, phone, criteria: { connectionId: connection.id }, sender: args.sender ?? 'system' },
+        { phone, criteria: { connectionId: connection.id }, sender: args.sender ?? 'system' },
         { kind: 'text', body: args.text },
       );
       return { via: 'text' };
@@ -86,9 +77,6 @@ export class WhatsappSmartSendService {
     try {
       await this.orchestrator.send(
         {
-          organizationId: args.organizationId,
-          workspaceId: args.workspaceId,
-          environmentId: args.environmentId,
           phone,
           criteria: args.criteria,
           sender: args.sender ?? 'system',

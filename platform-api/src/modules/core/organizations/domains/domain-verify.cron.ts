@@ -26,7 +26,7 @@ export class DomainVerifyCron {
   //
   // SEM o gate `processorsEnabled()` de proposito: aquele gate serve pros
   // processors de fila, que rodam no WORKER. Este cron vive no
-  // OrganizationsModule, que o `worker.module.ts` NAO importa — entao ele so
+  // InstallationDomainsModule, que o `worker.module.ts` NAO importa — então só
   // existe no processo da API. Com o gate, nao dispararia em lugar nenhum em
   // producao (`WORKER_INLINE=off`), e o toggle ligado nao faria nada.
   @Cron(CronExpression.EVERY_30_MINUTES)

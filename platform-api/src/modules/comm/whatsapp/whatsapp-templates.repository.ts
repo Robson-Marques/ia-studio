@@ -7,10 +7,9 @@ import { PrismaService } from '../../../shared/prisma/prisma.service';
 export class WhatsappTemplatesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(organizationId: string, connectionId?: string): Promise<WhatsappTemplate[]> {
+  list(connectionId?: string): Promise<WhatsappTemplate[]> {
     return this.prisma.whatsappTemplate.findMany({
       where: {
-        organization_id: organizationId,
         ...(connectionId ? { connection_id: connectionId } : {}),
       },
       orderBy: [{ name: 'asc' }, { language: 'asc' }],
@@ -41,9 +40,6 @@ export class WhatsappTemplatesRepository {
 
   /** Upsert usado pelo sync (Meta → IA Studio). */
   upsertFromMeta(input: {
-    organizationId: string;
-    workspaceId: string;
-    environmentId: string;
     connectionId: string;
     name: string;
     language: string;
@@ -63,9 +59,6 @@ export class WhatsappTemplatesRepository {
         },
       },
       create: {
-        organization_id: input.organizationId,
-        workspace_id: input.workspaceId,
-        environment_id: input.environmentId,
         connection_id: input.connectionId,
         name: input.name,
         language: input.language,

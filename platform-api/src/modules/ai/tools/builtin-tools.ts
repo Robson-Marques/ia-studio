@@ -83,7 +83,7 @@ export class BuiltinTools implements OnModuleInit {
         const baseId = typeof args['base_id'] === 'string' ? args['base_id'] : undefined;
         const baseIds = baseId ? [baseId] : (ctx.knowledgeBaseIds ?? []);
         if (baseIds.length === 0) return { chunks: [], detail: 'Nenhuma base de conhecimento habilitada.' };
-        const result = await this.knowledge.queryMulti(ctx.organizationId, baseIds, query, 5, {
+        const result = await this.knowledge.queryMulti(baseIds, query, 5, {
           traceId: ctx.traceId,
           agentId: ctx.agentId,
         });
@@ -161,7 +161,7 @@ export class BuiltinTools implements OnModuleInit {
         if (!chatId) return { detail: 'Sem uma conversa em contexto.' };
         const take = Math.min(Math.max(Number(args['limite']) || 30, 1), 100);
         const msgs: WhatsappMessage[] = await this.whatsappInbox
-          .listMessages(ctx.organizationId, chatId, take)
+          .listMessages(chatId, take)
           .catch(() => []);
         return {
           mensagens: msgs
@@ -216,7 +216,7 @@ export class BuiltinTools implements OnModuleInit {
         const chatId = ctx.scopeKeys?.['session'];
         if (!chatId) return { detail: 'Sem uma conversa em contexto.' };
         if (ctx.dryRun) return { detail: '[simulado] vincularia o cliente.' };
-        await this.whatsappInbox.linkCustomer(ctx.organizationId, chatId, {
+        await this.whatsappInbox.linkCustomer(chatId, {
           document: typeof args['documento'] === 'string' ? args['documento'] : null,
           name: typeof args['nome'] === 'string' ? args['nome'] : null,
           ref: typeof args['id_cliente'] === 'string' ? args['id_cliente'] : null,
@@ -277,7 +277,7 @@ export class BuiltinTools implements OnModuleInit {
         const connectionId = asString(args['connection_id'], 'connection_id');
         const operation = asString(args['operation'], 'operation');
         if (ctx.dryRun) return { simulated: true, operation };
-        return this.connections.execute(ctx.organizationId, connectionId, operation, args['params'] ?? {});
+        return this.connections.execute(connectionId, operation, args['params'] ?? {});
       },
     });
 
@@ -304,9 +304,6 @@ export class BuiltinTools implements OnModuleInit {
         if (ctx.dryRun) return { simulated: true, phone };
         const result = await this.whatsapp.send(
           {
-            organizationId: ctx.organizationId,
-            workspaceId: ctx.workspaceId ?? undefined,
-            environmentId: ctx.environmentId ?? undefined,
             phone,
             criteria: tag ? { tag } : undefined,
             sender: 'bot',
@@ -342,11 +339,6 @@ export class BuiltinTools implements OnModuleInit {
         if (ctx.dryRun) return { simulated: true, to };
         const isHtml = /</.test(body);
         const result = await this.email.send(
-          {
-            organizationId: ctx.organizationId,
-            workspaceId: ctx.workspaceId ?? undefined,
-            environmentId: ctx.environmentId ?? undefined,
-          },
           { to, subject, html: isHtml ? body : undefined, text: isHtml ? undefined : body },
           {
             tag: typeof args['tag'] === 'string' ? args['tag'] : undefined,
@@ -377,9 +369,6 @@ export class BuiltinTools implements OnModuleInit {
       handler: async (args, ctx) => {
         const body = asString(args['body'], 'body');
         const result = await this.notifications.notify({
-          organizationId: ctx.organizationId,
-          workspaceId: ctx.workspaceId ?? undefined,
-          environmentId: ctx.environmentId ?? undefined,
           recipient: {
             phone: typeof args['phone'] === 'string' ? args['phone'] : undefined,
             email: typeof args['email'] === 'string' ? args['email'] : undefined,
@@ -419,7 +408,7 @@ export class BuiltinTools implements OnModuleInit {
           this.logger.warn(`executar_sql: comando de escrita na conexão ${connectionId}.`);
         }
         if (ctx.dryRun) return { simulated: true, write: isWrite };
-        return this.connections.execute(ctx.organizationId, connectionId, 'sql.query', { sql, readonly: !isWrite });
+        return this.connections.execute(connectionId, 'sql.query', { sql, readonly: !isWrite });
       },
     });
 
@@ -447,9 +436,6 @@ export class BuiltinTools implements OnModuleInit {
           ? `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body>${content}</body></html>`
           : content;
         const file = await this.storage.save(Buffer.from(body, 'utf-8'), {
-          organizationId: ctx.organizationId,
-          workspaceId: ctx.workspaceId ?? undefined,
-          environmentId: ctx.environmentId ?? undefined,
           originalName: `${title}.${format}`,
           mime: format === 'html' ? 'text/html' : 'text/plain',
           folder: 'ai-documents',

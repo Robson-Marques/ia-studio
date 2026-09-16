@@ -23,7 +23,6 @@ export interface ApiKeyView {
 /** Contexto resolvido para a Public API (request.apiKey). */
 export interface ApiKeyContext {
   key_id: string;
-  organization_id: string;
   scopes: string[];
 }
 
@@ -50,8 +49,8 @@ export class DeveloperService {
     };
   }
 
-  async list(organizationId: string): Promise<ApiKeyView[]> {
-    const keys = await this.repo.findAllByOrg(organizationId);
+  async list(): Promise<ApiKeyView[]> {
+    const keys = await this.repo.findAll();
     return keys.map((k) => DeveloperService.toView(k));
   }
 
@@ -60,7 +59,6 @@ export class DeveloperService {
    * Formato: `ias_<prefix8>_<random32>`.
    */
   async create(
-    organizationId: string,
     dto: CreateApiKeyDto,
     createdBy: string | null,
   ): Promise<{ key: ApiKeyView; plaintext: string }> {
@@ -68,7 +66,6 @@ export class DeveloperService {
     const secret = randomBytes(24).toString('base64url'); // 32 chars
     const plaintext = `ias_${prefix}_${secret}`;
     const created = await this.repo.create({
-      organization_id: organizationId,
       name: dto.name.trim(),
       prefix,
       hashed_key: DeveloperService.hash(plaintext),
@@ -76,13 +73,13 @@ export class DeveloperService {
       expires_at: dto.expires_at ? new Date(dto.expires_at) : null,
       created_by: createdBy,
     });
-    this.logger.log(`Chave de API criada (org=${organizationId}, prefix=${prefix}).`);
+    this.logger.log(`Chave de API criada (prefix=${prefix}).`);
     return { key: DeveloperService.toView(created), plaintext };
   }
 
-  async revoke(organizationId: string, id: string): Promise<ApiKeyView> {
+  async revoke(id: string): Promise<ApiKeyView> {
     const key = await this.repo.findById(id);
-    if (!key || key.organization_id !== organizationId) {
+    if (!key) {
       throw new NotFoundException('Chave de API não encontrada.');
     }
     if (key.revoked_at) return DeveloperService.toView(key);
@@ -102,6 +99,6 @@ export class DeveloperService {
       throw new ForbiddenException('Chave de API expirada.');
     }
     void this.repo.touch(key.id);
-    return { key_id: key.id, organization_id: key.organization_id, scopes: key.scopes };
+    return { key_id: key.id, scopes: key.scopes };
   }
 }

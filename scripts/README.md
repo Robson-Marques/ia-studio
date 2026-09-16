@@ -1,8 +1,18 @@
-# scripts/ — Instalação, Atualização e Backup (Fase 8)
+# scripts/ — Operação legada e transição para instalação dedicada
 
 Scripts de operação de produção do IA Studio. Modelo consagrado no Aquapark.
 
-**Ambiente-alvo:** Debian 13, executando como **root** (nenhum script usa `sudo`
+> **Transição ativa:** `install.sh`, `uninstall.sh`, `upgrade.sh`, os processos
+> PM2 e os caminhos globais descritos abaixo pertencem à instalação SaaS
+> recuperada. Eles **não podem ser usados** para criar a primeira instância ISP
+> dedicada. O slice S4 da Capability
+> `ia-studio.capability.saas-to-dedicated-installation` os substituirá por
+> comandos parametrizados por identificador de instância, com banco, Redis,
+> storage, backup, processos e vhost exclusivos. Até lá, a fonte SaaS é somente
+> histórica/rollback e os scripts de `migration/` são os únicos instrumentos
+> autorizados para exportação controlada e verificação do corte.
+
+**Ambiente legado recuperado:** Debian 13, executando como **root** (nenhum script usa `sudo`
 para si — apenas `sudo -u postgres` para falar com o Postgres). Caminho fixo de
 produção: `/opt/iastudio`. Processos PM2: `iastudio-api` + `iastudio-worker`.
 
@@ -21,6 +31,8 @@ produção: `/opt/iastudio`. Processos PM2: `iastudio-api` + `iastudio-worker`.
 | `restore-full.sh <arquivo.tar.gz> [restore_id]` | Restauração completa (banco + storage + segredos). Roda via **`systemd-run`** (fora da árvore do PM2, evita treekill); `trap EXIT` garante o restart com `pm2 delete + start` para reler o `.env`. |
 | `restore-backup.sh <dump.sql[.gz]>` | Restaura **só o banco** (stop PM2 → restore → start). |
 | `ecosystem.config.js` | Definição PM2 dos apps `iastudio-api` e `iastudio-worker` (fork, cwd `/opt/iastudio/platform-api`, env de produção com `WORKER_INLINE=off`). |
+| `migration/export-isp-operational-data.sh` | Exporta conjuntos ISP aprovados da fonte SaaS para NDJSON, depois de backup completo. É somente leitura, exige organização de origem explícita e nunca exporta secrets ou SQL de restauração. |
+| `migration/verify-dedicated-cut.sh` | Gate transversal da Capability dedicada. Reporta ou falha enquanto schema, auth, ACL, API e eventos ainda tiverem contratos SaaS. |
 
 ## Fases do `upgrade.sh`
 

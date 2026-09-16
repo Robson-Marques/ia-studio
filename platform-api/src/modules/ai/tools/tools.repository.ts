@@ -7,22 +7,20 @@ import { PrismaService } from '../../../shared/prisma/prisma.service';
 export class ToolsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(organizationId: string, filters: { onlyActive?: boolean } = {}) {
-    const where: Prisma.AiToolWhereInput = { organization_id: organizationId };
+  findAll(filters: { onlyActive?: boolean } = {}) {
+    const where: Prisma.AiToolWhereInput = {};
     if (filters.onlyActive) where.is_active = true;
     return this.prisma.aiTool.findMany({ where, orderBy: { name: 'asc' } });
   }
 
-  findByKeys(organizationId: string, keys: string[]) {
+  findByKeys(keys: string[]) {
     return this.prisma.aiTool.findMany({
-      where: { organization_id: organizationId, key: { in: keys }, is_active: true },
+      where: { key: { in: keys }, is_active: true },
     });
   }
 
-  findByKey(organizationId: string, key: string) {
-    return this.prisma.aiTool.findUnique({
-      where: { organization_id_key: { organization_id: organizationId, key } },
-    });
+  findByKey(key: string) {
+    return this.prisma.aiTool.findFirst({ where: { key } });
   }
 
   findById(id: string) {
@@ -37,9 +35,9 @@ export class ToolsRepository {
     return this.prisma.aiTool.update({ where: { id }, data });
   }
 
-  upsertByKey(organizationId: string, key: string, data: Prisma.AiToolUncheckedCreateInput) {
+  upsertByKey(key: string, data: Prisma.AiToolUncheckedCreateInput) {
     return this.prisma.aiTool.upsert({
-      where: { organization_id_key: { organization_id: organizationId, key } },
+      where: { key },
       create: data,
       update: {},
     });

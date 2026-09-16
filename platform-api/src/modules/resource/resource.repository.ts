@@ -5,8 +5,6 @@ import { Prisma, ResourceMapping } from '@prisma/client';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 
 export interface MappingFilters {
-  workspaceId?: string;
-  environmentId?: string;
   providerKey?: string;
   connectionId?: string;
   resourceType?: string;
@@ -17,10 +15,8 @@ export interface MappingFilters {
 export class ResourceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(organizationId: string, filters: MappingFilters = {}): Promise<ResourceMapping[]> {
-    const where: Prisma.ResourceMappingWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
+  findAll(filters: MappingFilters = {}): Promise<ResourceMapping[]> {
+    const where: Prisma.ResourceMappingWhereInput = {};
     if (filters.providerKey) where.provider_key = filters.providerKey;
     if (filters.connectionId) where.connection_id = filters.connectionId;
     if (filters.resourceType) where.resource_type = filters.resourceType;
@@ -33,18 +29,16 @@ export class ResourceRepository {
   }
 
   /**
-   * Resolve o mapping ativo para (org, resource_type) preferindo a conexao
+   * Resolve o mapping ativo para o recurso local, preferindo a conexao
    * especifica; cai para o mapping do provider (connection_id null).
    */
   async findActiveForResource(
-    organizationId: string,
     providerKey: string,
     connectionId: string,
     resourceType: string,
   ): Promise<ResourceMapping | null> {
     const byConnection = await this.prisma.resourceMapping.findFirst({
       where: {
-        organization_id: organizationId,
         provider_key: providerKey,
         connection_id: connectionId,
         resource_type: resourceType,
@@ -55,7 +49,6 @@ export class ResourceRepository {
     if (byConnection) return byConnection;
     return this.prisma.resourceMapping.findFirst({
       where: {
-        organization_id: organizationId,
         provider_key: providerKey,
         // "" = mapeamento de nivel do provider (sem conexao especifica).
         connection_id: '',
@@ -76,17 +69,15 @@ export class ResourceRepository {
 
   /** Upsert idempotente pela chave natural (usado pelo seed dos exemplos). */
   upsertByNaturalKey(
-    organizationId: string,
     providerKey: string,
     connectionId: string | null,
     resourceType: string,
     sourceOperation: string,
-    data: Omit<Prisma.ResourceMappingUncheckedCreateInput, 'organization_id' | 'provider_key' | 'connection_id' | 'resource_type' | 'source_operation'>,
+    data: Omit<Prisma.ResourceMappingUncheckedCreateInput, 'provider_key' | 'connection_id' | 'resource_type' | 'source_operation'>,
   ): Promise<ResourceMapping> {
     return this.prisma.resourceMapping.upsert({
       where: {
-        organization_id_provider_key_connection_id_resource_type_source_operation: {
-          organization_id: organizationId,
+        provider_key_connection_id_resource_type_source_operation: {
           provider_key: providerKey,
           connection_id: connectionId ?? '',
           resource_type: resourceType,
@@ -94,7 +85,6 @@ export class ResourceRepository {
         },
       },
       create: {
-        organization_id: organizationId,
         provider_key: providerKey,
         connection_id: connectionId ?? '',
         resource_type: resourceType,

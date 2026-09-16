@@ -6,7 +6,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { TemplatesService, extractTemplateVariables } from './templates.service';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
@@ -20,27 +19,17 @@ export class TemplatesController {
   @Get()
   @RequirePermissions(PERMISSIONS.AUTOMATION_TEMPLATES_READ)
   findAll(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('workspace_id') workspaceId?: string,
-    @Query('environment_id') environmentId?: string,
     @Query('channel') channel?: TemplateChannel,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.templates.findAll(resolveOrganizationId(user, orgQuery), {
-      workspaceId,
-      environmentId,
-      channel,
-    });
+    return this.templates.findAll({ channel });
   }
 
   @Get(':id')
   @RequirePermissions(PERMISSIONS.AUTOMATION_TEMPLATES_READ)
   async findById(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    const template = await this.templates.findById(resolveOrganizationId(user, orgQuery), id);
+    const template = await this.templates.findById(id);
     return { ...template, variables: extractTemplateVariables(`${template.subject ?? ''} ${template.body}`) };
   }
 
@@ -49,41 +38,34 @@ export class TemplatesController {
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateTemplateDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.templates.create(resolveOrganizationId(user, orgQuery), dto, user.sub);
+    return this.templates.create(dto, user.sub);
   }
 
   @Patch(':id')
   @RequirePermissions(PERMISSIONS.AUTOMATION_TEMPLATES_WRITE)
   update(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateTemplateDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.templates.update(resolveOrganizationId(user, orgQuery), id, dto);
+    return this.templates.update(id, dto);
   }
 
   @Delete(':id')
   @RequirePermissions(PERMISSIONS.AUTOMATION_TEMPLATES_WRITE)
   remove(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.templates.remove(resolveOrganizationId(user, orgQuery), id);
+    return this.templates.remove(id);
   }
 
   /** Preview de render com dados de exemplo. */
   @Post(':id/render')
   @RequirePermissions(PERMISSIONS.AUTOMATION_TEMPLATES_READ)
   render(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() body: { data?: Record<string, unknown> },
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.templates.render(resolveOrganizationId(user, orgQuery), id, body?.data ?? {});
+    return this.templates.render(id, body?.data ?? {});
   }
 }

@@ -34,14 +34,14 @@ export class ResourceSuggestService {
     private readonly llm: LlmProviderService,
   ) {}
 
-  async suggest(organizationId: string, dto: SuggestMappingDto): Promise<SuggestResult> {
+  async suggest(dto: SuggestMappingDto): Promise<SuggestResult> {
     if (!findResourceType(dto.resource_type)) {
       throw new BadRequestException(`Tipo canônico desconhecido: "${dto.resource_type}".`);
     }
     const fields = allFieldsFor(dto.resource_type);
 
     // 1) Amostra via provider (read-only). Se a operacao falhar, tenta discover.
-    const sampleRecord = await this.collectSample(organizationId, dto);
+    const sampleRecord = await this.collectSample(dto);
     const flat = this.flatten(sampleRecord);
     const sampleKeys = Object.keys(flat);
 
@@ -53,7 +53,7 @@ export class ResourceSuggestService {
 
     // 2) Sugestao via IA (ou heuristico se nao houver conexao AI ativa).
     try {
-      const aiMap = await this.suggestViaAi(organizationId, dto, fields, flat);
+      const aiMap = await this.suggestViaAi(dto, fields, flat);
       return this.finish(dto, fields, sampleKeys, aiMap, 'ai');
     } catch (e) {
       this.logger.warn(`Sugestão via IA indisponível (${(e as Error).message}) — usando heurística local.`);
@@ -86,10 +86,9 @@ export class ResourceSuggestService {
     };
   }
 
-  private async collectSample(organizationId: string, dto: SuggestMappingDto): Promise<unknown> {
+  private async collectSample(dto: SuggestMappingDto): Promise<unknown> {
     try {
       const raw = await this.connections.execute(
-        organizationId,
         dto.connection_id,
         dto.source_operation,
         dto.sample_params ?? {},
@@ -101,7 +100,7 @@ export class ResourceSuggestService {
     }
     // Fallback: primeiro recurso do discover (schema discovery).
     const discovered = await this.connections
-      .execute(organizationId, dto.connection_id, dto.source_operation, dto.sample_params ?? {})
+      .execute(dto.connection_id, dto.source_operation, dto.sample_params ?? {})
       .catch(() => null);
     return this.firstRow(discovered) ?? {};
   }
@@ -144,12 +143,11 @@ export class ResourceSuggestService {
   }
 
   private async suggestViaAi(
-    organizationId: string,
     dto: SuggestMappingDto,
     fields: CanonicalField[],
     flat: Record<string, unknown>,
   ): Promise<Record<string, string>> {
-    const resolved = await this.orchestrator.resolve({ organizationId }, ResourceSuggestService.DEFAULT_MODEL);
+    const resolved = await this.orchestrator.resolve(ResourceSuggestService.DEFAULT_MODEL);
     const fieldsDesc = fields.map((f) => `- ${f.key} (${f.type})${f.label ? `: ${f.label}` : ''}`).join('\n');
     const sampleDesc = Object.entries(flat)
       .map(([k, v]) => `- ${k} = ${JSON.stringify(v)?.slice(0, 80)}`)

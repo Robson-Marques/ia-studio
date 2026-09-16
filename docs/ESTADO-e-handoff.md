@@ -6,7 +6,169 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-07-13.
+> Última atualização: 2026-09-14.
+
+## 🏗️ Conversão SaaS → instalação dedicada — Capability ativa
+
+O modelo aprovado é uma instância independente por cliente, não SaaS
+multi-tenant. O Architecture Recovery concluiu que a base é suficiente para esta
+frente e materializou:
+
+- Baseline: [`docs/architecture-baseline.md`](architecture-baseline.md).
+- Decisão: [`docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md`](rfcs/RFC-001-conversao-saas-instalacao-dedicada.md).
+- Capability Contract em estado **`in-progress`**:
+  [`docs/capabilities/saas-to-dedicated-installation.md`](capabilities/saas-to-dedicated-installation.md).
+- Manifesto do corte atômico de S1:
+  [`docs/capabilities/saas-to-dedicated-s1-cut-manifest.md`](capabilities/saas-to-dedicated-s1-cut-manifest.md).
+
+O primeiro slice técnico é **S1 — núcleo dedicado**: schema, auth, ACL, API e
+eventos deixam de depender de organização/workspace/ambiente. A decisão foi
+tomada: a instância ISP nasce em banco limpo, a fonte SaaS é preservada e somente
+dados operacionais aprovados seguem por exportação NDJSON seletiva e auditável
+(sem secrets e sem SQL de restauração); ver
+`docs/migrations/isp-dedicated-operational-data-export.md`. A vertical ISP/IXC é
+Capability posterior, dependente desta conversão; Delivery System é outro projeto
+e não entra nesta frente.
+
+O gate transversal `scripts/migration/verify-dedicated-cut.sh --check` ainda
+falha na baseline recuperada (schema 209 referências; auth 68; ACL 53; API 1.254;
+eventos 735). Isto impede a conclusão de S1 e da Capability; a próxima alteração
+de código deve substituir essas cinco superfícies no mesmo conjunto coeso, sem
+compatibilidade de tenant ou correções avulsas.
+
+Atualização de 2026-09-15 (gate estrutural de S1): o corte transversal passou
+com `schema 0`, `auth 0`, `ACL 0`, `API 0` e `eventos 0` referências bloqueantes
+contra a baseline de 2.319; `git diff --check` também passou. Schema, JWT,
+ACL, API e Event Bus não carregam tenant, billing/licensing e os modelos
+Organization/Workspace/Environment foram retirados do alvo. O administrador da
+instalação é agora um usuário local com perfil ACL completo, sem bypass de
+plataforma. S1 e a Capability continuam **`in-progress`**: ainda faltam a prova
+em PostgreSQL da base limpa, exportação/importação seletiva auditável, painel
+dedicado e isolamento operacional de instâncias dos slices seguintes.
+
+Atualização de 2026-09-15: o lote de IA consolidou knowledge/RAG, memória,
+colaboração, revisão de conteúdo, análise de atendimento, tools/seed e MCP como
+portas locais. O módulo de custos/orçamentos e seus consumidores foi removido
+por constituir metering comercial. Depois de desacoplar todos os consumidores
+diretos, os campos/índices desses fluxos foram retirados do schema; não houve
+fallback, UUID sentinela, `undefined` artificial ou reclassificação de
+referência ativa. Gate atual: `schema 164 ativos`; `auth 0 ativos + 12
+temporários bloqueantes`; `ACL 0 ativos + 12 temporários bloqueantes`; `API 372
+ativos`; `eventos 70 ativos`; `S1 72,8%` (630/2.319 bloqueantes restantes).
+S1 e a Capability seguem **`in-progress`**. O próximo corte é identidade
+administrativa local (usuários, perfis, convites e relações de
+workspace/organização), pois é o consumidor real dos 12 adaptadores temporários
+de Auth e ACL.
+
+Atualização de 2026-09-15 (lote administrativo local): Settings, Resource
+Mapping/Explorer/Suggest, API Keys, Developer Tools, OAuth Google e as portas
+administrativas de WhatsApp passaram a usar contratos locais. Sessões Baileys,
+estado de sync, vínculo canal→agente e IntegrationLog tiveram seus campos
+físicos de tenant removidos após a limpeza dos consumidores diretos. O
+`tenant.util` foi removido, sem fallback de header/UUID. Flags, auditoria e
+dashboards são locais; a API de conta/licença e a gestão de usuários por
+organização foram retiradas. Gate: `schema 137 ativos`; `auth 0 ativos + 4
+temporários bloqueantes`; `ACL 0 ativos + 4 temporários bloqueantes`; `API 126
+ativos`; `eventos 20 ativos`; `S1 87,5%` (291/2.319). O próximo bloco é retirar
+organização/licenciamento/billing e substituir o último guard administrativo
+SaaS por autorização local, antes da limpeza física restante. S1 e Capability
+seguem **`in-progress`**.
+
+O corte de identidade foi concluído no código de origem: usuários, perfis,
+convites, ACL local e auditoria agora trabalham sem organização/workspace;
+memberships e a API/módulo de workspaces foram removidos junto com a relação
+física `WorkspaceMember`. Gate: `schema 161 ativos`; `auth 0 ativos + 12
+temporários bloqueantes`; `ACL 0 ativos + 12 temporários bloqueantes`; `API 275
+ativos`; `eventos 70 ativos`; `S1 77,1%` (530/2.319). Os adaptadores continuam
+porque ainda são chamados por consumidores reais externos a essa cadeia (core
+SaaS remanescente, recursos, settings, WhatsApp e Developer Tools); não foram
+removidos prematuramente nem convertidos em fallback. S1 e Capability seguem
+**`in-progress`**.
+
+O bloco Auth/ACL/API de borda foi iniciado: o login/JWT/ACL agora seguem o
+contrato local e headers/resolvedores SaaS falham explicitamente. O gate separa
+resíduos ativos dos adaptadores temporários bloqueantes. Última leitura: schema
+209 ativos; auth 0 ativos + 12 temporários; ACL 0 ativos + 12 temporários; API
+1.204 ativos; eventos 701 ativos. O Event Bus, log persistido, producers,
+consumer direto e worker já não carregam tenant no envelope. S1 continua
+`in-progress`; falta propagar o corte para schema, repositories, serviços, DTOs
+e módulos SaaS antes de qualquer aceite.
+
+A cadeia dispatcher → workflow → execução foi iniciada antes do schema: APIs,
+DTOs, services, repositories e motor não recebem escopo e não usam
+Limits/Usage. `ConnectionsService.execute`, renderização de templates,
+orquestradores de e-mail/WhatsApp e Notification Center agora expõem contratos
+locais, e os nós os consomem sem escopo. Worker de notificação, scheduler,
+conexões, marketplace, cofre de segredos e logs de integração também passaram a
+operar localmente. As demais chamadas/modelos SaaS seguem ativas e bloqueantes
+até sua remoção real; schema permanece intacto nesta etapa. Última leitura:
+schema 205 ativos; auth 0 ativos + 12 temporários; ACL 0 ativos + 12
+temporários; API 942 ativos; eventos 531 ativos. S1 continua
+`in-progress`.
+
+O sub-slice WhatsApp eliminou tenant dos templates HSM (CRUD, replicação e sync
+Meta), webhook inbound, repositório de chats, inbox HTTP e consumidores diretos
+de IA/ISP. O gate agora registra schema 205 ativos; auth 0 ativos + 12
+temporários; ACL 0 ativos + 12 temporários; API 753 ativos; eventos 434 ativos.
+A atribuição completa de atendimento segue como dependência ativa e não foi
+classificada como temporária. S1 e a Capability seguem `in-progress`.
+
+O sub-slice seguinte consolidou a cadeia de atendimento: claim, release,
+transfer, close, reopen, takeover, timeline, equipes, filas, membros e o
+encaminhamento ISP usam contratos locais e persistência sem tenant. O CRUD de
+agentes (incluindo versões, importação/exportação e execução HTTP) também foi
+reduzido a uma instância dedicada e retirou limites/licensing/metering. Gate
+atual: `schema: 205 ativas`, `API: 638 ativas`, `eventos: 319 ativas`; Auth e
+ACL têm 12 adaptadores temporários bloqueantes cada. O runner de agentes e suas
+portas de provider, ferramentas, RAG e colaboração ainda são dependências
+ativas reais. S1 e a Capability seguem `in-progress`.
+
+O mesmo fluxo avançou por catálogo de tools do agente, consulta RAG e
+colaboração: essas portas agora usam apenas IDs locais de ferramenta, base,
+agente, run e correlação. O gate registra `schema: 205 ativas`, `API: 620
+ativas`, `eventos: 303 ativas`; Auth/ACL têm 12 temporárias bloqueantes cada.
+`ToolExecutionContext`, runtime de tools, aprovações, logs e persistência de
+runs seguem bloqueantes reais e serão removidos antes do schema. S1 e a
+Capability seguem `in-progress`.
+
+O runner agora persiste e retoma runs por agente, execução, correlação e
+contexto conversacional locais; budget, metering e licensing saíram desse
+caminho. Gate: `schema: 205 ativas`, `API: 610 ativas`, `eventos: 293 ativas`;
+Auth/ACL seguem com 12 temporárias bloqueantes cada. `ToolExecutionContext`,
+runtime, logs e aprovações são o concentrador ativo restante desse fluxo. S1 e
+a Capability seguem `in-progress`.
+
+Storage (gravação, listagem e download) passou a ser uma porta local, sem
+metering, e os handlers de histórico, diagnóstico ISP e configuração de fila
+usam contratos locais. O gerador de link de pagamento ISP ainda persiste escopo
+e permanece bloqueante para a reconstrução aprovada. Gate: `schema: 205
+ativas`, `API: 597 ativas`, `eventos: 292 ativas`; Auth/ACL têm 12 temporárias
+bloqueantes cada. S1 e a Capability seguem `in-progress`.
+
+O corte de execução aprovada está local: storage, links de pagamento ISP,
+handlers, `ToolExecutionContext`, runtime, logs, aprovações e reconstrução após
+decisão preservam somente IDs operacionais de agente, run, execução,
+correlação, memória e conversa. Não há tenant reconstituído nesse caminho.
+Administração de políticas/aprovações ainda é consumidora ativa, portanto o
+schema continua preservado. Gate: `schema: 205 ativas`, `API: 587 ativas`,
+`eventos: 285 ativas`; Auth/ACL mantêm 12 temporárias bloqueantes cada. S1 e a
+Capability seguem `in-progress`.
+
+Dentro desse mesmo fluxo, provider e orquestrador de conexão de IA agora são
+portas locais; embeddings, Console de Desenvolvedor, sugestão de recursos,
+análise de atendimento e revisão de conteúdo já as consomem sem escopo SaaS.
+Gate atual: `schema: 205 ativas`, `API: 626 ativas`, `eventos: 309 ativas`;
+Auth/ACL continuam com 12 adaptadores temporários bloqueantes cada. Tools, RAG,
+colaboração, aprovações e a persistência do runner continuam dependências
+ativas reais. S1 e a Capability seguem `in-progress`.
+
+O sub-slice ISP de incidentes consolidou contratos locais para incidentes,
+targets, dispatches, plantão, resolvedor de ERP, configuração operacional,
+cron de outage e tools correlatas. O gate agora registra schema 205 ativos;
+auth 0 ativos + 12 temporários; ACL 0 ativos + 12 temporários; API 850 ativos;
+eventos 531 ativos. Templates e inbound/inbox de WhatsApp são o próximo bloco
+ativo; não foram classificados como temporários. S1 e a Capability seguem
+`in-progress`.
 
 ## 🔴 REGRA DE OURO (o furo recorrente)
 

@@ -112,7 +112,6 @@ export class WhatsappWebhookController {
         if (!route.valid) {
           this.logger.warn(`[Webhook POST] HMAC INVÁLIDO pra phone_number_id=${pnId} — evento rejeitado.`);
           await this.integrationLogs.record({
-            organizationId: route.connection.organization_id,
             connectionId: route.connection.id,
             direction: IntegrationDirection.INBOUND,
             operation: 'webhook',

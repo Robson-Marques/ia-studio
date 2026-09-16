@@ -22,14 +22,6 @@ export class CreateApprovalPolicyDto {
   @IsString()
   description?: string;
 
-  @IsOptional()
-  @IsString()
-  workspace_id?: string;
-
-  @IsOptional()
-  @IsString()
-  environment_id?: string;
-
   @IsString()
   @IsIn(APPROVAL_TARGET_TYPES)
   target_type!: string;

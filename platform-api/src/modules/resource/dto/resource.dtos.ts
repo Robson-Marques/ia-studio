@@ -28,9 +28,6 @@ export class CreateMappingDto {
   /** Nasce OFF por padrao (diretriz de automatismos). */
   @IsOptional() @IsBoolean() is_active?: boolean;
 
-  @IsOptional() @IsString() workspace_id?: string;
-
-  @IsOptional() @IsString() environment_id?: string;
 }
 
 export class UpdateMappingDto {

@@ -1,13 +1,12 @@
 // Acoes de atendimento por conversa: claim/release/transfer/close/reopen +
 // timeline (trilha). Toda acao passa pelo escopo do ator + lock otimista
 // (2o concorrente recebe 409) + @Auditable.
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { Auditable } from '../../../shared/audit/auditable.decorator';
 import { ChatAssignmentService, TransferTarget } from './chat-assignment.service';
 import { ChatScopeResolver } from './chat-scope.resolver';
@@ -37,10 +36,9 @@ export class AttendanceController {
   async claim(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     const scope = await this.scopeResolver.resolve(user);
-    return this.assignment.claim(resolveOrganizationId(user, orgQuery), id, scope);
+    return this.assignment.claim(id, scope);
   }
 
   @Post(':id/release')
@@ -49,10 +47,9 @@ export class AttendanceController {
   async release(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     const scope = await this.scopeResolver.resolve(user);
-    return this.assignment.release(resolveOrganizationId(user, orgQuery), id, scope);
+    return this.assignment.release(id, scope);
   }
 
   @Post(':id/transfer')
@@ -62,11 +59,10 @@ export class AttendanceController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: TransferChatDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
     const scope = await this.scopeResolver.resolve(user);
     const target: TransferTarget = { type: dto.type, id: dto.id } as TransferTarget;
-    return this.assignment.transfer(resolveOrganizationId(user, orgQuery), id, scope, target, dto.reason);
+    return this.assignment.transfer(id, scope, target, dto.reason);
   }
 
   @Post(':id/close')
@@ -76,10 +72,9 @@ export class AttendanceController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: CloseChatDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
     const scope = await this.scopeResolver.resolve(user);
-    return this.assignment.close(resolveOrganizationId(user, orgQuery), id, scope, dto.reason);
+    return this.assignment.close(id, scope, dto.reason);
   }
 
   @Post(':id/reopen')
@@ -88,10 +83,9 @@ export class AttendanceController {
   async reopen(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     const scope = await this.scopeResolver.resolve(user);
-    return this.assignment.reopen(resolveOrganizationId(user, orgQuery), id, scope);
+    return this.assignment.reopen(id, scope);
   }
 
   /** Trilha de atendimento (TimelineModal). */
@@ -100,8 +94,7 @@ export class AttendanceController {
   timeline(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.events.timeline(resolveOrganizationId(user, orgQuery), id);
+    return this.events.timeline(id);
   }
 }

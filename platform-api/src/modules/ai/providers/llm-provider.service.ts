@@ -40,7 +40,6 @@ export interface ResolvedLlmConnection {
 }
 
 export interface ChatViaConnectionArgs {
-  organizationId: string;
   connectionId: string;
   model: string;
   messages: LlmMessage[];
@@ -73,9 +72,9 @@ export class LlmProviderService {
     return kind;
   }
 
-  /** Resolve uma Connection AI: valida ownership/estado + le base_url/api_key. */
-  async resolveConnection(organizationId: string, connectionId: string): Promise<ResolvedLlmConnection> {
-    const connection = await this.connections.findById(organizationId, connectionId);
+  /** Resolve uma Connection AI local: le estado, base_url e api_key. */
+  async resolveConnection(connectionId: string): Promise<ResolvedLlmConnection> {
+    const connection = await this.connections.findById(connectionId);
     const kind = this.kindForProviderKey(connection.provider_key);
     const config = (connection.config ?? {}) as Record<string, unknown>;
     const accessor = this.secrets.accessorFor(connection.secret_id);
@@ -88,7 +87,7 @@ export class LlmProviderService {
 
   /** Chat via connection resolvida: delega ao provider e calcula custo. */
   async chatViaConnection(args: ChatViaConnectionArgs): Promise<ChatResultWithCost> {
-    const resolved = await this.resolveConnection(args.organizationId, args.connectionId);
+    const resolved = await this.resolveConnection(args.connectionId);
     return this.chat(resolved, {
       model: args.model,
       messages: args.messages,
@@ -120,12 +119,11 @@ export class LlmProviderService {
 
   /** Embeddings via connection resolvida (provider deve suportar embed). */
   async embedViaConnection(
-    organizationId: string,
     connectionId: string,
     model: string,
     input: string[],
   ): Promise<{ result: LlmEmbedResult; providerKind: AiProviderKind }> {
-    const resolved = await this.resolveConnection(organizationId, connectionId);
+    const resolved = await this.resolveConnection(connectionId);
     const provider = this.registry.get(resolved.kind);
     if (!provider.embed) {
       throw new BadRequestException(`Provedor "${resolved.kind}" não gera embeddings — use OpenAI/Gemini/Ollama.`);

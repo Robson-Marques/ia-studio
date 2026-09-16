@@ -1,19 +1,16 @@
 // Console — registro de dominios/subdominios da instalacao (fase 1).
-// Super-only (@PlatformAdminOnly, diretriz 41): quem define por qual endereco a
-// plataforma e cada cliente atendem e o operador do SaaS. Quando a gestao for
-// aberta ao admin da propria org (fase futura), entra perm no catalogo + guard
-// por organizacao — nao se afrouxa este controller.
+// Apenas o administrador local define os endereços da própria instalação.
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { DomainScope, DomainStatus } from '@prisma/client';
-import { PlatformAdminOnly } from '../../../../shared/auth/platform-admin.guard';
+import { DomainStatus } from '@prisma/client';
+import { InstallationAdminOnly } from '../../../../shared/auth/permissions.decorator';
 import { CurrentUserId } from '../../../../shared/auth/current-user.decorator';
 import { PlatformDomainsService } from './platform-domains.service';
 import { CreateDomainDto, SetAutoVerifyDto, SetBaseDomainDto, UpdateDomainDto } from './dto/platform-domains.dtos';
 
 @ApiTags('Console — Domínios')
 @ApiBearerAuth()
-@PlatformAdminOnly()
+@InstallationAdminOnly()
 @Controller('console/domains')
 export class PlatformDomainsController {
   constructor(private readonly domains: PlatformDomainsService) {}
@@ -31,16 +28,12 @@ export class PlatformDomainsController {
     return this.domains.setBaseDomain(dto.base_domain);
   }
 
-  /** Lista os hosts. `organization_id=null` filtra os da plataforma. */
+  /** Lista os hosts da instalação. */
   @Get()
   list(
-    @Query('organization_id') organizationId?: string,
-    @Query('scope') scope?: string,
     @Query('status') status?: string,
   ) {
     return this.domains.list({
-      organizationId: organizationId === 'null' ? null : organizationId || undefined,
-      scope: (scope as DomainScope) || undefined,
       status: (status as DomainStatus) || undefined,
     });
   }

@@ -10,10 +10,8 @@ export class IspRepository {
 
   // ─── Incidentes ─────────────────────────────────────
 
-  findAll(organizationId: string, filters: { workspaceId?: string; environmentId?: string; status?: IspIncidentStatus } = {}) {
-    const where: Prisma.IspIncidentWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
+  findAll(filters: { status?: IspIncidentStatus } = {}) {
+    const where: Prisma.IspIncidentWhereInput = {};
     if (filters.status) where.status = filters.status;
     return this.prisma.ispIncident.findMany({
       where,
@@ -33,10 +31,10 @@ export class IspRepository {
     });
   }
 
-  /** Incidentes ACTIVE de uma org (consulta reativa das tools). */
-  findActive(organizationId: string) {
+  /** Incidentes ACTIVE da instância (consulta reativa das tools). */
+  findActive() {
     return this.prisma.ispIncident.findMany({
-      where: { organization_id: organizationId, status: IspIncidentStatus.ACTIVE },
+      where: { status: IspIncidentStatus.ACTIVE },
       include: { targets: true },
     });
   }
@@ -74,7 +72,6 @@ export class IspRepository {
   /** Substitui os targets de origem SCOPE por uma nova resolucao (mantem MANUAL). */
   async replaceScopeTargets(
     incidentId: string,
-    organizationId: string,
     rows: { customer_ref: string; name?: string; phone?: string; last_status?: string }[],
   ) {
     await this.prisma.$transaction(async (tx) => {
@@ -82,7 +79,6 @@ export class IspRepository {
       if (rows.length === 0) return;
       await tx.ispIncidentTarget.createMany({
         data: rows.map((r) => ({
-          organization_id: organizationId,
           incident_id: incidentId,
           customer_ref: r.customer_ref,
           name: r.name ?? null,
@@ -98,13 +94,11 @@ export class IspRepository {
 
   upsertManualTarget(
     incidentId: string,
-    organizationId: string,
     data: { customer_ref: string; name?: string; phone?: string },
   ) {
     return this.prisma.ispIncidentTarget.upsert({
       where: { incident_id_customer_ref: { incident_id: incidentId, customer_ref: data.customer_ref } },
       create: {
-        organization_id: organizationId,
         incident_id: incidentId,
         customer_ref: data.customer_ref,
         name: data.name ?? null,
@@ -144,10 +138,9 @@ export class IspRepository {
    * de dedup: um escopo tem um rascunho aberto (o 2o cliente da regiao nao cria
    * outro). Match deterministico pelo hash do escopo normalizado.
    */
-  findOpenByScopeHash(organizationId: string, connectionId: string, scopeHash: string) {
+  findOpenByScopeHash(connectionId: string, scopeHash: string) {
     return this.prisma.ispIncident.findFirst({
       where: {
-        organization_id: organizationId,
         connection_id: connectionId,
         scope_hash: scopeHash,
         status: { in: [IspIncidentStatus.DRAFT, IspIncidentStatus.ACTIVE] },
@@ -169,11 +162,10 @@ export class IspRepository {
    * tem relation com User no schema) — resolve os user_ids, depois os usuarios.
    */
   async findPlantaoRecipients(
-    organizationId: string,
     teamId: string,
   ): Promise<{ user_id: string; name: string; phone: string }[]> {
     const members = await this.prisma.attendanceTeamMember.findMany({
-      where: { organization_id: organizationId, team_id: teamId, receive_incident_alerts: true },
+      where: { team_id: teamId, receive_incident_alerts: true },
       select: { user_id: true },
     });
     const ids = members.map((m) => m.user_id);

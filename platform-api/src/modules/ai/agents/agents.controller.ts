@@ -1,12 +1,11 @@
 // Agentes de IA — CRUD + versoes (draft/publish/rollback) + testar (execute) +
 // export/import. Sem DELETE (agente e inativado, nunca excluido).
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { AgentsService } from './agents.service';
 import { AgentRunnerService } from './agent-runner.service';
 import {
@@ -29,43 +28,32 @@ export class AgentsController {
 
   @Get()
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
-  findAll(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('workspace_id') workspaceId?: string,
-    @Query('environment_id') environmentId?: string,
-    @Query('organization_id') orgQuery?: string,
-  ) {
-    return this.agents.findAll(resolveOrganizationId(user, orgQuery), { workspaceId, environmentId });
+  findAll() {
+    return this.agents.findAll();
   }
 
   @Get(':id')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
   findById(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.findDetail(resolveOrganizationId(user, orgQuery), id);
+    return this.agents.findDetail(id);
   }
 
   @Get(':id/versions')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
   listVersions(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.listVersions(resolveOrganizationId(user, orgQuery), id);
+    return this.agents.listVersions(id);
   }
 
   @Get(':id/runs')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
   listRuns(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.listRuns(resolveOrganizationId(user, orgQuery), id);
+    return this.agents.listRuns(id);
   }
 
   @Post()
@@ -73,9 +61,8 @@ export class AgentsController {
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateAgentDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.create(resolveOrganizationId(user, orgQuery), dto, user.sub, user);
+    return this.agents.create(dto, user.sub, user);
   }
 
   @Patch(':id')
@@ -84,9 +71,8 @@ export class AgentsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateAgentDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.update(resolveOrganizationId(user, orgQuery), id, dto, user);
+    return this.agents.update(id, dto, user);
   }
 
   @Post(':id/versions')
@@ -95,9 +81,8 @@ export class AgentsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: SaveAgentVersionDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.saveVersion(resolveOrganizationId(user, orgQuery), id, dto, user.sub);
+    return this.agents.saveVersion(id, dto, user.sub);
   }
 
   @Post(':id/publish')
@@ -106,9 +91,8 @@ export class AgentsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: PublishAgentDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.publish(resolveOrganizationId(user, orgQuery), id, dto.version, user.sub);
+    return this.agents.publish(id, dto.version, user.sub);
   }
 
   @Post(':id/execute')
@@ -117,10 +101,8 @@ export class AgentsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: ExecuteAgentDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    // Garante ownership (404 se de outra org) antes de rodar.
-    return this.agents.findById(resolveOrganizationId(user, orgQuery), id).then(() =>
+    return this.agents.findById(id).then(() =>
       this.runner.run({
         agentId: id,
         input: dto.input,
@@ -134,11 +116,9 @@ export class AgentsController {
   @Get(':id/export')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
   exportAgent(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.exportAgent(resolveOrganizationId(user, orgQuery), id);
+    return this.agents.exportAgent(id);
   }
 
   @Post('import')
@@ -146,8 +126,7 @@ export class AgentsController {
   importAgent(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ImportAgentDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.agents.importAgent(resolveOrganizationId(user, orgQuery), dto, user.sub, user);
+    return this.agents.importAgent(dto, user.sub, user);
   }
 }

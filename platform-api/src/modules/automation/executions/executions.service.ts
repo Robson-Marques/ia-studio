@@ -6,7 +6,6 @@ import { ExecutionStatus } from '@prisma/client';
 import { ExecutionsRepository, ExecutionFilters } from '../engine/executions.repository';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { assertSameOrg } from '../../../shared/auth/tenant.util';
 
 @Injectable()
 export class ExecutionsService {
@@ -16,22 +15,21 @@ export class ExecutionsService {
     private readonly audit: AuditLogService,
   ) {}
 
-  async findAll(organizationId: string, filters: ExecutionFilters, take = 25, skip = 0) {
-    const [total, items] = await this.repository.findAllByOrg(organizationId, filters, take, skip);
+  async findAll(filters: ExecutionFilters, take = 25, skip = 0) {
+    const [total, items] = await this.repository.findAll(filters, take, skip);
     return { total, items };
   }
 
-  async findById(organizationId: string, id: string) {
+  async findById(id: string) {
     const execution = await this.repository.findByIdWithLogs(id);
     if (!execution) throw new NotFoundException('Execução não encontrada.');
-    assertSameOrg(execution.organization_id, organizationId);
     return execution;
   }
 
   /** Retry = NOVA execucao com o mesmo input/versao (trigger RETRY). */
-  async retry(organizationId: string, id: string, userId: string | null) {
-    const execution = await this.findById(organizationId, id);
-    const workflow = await this.workflows.findById(organizationId, execution.workflow_id);
+  async retry(id: string, userId: string | null) {
+    const execution = await this.findById(id);
+    const workflow = await this.workflows.findById(execution.workflow_id);
     const retried = await this.workflows.startExecution(workflow, {
       triggerType: 'RETRY',
       input: execution.input ?? {},
@@ -44,15 +42,14 @@ export class ExecutionsService {
       action: 'automation.execution.retry',
       entityType: 'WorkflowExecution',
       entityId: id,
-      organizationId,
       newValue: { retried_execution_id: retried?.id ?? null },
     });
     return retried;
   }
 
   /** Cancel cooperativo: QUEUED/RUNNING → CANCELLED (409 se ja finalizou). */
-  async cancel(organizationId: string, id: string) {
-    const execution = await this.findById(organizationId, id);
+  async cancel(id: string) {
+    const execution = await this.findById(id);
     const changed = await this.repository.updateIfStatus(
       execution.id,
       [ExecutionStatus.QUEUED, ExecutionStatus.RUNNING],
@@ -65,7 +62,6 @@ export class ExecutionsService {
       action: 'automation.execution.cancel',
       entityType: 'WorkflowExecution',
       entityId: id,
-      organizationId,
     });
     return this.repository.findById(id);
   }

@@ -130,11 +130,6 @@ export class CoreNodes implements OnModuleInit {
           workflow: { id: '', name: '', version: 0 },
           input: ctx.input,
           vars: ctx.vars,
-          env: {
-            organization_id: ctx.organizationId,
-            workspace_id: ctx.workspaceId,
-            environment_id: ctx.environmentId,
-          },
           now: new Date().toISOString(),
         });
         await ctx.log('info', `condição "${expr}" → ${result}`);

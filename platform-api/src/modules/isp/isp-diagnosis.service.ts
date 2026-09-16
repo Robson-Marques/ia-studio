@@ -89,17 +89,17 @@ export class IspDiagnosisService {
    * Executa o diagnóstico determinístico e devolve a PRÓXIMA etapa. O agente
    * chama esta ferramenta a cada escolha do cliente (passa id_contrato / login).
    */
-  async diagnose(organizationId: string, connectionId: string, input: DiagnoseInput): Promise<DiagnosisResult> {
+  async diagnose(connectionId: string, input: DiagnoseInput): Promise<DiagnosisResult> {
     const cpf = input.cpf.trim();
     if (!cpf) throw new BadRequestException('Informe o CPF/CNPJ do titular.');
 
     // 1) Cliente (id + endereço de cadastro, usado como fallback dos pontos).
-    const clienteRaw = await this.connections.execute(organizationId, connectionId, 'cliente.dados', { cpf });
+    const clienteRaw = await this.connections.execute(connectionId, 'cliente.dados', { cpf });
     const cliente = rows(clienteRaw).map(projectCliente)[0];
     if (!cliente) return { etapa: 'cliente_nao_encontrado' };
 
     // 2) Contratos ATIVOS (status = 'A'). Inativos/cancelados suprimidos.
-    const contratosTodos = rows(await this.connections.execute(organizationId, connectionId, 'cliente.planos', { cpf })).map(
+    const contratosTodos = rows(await this.connections.execute(connectionId, 'cliente.planos', { cpf })).map(
       projectContrato,
     );
     const ativos = contratosTodos.filter((c) => this.isAtivo(c['status']));
@@ -118,7 +118,7 @@ export class IspDiagnosisService {
     const resumo = this.contratoResumo(contrato);
 
     // 3) Logins ATIVOS (ativo='S') DAQUELE contrato. Inativos suprimidos.
-    const loginsTodos = rows(await this.connections.execute(organizationId, connectionId, 'cliente.acesso', { cpf })).map(
+    const loginsTodos = rows(await this.connections.execute(connectionId, 'cliente.acesso', { cpf })).map(
       projectConexao,
     );
     const loginsDoContrato = loginsTodos.filter(

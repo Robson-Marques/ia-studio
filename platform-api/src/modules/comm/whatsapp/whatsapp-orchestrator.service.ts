@@ -1,17 +1,16 @@
 // Meta Orchestrator (spec "Connection Wizard Meta"): o chamador NUNCA conhece
-// o numero. Pede organization/workspace/ambiente + criterios (tag/departamento/
+// o número. Pede critérios locais (tag/departamento/
 // conexao/prioridade) e o orchestrator resolve a Connection whatsapp-meta:
 //   1) criteria.connectionId explicito;
 //   2) tag/departamento (Connection.tags / config.department);
 //   3) conexao padrao (config.is_default);
 //   4) maior priority entre as ACTIVE.
 // Todo envio passa pelo ConnectionsService.execute (Provider Registry →
-// IntegrationLog + last_used_at) e registra consumo 'whatsapp_messages'.
+// IntegrationLog + last_used_at).
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { CommMessageDirection, Connection, ConnectionStatus } from '@prisma/client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
-import { UsageService } from '../../licensing/usage.service';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
 import { normalizePhone } from './whatsapp.helpers';
 import {
@@ -23,13 +22,7 @@ import {
 
 export const WHATSAPP_PROVIDER_KEY = 'whatsapp-meta';
 
-export interface OrchestratorScope {
-  organizationId: string;
-  workspaceId?: string;
-  environmentId?: string;
-}
-
-export interface OrchestratorSendArgs extends OrchestratorScope {
+export interface OrchestratorSendArgs {
   phone: string;
   criteria?: SendCriteria;
   /** Quem enviou (gravado na mensagem): 'user:<id>' | 'bot' | 'system'. */
@@ -50,26 +43,23 @@ export class WhatsappOrchestratorService {
     private readonly connections: ConnectionsService,
     private readonly connectionsRepository: ConnectionsRepository,
     private readonly chats: WhatsappChatsRepository,
-    private readonly usage: UsageService,
   ) {}
 
   // ─── Resolucao de conexao (o fluxo nunca conhece o numero) ──────────
 
-  async resolveConnection(scope: OrchestratorScope, criteria?: SendCriteria): Promise<Connection> {
-    const all = await this.connectionsRepository.findAllByOrg(scope.organizationId, {
+  async resolveConnection(criteria?: SendCriteria): Promise<Connection> {
+    const all = await this.connectionsRepository.findAll({
       providerKey: WHATSAPP_PROVIDER_KEY,
-      workspaceId: scope.workspaceId,
-      environmentId: scope.environmentId,
     });
     const active = all.filter((c) => c.status === ConnectionStatus.ACTIVE);
     if (active.length === 0) {
-      throw new BadRequestException('Nenhuma conexão WhatsApp ativa neste escopo. Conecte um número primeiro.');
+      throw new BadRequestException('Nenhuma conexão WhatsApp ativa nesta instância. Conecte um número primeiro.');
     }
 
     // 1) Conexao explicita.
     if (criteria?.connectionId) {
       const found = active.find((c) => c.id === criteria.connectionId);
-      if (!found) throw new BadRequestException('Conexão WhatsApp informada não está ativa neste escopo.');
+      if (!found) throw new BadRequestException('Conexão WhatsApp informada não está ativa nesta instância.');
       return found;
     }
 
@@ -102,7 +92,7 @@ export class WhatsappOrchestratorService {
   // ─── Envio (RichMessage → Cloud API via Provider Registry) ──────────
 
   async send(args: OrchestratorSendArgs, message: RichMessage): Promise<OrchestratorSendResult> {
-    const connection = await this.resolveConnection(args, args.criteria);
+    const connection = await this.resolveConnection(args.criteria);
     // Coexistência: se a conversa (conexão + telefone) está em modo manual, este
     // caminho automático (IA, relacionamento, cobrança) NÃO envia por ela — só o
     // atendente responde, pelo canal manual (Baileys), via a inbox.
@@ -124,25 +114,16 @@ export class WhatsappOrchestratorService {
     if (!phone) throw new BadRequestException('Telefone de destino inválido.');
 
     const { operation, params } = this.toOperation(phone, message);
-    const result = (await this.connections.execute(
-      connection.organization_id,
-      connection.id,
-      operation,
-      params,
-    )) as { wamid?: string | null };
+    const result = (await this.connections.execute(connection.id, operation, params)) as { wamid?: string | null };
 
     // A Meta NAO ecoa o outbound — grava na inbox pra conversa refletir o envio.
     const chat = await this.chats.upsertChat({
-      organizationId: connection.organization_id,
-      workspaceId: connection.workspace_id,
-      environmentId: connection.environment_id,
       connectionId: connection.id,
       phone,
       lastMessage: this.preview(message),
       direction: CommMessageDirection.OUTGOING,
     });
     await this.chats.createMessage({
-      organization_id: connection.organization_id,
       chat_id: chat.id,
       connection_id: connection.id,
       external_id: result?.wamid ?? null,
@@ -163,9 +144,6 @@ export class WhatsappOrchestratorService {
       status: 'sent',
     });
 
-    // Metering (diretriz 40): todo outbound conta 'whatsapp_messages'.
-    await this.usage.increment(connection.organization_id, connection.workspace_id, 'whatsapp_messages');
-
     return { wamid: result?.wamid ?? null, connectionId: connection.id, chatId: chat.id };
   }
 
@@ -176,14 +154,13 @@ export class WhatsappOrchestratorService {
   // quebrar o atendimento; engolimos o erro (mas logamos em debug).
 
   async markRead(
-    organizationId: string,
     connectionId: string,
     messageId: string,
     opts?: { typing?: boolean },
   ): Promise<void> {
     if (!messageId) return;
     try {
-      await this.connections.execute(organizationId, connectionId, 'markRead', {
+      await this.connections.execute(connectionId, 'markRead', {
         message_id: messageId,
         typing: opts?.typing === true,
       });
@@ -193,10 +170,10 @@ export class WhatsappOrchestratorService {
   }
 
   /** Como markRead, resolvendo a última mensagem incoming (wamid) do chat. */
-  async markReadByChat(organizationId: string, chatId: string, opts?: { typing?: boolean }): Promise<void> {
+  async markReadByChat(chatId: string, opts?: { typing?: boolean }): Promise<void> {
     const anchor = await this.chats.findLastIncomingAnchor(chatId).catch(() => null);
     if (!anchor) return;
-    await this.markRead(organizationId, anchor.connection_id, anchor.external_id, opts);
+    await this.markRead(anchor.connection_id, anchor.external_id, opts);
   }
 
   // ─── Janela de 24h ──────────────────────────────────

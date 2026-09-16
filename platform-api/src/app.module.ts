@@ -12,12 +12,10 @@ import { BrokerModule } from './shared/broker/broker.module';
 import { EventsModule } from './shared/events/events.module';
 import { HealthModule } from './shared/health/health.module';
 import { JwtAuthGuard } from './shared/auth/jwt-auth.guard';
-import { PlatformAdminGuard } from './shared/auth/platform-admin.guard';
 import { PermissionsGuard } from './shared/auth/permissions.guard';
 
 import { CoreAuthModule } from './modules/core/auth/core-auth.module';
-import { OrganizationsModule } from './modules/core/organizations/organizations.module';
-import { WorkspacesModule } from './modules/core/workspaces/workspaces.module';
+import { InstallationDomainsModule } from './modules/core/organizations/organizations.module';
 import { UsersModule } from './modules/core/users/users.module';
 import { InvitesModule } from './modules/core/invites/invites.module';
 import { ProfilesModule } from './modules/core/profiles/profiles.module';
@@ -25,8 +23,6 @@ import { FlagsModule } from './modules/core/flags/flags.module';
 import { SettingsModule } from './modules/core/settings/settings.module';
 import { AuditQueryModule } from './modules/core/audit/audit-query.module';
 import { SeedModule } from './modules/core/seed/seed.module';
-import { LicensingModule } from './modules/licensing/licensing.module';
-import { BillingModule } from './modules/billing/billing.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { CommModule } from './modules/comm/comm.module';
 import { AutomationModule } from './modules/automation/automation.module';
@@ -60,16 +56,13 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
     BrokerModule,
     EventsModule,
     CoreAuthModule,
-    OrganizationsModule,
-    WorkspacesModule,
+    InstallationDomainsModule,
     UsersModule,
     InvitesModule,
     ProfilesModule,
     FlagsModule,
     SettingsModule,
     AuditQueryModule,
-    LicensingModule,
-    BillingModule,
     IntegrationModule,
     CommModule,
     AutomationModule,
@@ -87,10 +80,9 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
     SeedModule,
   ],
   providers: [
-    // Ordem importa: throttling → autenticacao → ator de plataforma → ACL granular.
+    // Ordem importa: throttling → autenticacao → ACL granular local.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: PlatformAdminGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })

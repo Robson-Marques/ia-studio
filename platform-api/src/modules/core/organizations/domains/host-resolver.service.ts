@@ -1,9 +1,7 @@
-// Resolucao de tenant por HOST (fase 2 da frente de tenancy).
+// Resolução de host da instalação dedicada.
 //
-// REGRA DE ISOLAMENTO (nao afrouxar): o Host decide APENAS a apresentacao —
-// qual marca a tela de login mostra e qual superficie o endereco serve. Quem
-// governa acesso a dado continua sendo o JWT + `organization_id` em toda query.
-// Host NUNCA concede acesso a organizacao nenhuma.
+// O Host decide APENAS a apresentação — qual superfície o endereço serve.
+// A ACL local no JWT governa acesso; host nunca concede privilégio.
 //
 // DEGRADACAO GRACIOSA: host nao cadastrado (ou nao ACTIVE) resolve para `null`
 // e o sistema segue exatamente como hoje (instalacao de dominio unico). Nada
@@ -13,16 +11,10 @@ import { DomainStatus } from '@prisma/client';
 import { PlatformDomainsRepository } from './platform-domains.repository';
 import { normalizeHostname } from './platform-domains.helpers';
 
-export interface TenantContext {
+export interface InstallationHostContext {
   hostname: string;
-  scope: 'PLATFORM' | 'ORGANIZATION';
+  scope: 'PLATFORM';
   surface: 'ADMIN' | 'CONSOLE' | 'API';
-  organization: {
-    id: string;
-    name: string;
-    slug: string;
-    branding: unknown;
-  } | null;
 }
 
 /**
@@ -37,7 +29,7 @@ const CACHE_TTL_MS = 30_000;
 @Injectable()
 export class HostResolverService {
   private readonly logger = new Logger(HostResolverService.name);
-  private readonly cache = new Map<string, { at: number; value: TenantContext | null }>();
+  private readonly cache = new Map<string, { at: number; value: InstallationHostContext | null }>();
 
   constructor(private readonly repository: PlatformDomainsRepository) {}
 
@@ -62,29 +54,22 @@ export class HostResolverService {
    * Organizacao inativa tambem resolve para `null` (nao expoe marca de cliente
    * fora de operacao).
    */
-  async resolve(rawHost: string): Promise<TenantContext | null> {
+  async resolve(rawHost: string): Promise<InstallationHostContext | null> {
     const hostname = normalizeHostname(rawHost);
     if (!hostname) return null;
 
     const hit = this.cache.get(hostname);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
 
-    let value: TenantContext | null = null;
+    let value: InstallationHostContext | null = null;
     try {
       const domain = await this.repository.findByHostname(hostname);
       if (domain && domain.status === DomainStatus.ACTIVE) {
-        const org = domain.organization;
-        const orgUsable = !org || org.is_active;
-        if (orgUsable) {
-          value = {
-            hostname: domain.hostname,
-            scope: domain.scope as TenantContext['scope'],
-            surface: domain.surface as TenantContext['surface'],
-            organization: org
-              ? { id: org.id, name: org.name, slug: org.slug, branding: org.branding }
-              : null,
-          };
-        }
+        value = {
+          hostname: domain.hostname,
+          scope: domain.scope as InstallationHostContext['scope'],
+          surface: domain.surface as InstallationHostContext['surface'],
+        };
       }
     } catch (e) {
       // Falha de leitura NAO pode derrubar o login — cai no comportamento padrao.

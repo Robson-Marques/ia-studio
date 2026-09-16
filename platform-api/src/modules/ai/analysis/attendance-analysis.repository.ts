@@ -1,13 +1,11 @@
-// Acesso de dados da análise de atendimento (Checkpoint 1a). Multi-tenant: toda
-// leitura filtra por organização; a conversa é lida do módulo Comm (mesma base).
+// Acesso de dados da análise de atendimento local; a conversa é lida do módulo
+// Comm na mesma instância dedicada.
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import type { LearningSuggestion } from './attendance-analysis.helpers';
 
 export interface CreateAnalysisInput {
-  organizationId: string;
-  workspaceId: string;
-  environmentId: string;
   chatId: string;
   traceId: string;
   createdBy: string | null;
@@ -18,28 +16,22 @@ export interface CreateAnalysisInput {
 export class AttendanceAnalysisRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  listAnalyses(organizationId: string, environmentId?: string, limit = 200) {
+  listAnalyses(limit = 200) {
     return this.prisma.aiAttendanceAnalysis.findMany({
-      where: {
-        organization_id: organizationId,
-        ...(environmentId ? { environment_id: environmentId } : {}),
-      },
+      where: {},
       orderBy: { created_at: 'desc' },
       take: limit,
       include: { chat: { select: { id: true, contact_name: true } } },
     });
   }
 
-  // Conversa + transcript para análise. Ownership por organização; só mensagens
+  // Conversa + transcript para análise local; só mensagens
   // com texto (content != '') e as 80 mais recentes.
-  findChatForAnalysis(organizationId: string, chatId: string) {
-    return this.prisma.whatsappChat.findFirst({
-      where: { id: chatId, organization_id: organizationId },
+  findChatForAnalysis(chatId: string) {
+    return this.prisma.whatsappChat.findUnique({
+      where: { id: chatId },
       select: {
         id: true,
-        organization_id: true,
-        workspace_id: true,
-        environment_id: true,
         contact_name: true,
         messages: {
           where: { content: { not: '' } },
@@ -55,9 +47,6 @@ export class AttendanceAnalysisRepository {
     if (!input.suggestions.length) return [];
     await this.prisma.aiAttendanceAnalysis.createMany({
       data: input.suggestions.map((suggestion) => ({
-        organization_id: input.organizationId,
-        workspace_id: input.workspaceId,
-        environment_id: input.environmentId,
         chat_id: input.chatId,
         improvement_target: suggestion.improvement_target,
         content: suggestion.content,
@@ -66,7 +55,7 @@ export class AttendanceAnalysisRepository {
         analysis_trace_id: input.traceId,
         analyzed_at: new Date(),
         created_by: input.createdBy,
-      })),
+      })) as Prisma.AiAttendanceAnalysisCreateManyInput[],
     });
     return this.prisma.aiAttendanceAnalysis.findMany({
       where: { analysis_trace_id: input.traceId },

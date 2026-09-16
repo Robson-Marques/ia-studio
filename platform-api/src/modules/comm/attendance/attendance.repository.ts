@@ -11,11 +11,9 @@ export class AttendanceRepository {
 
   // ─── Equipes ────────────────────────────────────────
 
-  listTeams(organizationId: string, environmentId?: string, includeInactive = false) {
+  listTeams(includeInactive = false) {
     return this.prisma.attendanceTeam.findMany({
       where: {
-        organization_id: organizationId,
-        ...(environmentId ? { environment_id: environmentId } : {}),
         ...(includeInactive ? {} : { is_active: true }),
       },
       include: { members: true },
@@ -37,11 +35,9 @@ export class AttendanceRepository {
 
   // ─── Filas ──────────────────────────────────────────
 
-  listQueues(organizationId: string, environmentId?: string, includeInactive = false) {
+  listQueues(includeInactive = false) {
     return this.prisma.attendanceQueue.findMany({
       where: {
-        organization_id: organizationId,
-        ...(environmentId ? { environment_id: environmentId } : {}),
         ...(includeInactive ? {} : { is_active: true }),
       },
       orderBy: { name: 'asc' },
@@ -71,7 +67,6 @@ export class AttendanceRepository {
   }
 
   addMember(
-    organizationId: string,
     teamId: string,
     userId: string,
     role: CommTeamRole,
@@ -80,7 +75,6 @@ export class AttendanceRepository {
     return this.prisma.attendanceTeamMember.upsert({
       where: { team_id_user_id: { team_id: teamId, user_id: userId } },
       create: {
-        organization_id: organizationId,
         team_id: teamId,
         user_id: userId,
         role,
@@ -102,7 +96,7 @@ export class AttendanceRepository {
   findUserActive(userId: string) {
     return this.prisma.user.findFirst({
       where: { id: userId, is_active: true, deleted_at: null },
-      select: { id: true, name: true, organization_id: true },
+      select: { id: true, name: true },
     });
   }
 
@@ -116,10 +110,10 @@ export class AttendanceRepository {
     return new Map(users.map((u) => [u.id, u.name]));
   }
 
-  /** Usuarios da organization (pra montar seletor de transferencia/membros). */
-  listOrgUsers(organizationId: string) {
+  /** Usuários ativos da instalação (seletor de transferência/membros). */
+  listActiveUsers() {
     return this.prisma.user.findMany({
-      where: { organization_id: organizationId, is_active: true, deleted_at: null },
+      where: { is_active: true, deleted_at: null },
       select: { id: true, name: true, email: true },
       orderBy: { name: 'asc' },
     });

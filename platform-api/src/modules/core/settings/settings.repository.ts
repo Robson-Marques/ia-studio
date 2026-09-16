@@ -7,24 +7,22 @@ import { PrismaService } from '../../../shared/prisma/prisma.service';
 export class SettingsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string) {
+  findAll() {
     return this.prisma.systemSetting.findMany({
-      where: { organization_id: organizationId },
       orderBy: { key: 'asc' },
     });
   }
 
-  findByKey(organizationId: string, key: string) {
-    return this.prisma.systemSetting.findUnique({
-      where: { organization_id_key: { organization_id: organizationId, key } },
-    });
+  findByKey(key: string) {
+    return this.prisma.systemSetting.findFirst({ where: { key }, orderBy: { created_at: 'asc' } });
   }
 
-  upsert(organizationId: string, key: string, value: Prisma.InputJsonValue) {
-    return this.prisma.systemSetting.upsert({
-      where: { organization_id_key: { organization_id: organizationId, key } },
-      create: { organization_id: organizationId, key, value },
-      update: { value },
-    });
+  async upsert(key: string, value: Prisma.InputJsonValue) {
+    const current = await this.findByKey(key);
+    if (current) {
+      return this.prisma.systemSetting.update({ where: { id: current.id }, data: { value } });
+    }
+    return this.prisma.systemSetting.create({ data: { key, value } as Prisma.SystemSettingUncheckedCreateInput });
   }
+
 }

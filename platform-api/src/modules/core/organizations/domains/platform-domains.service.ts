@@ -20,7 +20,6 @@ import { PlatformDomainsRepository } from './platform-domains.repository';
 import { HostResolverService } from './host-resolver.service';
 import { DomainSyncService } from './domain-sync.service';
 import { AuditLogService } from '../../../../shared/audit/audit-log.service';
-import { PrismaService } from '../../../../shared/prisma/prisma.service';
 import {
   buildSubdomain,
   generateVerifyToken,
@@ -40,7 +39,6 @@ export class PlatformDomainsService {
     private readonly hostResolver: HostResolverService,
     private readonly sync: DomainSyncService,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // ─── Dominio-base ───────────────────────────────────────────────────
@@ -68,7 +66,7 @@ export class PlatformDomainsService {
 
   // ─── Leitura ────────────────────────────────────────────────────────
 
-  list(filters: { organizationId?: string | null; scope?: DomainScope; status?: DomainStatus } = {}) {
+  list(filters: { status?: DomainStatus } = {}) {
     return this.repository.findAll(filters);
   }
 
@@ -81,17 +79,8 @@ export class PlatformDomainsService {
   // ─── Cadastro ───────────────────────────────────────────────────────
 
   async create(dto: CreateDomainDto, createdBy: string | null) {
-    const organizationId = dto.organization_id ?? null;
     const surface = (dto.surface ?? 'ADMIN') as DomainSurface;
-    const scope: DomainScope = organizationId ? DomainScope.ORGANIZATION : DomainScope.PLATFORM;
-
-    if (organizationId) {
-      const org = await this.prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { id: true },
-      });
-      if (!org) throw new BadRequestException('Organização inválida.');
-    }
+    const scope: DomainScope = DomainScope.PLATFORM;
 
     const hostname = await this.resolveHostname(dto);
     if (!isValidHostname(hostname)) {
@@ -107,11 +96,10 @@ export class PlatformDomainsService {
     const kind = base && isSubdomainOf(hostname, base) ? DomainKind.SUBDOMAIN : DomainKind.CUSTOM;
 
     // Primeiro host do escopo/superficie vira primario sozinho.
-    const existing = await this.repository.countBySurface(organizationId, surface);
+    const existing = await this.repository.countBySurface(surface);
     const isPrimary = dto.is_primary === true || existing === 0;
 
     const domain = await this.repository.create({
-      organization_id: organizationId,
       hostname,
       scope,
       surface,
@@ -122,13 +110,12 @@ export class PlatformDomainsService {
       notes: dto.notes ?? null,
       created_by: createdBy,
     });
-    if (isPrimary) await this.repository.setPrimary(domain.id, organizationId, surface);
+    if (isPrimary) await this.repository.setPrimary(domain.id, surface);
 
     await this.audit.record({
       action: 'core.platform_domain.create',
       entityType: 'PlatformDomain',
       entityId: domain.id,
-      organizationId: organizationId ?? undefined,
       newValue: { hostname, scope, surface, kind, is_primary: isPrimary },
     });
     this.hostResolver.invalidate(hostname);
@@ -147,7 +134,6 @@ export class PlatformDomainsService {
       action: 'core.platform_domain.update',
       entityType: 'PlatformDomain',
       entityId: id,
-      organizationId: before.organization_id ?? undefined,
       oldValue: { surface: before.surface, status: before.status },
       newValue: { surface: domain.surface, status: domain.status },
     });
@@ -159,14 +145,13 @@ export class PlatformDomainsService {
   /** Promove a host canônico do escopo (os irmãos perdem o primário). */
   async setPrimary(id: string) {
     const domain = await this.findById(id);
-    const updated = await this.repository.setPrimary(id, domain.organization_id, domain.surface);
+    const updated = await this.repository.setPrimary(id, domain.surface);
     // O primario pode virar host canonico exposto no contexto — nao deixa cache velho.
     this.hostResolver.invalidate();
     await this.audit.record({
       action: 'core.platform_domain.set_primary',
       entityType: 'PlatformDomain',
       entityId: id,
-      organizationId: domain.organization_id ?? undefined,
       newValue: { hostname: domain.hostname, surface: domain.surface },
     });
     return updated;
@@ -180,7 +165,7 @@ export class PlatformDomainsService {
   async remove(id: string) {
     const domain = await this.findById(id);
     if (domain.is_primary) {
-      const siblings = await this.repository.countBySurface(domain.organization_id, domain.surface);
+      const siblings = await this.repository.countBySurface(domain.surface);
       if (siblings > 1) {
         throw new ConflictException(
           'Este é o endereço principal. Defina outro como principal antes de remover.',
@@ -193,7 +178,6 @@ export class PlatformDomainsService {
       action: 'core.platform_domain.delete',
       entityType: 'PlatformDomain',
       entityId: id,
-      organizationId: domain.organization_id ?? undefined,
       oldValue: { hostname: domain.hostname, scope: domain.scope, surface: domain.surface },
     });
     return { ok: true };
@@ -224,7 +208,6 @@ export class PlatformDomainsService {
         action: 'core.platform_domain.activate_failed',
         entityType: 'PlatformDomain',
         entityId: id,
-        organizationId: domain.organization_id ?? undefined,
         newValue: { hostname: domain.hostname, reason: started.reason },
       });
       return failed;
@@ -234,7 +217,6 @@ export class PlatformDomainsService {
       action: 'core.platform_domain.activate',
       entityType: 'PlatformDomain',
       entityId: id,
-      organizationId: domain.organization_id ?? undefined,
       newValue: { hostname: domain.hostname },
     });
     this.logger.log(`Verificação disparada para ${domain.hostname}.`);

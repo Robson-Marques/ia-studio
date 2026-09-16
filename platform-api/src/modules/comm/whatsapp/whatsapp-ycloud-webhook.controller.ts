@@ -67,7 +67,6 @@ export class WhatsappYcloudWebhookController {
       // devolve ok pra não empilhar re-entregas do mesmo evento.
       this.logger.error(`[YCloud webhook] falha ao processar evento: ${(err as Error).message}`);
       await this.integrationLogs.record({
-        organizationId: match.organization_id,
         connectionId: match.id,
         direction: IntegrationDirection.INBOUND,
         operation: 'webhook:ycloud:error',

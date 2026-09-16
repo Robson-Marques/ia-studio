@@ -1,5 +1,5 @@
 // Marketplace de Conectores (diretrizes 1/43/48): catalogo + instalar/
-// desinstalar por organization + curadoria de ProviderDefinition (Console).
+// desinstalar por instância + curadoria de ProviderDefinition (Console).
 import {
   BadRequestException,
   ConflictException,
@@ -48,12 +48,11 @@ export class MarketplaceService {
 
   // ─── Catalogo (painel do cliente) ───────────────────
   async catalog(
-    organizationId: string,
     filters: { category?: ProviderCategory; search?: string },
   ): Promise<CatalogItem[]> {
     const [definitions, installs] = await Promise.all([
       this.repository.findDefinitions({ ...filters, onlyActive: true }),
-      this.repository.findInstallsByOrg(organizationId),
+      this.repository.findInstalls(),
     ]);
     const installedKeys = new Set(installs.map((i) => i.provider_key));
     return definitions.map((def) => ({
@@ -72,32 +71,31 @@ export class MarketplaceService {
   }
 
   // ─── Instalar / desinstalar ─────────────────────────
-  async install(organizationId: string, providerKey: string, installedBy: string | null) {
+  async install(providerKey: string, installedBy: string | null) {
     const def = await this.repository.findDefinitionByKey(providerKey);
     if (!def || !def.is_active) {
       throw new NotFoundException('Conector não encontrado no marketplace.');
     }
-    const existing = await this.repository.findInstall(organizationId, providerKey);
+    const existing = await this.repository.findInstall(providerKey);
     if (existing) {
-      throw new ConflictException('Conector já instalado nesta organização.');
+      throw new ConflictException('Conector já instalado nesta instância.');
     }
-    const install = await this.repository.createInstall(organizationId, providerKey, installedBy);
+    const install = await this.repository.createInstall(providerKey, installedBy);
     await this.audit.record({
       action: 'integration.marketplace.install',
       entityType: 'ProviderInstall',
       entityId: install.id,
-      organizationId,
       newValue: { provider_key: providerKey },
     });
     return install;
   }
 
-  async uninstall(organizationId: string, providerKey: string) {
-    const existing = await this.repository.findInstall(organizationId, providerKey);
+  async uninstall(providerKey: string) {
+    const existing = await this.repository.findInstall(providerKey);
     if (!existing) {
-      throw new NotFoundException('Conector não está instalado nesta organização.');
+      throw new NotFoundException('Conector não está instalado nesta instância.');
     }
-    const activeConnections = await this.repository.countActiveConnections(organizationId, providerKey);
+    const activeConnections = await this.repository.countActiveConnections(providerKey);
     if (activeConnections > 0) {
       throw new ConflictException(
         `Desative as ${activeConnections} conexão(ões) deste conector antes de desinstalar.`,
@@ -108,20 +106,19 @@ export class MarketplaceService {
       action: 'integration.marketplace.uninstall',
       entityType: 'ProviderInstall',
       entityId: existing.id,
-      organizationId,
       oldValue: { provider_key: providerKey },
     });
     return { uninstalled: true };
   }
 
   /** Provider instalado (ou default) e ativo? Usado pelo connections. */
-  async assertInstalled(organizationId: string, providerKey: string): Promise<ProviderDefinition> {
+  async assertInstalled(providerKey: string): Promise<ProviderDefinition> {
     const def = await this.repository.findDefinitionByKey(providerKey);
     if (!def || !def.is_active) {
       throw new BadRequestException('Conector inexistente ou desativado no marketplace.');
     }
     if (!def.is_installed_by_default) {
-      const install = await this.repository.findInstall(organizationId, providerKey);
+      const install = await this.repository.findInstall(providerKey);
       if (!install) {
         throw new BadRequestException('Instale o conector no marketplace antes de criar conexões.');
       }

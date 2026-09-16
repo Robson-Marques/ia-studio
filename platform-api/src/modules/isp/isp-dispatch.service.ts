@@ -56,7 +56,6 @@ export class IspDispatchService {
       if (!target.phone) {
         result.skipped += 1;
         await this.repository.createDispatch({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           target_id: target.id,
           channel: 'WHATSAPP',
@@ -68,9 +67,6 @@ export class IspDispatchService {
       try {
         await this.whatsapp.send(
           {
-            organizationId: incident.organization_id,
-            workspaceId: incident.workspace_id,
-            environmentId: incident.environment_id,
             phone: target.phone,
             sender: 'system',
           },
@@ -78,7 +74,6 @@ export class IspDispatchService {
         );
         result.sent += 1;
         await this.repository.createDispatch({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           target_id: target.id,
           channel: 'WHATSAPP',
@@ -88,7 +83,6 @@ export class IspDispatchService {
       } catch (e) {
         result.failed += 1;
         await this.repository.createDispatch({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           target_id: target.id,
           channel: 'WHATSAPP',

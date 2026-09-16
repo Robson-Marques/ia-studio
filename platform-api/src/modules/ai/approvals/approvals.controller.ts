@@ -8,7 +8,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { ApprovalsService } from './approvals.service';
 import {
   CreateApprovalPolicyDto,
@@ -26,22 +25,17 @@ export class ApprovalsController {
   @Get()
   @RequirePermissions(PERMISSIONS.AI_APPROVALS_READ)
   listApprovals(
-    @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: AiApprovalStatus,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.approvals.listApprovals(resolveOrganizationId(user, orgQuery), { status });
+    return this.approvals.listApprovals({ status });
   }
 
   /** Lista politicas de aprovacao (filtro por workspace). */
   @Get('policies')
   @RequirePermissions(PERMISSIONS.AI_APPROVALS_READ)
   listPolicies(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('workspace_id') workspaceId?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.approvals.listPolicies(resolveOrganizationId(user, orgQuery), { workspaceId });
+    return this.approvals.listPolicies();
   }
 
   /** Cria uma politica de aprovacao (nasce OFF — diretriz 31). */
@@ -50,21 +44,18 @@ export class ApprovalsController {
   createPolicy(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateApprovalPolicyDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.approvals.createPolicy(resolveOrganizationId(user, orgQuery), dto, user.sub);
+    return this.approvals.createPolicy(dto, user.sub);
   }
 
   /** Edita/liga/desliga uma politica de aprovacao. */
   @Patch('policies/:id')
   @RequirePermissions(PERMISSIONS.AI_APPROVALS_DECIDE)
   updatePolicy(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateApprovalPolicyDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.approvals.updatePolicy(resolveOrganizationId(user, orgQuery), id, dto);
+    return this.approvals.updatePolicy(id, dto);
   }
 
   /** Decide (aprovar/rejeitar) uma aprovacao pendente. */
@@ -74,9 +65,8 @@ export class ApprovalsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: DecideApprovalDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.approvals.decide(resolveOrganizationId(user, orgQuery), id, {
+    return this.approvals.decide(id, {
       approve: dto.approve,
       decidedBy: user.sub,
       rejectReason: dto.reject_reason,

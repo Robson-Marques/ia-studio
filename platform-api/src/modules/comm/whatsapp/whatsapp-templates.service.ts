@@ -33,16 +33,16 @@ export class WhatsappTemplatesService {
     private readonly audit: AuditLogService,
   ) {}
 
-  list(organizationId: string, connectionId?: string): Promise<WhatsappTemplate[]> {
-    return this.repository.list(organizationId, connectionId);
+  list(connectionId?: string): Promise<WhatsappTemplate[]> {
+    return this.repository.list(connectionId);
   }
 
   // ─── CRUD local + vínculo a evento (Checkpoint 1) ───
 
   /** Detalhe de um template (com checagem de dono). */
-  async getById(organizationId: string, id: string): Promise<WhatsappTemplate> {
+  async getById(id: string): Promise<WhatsappTemplate> {
     const template = await this.repository.findById(id);
-    if (!template || template.organization_id !== organizationId) {
+    if (!template) {
       throw new NotFoundException('Template não encontrado.');
     }
     return template;
@@ -50,8 +50,8 @@ export class WhatsappTemplatesService {
 
   /** Edita o conteúdo de um template em rascunho. Publicados se alteram por
    *  push-edit (checkpoint futuro), nunca em silêncio por baixo da Meta. */
-  async update(organizationId: string, id: string, dto: UpdateTemplateDto): Promise<WhatsappTemplate> {
-    const template = await this.getById(organizationId, id);
+  async update(id: string, dto: UpdateTemplateDto): Promise<WhatsappTemplate> {
+    const template = await this.getById(id);
     if (template.status !== 'DRAFT') {
       throw new BadRequestException('Só rascunhos podem ser editados aqui. Um template já enviado à Meta se altera por "editar publicado" (checkpoint futuro).');
     }
@@ -66,7 +66,6 @@ export class WhatsappTemplatesService {
       action: 'comm.whatsapp.template.update',
       entityType: 'WhatsappTemplate',
       entityId: id,
-      organizationId,
       newValue: { category: dto.category },
     });
     return updated;
@@ -74,8 +73,8 @@ export class WhatsappTemplatesService {
 
   /** Exclui o template LOCAL. Bloqueia quando ele ainda vive na Meta (remover de
    *  lá é o delete-official — checkpoint futuro), para não deixar órfão. */
-  async remove(organizationId: string, id: string): Promise<{ deleted: true }> {
-    const template = await this.getById(organizationId, id);
+  async remove(id: string): Promise<{ deleted: true }> {
+    const template = await this.getById(id);
     if (template.meta_template_id && ['APPROVED', 'PENDING', 'PAUSED'].includes(template.status)) {
       throw new BadRequestException('Este template existe na Meta. Remova-o da Meta primeiro (checkpoint futuro) antes de excluí-lo aqui.');
     }
@@ -84,7 +83,6 @@ export class WhatsappTemplatesService {
       action: 'comm.whatsapp.template.delete',
       entityType: 'WhatsappTemplate',
       entityId: id,
-      organizationId,
       oldValue: { name: template.name, language: template.language, status: template.status },
     });
     return { deleted: true };
@@ -92,15 +90,14 @@ export class WhatsappTemplatesService {
 
   /** Liga/desliga o vínculo do template a um evento do sistema (docs-as-code).
    *  É metadado local — vale em qualquer status. event vazio desvincula. */
-  async bindEvent(organizationId: string, id: string, event: string | null): Promise<WhatsappTemplate> {
-    await this.getById(organizationId, id);
+  async bindEvent(id: string, event: string | null): Promise<WhatsappTemplate> {
+    await this.getById(id);
     const normalized = (event ?? '').trim() || null;
     const updated = await this.repository.update(id, { event: normalized });
     await this.audit.record({
       action: 'comm.whatsapp.template.bind',
       entityType: 'WhatsappTemplate',
       entityId: id,
-      organizationId,
       newValue: { event: normalized },
     });
     return updated;
@@ -109,8 +106,8 @@ export class WhatsappTemplatesService {
   // ─── Operações na Meta (push-edit / delete-official) ──
 
   /** Edita um template JÁ publicado na Meta e o reenvia para análise (→ PENDING). */
-  async pushEdit(organizationId: string, id: string, dto: UpdateTemplateDto): Promise<WhatsappTemplate> {
-    const template = await this.getById(organizationId, id);
+  async pushEdit(id: string, dto: UpdateTemplateDto): Promise<WhatsappTemplate> {
+    const template = await this.getById(id);
     if (!template.meta_template_id) {
       throw new BadRequestException('Este template ainda não está na Meta — edite o rascunho (PUT); ele publica no envio/sync.');
     }
@@ -121,7 +118,7 @@ export class WhatsappTemplatesService {
       language: template.language,
     } as CreateTemplateDto);
     try {
-      await this.connections.execute(organizationId, template.connection_id, 'editTemplate', {
+      await this.connections.execute(template.connection_id, 'editTemplate', {
         template_id: template.meta_template_id,
         category: dto.category,
         components,
@@ -140,20 +137,19 @@ export class WhatsappTemplatesService {
       action: 'comm.whatsapp.template.push_edit',
       entityType: 'WhatsappTemplate',
       entityId: id,
-      organizationId,
       newValue: { category: dto.category },
     });
     return updated;
   }
 
   /** Remove o template da Meta (delete-official) e, em seguida, localmente. */
-  async deleteOfficial(organizationId: string, id: string): Promise<{ deleted: true }> {
-    const template = await this.getById(organizationId, id);
+  async deleteOfficial(id: string): Promise<{ deleted: true }> {
+    const template = await this.getById(id);
     if (!template.meta_template_id) {
       throw new BadRequestException('Este template não está na Meta — use a exclusão comum (DELETE).');
     }
     try {
-      await this.connections.execute(organizationId, template.connection_id, 'deleteTemplate', {
+      await this.connections.execute(template.connection_id, 'deleteTemplate', {
         name: template.name,
         hsm_id: template.meta_template_id,
       });
@@ -165,7 +161,6 @@ export class WhatsappTemplatesService {
       action: 'comm.whatsapp.template.delete_official',
       entityType: 'WhatsappTemplate',
       entityId: id,
-      organizationId,
       oldValue: { name: template.name, language: template.language, meta_template_id: template.meta_template_id },
     });
     return { deleted: true };
@@ -174,19 +169,16 @@ export class WhatsappTemplatesService {
   // ─── Reuso: duplicar / replicar (local, como rascunho) ──
 
   /** Duplica um template na MESMA conexão como rascunho, com nome único. */
-  async duplicate(organizationId: string, id: string): Promise<WhatsappTemplate> {
-    const src = await this.getById(organizationId, id);
+  async duplicate(id: string): Promise<WhatsappTemplate> {
+    const src = await this.getById(id);
     const name = await this.uniqueCopyName(src.connection_id, src.name, src.language);
     const copy = await this.repository.create(this.buildCopy(src, {
       connectionId: src.connection_id,
-      workspaceId: src.workspace_id,
-      environmentId: src.environment_id,
     }, name));
     await this.audit.record({
       action: 'comm.whatsapp.template.duplicate',
       entityType: 'WhatsappTemplate',
       entityId: copy.id,
-      organizationId,
       newValue: { from: src.id, name },
     });
     return copy;
@@ -195,11 +187,10 @@ export class WhatsappTemplatesService {
   /** Replica um template como RASCUNHO em outras conexões WhatsApp da org. Não
    *  publica na Meta — o destino publica/sincroniza depois. Pula onde já existe. */
   async replicate(
-    organizationId: string,
     id: string,
     connectionIds: string[],
   ): Promise<Array<{ connection_id: string; success: boolean; shared?: boolean; template_id?: string; message: string }>> {
-    const src = await this.getById(organizationId, id);
+    const src = await this.getById(id);
     const results: Array<{ connection_id: string; success: boolean; shared?: boolean; template_id?: string; message: string }> = [];
     for (const targetId of Array.from(new Set(connectionIds ?? []))) {
       if (targetId === src.connection_id) {
@@ -208,7 +199,7 @@ export class WhatsappTemplatesService {
       }
       let target: Connection;
       try {
-        target = await this.loadConnection(organizationId, targetId);
+        target = await this.loadConnection(targetId);
       } catch {
         results.push({ connection_id: targetId, success: false, message: 'Conexão WhatsApp não encontrada.' });
         continue;
@@ -220,8 +211,6 @@ export class WhatsappTemplatesService {
       }
       const created = await this.repository.create(this.buildCopy(src, {
         connectionId: target.id,
-        workspaceId: target.workspace_id,
-        environmentId: target.environment_id,
       }, src.name));
       results.push({ connection_id: targetId, success: true, template_id: created.id, message: 'Rascunho criado — publique/sincronize para enviar à Meta.' });
     }
@@ -229,7 +218,6 @@ export class WhatsappTemplatesService {
       action: 'comm.whatsapp.template.replicate',
       entityType: 'WhatsappTemplate',
       entityId: id,
-      organizationId,
       newValue: { targets: connectionIds },
     });
     return results;
@@ -250,13 +238,10 @@ export class WhatsappTemplatesService {
 
   private buildCopy(
     src: WhatsappTemplate,
-    target: { connectionId: string; workspaceId: string; environmentId: string },
+    target: { connectionId: string },
     name: string,
   ): Prisma.WhatsappTemplateUncheckedCreateInput {
     return {
-      organization_id: src.organization_id,
-      workspace_id: target.workspaceId,
-      environment_id: target.environmentId,
       connection_id: target.connectionId,
       name,
       language: src.language,
@@ -272,8 +257,8 @@ export class WhatsappTemplatesService {
 
   // ─── Criacao local + publicacao na Meta ─────────────
 
-  async create(organizationId: string, dto: CreateTemplateDto, createdBy: string | null): Promise<WhatsappTemplate> {
-    const connection = await this.loadConnection(organizationId, dto.connection_id);
+  async create(dto: CreateTemplateDto, createdBy: string | null): Promise<WhatsappTemplate> {
+    const connection = await this.loadConnection(dto.connection_id);
     const language = dto.language ?? 'pt_BR';
 
     const existing = await this.repository.findByName(connection.id, dto.name, language);
@@ -281,9 +266,6 @@ export class WhatsappTemplatesService {
 
     const components = this.buildComponents(dto);
     let template = await this.repository.create({
-      organization_id: organizationId,
-      workspace_id: connection.workspace_id,
-      environment_id: connection.environment_id,
       connection_id: connection.id,
       name: dto.name,
       language,
@@ -295,7 +277,7 @@ export class WhatsappTemplatesService {
 
     // Publica na Meta na hora (bidirecional). Falhou → fica DRAFT + erro pt-BR.
     try {
-      const result = (await this.connections.execute(organizationId, connection.id, 'createTemplate', {
+      const result = (await this.connections.execute(connection.id, 'createTemplate', {
         name: dto.name,
         language,
         category: dto.category,
@@ -316,7 +298,6 @@ export class WhatsappTemplatesService {
         action: 'comm.whatsapp.template.create',
         entityType: 'WhatsappTemplate',
         entityId: template.id,
-        organizationId,
         newValue: { name: dto.name, language, category: dto.category, status: template.status },
       });
     }
@@ -325,21 +306,19 @@ export class WhatsappTemplatesService {
 
   // ─── Sync bidirecional (pull Meta → local; push DRAFTs locais) ──────
 
-  async sync(organizationId: string, connectionId: string): Promise<{ pulled: number; pushed: number }> {
-    const connection = await this.loadConnection(organizationId, connectionId);
+  async sync(connectionId: string): Promise<{ pulled: number; pushed: number }> {
+    const connection = await this.loadConnection(connectionId);
     return this.syncConnection(connection);
   }
 
   /** Usado tambem pelo cron de sync (~10 min). */
   async syncConnection(connection: Connection): Promise<{ pulled: number; pushed: number }> {
-    const organizationId = connection.organization_id;
-
     // 1) PUSH: rascunhos locais que ainda nao chegaram na Meta.
     let pushed = 0;
     const drafts = await this.repository.listDrafts(connection.id);
     for (const draft of drafts) {
       try {
-        const result = (await this.connections.execute(organizationId, connection.id, 'createTemplate', {
+        const result = (await this.connections.execute(connection.id, 'createTemplate', {
           name: draft.name,
           language: draft.language,
           category: draft.category,
@@ -358,7 +337,6 @@ export class WhatsappTemplatesService {
 
     // 2) PULL: catalogo da WABA → upsert local.
     const metaTemplates = (await this.connections.execute(
-      organizationId,
       connection.id,
       'listTemplates',
       {},
@@ -367,9 +345,6 @@ export class WhatsappTemplatesService {
     for (const t of metaTemplates) {
       if (!t?.name || !t?.language) continue;
       await this.repository.upsertFromMeta({
-        organizationId,
-        workspaceId: connection.workspace_id,
-        environmentId: connection.environment_id,
         connectionId: connection.id,
         name: t.name,
         language: t.language,
@@ -429,18 +404,17 @@ export class WhatsappTemplatesService {
    *  Meta) e devolve o handle + o formato inferido do mime. O handle vai no DTO
    *  de criar/editar como header_handle + header_format. */
   async uploadHeaderMedia(
-    organizationId: string,
     connectionId: string,
     file: { data: Buffer; mimeType: string; filename: string },
   ): Promise<{ handle: string; format: 'IMAGE' | 'VIDEO' | 'DOCUMENT' }> {
-    await this.loadConnection(organizationId, connectionId);
+    await this.loadConnection(connectionId);
     const mime = file.mimeType || '';
     const format: 'IMAGE' | 'VIDEO' | 'DOCUMENT' = mime.startsWith('image/')
       ? 'IMAGE'
       : mime.startsWith('video/')
         ? 'VIDEO'
         : 'DOCUMENT';
-    const res = (await this.connections.execute(organizationId, connectionId, 'uploadTemplateMedia', {
+    const res = (await this.connections.execute(connectionId, 'uploadTemplateMedia', {
       data: file.data,
       mime_type: mime,
       filename: file.filename,
@@ -451,9 +425,9 @@ export class WhatsappTemplatesService {
     return { handle: res.handle, format };
   }
 
-  private async loadConnection(organizationId: string, connectionId: string): Promise<Connection> {
+  private async loadConnection(connectionId: string): Promise<Connection> {
     const connection = await this.connectionsRepository.findById(connectionId);
-    if (!connection || connection.organization_id !== organizationId || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
+    if (!connection || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
       throw new NotFoundException('Conexão WhatsApp não encontrada.');
     }
     return connection;

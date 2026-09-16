@@ -15,9 +15,6 @@ import { FastifyReply } from 'fastify';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { Public } from '../../../shared/auth/public.decorator';
-import { CurrentUser } from '../../../shared/auth/current-user.decorator';
-import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { GoogleOauthService } from './google-oauth.service';
 
 @ApiTags('Integrations — OAuth Google')
@@ -34,11 +31,9 @@ export class GoogleOauthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Inicia o consentimento OAuth do Google (URL de consentimento com state assinado)' })
   start(
-    @CurrentUser() user: AuthenticatedUser,
     @Query('connection_id') connectionId: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.oauth.start(resolveOrganizationId(user, orgQuery), connectionId);
+    return this.oauth.start(connectionId);
   }
 
   // ─── Callback (publico) ─────────────────────────────

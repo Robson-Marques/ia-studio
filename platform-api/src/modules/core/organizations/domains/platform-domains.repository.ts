@@ -1,10 +1,7 @@
 // Porta unica ao banco do registro de dominios (core_platform_domains).
-// Guarda tambem o DOMINIO-BASE da instalacao, que e config de plataforma
-// (system_settings com organization_id NULO — o SettingsService e por-org e
-// nao atende este escopo). Fica aqui por coesao: e o dado que define de quem
-// os subdominios sao filhos.
+// Guarda também o domínio-base e o toggle de verificação da instalação.
 import { Injectable } from '@nestjs/common';
-import { DomainScope, DomainStatus, DomainSurface, Prisma } from '@prisma/client';
+import { DomainStatus, DomainSurface, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../shared/prisma/prisma.service';
 
 /** Chave da config de plataforma com o dominio-base dos subdominios. */
@@ -21,7 +18,7 @@ export class PlatformDomainsRepository {
 
   async getBaseDomain(): Promise<string | null> {
     const row = await this.prisma.systemSetting.findFirst({
-      where: { organization_id: null, key: BASE_DOMAIN_SETTING_KEY },
+      where: { key: BASE_DOMAIN_SETTING_KEY },
     });
     const v = row?.value;
     return typeof v === 'string' && v ? v : null;
@@ -31,13 +28,13 @@ export class PlatformDomainsRepository {
     // Unique composto com NULL nao e enderecavel por findUnique no Prisma —
     // por isso o par findFirst + create/update (idempotente).
     const row = await this.prisma.systemSetting.findFirst({
-      where: { organization_id: null, key: BASE_DOMAIN_SETTING_KEY },
+      where: { key: BASE_DOMAIN_SETTING_KEY },
     });
     if (row) {
       await this.prisma.systemSetting.update({ where: { id: row.id }, data: { value: value } });
     } else {
       await this.prisma.systemSetting.create({
-        data: { organization_id: null, key: BASE_DOMAIN_SETTING_KEY, value: value },
+        data: { key: BASE_DOMAIN_SETTING_KEY, value },
       });
     }
     return value;
@@ -47,20 +44,20 @@ export class PlatformDomainsRepository {
 
   async isAutoVerifyEnabled(): Promise<boolean> {
     const row = await this.prisma.systemSetting.findFirst({
-      where: { organization_id: null, key: AUTO_VERIFY_SETTING_KEY },
+      where: { key: AUTO_VERIFY_SETTING_KEY },
     });
     return row?.value === true || row?.value === 'true';
   }
 
   async setAutoVerify(enabled: boolean): Promise<boolean> {
     const row = await this.prisma.systemSetting.findFirst({
-      where: { organization_id: null, key: AUTO_VERIFY_SETTING_KEY },
+      where: { key: AUTO_VERIFY_SETTING_KEY },
     });
     if (row) {
       await this.prisma.systemSetting.update({ where: { id: row.id }, data: { value: enabled } });
     } else {
       await this.prisma.systemSetting.create({
-        data: { organization_id: null, key: AUTO_VERIFY_SETTING_KEY, value: enabled },
+        data: { key: AUTO_VERIFY_SETTING_KEY, value: enabled },
       });
     }
     return enabled;
@@ -75,15 +72,12 @@ export class PlatformDomainsRepository {
 
   // ─── Dominios ───────────────────────────────────────────────────────
 
-  findAll(filters: { organizationId?: string | null; scope?: DomainScope; status?: DomainStatus } = {}) {
+  findAll(filters: { status?: DomainStatus } = {}) {
     const where: Prisma.PlatformDomainWhereInput = {};
-    if (filters.organizationId !== undefined) where.organization_id = filters.organizationId;
-    if (filters.scope) where.scope = filters.scope;
     if (filters.status) where.status = filters.status;
     return this.prisma.platformDomain.findMany({
       where,
-      orderBy: [{ scope: 'asc' }, { is_primary: 'desc' }, { hostname: 'asc' }],
-      include: { organization: { select: { id: true, name: true, slug: true } } },
+      orderBy: [{ is_primary: 'desc' }, { hostname: 'asc' }],
     });
   }
 
@@ -95,7 +89,6 @@ export class PlatformDomainsRepository {
   findByHostname(hostname: string) {
     return this.prisma.platformDomain.findUnique({
       where: { hostname },
-      include: { organization: { select: { id: true, name: true, slug: true, branding: true, is_active: true } } },
     });
   }
 
@@ -125,20 +118,19 @@ export class PlatformDomainsRepository {
   }
 
   /**
-   * Promove um host a principal do seu escopo, tirando o primario dos irmaos
-   * (mesmo organization_id + mesma superficie) numa transacao — nunca ficam dois.
+   * Promove um host a principal da superfície local, sem permitir duplicidade.
    */
-  async setPrimary(id: string, organizationId: string | null, surface: DomainSurface) {
+  async setPrimary(id: string, surface: DomainSurface) {
     return this.prisma.$transaction(async (tx) => {
       await tx.platformDomain.updateMany({
-        where: { organization_id: organizationId, surface, NOT: { id } },
+        where: { surface, NOT: { id } },
         data: { is_primary: false },
       });
       return tx.platformDomain.update({ where: { id }, data: { is_primary: true } });
     });
   }
 
-  countBySurface(organizationId: string | null, surface: DomainSurface) {
-    return this.prisma.platformDomain.count({ where: { organization_id: organizationId, surface } });
+  countBySurface(surface: DomainSurface) {
+    return this.prisma.platformDomain.count({ where: { surface } });
   }
 }

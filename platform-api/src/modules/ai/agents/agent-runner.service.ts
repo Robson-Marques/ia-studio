@@ -8,7 +8,7 @@
 //        chat → acumula tokens/custo → se toolCalls: executa via ToolRuntime
 //        (gate de aprovacao pode pausar o run) → anexa resultado → continua;
 //        senao resposta final → fim;
-//   5) persiste transcript/tokens/cost; CostsService.record; UsageService
+//   5) persiste transcript e logs locais de execução
 //      ai_tokens; emite evento ai.agent.run.completed.
 //   6) resume(runId): retoma o loop apos aprovacao.
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -24,9 +24,7 @@ import { ToolsService } from '../tools/tools.service';
 import { ToolRuntimeService } from '../tools/tool-runtime.service';
 import { ToolExecutionContext } from '../tools/tool-registry.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
-import { CostsService } from '../costs/costs.service';
 import { CollaborationService } from '../collaboration/collaboration.service';
-import { UsageService } from '../../licensing/usage.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { LlmMessage, LlmTool } from '../providers/llm.interface';
 
@@ -70,9 +68,7 @@ export class AgentRunnerService {
     private readonly tools: ToolsService,
     private readonly toolRuntime: ToolRuntimeService,
     private readonly knowledge: KnowledgeService,
-    private readonly costs: CostsService,
     private readonly collaboration: CollaborationService,
-    private readonly usage: UsageService,
     private readonly eventBus: EventBusService,
     private readonly promptSecurity: PromptSecurityService,
   ) {}
@@ -84,14 +80,6 @@ export class AgentRunnerService {
 
     const traceId = params.traceId ?? randomUUID();
     const dryRun = params.dryRun ?? false;
-
-    // Bloqueio por orcamento (diretriz 17) — antes de gastar tokens.
-    if (!dryRun && agent.workspace_id) {
-      const blocked = await this.costs.isBlocked(agent.organization_id, agent.workspace_id).catch(() => false);
-      if (blocked) {
-        throw new BadRequestException('Orçamento de IA excedido — execução bloqueada pela política ativa.');
-      }
-    }
 
     const resolved = await this.resolveProvider(agent);
     const guardrails = this.parseGuardrails(agent.guardrails);
@@ -109,9 +97,6 @@ export class AgentRunnerService {
     ];
 
     const run = await this.repository.createRun({
-      organization_id: agent.organization_id,
-      workspace_id: agent.workspace_id,
-      environment_id: agent.environment_id,
       agent_id: agent.id,
       execution_id: params.executionId ?? null,
       trace_id: traceId,
@@ -122,7 +107,7 @@ export class AgentRunnerService {
       provider_kind: resolved.kind,
       created_by: params.createdBy ?? null,
       started_at: new Date(),
-    });
+    } as Prisma.AiAgentRunUncheckedCreateInput);
 
     return this.loop(agent, run.id, resolved, messages, llmTools, guardrails, {
       traceId,
@@ -133,9 +118,9 @@ export class AgentRunnerService {
   }
 
   /** Retoma um run pausado por aprovacao (apos decisao concedida). */
-  async resume(organizationId: string, runId: string): Promise<RunAgentOutput> {
+  async resume(runId: string): Promise<RunAgentOutput> {
     const run = await this.repository.findRunById(runId);
-    if (!run || run.organization_id !== organizationId) throw new NotFoundException('Execução não encontrada.');
+    if (!run) throw new NotFoundException('Execução não encontrada.');
     if (run.status !== AiRunStatus.AWAITING_APPROVAL) {
       throw new BadRequestException('Execução não está aguardando aprovação.');
     }
@@ -325,30 +310,10 @@ export class AgentRunnerService {
       finished_at: new Date(),
     });
 
-    // Custo agregado (diretriz 17) + metering de tokens (diretriz 40).
-    await this.costs.record({
-      organizationId: agent.organization_id,
-      workspaceId: agent.workspace_id,
-      environmentId: agent.environment_id,
-      agentId: agent.id,
-      providerKind: data.providerKind,
-      model: agent.model,
-      promptTokens: data.promptTokens,
-      completionTokens: data.completionTokens,
-      costUsd: data.costUsd,
-      traceId: data.traceId,
-    });
-    if (totalTokens > 0) {
-      await this.usage.increment(agent.organization_id, agent.workspace_id, 'ai_tokens', totalTokens);
-    }
-
     // Evento no Event Bus (diretriz 7).
     await this.eventBus
       .publish({
         event: 'ai.agent.run.completed',
-        organization_id: agent.organization_id,
-        workspace_id: agent.workspace_id,
-        environment_id: agent.environment_id,
         trace_id: data.traceId,
         source_event_id: `ai-run:${runId}`,
         occurred_at: new Date().toISOString(),
@@ -363,16 +328,9 @@ export class AgentRunnerService {
 
   private async resolveProvider(agent: AiAgent): Promise<ResolvedLlmConnection> {
     if (agent.connection_id) {
-      return this.llm.resolveConnection(agent.organization_id, agent.connection_id);
+      return this.llm.resolveConnection(agent.connection_id);
     }
-    return this.orchestrator.resolve(
-      {
-        organizationId: agent.organization_id,
-        workspaceId: agent.workspace_id,
-        environmentId: agent.environment_id,
-      },
-      agent.model,
-    );
+    return this.orchestrator.resolve(agent.model);
   }
 
   private async buildSystemPrompt(agent: AiAgent, userInput: string, traceId: string): Promise<string> {
@@ -392,7 +350,6 @@ export class AgentRunnerService {
     if (agent.knowledge_base_ids.length > 0) {
       try {
         const rag = await this.knowledge.queryMulti(
-          agent.organization_id,
           agent.knowledge_base_ids,
           userInput,
           5,
@@ -411,7 +368,7 @@ export class AgentRunnerService {
 
   private async buildTools(agent: AiAgent): Promise<LlmTool[]> {
     if (agent.allowed_tools.length === 0) return [];
-    const catalog = await this.tools.resolveForAgent(agent.organization_id, agent.allowed_tools);
+    const catalog = await this.tools.resolveForAgent(agent.allowed_tools);
     return catalog.map((t) => ({
       name: t.key,
       description: t.description,
@@ -425,9 +382,6 @@ export class AgentRunnerService {
     ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
   ): ToolExecutionContext {
     return {
-      organizationId: agent.organization_id,
-      workspaceId: agent.workspace_id,
-      environmentId: agent.environment_id,
       agentId: agent.id,
       agentRunId: runId,
       traceId: ctx.traceId,
@@ -438,7 +392,6 @@ export class AgentRunnerService {
       dryRun: ctx.dryRun,
       runAgent: async (a) => {
         const res = await this.collaboration.consult({
-          organizationId: agent.organization_id,
           principalAgentId: agent.id,
           query: a.input,
           traceId: a.traceId,

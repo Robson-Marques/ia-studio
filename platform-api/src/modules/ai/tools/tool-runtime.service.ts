@@ -42,7 +42,7 @@ export class ToolRuntimeService {
     ctx: ToolExecutionContext,
   ): Promise<ToolExecutionResult> {
     const started = Date.now();
-    const tool = await this.repository.findByKey(ctx.organizationId, toolKey);
+    const tool = await this.repository.findByKey(toolKey);
     if (!tool || !tool.is_active) {
       return this.fail(`Ferramenta "${toolKey}" não encontrada ou inativa.`, started, ctx, toolKey, args);
     }
@@ -50,7 +50,6 @@ export class ToolRuntimeService {
     // Gate de aprovacao: flag da tool OU policy ativa que case (diretriz 31).
     const requiresByFlag = tool.requires_approval;
     const policyEval = await this.approvalPolicy.evaluate({
-      organizationId: ctx.organizationId,
       targetType: this.targetTypeFor(tool),
       context: {
         tool_key: toolKey,
@@ -61,7 +60,6 @@ export class ToolRuntimeService {
 
     if (!ctx.dryRun && (requiresByFlag || policyEval.required)) {
       const approval = await this.approvals.createApproval({
-        organizationId: ctx.organizationId,
         policyId: policyEval.policy?.id,
         agentRunId: ctx.agentRunId,
         requestedBy: null,
@@ -72,8 +70,6 @@ export class ToolRuntimeService {
         context: {
           arguments: args,
           scope: {
-            workspaceId: ctx.workspaceId ?? null,
-            environmentId: ctx.environmentId ?? null,
             scopeKeys: ctx.scopeKeys ?? {},
             memoryProfileIds: ctx.memoryProfileIds ?? [],
             agentId: ctx.agentId,
@@ -106,7 +102,7 @@ export class ToolRuntimeService {
     ctx: ToolExecutionContext,
   ): Promise<ToolExecutionResult> {
     const started = Date.now();
-    const tool = await this.repository.findByKey(ctx.organizationId, toolKey);
+    const tool = await this.repository.findByKey(toolKey);
     if (!tool || !tool.is_active) {
       return this.fail(`Ferramenta "${toolKey}" não encontrada.`, started, ctx, toolKey, args);
     }
@@ -137,7 +133,7 @@ export class ToolRuntimeService {
       const connectionId = typeof args['connection_id'] === 'string' ? args['connection_id'] : undefined;
       if (!connectionId) throw new Error('connection_id obrigatório para esta ferramenta.');
       if (ctx.dryRun) return { simulated: true, operation: op.operation };
-      return this.connections.execute(ctx.organizationId, connectionId, op.operation, args);
+      return this.connections.execute(connectionId, op.operation, args);
     }
     throw new Error(`Ferramenta "${tool.key}" sem handler builtin nem operação de conexão.`);
   }
@@ -158,14 +154,13 @@ export class ToolRuntimeService {
   ): Promise<void> {
     await this.repository
       .createCallLog({
-        organization_id: ctx.organizationId,
         agent_run_id: ctx.agentRunId,
         tool_key: toolKey,
         arguments: args as Prisma.InputJsonValue,
         result: result === undefined || result === null ? undefined : (result as Prisma.InputJsonValue),
         error: error ?? undefined,
         duration_ms: durationMs,
-      })
+      } as Prisma.AiToolCallLogUncheckedCreateInput)
       .catch((e) => this.logger.warn(`Falha ao logar chamada de tool: ${(e as Error).message}`));
   }
 

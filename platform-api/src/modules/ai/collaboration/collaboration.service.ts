@@ -3,10 +3,10 @@
 // runner → collaboration → runner); o runner injeta a si mesmo como callback
 // `runAgent` no metodo consult() (injecao de dependencia por parametro).
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { CollaborationRepository } from './collaboration.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { assertSameOrg } from '../../../shared/auth/tenant.util';
 import { CreateCollaborationRuleDto, UpdateCollaborationRuleDto } from './dto/collaboration.dtos';
 
 /** Resultado de uma execucao de agente colaborador. */
@@ -23,7 +23,6 @@ export type RunAgentFn = (args: {
 }) => Promise<RunAgentResult>;
 
 export interface ConsultParams {
-  organizationId: string;
   principalAgentId: string;
   query: string;
   traceId: string;
@@ -50,40 +49,37 @@ export class CollaborationService {
 
   // ─── Leitura ────────────────────────────────────────
 
-  list(organizationId: string, filters: { principalAgentId?: string }) {
-    return this.repository.findByOrg(organizationId, filters);
+  list(filters: { principalAgentId?: string }) {
+    return this.repository.findAll(filters);
   }
 
-  async getRule(organizationId: string, id: string) {
+  async getRule(id: string) {
     const rule = await this.repository.findById(id);
     if (!rule) throw new NotFoundException('Regra de colaboração não encontrada.');
-    assertSameOrg(rule.organization_id, organizationId);
     return rule;
   }
 
   // ─── CRUD ───────────────────────────────────────────
 
-  async create(organizationId: string, dto: CreateCollaborationRuleDto, createdBy: string | null) {
+  async create(dto: CreateCollaborationRuleDto, createdBy: string | null) {
     if (dto.principal_agent_id === dto.collaborator_agent_id) {
       throw new BadRequestException('O agente principal e o colaborador devem ser diferentes.');
     }
-    await this.assertAgentInOrg(organizationId, dto.principal_agent_id, 'principal');
-    await this.assertAgentInOrg(organizationId, dto.collaborator_agent_id, 'colaborador');
+    await this.assertAgentExists(dto.principal_agent_id, 'principal');
+    await this.assertAgentExists(dto.collaborator_agent_id, 'colaborador');
 
     const rule = await this.repository.create({
-      organization_id: organizationId,
       principal_agent_id: dto.principal_agent_id,
       collaborator_agent_id: dto.collaborator_agent_id,
       output_mode: dto.output_mode ?? undefined,
       trigger_mode: dto.trigger_mode ?? undefined,
       label: dto.label ?? null,
       created_by: createdBy,
-    });
+    } as Prisma.AiCollaborationRuleUncheckedCreateInput);
     await this.audit.record({
       action: 'ai.collaboration.create',
       entityType: 'AiCollaborationRule',
       entityId: rule.id,
-      organizationId,
       newValue: {
         principal_agent_id: rule.principal_agent_id,
         collaborator_agent_id: rule.collaborator_agent_id,
@@ -95,8 +91,8 @@ export class CollaborationService {
     return rule;
   }
 
-  async update(organizationId: string, id: string, dto: UpdateCollaborationRuleDto) {
-    const before = await this.getRule(organizationId, id);
+  async update(id: string, dto: UpdateCollaborationRuleDto) {
+    const before = await this.getRule(id);
     const rule = await this.repository.update(id, {
       output_mode: dto.output_mode ?? undefined,
       trigger_mode: dto.trigger_mode ?? undefined,
@@ -107,7 +103,6 @@ export class CollaborationService {
       action: 'ai.collaboration.update',
       entityType: 'AiCollaborationRule',
       entityId: id,
-      organizationId,
       oldValue: {
         output_mode: before.output_mode,
         trigger_mode: before.trigger_mode,
@@ -166,14 +161,14 @@ export class CollaborationService {
 
   // ─── Privados ───────────────────────────────────────
 
-  /** Garante que o agente existe e pertence a org (nao vaza existencia). */
-  private async assertAgentInOrg(organizationId: string, agentId: string, role: string): Promise<void> {
+  /** Garante que o agente existe na instancia dedicada. */
+  private async assertAgentExists(agentId: string, role: string): Promise<void> {
     const agent = await this.prisma.aiAgent.findUnique({
       where: { id: agentId },
-      select: { id: true, organization_id: true },
+      select: { id: true },
     });
-    if (!agent || agent.organization_id !== organizationId) {
-      throw new BadRequestException(`Agente ${role} não encontrado na sua organização.`);
+    if (!agent) {
+      throw new BadRequestException(`Agente ${role} não encontrado nesta instalação.`);
     }
   }
 }

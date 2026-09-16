@@ -15,12 +15,6 @@ const AI_PROVIDER_KEYS = [
   'openrouter', 'groq', 'deepseek', 'mistral', 'azure-openai',
 ];
 
-export interface OrchestratorScope {
-  organizationId: string;
-  workspaceId?: string | null;
-  environmentId?: string | null;
-}
-
 @Injectable()
 export class AiOrchestratorService {
   private readonly logger = new Logger(AiOrchestratorService.name);
@@ -31,11 +25,11 @@ export class AiOrchestratorService {
   ) {}
 
   /**
-   * Resolve a melhor Connection AI ativa da org pro modelo pedido.
+   * Resolve a melhor Connection AI ativa da instalação pro modelo pedido.
    * Criterio: menor custo estimado (prompt+completion por 1k) → maior priority.
    */
-  async resolve(scope: OrchestratorScope, model: string): Promise<ResolvedLlmConnection> {
-    const candidates = await this.activeAiConnections(scope);
+  async resolve(model: string): Promise<ResolvedLlmConnection> {
+    const candidates = await this.activeAiConnections();
     if (candidates.length === 0) {
       throw new BadRequestException(
         'Nenhuma conexão de IA ativa. Conecte um provedor (OpenAI, Anthropic, ...) no Integration Manager.',
@@ -53,7 +47,7 @@ export class AiOrchestratorService {
 
     for (const connection of sorted) {
       try {
-        return await this.llm.resolveConnection(scope.organizationId, connection.id);
+        return await this.llm.resolveConnection(connection.id);
       } catch (e) {
         this.logger.warn(`Conexão AI ${connection.id} indisponível: ${(e as Error).message} — tentando próxima.`);
       }
@@ -62,26 +56,17 @@ export class AiOrchestratorService {
   }
 
   /** Kind default sugerido (primeira connection ativa) — usado por defaults. */
-  async defaultKind(scope: OrchestratorScope): Promise<AiProviderKind | null> {
-    const candidates = await this.activeAiConnections(scope);
+  async defaultKind(): Promise<AiProviderKind | null> {
+    const candidates = await this.activeAiConnections();
     if (candidates.length === 0) return null;
     return this.llm.kindForProviderKey(candidates[0].provider_key);
   }
 
-  private async activeAiConnections(scope: OrchestratorScope) {
-    const scoped = await this.connectionsRepository.findAllByOrg(scope.organizationId, {
+  private async activeAiConnections() {
+    const scoped = await this.connectionsRepository.findAll({
       status: ConnectionStatus.ACTIVE,
-      workspaceId: scope.workspaceId ?? undefined,
-      environmentId: scope.environmentId ?? undefined,
     });
     const ai = scoped.filter((c) => AI_PROVIDER_KEYS.includes(c.provider_key));
-    if (ai.length > 0 || (!scope.workspaceId && !scope.environmentId)) return ai;
-    // Fallback: o escopo (workspace/ambiente) não tinha conexão de IA — procura
-    // na ORG inteira. Sem isto, um assistente escopado num workspace não
-    // enxergava a conexão OpenAI criada em outro escopo e "não respondia".
-    const orgWide = await this.connectionsRepository.findAllByOrg(scope.organizationId, {
-      status: ConnectionStatus.ACTIVE,
-    });
-    return orgWide.filter((c) => AI_PROVIDER_KEYS.includes(c.provider_key));
+    return ai;
   }
 }

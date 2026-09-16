@@ -3,10 +3,9 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { UsersRepository } from './users.repository';
 import { ProfilesModule } from '../profiles/profiles.module';
-import { WorkspacesModule } from '../workspaces/workspaces.module';
 
 @Module({
-  imports: [ProfilesModule, WorkspacesModule],
+  imports: [ProfilesModule],
   controllers: [UsersController],
   providers: [UsersService, UsersRepository],
   exports: [UsersService, UsersRepository],

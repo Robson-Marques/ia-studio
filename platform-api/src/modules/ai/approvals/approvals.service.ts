@@ -11,15 +11,12 @@ import { ModuleRef } from '@nestjs/core';
 import { AiActionApproval, AiApprovalStatus, Prisma } from '@prisma/client';
 import { ApprovalsRepository, ApprovalFilters } from './approvals.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { assertSameOrg, validateWorkspaceScope } from '../../../shared/auth/tenant.util';
 import { CreateApprovalPolicyDto, UpdateApprovalPolicyDto } from './dto/approvals.dtos';
 import { ToolRuntimeService } from '../tools/tool-runtime.service';
 import { ToolExecutionContext } from '../tools/tool-registry.service';
 
 /** Entrada da criacao de aprovacao (usada pelo ToolRuntime, nao pelo controller). */
 export interface CreateApprovalInput {
-  organizationId: string;
   policyId?: string | null;
   agentRunId?: string | null;
   requestedBy?: string | null;
@@ -41,7 +38,6 @@ export class ApprovalsService {
   constructor(
     private readonly repository: ApprovalsRepository,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
     // ModuleRef pra resolver o ToolRuntime SEM ciclo (ToolRuntime injeta este
     // service pra criar a aprovação; resolvê-lo lazy aqui evita a dependência
     // circular no construtor).
@@ -50,26 +46,19 @@ export class ApprovalsService {
 
   // ─── Politicas (CRUD generico) ──────────────────────
 
-  listPolicies(organizationId: string, filters: { workspaceId?: string }) {
-    return this.repository.findPolicies(organizationId, filters);
+  listPolicies() {
+    return this.repository.findPolicies();
   }
 
-  async getPolicy(organizationId: string, id: string) {
+  async getPolicy(id: string) {
     const policy = await this.repository.findPolicyById(id);
     if (!policy) throw new NotFoundException('Política de aprovação não encontrada.');
-    assertSameOrg(policy.organization_id, organizationId);
     return policy;
   }
 
-  async createPolicy(organizationId: string, dto: CreateApprovalPolicyDto, createdBy: string | null) {
-    if (dto.workspace_id) {
-      await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
-    }
+  async createPolicy(dto: CreateApprovalPolicyDto, createdBy: string | null) {
     // is_active NAO e forcado: nasce OFF por default do schema (diretriz 31).
     const policy = await this.repository.createPolicy({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       name: dto.name,
       description: dto.description,
       target_type: dto.target_type,
@@ -78,20 +67,18 @@ export class ApprovalsService {
       approver_user_ids: dto.approver_user_ids ?? [],
       expires_after_seconds: dto.expires_after_seconds,
       created_by: createdBy,
-    });
+    } as Prisma.AiApprovalPolicyUncheckedCreateInput);
     await this.audit.record({
       action: 'ai.approval_policy.create',
       entityType: 'AiApprovalPolicy',
       entityId: policy.id,
-      organizationId,
-      workspaceId: policy.workspace_id,
       newValue: { name: policy.name, target_type: policy.target_type, is_active: policy.is_active },
     });
     return policy;
   }
 
-  async updatePolicy(organizationId: string, id: string, dto: UpdateApprovalPolicyDto) {
-    const before = await this.getPolicy(organizationId, id);
+  async updatePolicy(id: string, dto: UpdateApprovalPolicyDto) {
+    const before = await this.getPolicy(id);
     const policy = await this.repository.updatePolicy(id, {
       name: dto.name ?? undefined,
       description: dto.description ?? undefined,
@@ -106,7 +93,6 @@ export class ApprovalsService {
       action: 'ai.approval_policy.update',
       entityType: 'AiApprovalPolicy',
       entityId: id,
-      organizationId,
       oldValue: { is_active: before.is_active, condition: before.condition },
       newValue: { is_active: policy.is_active, condition: policy.condition },
     });
@@ -115,14 +101,13 @@ export class ApprovalsService {
 
   // ─── Aprovacoes de acao ─────────────────────────────
 
-  listApprovals(organizationId: string, filters: ApprovalFilters) {
-    return this.repository.findApprovals(organizationId, filters);
+  listApprovals(filters: ApprovalFilters) {
+    return this.repository.findApprovals(filters);
   }
 
-  async getApproval(organizationId: string, id: string) {
+  async getApproval(id: string) {
     const approval = await this.repository.findApprovalById(id);
     if (!approval) throw new NotFoundException('Aprovação não encontrada.');
-    assertSameOrg(approval.organization_id, organizationId);
     return approval;
   }
 
@@ -134,8 +119,6 @@ export class ApprovalsService {
     const ctxJson = (approval.context ?? {}) as unknown as {
       arguments?: Record<string, unknown>;
       scope?: {
-        workspaceId?: string | null;
-        environmentId?: string | null;
         scopeKeys?: Record<string, string>;
         memoryProfileIds?: string[];
         agentId?: string;
@@ -148,9 +131,6 @@ export class ApprovalsService {
     const scope = ctxJson.scope ?? {};
     const runtime = this.moduleRef.get(ToolRuntimeService, { strict: false });
     const execCtx: ToolExecutionContext = {
-      organizationId: approval.organization_id,
-      workspaceId: scope.workspaceId ?? null,
-      environmentId: scope.environmentId ?? null,
       agentId: scope.agentId ?? '',
       agentRunId: approval.agent_run_id ?? scope.agentRunId ?? '',
       traceId: scope.traceId ?? '',
@@ -176,7 +156,6 @@ export class ApprovalsService {
         ? new Date(Date.now() + input.expiresAfterSeconds * 1000)
         : null;
     return this.repository.createApproval({
-      organization_id: input.organizationId,
       policy_id: input.policyId ?? null,
       agent_run_id: input.agentRunId ?? null,
       requested_by: input.requestedBy ?? null,
@@ -184,7 +163,7 @@ export class ApprovalsService {
       context: (input.context ?? {}) as Prisma.InputJsonValue,
       status: AiApprovalStatus.PENDING,
       expires_at: expiresAt,
-    });
+    } as Prisma.AiActionApprovalUncheckedCreateInput);
   }
 
   /**
@@ -193,11 +172,10 @@ export class ApprovalsService {
    * (evita dependencia circular com o AgentRunner).
    */
   async decide(
-    organizationId: string,
     id: string,
     decision: ApprovalDecision,
   ): Promise<AiActionApproval> {
-    const approval = await this.getApproval(organizationId, id);
+    const approval = await this.getApproval(id);
     if (approval.status !== AiApprovalStatus.PENDING) {
       throw new ConflictException('Aprovação já decidida.');
     }
@@ -230,7 +208,6 @@ export class ApprovalsService {
       action: 'ai.approval.decide',
       entityType: 'AiActionApproval',
       entityId: id,
-      organizationId,
       oldValue: { status: approval.status },
       newValue: { status: updated.status, id: updated.id },
     });

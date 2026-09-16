@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ProfilesRepository } from './profiles.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { assertSameOrg } from '../../../shared/auth/tenant.util';
+import { Prisma } from '@prisma/client';
 import {
   ALL_PERMISSIONS,
   PERMISSION_GROUPS,
@@ -31,47 +31,44 @@ export class ProfilesService {
     };
   }
 
-  findAll(orgId: string) {
-    return this.repository.findAllByOrg(orgId);
+  findAll() {
+    return this.repository.findAll();
   }
 
-  async findById(orgId: string, id: string) {
+  async findById(id: string) {
     const profile = await this.repository.findById(id);
     if (!profile || profile.deleted_at) throw new NotFoundException('Perfil não encontrado.');
-    assertSameOrg(profile.organization_id, orgId);
     return profile;
   }
 
-  async create(orgId: string, dto: CreateProfileDto) {
+  async create(dto: CreateProfileDto) {
     this.assertKnownPermissions(dto.permissions);
-    const dup = await this.repository.findByName(orgId, dto.name);
+    const dup = await this.repository.findByName(dto.name);
     if (dup && !dup.deleted_at) throw new ConflictException('Já existe um perfil com este nome.');
 
     const profile = await this.repository.create({
-      organization: { connect: { id: orgId } },
       name: dto.name,
       description: dto.description ?? null,
       permissions: dto.permissions,
       is_system: false,
-    });
+    } as Prisma.PermissionProfileUncheckedCreateInput);
     await this.audit.record({
       action: 'core.profile.create',
       entityType: 'PermissionProfile',
       entityId: profile.id,
-      organizationId: orgId,
       newValue: { name: profile.name, permissions: profile.permissions },
     });
     return profile;
   }
 
-  async update(orgId: string, id: string, dto: UpdateProfileDto) {
-    const before = await this.findById(orgId, id);
+  async update(id: string, dto: UpdateProfileDto) {
+    const before = await this.findById(id);
     if (before.is_system) {
       throw new BadRequestException('Perfis de sistema não podem ser editados.');
     }
     if (dto.permissions) this.assertKnownPermissions(dto.permissions);
     if (dto.name && dto.name !== before.name) {
-      const dup = await this.repository.findByName(orgId, dto.name);
+      const dup = await this.repository.findByName(dto.name);
       if (dup) throw new ConflictException('Já existe um perfil com este nome.');
     }
     const profile = await this.repository.update(id, {
@@ -83,7 +80,6 @@ export class ProfilesService {
       action: 'core.profile.update',
       entityType: 'PermissionProfile',
       entityId: id,
-      organizationId: orgId,
       oldValue: { name: before.name, description: before.description, permissions: before.permissions },
       newValue: { name: profile.name, description: profile.description, permissions: profile.permissions },
     });
@@ -91,8 +87,8 @@ export class ProfilesService {
   }
 
   /** Soft-delete — bloqueado pra perfis de sistema e perfis em uso. */
-  async inactivate(orgId: string, id: string) {
-    const before = await this.findById(orgId, id);
+  async inactivate(id: string) {
+    const before = await this.findById(id);
     if (before.is_system) {
       throw new BadRequestException('Perfis de sistema não podem ser excluídos.');
     }
@@ -107,7 +103,6 @@ export class ProfilesService {
       action: 'core.profile.inactivate',
       entityType: 'PermissionProfile',
       entityId: id,
-      organizationId: orgId,
       oldValue: { deleted_at: null },
       newValue: { deleted_at: profile.deleted_at },
     });

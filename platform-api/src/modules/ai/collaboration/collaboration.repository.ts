@@ -12,8 +12,8 @@ export interface CollaborationRuleFilters {
 export class CollaborationRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByOrg(organizationId: string, filters: CollaborationRuleFilters = {}) {
-    const where: Prisma.AiCollaborationRuleWhereInput = { organization_id: organizationId };
+  findAll(filters: CollaborationRuleFilters = {}) {
+    const where: Prisma.AiCollaborationRuleWhereInput = {};
     if (filters.principalAgentId) where.principal_agent_id = filters.principalAgentId;
     return this.prisma.aiCollaborationRule.findMany({
       where,

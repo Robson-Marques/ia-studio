@@ -6,9 +6,6 @@ import { CommChatStatus, CommMessageDirection, Prisma, WhatsappChat, WhatsappMes
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface ChatListFilters {
-  organizationId: string;
-  workspaceId?: string;
-  environmentId?: string;
   status?: CommChatStatus;
   connectionId?: string;
   search?: string;
@@ -19,9 +16,6 @@ export interface ChatListFilters {
 }
 
 export interface UpsertChatInput {
-  organizationId: string;
-  workspaceId: string;
-  environmentId: string;
   connectionId: string;
   phone: string;
   contactName?: string | null;
@@ -48,9 +42,7 @@ export class WhatsappChatsRepository {
   }
 
   async listChats(filters: ChatListFilters): Promise<{ items: WhatsappChat[]; total: number }> {
-    const where: Prisma.WhatsappChatWhereInput = { organization_id: filters.organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
+    const where: Prisma.WhatsappChatWhereInput = {};
     if (filters.status) where.attendance_status = filters.status;
     if (filters.connectionId) where.connection_id = filters.connectionId;
     if (filters.search) {
@@ -81,9 +73,7 @@ export class WhatsappChatsRepository {
    * composicao de WHERE do listChats — sem inventar regra nova.
    */
   countChats(filters: ChatListFilters): Promise<number> {
-    const where: Prisma.WhatsappChatWhereInput = { organization_id: filters.organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
+    const where: Prisma.WhatsappChatWhereInput = {};
     if (filters.status) where.attendance_status = filters.status;
     if (filters.connectionId) where.connection_id = filters.connectionId;
     if (filters.search) {
@@ -105,9 +95,6 @@ export class WhatsappChatsRepository {
     return this.prisma.whatsappChat.upsert({
       where: { connection_id_phone: { connection_id: input.connectionId, phone: input.phone } },
       create: {
-        organization_id: input.organizationId,
-        workspace_id: input.workspaceId,
-        environment_id: input.environmentId,
         connection_id: input.connectionId,
         phone: input.phone,
         contact_name: input.contactName ?? null,

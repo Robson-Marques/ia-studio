@@ -39,10 +39,6 @@ export class CreateIncidentDto {
 
   @IsOptional() @IsString() @MaxLength(240) forecast?: string;
 
-  @IsString() workspace_id!: string;
-
-  @IsString() environment_id!: string;
-
   /** Conexao Altarede que resolve os afetados. */
   @IsString() connection_id!: string;
 

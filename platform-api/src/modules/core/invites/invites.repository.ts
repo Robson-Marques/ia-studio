@@ -7,9 +7,9 @@ import { PrismaService } from '../../../shared/prisma/prisma.service';
 export class InvitesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string) {
+  findAll() {
     return this.prisma.userInvite.findMany({
-      where: { organization_id: organizationId },
+      where: {},
       orderBy: { created_at: 'desc' },
     });
   }
@@ -21,14 +21,12 @@ export class InvitesRepository {
   findByToken(token: string) {
     return this.prisma.userInvite.findUnique({
       where: { token },
-      include: { organization: { select: { id: true, name: true, is_active: true } } },
     });
   }
 
-  findPendingByEmail(organizationId: string, email: string) {
+  findPendingByEmail(email: string) {
     return this.prisma.userInvite.findFirst({
       where: {
-        organization_id: organizationId,
         email,
         accepted_at: null,
         expires_at: { gt: new Date() },

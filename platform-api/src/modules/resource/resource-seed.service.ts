@@ -5,7 +5,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ResourceRepository } from './resource.repository';
-import { PrismaService } from '../../shared/prisma/prisma.service';
 
 interface ExampleMapping {
   resource_type: string;
@@ -99,34 +98,27 @@ const ALTAREDE_EXAMPLES: ExampleMapping[] = [
 export class ResourceSeedService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ResourceSeedService.name);
 
-  constructor(
-    private readonly repository: ResourceRepository,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly repository: ResourceRepository) {}
 
   async onApplicationBootstrap(): Promise<void> {
     try {
-      const orgs = await this.prisma.organization.findMany({ select: { id: true } });
       let count = 0;
-      for (const org of orgs) {
-        for (const ex of ALTAREDE_EXAMPLES) {
-          await this.repository.upsertByNaturalKey(
-            org.id,
-            'altarede',
-            null,
-            ex.resource_type,
-            ex.source_operation,
-            {
-              field_map: ex.field_map as Prisma.InputJsonValue,
-              extensions: (ex.extensions ?? undefined) as Prisma.InputJsonValue | undefined,
-              description: ex.description,
-              is_active: false, // nasce OFF (diretriz 25) — usuario ativa
-            },
-          );
-          count++;
-        }
+      for (const ex of ALTAREDE_EXAMPLES) {
+        await this.repository.upsertByNaturalKey(
+          'altarede',
+          null,
+          ex.resource_type,
+          ex.source_operation,
+          {
+            field_map: ex.field_map as Prisma.InputJsonValue,
+            extensions: ex.extensions as Prisma.InputJsonValue | undefined,
+            description: ex.description,
+            is_active: false, // nasce OFF (diretriz 25) — usuario ativa
+          },
+        );
+        count++;
       }
-      this.logger.log(`ResourceMapping de exemplo (Altarede) semeados: ${count} em ${orgs.length} organização(ões).`);
+      this.logger.log(`ResourceMapping de exemplo (Altarede) semeados: ${count}.`);
     } catch (e) {
       // Seed nunca derruba o boot.
       this.logger.error(`Seed de ResourceMapping falhou: ${(e as Error).message}`);

@@ -4,7 +4,6 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface AuditFilters {
-  organizationId?: string;
   entityType?: string;
   entityId?: string;
   action?: string;
@@ -21,7 +20,6 @@ export class AuditQueryRepository {
 
   async findAll(filters: AuditFilters) {
     const where: Prisma.AuditLogWhereInput = {
-      ...(filters.organizationId ? { organization_id: filters.organizationId } : {}),
       ...(filters.entityType ? { entity_type: filters.entityType } : {}),
       ...(filters.entityId ? { entity_id: filters.entityId } : {}),
       ...(filters.action ? { action: filters.action } : {}),

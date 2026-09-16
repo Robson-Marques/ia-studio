@@ -25,8 +25,6 @@ import { IspIncidentsService } from './isp-incidents.service';
 import { IspOutageDetectionCron } from './isp-outage-detection.cron';
 import { IspTools } from './isp-tools';
 import { IspController } from './isp.controller';
-import { IspExampleRepository } from './isp-example.repository';
-import { IspExampleAssistantSeed } from './isp-example-assistant.seed';
 import { IspOsConfigRepository } from './isp-os-config.repository';
 import { IspOsConfigService } from './isp-os-config.service';
 import { IspOsConfigController } from './isp-os-config.controller';
@@ -48,8 +46,6 @@ import { IspPaymentLinkController } from './isp-payment-link.controller';
     IspIncidentsService,
     IspOutageDetectionCron,
     IspTools,
-    IspExampleRepository,
-    IspExampleAssistantSeed,
     IspOsConfigRepository,
     IspOsConfigService,
     IspPaymentLinkRepository,
