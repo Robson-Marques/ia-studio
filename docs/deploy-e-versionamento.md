@@ -9,27 +9,53 @@ Console, banco `iastudio_db`, processos PM2 globais ou vhost `/console/`.
 - Um domínio, uma porta HTTP livre e um banco Redis (`0`–`15`) por instância.
 - Checkout Git limpo usado somente como fonte para criar instâncias.
 
-## Primeira conversão no servidor de desenvolvimento
+## Refazer o servidor de desenvolvimento do zero
 
-O checkout SaaS legado é preservado como fonte/histórico; seu banco não recebe
-`db push`, restore nem mudança de schema. A primeira instância dedicada nasce
-em banco limpo sob `/opt/iastudio/instances/<instance-id>`.
+Não há dados a preservar neste ambiente. A primeira instância dedicada nasce em
+banco limpo sob `/opt/iastudio/instances/<instance-id>`, depois de remover o
+legado somente pelo script restrito abaixo. Ele não toca nos demais produtos do
+host.
 
-Depois de obter a tag desta conversão, crie um checkout temporário da tag. Não
-atualize nem execute scripts dentro da instalação legada:
+Crie primeiro um checkout temporário da tag. Ele continuará disponível depois
+da remoção de `/opt/iastudio` para executar o bootstrap:
 
 ```bash
 git clone --branch <tag> https://github.com/Robson-Marques/ia-studio.git \
   /opt/iastudio-bootstrap-<tag>
 cd /opt/iastudio-bootstrap-<tag>
+```
+
+## Remover o SaaS legado (somente quando o ambiente puder ser refeito)
+
+Não use o antigo `uninstall.sh`: ele tinha modo de purge global e poderia afetar
+outros produtos instalados no servidor. Primeiro confira a prévia:
+
+```bash
+bash scripts/uninstall-legacy-saas.sh --dry-run
+```
+
+Se a lista mostrar apenas o legado esperado, execute a remoção restrita:
+
+```bash
+bash scripts/uninstall-legacy-saas.sh --remove --confirm LEGACY-IASTUDIO
+```
+
+Ele só remove `/opt/iastudio`, `/opt/iastudio-backups`, banco/role
+`iastudio_db`/`iastudio`, os dois processos PM2 históricos e vhosts
+`iastudio*`. Redis, Node, PostgreSQL, PM2, Nginx, SSL e as aplicações
+`ctrl-leads` e `financas-pessoais` permanecem intactos.
+
+Com a remoção concluída, ainda no checkout temporário, crie a primeira
+instância dedicada:
+
+```bash
 bash scripts/upgrade.sh --bootstrap-dedicated --to <tag> \
   --instance-id ia-dev --domain ia-dev.exemplo.com \
   --admin-email admin@exemplo.com --admin-password '<senha-forte>' \
   --redis-db 1 --email ops@exemplo.com
 ```
 
-Esse modo clona a tag para a nova instância e chama o instalador dedicado. Ele
-não lê, altera, move, restaura ou reaproveita o checkout ou banco SaaS anterior.
+Esse modo clona a tag para a nova instância e chama o instalador dedicado.
 Depois da validação, o checkout temporário pode ser removido; ele não é uma
 instância em execução.
 

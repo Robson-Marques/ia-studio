@@ -2,8 +2,7 @@
 
 Os scripts operam uma instância identificada, nunca uma plataforma compartilhada.
 Cada instalação tem diretório, banco/role PostgreSQL, Redis, fila, storage,
-backup, PM2 e vhost próprios. A fonte SaaS anterior é histórica/rollback e não é
-alvo de `db push`, restore ou upgrade.
+backup, PM2 e vhost próprios.
 
 | Script | Responsabilidade |
 |---|---|
@@ -11,6 +10,7 @@ alvo de `db push`, restore ou upgrade.
 | `install-dedicated.sh` | Cria uma instância com `--instance-id`, domínio, administrador e Redis explícitos. |
 | `provision-dedicated-schema.sh` | Inicializa o schema limpo da instância informada. |
 | `uninstall.sh` / `uninstall-dedicated.sh` | Remove somente a instância confirmada; nunca dependências ou recursos de outros clientes. |
+| `uninstall-legacy-saas.sh` | Remove o SaaS antigo somente após prévia e confirmação literal; preserva serviços compartilhados do host. |
 | `upgrade.sh` | Atualiza uma instância dedicada; `--bootstrap-dedicated` cria a primeira instância limpa a partir do checkout histórico sem tocar no banco legado. |
 | `backup-full.sh` / `restore-full.sh` | Backup e restauração completos da instância. |
 | `migration/export-isp-operational-data.sh` | Exportação seletiva e somente leitura da base histórica. |
@@ -25,7 +25,7 @@ Exemplo de criação:
 ```bash
 bash scripts/install.sh --instance-id isp-a --domain ia.exemplo.com \
   --admin-email admin@exemplo.com --admin-password 'senha-forte' \
-  --redis-db 2 --email ops@exemplo.com
+  --redis-db 2 --email ops@exemplo.com --source-revision <tag>
 ```
 
 O servidor de produção executa os builds. Não há build local obrigatório no
@@ -45,4 +45,5 @@ explícita; instâncias diferentes não disputam o mesmo lock.
 O bootstrap da primeira instância exige tag, `instance-id`, domínio, credenciais
 locais e Redis explícito. Toda instalação clona uma `--source-revision` marcada
 para o próprio diretório; execute o bootstrap a partir de um checkout temporário
-da tag, nunca dentro da instalação SaaS que será preservada.
+da tag. No servidor de desenvolvimento que será refeito, remova antes o SaaS
+legado com `uninstall-legacy-saas.sh`.

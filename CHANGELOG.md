@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.11.2 - 2026-09-18 (Remoção segura do SaaS legado)
+
+Adiciona `uninstall-legacy-saas.sh`, com prévia obrigatória e confirmação
+literal. Ele remove exclusivamente os recursos conhecidos do IA Studio SaaS,
+mantendo serviços compartilhados e os demais produtos no host.
+
 ## v0.11.1 - 2026-09-18 (Bootstrap sem tocar no legado)
 
 Correção do checkpoint dedicado. O bootstrap pode rodar a partir de um checkout
