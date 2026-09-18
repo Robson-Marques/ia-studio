@@ -15,9 +15,13 @@ O checkout SaaS legado é preservado como fonte/histórico; seu banco não receb
 `db push`, restore nem mudança de schema. A primeira instância dedicada nasce
 em banco limpo sob `/opt/iastudio/instances/<instance-id>`.
 
-Depois de obter a tag desta conversão, execute no checkout legado:
+Depois de obter a tag desta conversão, crie um checkout temporário da tag. Não
+atualize nem execute scripts dentro da instalação legada:
 
 ```bash
+git clone --branch <tag> https://github.com/Robson-Marques/ia-studio.git \
+  /opt/iastudio-bootstrap-<tag>
+cd /opt/iastudio-bootstrap-<tag>
 bash scripts/upgrade.sh --bootstrap-dedicated --to <tag> \
   --instance-id ia-dev --domain ia-dev.exemplo.com \
   --admin-email admin@exemplo.com --admin-password '<senha-forte>' \
@@ -26,6 +30,8 @@ bash scripts/upgrade.sh --bootstrap-dedicated --to <tag> \
 
 Esse modo clona a tag para a nova instância e chama o instalador dedicado. Ele
 não lê, altera, move, restaura ou reaproveita o checkout ou banco SaaS anterior.
+Depois da validação, o checkout temporário pode ser removido; ele não é uma
+instância em execução.
 
 ## Nova instância no mesmo host
 

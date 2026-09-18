@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.11.1 - 2026-09-18 (Bootstrap sem tocar no legado)
+
+Correção do checkpoint dedicado. O bootstrap pode rodar a partir de um checkout
+temporário da tag e instala a nova instância sem executar scripts nem alterar o
+checkout SaaS histórico.
+
 ## v0.11.0 - 2026-09-18 (Checkpoint: base dedicada por instância)
 
 Marco de código para criar a primeira instância dedicada a partir do ambiente

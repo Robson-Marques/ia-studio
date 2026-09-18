@@ -87,7 +87,10 @@ if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then
   git -C "$REPO_PATH" fetch --tags origin
   git -C "$REPO_PATH" rev-parse --verify "refs/tags/${TO_VERSION}^{commit}" >/dev/null \
     || { echo "ERRO: tag/revisão não encontrada: $TO_VERSION" >&2; exit 1; }
-  exec bash "$REPO_PATH/scripts/install-dedicated.sh" --source-dir "$REPO_PATH" --source-revision "$TO_VERSION" "${BOOTSTRAP_ARGS[@]}"
+  # SCRIPT_DIR pertence ao checkout que contém este bootstrap. Assim ele pode
+  # ser um clone novo na tag, enquanto REPO_PATH permanece apenas como fonte
+  # histórica — sem alterar o código da instalação antiga.
+  exec bash "$SCRIPT_DIR/install-dedicated.sh" --source-dir "$REPO_PATH" --source-revision "$TO_VERSION" "${BOOTSTRAP_ARGS[@]}"
 fi
 
 [ -z "$TO_VERSION" ]  && echo "ERRO: versao (tag) obrigatoria" && exit 1

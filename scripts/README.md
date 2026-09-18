@@ -44,4 +44,5 @@ explícita; instâncias diferentes não disputam o mesmo lock.
 
 O bootstrap da primeira instância exige tag, `instance-id`, domínio, credenciais
 locais e Redis explícito. Toda instalação clona uma `--source-revision` marcada
-para o próprio diretório; ela não é um upgrade in-place do banco SaaS.
+para o próprio diretório; execute o bootstrap a partir de um checkout temporário
+da tag, nunca dentro da instalação SaaS que será preservada.
