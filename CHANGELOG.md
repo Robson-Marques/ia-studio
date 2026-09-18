@@ -1,5 +1,21 @@
 # Changelog — IA Studio
 
+## v0.11.0 - 2026-09-18 (Checkpoint: base dedicada por instância)
+
+Marco de código para criar a primeira instância dedicada a partir do ambiente
+de desenvolvimento. Não é deploy nem release operacional: S4 ainda requer a
+prova de duas instâncias reais no mesmo host.
+
+- A primeira instalação usa `upgrade.sh --bootstrap-dedicated --to <tag>`:
+  preserva checkout e banco SaaS legados e cria uma base PostgreSQL limpa em
+  `/opt/iastudio/instances/<id>`.
+- `install.sh` exige uma tag (`--source-revision`) e cria clone Git próprio,
+  banco/role PostgreSQL, Redis, PM2, storage, backup e vhost por instância.
+- `upgrade.sh` de instâncias dedicadas não aceita perda de schema
+  automaticamente; mudanças destrutivas falham de forma explícita.
+- S2 está concluído como não aplicável à migração de dados: não existem
+  clientes nem dados operacionais na instalação de desenvolvimento.
+
 ## v0.10.89 - 2026-09-14 (Templates header-media — parte 3: seletor de cabeçalho no formulário)
 
 Sem `db push`. Só `platform-admin` (build do painel). Fecha o header-media (partes 1–2 no backend).
