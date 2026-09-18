@@ -11,7 +11,7 @@ alvo de `db push`, restore ou upgrade.
 | `install-dedicated.sh` | Cria uma instância com `--instance-id`, domínio, administrador e Redis explícitos. |
 | `provision-dedicated-schema.sh` | Inicializa o schema limpo da instância informada. |
 | `uninstall.sh` / `uninstall-dedicated.sh` | Remove somente a instância confirmada; nunca dependências ou recursos de outros clientes. |
-| `upgrade.sh` | Atualiza API e painel local; não constrói nem publica Console. |
+| `upgrade.sh` | Atualiza uma instância dedicada; `--bootstrap-dedicated` cria a primeira instância limpa a partir do checkout histórico sem tocar no banco legado. |
 | `backup-full.sh` / `restore-full.sh` | Backup e restauração completos da instância. |
 | `migration/export-isp-operational-data.sh` | Exportação seletiva e somente leitura da base histórica. |
 | `migration/backup-saas-historical.sh` / `verify-saas-historical-backup.sh` | Snapshot verificável da fonte SaaS, exclusivo para rollback e nunca restaurável no dedicado. |
@@ -41,3 +41,7 @@ silencioso nem reversão destrutiva automática.
 Install, provisionamento, upgrade, backup e restauração usam lock por
 `instance-id`. Uma operação concorrente na mesma instalação falha de forma
 explícita; instâncias diferentes não disputam o mesmo lock.
+
+O bootstrap da primeira instância exige tag, `instance-id`, domínio, credenciais
+locais e Redis explícito. Toda instalação clona uma `--source-revision` marcada
+para o próprio diretório; ela não é um upgrade in-place do banco SaaS.

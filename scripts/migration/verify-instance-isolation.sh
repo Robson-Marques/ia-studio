@@ -19,8 +19,24 @@ rg -Fq 'pg_advisory_xact_lock' scripts/provision-dedicated-schema.sh \
   || fail 'provisionamento do schema não possui advisory lock transacional.'
 rg -Fq -- '--from-empty' scripts/provision-dedicated-schema.sh \
   || fail 'schema inicial não é gerado a partir de banco vazio.'
-if rg -n -- '--accept-data-loss|prisma db push' scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh; then
-  fail 'instalação dedicada não pode aplicar db push destrutivo.'
+if rg -n -- '--accept-data-loss' scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/upgrade.sh; then
+  fail 'instalação ou atualização dedicada não pode aceitar perda de dados automaticamente.'
+fi
+if rg -n -- 'prisma db push' scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh; then
+  fail 'provisionamento dedicado deve usar migrations a partir de banco vazio, não db push.'
+fi
+rg -Fq -- '--bootstrap-dedicated' scripts/upgrade.sh \
+  || fail 'upgrade não oferece bootstrap explícito da primeira instância dedicada.'
+rg -Fq 'install-dedicated.sh' scripts/upgrade.sh \
+  || fail 'bootstrap não delega ao instalador dedicado.'
+rg -Fq -- '--source-revision "$TO_VERSION"' scripts/upgrade.sh \
+  || fail 'bootstrap não fixa explicitamente a revisão de origem.'
+rg -Fq 'git clone --no-checkout' scripts/install-dedicated.sh \
+  || fail 'instalação não cria um checkout próprio para futuras atualizações.'
+rg -Fq 'remote set-url origin' scripts/install-dedicated.sh \
+  || fail 'checkout da instância não preserva a origem das atualizações.'
+if ! rg -Fq 'if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then' scripts/upgrade.sh; then
+  fail 'bootstrap não possui caminho exclusivo antes do upgrade de instância.'
 fi
 if rg -n '/opt/iastudio\b|iastudio_db\b|iastudio-api\b|iastudio-worker\b|platform-console|/console/' \
   scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/uninstall-dedicated.sh scripts/backup-full.sh scripts/restore-full.sh scripts/restore-backup.sh scripts/upgrade.sh; then

@@ -7,7 +7,12 @@
 # Disparado pelo painel local de Administração da instalação (spawn detached), que ja criou
 # a row em system_upgrades (status=RUNNING) e chama com args POSICIONAIS:
 #     bash scripts/upgrade.sh <tag> <upgrade_id>
-# (tambem aceita --to / --upgrade-id / --repo-path para uso manual)
+# (também aceita --to / --upgrade-id / --repo-path para uso manual).
+#
+# A primeira conversão de uma checkout SaaS de desenvolvimento NÃO usa este
+# fluxo normal: use --bootstrap-dedicated. Ele lê uma tag no checkout histórico
+# e cria uma instância dedicada limpa ao lado, sem alterar banco, código ou
+# processos do legado.
 #
 # Cada fase grava UMA linha em system_upgrades.log_lines (String[]) via psql
 # array_append — o front faz polling a cada 2s. Falha em qualquer fase:
@@ -34,22 +39,59 @@ fi
 # ---------- ARGS (posicionais OU flags) ----------
 SCRIPT_DIR="${IASTUDIO_UPGRADE_SOURCE_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"; DO_RESTART=1
+BOOTSTRAP_DEDICATED=0
+BOOTSTRAP_ARGS=()
+usage() {
+  cat <<'EOF'
+Uso normal (somente instância já dedicada):
+  bash scripts/upgrade.sh --to <tag> --upgrade-id <uuid> [--repo-path <instância>]
+
+Bootstrap da primeira instância dedicada a partir de um checkout SaaS de desenvolvimento:
+  bash scripts/upgrade.sh --bootstrap-dedicated --to <tag> [--repo-path <checkout-legado>] \
+    --instance-id <id> --domain <domínio> --admin-email <email> --admin-password <senha> \
+    --redis-db <0-15> [--admin-name <nome>] [--email <ssl>] [--no-ssl] [--install-deps]
+
+O bootstrap não usa nem altera o banco, código ou processos SaaS legados. Ele
+clona a tag no diretório da nova instância e cria banco e recursos limpos.
+EOF
+}
 POS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --bootstrap-dedicated) BOOTSTRAP_DEDICATED=1; shift ;;
     --to)          TO_VERSION="$2"; shift 2 ;;
     --upgrade-id)  UPGRADE_ID="$2"; shift 2 ;;
     --repo-path)   REPO_PATH="$2"; shift 2 ;;
     --no-restart)  DO_RESTART=0; shift ;;
+    --instance-id|--domain|--admin-email|--admin-password|--admin-name|--redis-db|--email)
+                   BOOTSTRAP_ARGS+=("$1" "${2:?valor ausente}"); shift 2 ;;
+    --no-ssl|--install-deps)
+                   BOOTSTRAP_ARGS+=("$1"); shift ;;
+    -h|--help)     usage; exit 0 ;;
     *)             POS+=("$1"); shift ;;
   esac
 done
 [ -z "${TO_VERSION}" ] && [ "${#POS[@]}" -ge 1 ] && TO_VERSION="${POS[0]}"
 [ -z "${UPGRADE_ID}" ] && [ "${#POS[@]}" -ge 2 ] && UPGRADE_ID="${POS[1]}"
 
+[ ! -d "$REPO_PATH" ] && echo "ERRO: repo nao encontrado: $REPO_PATH" && exit 1
+
+if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then
+  [ -z "$TO_VERSION" ] && { echo "ERRO: tag obrigatória para --bootstrap-dedicated" >&2; exit 1; }
+  [ "${#POS[@]}" -eq 0 ] || { echo "ERRO: argumentos posicionais não são aceitos no bootstrap." >&2; exit 1; }
+  [ "${#BOOTSTRAP_ARGS[@]}" -gt 0 ] || { echo "ERRO: parâmetros da nova instância são obrigatórios." >&2; usage >&2; exit 1; }
+  git -C "$REPO_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+    || { echo "ERRO: repo-path não é um checkout git." >&2; exit 1; }
+  [ -z "$(git -C "$REPO_PATH" status --porcelain --untracked-files=no)" ] \
+    || { echo "ERRO: checkout-fonte tem alterações versionadas; faça commit/stash antes do bootstrap." >&2; exit 1; }
+  git -C "$REPO_PATH" fetch --tags origin
+  git -C "$REPO_PATH" rev-parse --verify "refs/tags/${TO_VERSION}^{commit}" >/dev/null \
+    || { echo "ERRO: tag/revisão não encontrada: $TO_VERSION" >&2; exit 1; }
+  exec bash "$REPO_PATH/scripts/install-dedicated.sh" --source-dir "$REPO_PATH" --source-revision "$TO_VERSION" "${BOOTSTRAP_ARGS[@]}"
+fi
+
 [ -z "$TO_VERSION" ]  && echo "ERRO: versao (tag) obrigatoria" && exit 1
 [ -z "$UPGRADE_ID" ]  && echo "ERRO: upgrade-id obrigatorio" && exit 1
-[ ! -d "$REPO_PATH" ] && echo "ERRO: repo nao encontrado: $REPO_PATH" && exit 1
 
 API_DIR="$REPO_PATH/platform-api"
 ADMIN_DIR="$REPO_PATH/platform-admin"
@@ -70,7 +112,7 @@ set -a
 source "$ENV_FILE"
 set +a
 
-: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância}"
+: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância. Para criar a primeira instância dedicada, use --bootstrap-dedicated.}"
 : "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da instância}"
 : "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da instância}"
 BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da instância}"
@@ -179,8 +221,8 @@ cd "$API_DIR"
 npm install --no-audit --no-fund 2>/tmp/iastudio_npm.err >/dev/null || mark_failed "API_INSTALL" "npm install falhou: $(tail -c 600 /tmp/iastudio_npm.err)"
 
 # ---------- 6) PRISMA_PUSH ----------
-log_db "PRISMA_PUSH" "prisma db push + generate"
-npx prisma db push --accept-data-loss 2>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISMA_PUSH" "db push falhou: $(tail -c 600 /tmp/iastudio_prisma.err)"
+log_db "PRISMA_PUSH" "prisma db push sem aceitação automática de perda"
+npx prisma db push 2>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISMA_PUSH" "db push falhou ou exigiu intervenção para mudança destrutiva: $(tail -c 600 /tmp/iastudio_prisma.err)"
 npx prisma generate 2>>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISMA_PUSH" "prisma generate falhou: $(tail -c 600 /tmp/iastudio_prisma.err)"
 
 # ---------- 7) API_BUILD ----------

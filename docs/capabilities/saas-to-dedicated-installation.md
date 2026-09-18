@@ -75,7 +75,7 @@ install/upgrade/backup/restore/uninstall dessa instância. Falha de A não afeta
 |---|---|---|---|
 | S0 — Recovery e contrato | Baseline, Capability Map, RFC e contrato local | decisão do produto | concluído neste slice |
 | S1 — núcleo dedicado | Modelo de dados alvo, exportação seletiva controlada, auth/ACL/eventos locais e retirada do tenant context | política de dados decidida | concluído — gate transversal 100%, sem bloqueantes nas cinco camadas |
-| S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | em andamento — gate local e exportação seletiva verificável; importação real depende da seleção operacional aprovada |
+| S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | concluído — gate local aprovado; exportação/importação é não aplicável à primeira instância sem clientes, conforme `migrations/s2-dev-data-disposition.md` |
 | S3 — superfícies dedicadas | Migração de atualização/backup/restauração para a administração local; remoção de Console e UI/rotas/contextos SaaS | S1 | concluído — matriz e gate em `saas-to-dedicated-s3-console-matrix.md` |
 | S4 — instâncias no mesmo host | Install/upgrade/backup/restore/uninstall isolados | S1 e contratos de runtime finais | em andamento — isolamento estático e locks por instância aprovados; falta prova com duas instalações reais no host |
 | S5 — Acceptance | Evidência integrada e documentação viva | S1–S4 | pendente |
@@ -101,6 +101,10 @@ contratos executáveis retomem organização/workspace/ambiente, tenant ou
 Licensing/Billing. A única referência de organização permitida fica no
 exportador histórico, que é somente leitura e é validado antes de revisão por
 `verify-isp-operational-export.sh`; ela nunca entra na aplicação dedicada.
+Na primeira instalação de desenvolvimento não há dados operacionais para mover:
+essa parte é formalmente não aplicável em
+[`s2-dev-data-disposition.md`](../migrations/s2-dev-data-disposition.md), não
+substituída por backup vazio ou schema SaaS reutilizado.
 
 S4 usa `scripts/migration/verify-instance-isolation.sh` como gate estático: ele
 deriva recursos de dois IDs distintos e exige banco/role, Redis, PM2, diretório,
@@ -121,7 +125,11 @@ host, sem cruzamento de dados ou processos.
    o painel local não mostra workspace/ambiente ou gestão comercial SaaS.
 5. Duas instâncias são operáveis no mesmo host com bancos/roles, diretórios,
    storage, Redis, PM2, backups e vhosts distintos; operar A não altera B.
-6. A instância ISP começa em base limpa; backup verificável, exportação seletiva e importação mapeada/auditável foram executados sem perda silenciosa.
+6. A instância ISP começa em base limpa. Quando existir dado operacional a
+   preservar, há backup verificável, exportação seletiva e importação
+   mapeada/auditável, sem perda silenciosa. Para a primeira instalação de
+   desenvolvimento, sem clientes nem dados operacionais, a não aplicabilidade
+   está registrada em `migrations/s2-dev-data-disposition.md`.
 7. Segurança, ACL, auditoria, logs, Event Bus, jobs e erros têm evidência
    proporcional após a conversão.
 8. README, CLAUDE, lock, deploy e documentos de módulo descrevem o modelo dedicado

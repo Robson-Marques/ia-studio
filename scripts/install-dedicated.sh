@@ -9,13 +9,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/instance.sh"
 
 INSTANCE_ID=''; DOMAIN=''; ADMIN_EMAIL=''; ADMIN_PASSWORD=''; ADMIN_NAME='Administrador da Instalação'
-REDIS_DB=''; CERT_EMAIL=''; SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"; NO_SSL=0; INSTALL_DEPS=0
+REDIS_DB=''; CERT_EMAIL=''; SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"; SOURCE_REVISION=''; NO_SSL=0; INSTALL_DEPS=0
 usage() {
   cat <<'EOF'
 Uso:
   bash scripts/install-dedicated.sh --instance-id <cliente> --domain <app.exemplo.com> \
     --admin-email <email> --admin-password <senha> --redis-db <0-15> [--email <ssl>] \
-    [--source-dir <repo>] [--no-ssl] [--install-deps]
+    [--source-dir <repo>] --source-revision <tag> [--no-ssl] [--install-deps]
 
 Cada execução cria diretório, role/banco PostgreSQL, banco Redis, prefixo de
 filas, storage, backup, PM2 e vhost exclusivos. Não há modo keep-db nem demo.
@@ -31,13 +31,14 @@ while (($#)); do
     --redis-db) REDIS_DB="${2:?valor ausente}"; shift 2 ;;
     --email) CERT_EMAIL="${2:?valor ausente}"; shift 2 ;;
     --source-dir) SOURCE_DIR="${2:?valor ausente}"; shift 2 ;;
+    --source-revision) SOURCE_REVISION="${2:?valor ausente}"; shift 2 ;;
     --no-ssl) NO_SSL=1; shift ;;
     --install-deps) INSTALL_DEPS=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) fail_instance "argumento desconhecido: $1" ;;
   esac
 done
-[ -n "$INSTANCE_ID" ] && [ -n "$DOMAIN" ] && [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] && [ -n "$REDIS_DB" ] || { usage >&2; exit 2; }
+[ -n "$INSTANCE_ID" ] && [ -n "$DOMAIN" ] && [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] && [ -n "$REDIS_DB" ] && [ -n "$SOURCE_REVISION" ] || { usage >&2; exit 2; }
 set_instance "$INSTANCE_ID"
 acquire_instance_lock
 [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || fail_instance 'domínio inválido.'
@@ -47,10 +48,16 @@ acquire_instance_lock
 [ -d "$SOURCE_DIR/platform-api" ] || fail_instance "fonte não contém platform-api: $SOURCE_DIR"
 [ ! -e "$IASTUDIO_APP_DIR" ] || fail_instance "diretório da instância já existe: $IASTUDIO_APP_DIR"
 [ ! -e "$IASTUDIO_CONFIG_FILE" ] || fail_instance "configuração da instância já existe: $IASTUDIO_CONFIG_FILE"
+git -C "$SOURCE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+  || fail_instance "fonte não é um checkout git: $SOURCE_DIR"
+SOURCE_COMMIT="$(git -C "$SOURCE_DIR" rev-parse --verify "refs/tags/$SOURCE_REVISION^{commit}" 2>/dev/null)" \
+  || fail_instance "tag de origem não encontrada: $SOURCE_REVISION"
+SOURCE_REMOTE="$(git -C "$SOURCE_DIR" remote get-url origin 2>/dev/null || true)"
+[ -n "$SOURCE_REMOTE" ] || fail_instance 'a fonte precisa possuir o remote origin para futuras atualizações da instância.'
 
 if [ "$INSTALL_DEPS" = 1 ]; then
   apt-get update -y
-  apt-get install -y git rsync openssl postgresql-client redis-server nginx certbot python3-certbot-nginx
+  apt-get install -y git openssl postgresql-client redis-server nginx certbot python3-certbot-nginx
 fi
 command -v psql >/dev/null || fail_instance 'PostgreSQL client ausente; use --install-deps ou prepare o host.'
 command -v redis-cli >/dev/null || fail_instance 'Redis client ausente; use --install-deps ou prepare o host.'
@@ -107,8 +114,9 @@ CORS_ORIGINS=https://$DOMAIN
 EOF
 chmod 600 "$IASTUDIO_CONFIG_FILE"
 
-mkdir -p "$IASTUDIO_APP_DIR"
-rsync -a --delete --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='.env' "$SOURCE_DIR/" "$IASTUDIO_APP_DIR/"
+git clone --no-checkout "$SOURCE_DIR" "$IASTUDIO_APP_DIR"
+git -C "$IASTUDIO_APP_DIR" remote set-url origin "$SOURCE_REMOTE"
+git -C "$IASTUDIO_APP_DIR" checkout --detach "$SOURCE_COMMIT"
 cp "$IASTUDIO_CONFIG_FILE" "$IASTUDIO_APP_DIR/platform-api/.env"
 chmod 600 "$IASTUDIO_APP_DIR/platform-api/.env"
 

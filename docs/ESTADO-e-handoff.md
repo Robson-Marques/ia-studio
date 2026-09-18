@@ -46,8 +46,14 @@ gate estático `verify-instance-isolation.sh` passou para `isp-a` e `loja-b`.
 Ainda falta a prova no servidor de duas instalações reais e operações cruzadas
 sem efeito.
 
+Atualização de 2026-09-18 (S2): o responsável confirmou que não há clientes nem
+dados operacionais na instalação de desenvolvimento. A migração seletiva não é
+necessária para a primeira instância; isso foi registrado em
+`docs/migrations/s2-dev-data-disposition.md`, sem backup vazio ou conversão do
+schema SaaS. S2 está concluído pelo gate operacional e pela disposição de dados.
+
 Progresso da Capability (S1–S5; S0 é Recovery e não entra no denominador):
-S1 100%, S2 50%, S3 100%, S4 50%, S5 0%; geral **60%**. A Capability segue
+S1 100%, S2 100%, S3 100%, S4 50%, S5 0%; geral **70%**. A Capability segue
 `in-progress`, sem tag, release ou deploy após o checkpoint S3.
 
 ## 🏗️ Conversão SaaS → instalação dedicada — Capability ativa
