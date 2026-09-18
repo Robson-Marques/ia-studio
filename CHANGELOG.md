@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.11.3 - 2026-09-18 (Proteções de coexistência no host)
+
+O instalador dedicado agora recusa banco Redis não vazio, porta derivada já em
+uso e domínio já declarado no Nginx. Isso impede cruzamento com os outros
+produtos que compartilham o servidor.
+
 ## v0.11.2 - 2026-09-18 (Remoção segura do SaaS legado)
 
 Adiciona `uninstall-legacy-saas.sh`, com prévia obrigatória e confirmação

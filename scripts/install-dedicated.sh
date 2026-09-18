@@ -63,17 +63,31 @@ command -v psql >/dev/null || fail_instance 'PostgreSQL client ausente; use --in
 command -v redis-cli >/dev/null || fail_instance 'Redis client ausente; use --install-deps ou prepare o host.'
 command -v node >/dev/null || fail_instance 'Node.js ausente; prepare o runtime no host.'
 command -v pm2 >/dev/null || fail_instance 'PM2 ausente; prepare o runtime no host.'
+command -v ss >/dev/null || fail_instance 'ss é obrigatório para validar a porta exclusiva da instância.'
 
 # A alocação do banco Redis é explícita e é recusada se outra instância já usa
 # o mesmo número. O prefixo também é exclusivo, protegendo chaves BullMQ.
 if grep -Rqs "^REDIS_DB=$REDIS_DB$" "$INSTANCE_CONFIG_BASE" 2>/dev/null; then
   fail_instance "REDIS_DB=$REDIS_DB já pertence a outra instância."
 fi
+REDIS_KEY_COUNT="$(redis-cli -n "$REDIS_DB" DBSIZE 2>/dev/null || true)"
+[[ "$REDIS_KEY_COUNT" =~ ^[0-9]+$ ]] || fail_instance "não foi possível inspecionar REDIS_DB=$REDIS_DB."
+[ "$REDIS_KEY_COUNT" -eq 0 ] || fail_instance "REDIS_DB=$REDIS_DB já contém $REDIS_KEY_COUNT chave(s) de outro serviço. Escolha um banco Redis vazio."
 
 DB_PASS="$(openssl rand -hex 24)"
 JWT_SECRET="$(openssl rand -hex 32)"
 ENCRYPTION_KEY="$(openssl rand -hex 32)"
 PORT="$((3000 + REDIS_DB))"
+ss -ltnH "sport = :$PORT" | grep -q . \
+  && fail_instance "porta $PORT já está em uso; escolha outro --redis-db para derivar uma porta livre."
+
+# O domínio é uma fronteira de instância. Não sobrescrevemos vhost de outro
+# produto, mesmo quando ele está no mesmo servidor físico.
+DOMAIN_REGEX="${DOMAIN//./\\.}"
+if grep -RqsE "^[[:space:]]*server_name[[:space:]].*([[:space:]]|^)$DOMAIN_REGEX([[:space:];]|$)" \
+  /etc/nginx/sites-available /etc/nginx/conf.d 2>/dev/null; then
+  fail_instance "domínio $DOMAIN já aparece em configuração Nginx; escolha outro ou remova o vhost anterior de forma explícita."
+fi
 
 # O arquivo é lido tanto por dotenv quanto pelos scripts operacionais. Aspas
 # simples tornam a senha do administrador um valor, nunca código ao carregar o

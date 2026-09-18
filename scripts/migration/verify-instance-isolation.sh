@@ -35,6 +35,12 @@ rg -Fq 'git clone --no-checkout' scripts/install-dedicated.sh \
   || fail 'instalação não cria um checkout próprio para futuras atualizações.'
 rg -Fq 'remote set-url origin' scripts/install-dedicated.sh \
   || fail 'checkout da instância não preserva a origem das atualizações.'
+rg -Fq 'REDIS_KEY_COUNT' scripts/install-dedicated.sh \
+  || fail 'instalação não recusa banco Redis já ocupado por outro serviço.'
+rg -Fq 'porta $PORT já está em uso' scripts/install-dedicated.sh \
+  || fail 'instalação não valida colisão de porta entre aplicações.'
+rg -Fq 'domínio $DOMAIN já aparece em configuração Nginx' scripts/install-dedicated.sh \
+  || fail 'instalação não valida colisão de domínio no Nginx.'
 if ! rg -Fq 'if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then' scripts/upgrade.sh; then
   fail 'bootstrap não possui caminho exclusivo antes do upgrade de instância.'
 fi
