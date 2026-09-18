@@ -1,5 +1,10 @@
 # Changelog — IA Studio
 
+## v0.11.4 - 2026-09-18 (Provisionamento PostgreSQL dedicado)
+
+Corrige o provisionador inicial para remover `?schema=public` da URL usada pelo
+`psql`; esse parâmetro pertence ao Prisma e impedia criar o schema limpo.
+
 ## v0.11.3 - 2026-09-18 (Proteções de coexistência no host)
 
 O instalador dedicado agora recusa banco Redis não vazio, porta derivada já em

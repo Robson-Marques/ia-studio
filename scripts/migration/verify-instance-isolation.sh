@@ -19,6 +19,8 @@ rg -Fq 'pg_advisory_xact_lock' scripts/provision-dedicated-schema.sh \
   || fail 'provisionamento do schema não possui advisory lock transacional.'
 rg -Fq -- '--from-empty' scripts/provision-dedicated-schema.sh \
   || fail 'schema inicial não é gerado a partir de banco vazio.'
+rg -Fq 'PSQL_DATABASE_URL="${DATABASE_URL%%\?*}"' scripts/provision-dedicated-schema.sh \
+  || fail 'provisionamento não remove parâmetros específicos do Prisma antes de chamar psql.'
 if rg -n -- '--accept-data-loss' scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/upgrade.sh; then
   fail 'instalação ou atualização dedicada não pode aceitar perda de dados automaticamente.'
 fi

@@ -25,6 +25,11 @@ acquire_instance_lock
 API_DIR="$IASTUDIO_APP_DIR/platform-api"
 [ -f "$API_DIR/prisma/schema.prisma" ] || fail_instance "schema não encontrado em $API_DIR"
 [ -n "${DATABASE_URL:-}" ] || fail_instance 'DATABASE_URL ausente na configuração da instância.'
+# DATABASE_URL é consumida pela aplicação/Prisma e contém `?schema=public`.
+# libpq/psql não conhece esse parâmetro Prisma; para executar o SQL inicial,
+# usamos a mesma URL sem a query string específica do ORM.
+PSQL_DATABASE_URL="${DATABASE_URL%%\?*}"
+[ -n "$PSQL_DATABASE_URL" ] || fail_instance 'DATABASE_URL inválida para provisionamento PostgreSQL.'
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -56,7 +61,7 @@ VALUES ('dedicated-initial-schema', '$fingerprint');
 COMMIT;
 EOF
 
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$transaction"
+psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$transaction"
 mkdir -p "$IASTUDIO_DATA_DIR/migrations"
 cp "$sql" "$IASTUDIO_DATA_DIR/migrations/dedicated-initial-schema-${fingerprint}.sql"
 printf '%s\n' "$fingerprint" > "$IASTUDIO_DATA_DIR/migrations/dedicated-initial-schema.sha256"
