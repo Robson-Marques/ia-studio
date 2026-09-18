@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.11.5 - 2026-09-18 (Preflight PostgreSQL por host)
+
+O instalador dedicado descobre a porta do cluster PostgreSQL local e valida a
+conexão TCP antes de criar role, banco ou diretórios. Corrige o host real com
+PostgreSQL em `localhost:5433`, sem alterar configuração global nem exigir patch
+manual em futuras instalações.
+
 ## v0.11.4 - 2026-09-18 (Provisionamento PostgreSQL dedicado)
 
 Corrige o provisionador inicial para remover `?schema=public` da URL usada pelo

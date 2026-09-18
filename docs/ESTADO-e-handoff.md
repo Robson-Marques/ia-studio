@@ -52,9 +52,18 @@ necessária para a primeira instância; isso foi registrado em
 `docs/migrations/s2-dev-data-disposition.md`, sem backup vazio ou conversão do
 schema SaaS. S2 está concluído pelo gate operacional e pela disposição de dados.
 
+Atualização de 2026-09-18 (S4, evidência real): o SaaS legado foi removido pelo
+removedor restrito sem afetar os processos PM2 de Ctrl Leads ou Finanças. A
+primeira criação de `ia-dev` revelou um cluster PostgreSQL 17 ativo em
+`localhost:5433`; o instalador fixava `127.0.0.1:5432`, criando uma instância
+parcial antes do provisionamento. A correção em andamento descobre a porta do
+cluster e valida TCP antes de criar recursos. S4 permanece 50%: falta remover
+somente `ia-dev`, instalar A limpa e provar B no mesmo host.
+
 Progresso da Capability (S1–S5; S0 é Recovery e não entra no denominador):
 S1 100%, S2 100%, S3 100%, S4 50%, S5 0%; geral **70%**. A Capability segue
-`in-progress`, sem tag, release ou deploy após o checkpoint S3.
+`in-progress`; a evidência real de S4 ainda não passou e não há Acceptance ou
+deploy da instância dedicada.
 
 ## 🏗️ Conversão SaaS → instalação dedicada — Capability ativa
 

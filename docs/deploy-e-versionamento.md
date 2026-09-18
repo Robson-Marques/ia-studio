@@ -71,7 +71,9 @@ bash scripts/install.sh \
 
 O instalador cria diretório, role/banco PostgreSQL, Redis DB/prefixo, storage,
 backup, nomes PM2 e vhost exclusivos. Ele materializa o schema somente a partir
-de PostgreSQL vazio, sob lock transacional.
+de PostgreSQL vazio, sob lock transacional. A porta PostgreSQL é descoberta no
+cluster local e validada por TCP antes de criar qualquer recurso da instância;
+ela não é presumida como `5432`.
 
 ## Atualização de uma instância já dedicada
 

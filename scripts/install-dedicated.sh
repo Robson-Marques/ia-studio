@@ -60,10 +60,26 @@ if [ "$INSTALL_DEPS" = 1 ]; then
   apt-get install -y git openssl postgresql-client redis-server nginx certbot python3-certbot-nginx
 fi
 command -v psql >/dev/null || fail_instance 'PostgreSQL client ausente; use --install-deps ou prepare o host.'
+command -v pg_isready >/dev/null || fail_instance 'pg_isready é obrigatório para validar o PostgreSQL do host.'
 command -v redis-cli >/dev/null || fail_instance 'Redis client ausente; use --install-deps ou prepare o host.'
 command -v node >/dev/null || fail_instance 'Node.js ausente; prepare o runtime no host.'
 command -v pm2 >/dev/null || fail_instance 'PM2 ausente; prepare o runtime no host.'
 command -v ss >/dev/null || fail_instance 'ss é obrigatório para validar a porta exclusiva da instância.'
+
+# O host pode usar um cluster PostgreSQL em porta diferente de 5432. A porta é
+# descoberta pelo próprio cluster ativo antes de criar qualquer recurso da
+# instância; nenhuma configuração global do PostgreSQL é alterada.
+PG_PORT="$(su -s /bin/sh postgres -c "psql -At -d postgres -c 'SHOW port;'" | tr -d '[:space:]')"
+[[ "$PG_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$PG_PORT" -gt 0 ] && [ "$PG_PORT" -le 65535 ] \
+  || fail_instance "porta PostgreSQL inválida detectada: ${PG_PORT:-vazia}."
+PG_HOST=''
+for candidate in 127.0.0.1 localhost; do
+  if pg_isready -q -h "$candidate" -p "$PG_PORT" -d postgres; then
+    PG_HOST="$candidate"
+    break
+  fi
+done
+[ -n "$PG_HOST" ] || fail_instance "PostgreSQL ativo na porta $PG_PORT não aceita conexão TCP local. Nenhum recurso da instância foi criado."
 
 # A alocação do banco Redis é explícita e é recusada se outra instância já usa
 # o mesmo número. O prefixo também é exclusivo, protegendo chaves BullMQ.
@@ -114,7 +130,7 @@ IASTUDIO_PM2_WORKER=$IASTUDIO_PM2_WORKER
 IASTUDIO_REDIS_PREFIX=$IASTUDIO_REDIS_PREFIX
 REDIS_DB=$REDIS_DB
 REDIS_URL=redis://127.0.0.1:6379/$REDIS_DB
-DATABASE_URL=postgresql://$IASTUDIO_DB_USER:$DB_PASS@127.0.0.1:5432/$IASTUDIO_DB_NAME?schema=public
+DATABASE_URL=postgresql://$IASTUDIO_DB_USER:$DB_PASS@$PG_HOST:$PG_PORT/$IASTUDIO_DB_NAME?schema=public
 JWT_SECRET=$JWT_SECRET
 ENCRYPTION_KEY=$ENCRYPTION_KEY
 INSTALLATION_ADMIN_EMAIL=$(env_value "$ADMIN_EMAIL")

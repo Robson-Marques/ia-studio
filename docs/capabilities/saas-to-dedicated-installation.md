@@ -77,7 +77,7 @@ install/upgrade/backup/restore/uninstall dessa instância. Falha de A não afeta
 | S1 — núcleo dedicado | Modelo de dados alvo, exportação seletiva controlada, auth/ACL/eventos locais e retirada do tenant context | política de dados decidida | concluído — gate transversal 100%, sem bloqueantes nas cinco camadas |
 | S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | concluído — gate local aprovado; exportação/importação é não aplicável à primeira instância sem clientes, conforme `migrations/s2-dev-data-disposition.md` |
 | S3 — superfícies dedicadas | Migração de atualização/backup/restauração para a administração local; remoção de Console e UI/rotas/contextos SaaS | S1 | concluído — matriz e gate em `saas-to-dedicated-s3-console-matrix.md` |
-| S4 — instâncias no mesmo host | Install/upgrade/backup/restore/uninstall isolados | S1 e contratos de runtime finais | em andamento — isolamento estático e locks por instância aprovados; falta prova com duas instalações reais no host |
+| S4 — instâncias no mesmo host | Install/upgrade/backup/restore/uninstall isolados | S1 e contratos de runtime finais | em andamento — isolamento estático aprovado; primeira prova real revelou PostgreSQL local na porta 5433 contra instalador fixo em 5432. O preflight passa a descobrir/validar a porta antes de criar recursos; faltam instalação limpa de A e prova de B. |
 | S5 — Acceptance | Evidência integrada e documentação viva | S1–S4 | pendente |
 
 S1 é o corte estrutural concluído: dados, autenticação, ACL, API e eventos foram

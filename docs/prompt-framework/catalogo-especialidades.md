@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.2.0
+version: 1.3.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-09-08"
 released_at: "2026-09-08"
-change_reason: MINOR. Adiciona a task local `ia-studio.whatsapp-connectors@1.0.0` (porte dos conectores WhatsApp Meta/YCloud/Baileys e da coexistência, adaptado ao Provider Registry + Secrets Manager multi-tenant), criada pela `workflow.specialty-creation@1.0.0` após o `ok` do relatório de alinhamento de 2026-09-08. Cobre parte da lacuna "Integrações externas".
+change_reason: MINOR. Adiciona `ia-studio.dedicated-instance-operations@1.0.0`, criada após aprovação do Robson para executar S4 da conversão SaaS→dedicado com evidência real de host e sem patches recorrentes.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -29,6 +29,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 | `ia-studio.studio-ux-adoption` | Engenheiro Frontend Sênior especializado em adoção controlada de Design Systems | Governar a adoção do Studio UX no `platform-admin` do IA Studio por famílias de tela, respeitando o piloto `/studio-ux-demo` já existente, o contexto multi-tenant e as regras do próprio DS. | [adocao-studio-ux.md](especialidades/adocao-studio-ux.md) |
 | `ia-studio.tenant-domains` | Engenheiro de plataforma multi-tenant (tenancy, domínios, resolução por Host) | Governar mudanças de tenancy no IA Studio — modelagem de domínio/organização, resolução de tenant por Host, branding white-label por domínio e gestão no Console — respeitando `organization_id`/workspace/environment e a fronteira app↔infra (Nginx/TLS fora do deploy por tag). | [tenant-domains.md](especialidades/tenant-domains.md) |
 | `ia-studio.whatsapp-connectors` | Engenheiro de Plataforma de Integrações multi-tenant (conectores de mensageria e coexistência) | Portar para o IA Studio os conectores WhatsApp do Aquapark (Meta/YCloud/Baileys) e o vínculo de coexistência canal oficial↔manual, adaptado ao Provider Registry (`IProvider`) + Secrets Manager e ao contexto `organization_id`/workspace/environment. Conexões ficam em Integrações › Conexões. | [whatsapp-connectors.md](especialidades/whatsapp-connectors.md) |
+| `ia-studio.dedicated-instance-operations` | Engenheiro de operações de instâncias dedicadas | Governar instalação, upgrade, backup, restauração e remoção por instância, com evidência real de host e sem afetar outros produtos. | [dedicated-instance-operations.md](especialidades/dedicated-instance-operations.md) |
 
 ## Critérios de aceite
 
@@ -41,7 +42,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 
 Estas responsabilidades **existem** no IA Studio mas ainda não têm especialidade catalogada — quando o próximo pedido tocar em uma delas, o alinhador retornará `especialidade não catalogada` e recomendará a criação. Ficam registradas aqui como lacuna conhecida:
 
-- **Backend / API dedicada** (`platform-api`): modelagem de domínio local, ACL, eventos e operação por instância. A antiga especialidade de tenancy/domínios foi aposentada junto com o SaaS.
+- **Backend / API dedicada** (`platform-api`): modelagem de domínio local, ACL e eventos. Operação por instância é coberta por `ia-studio.dedicated-instance-operations@1.0.0`.
 - **Runtime de assistentes**: prompts operacionais, tools, knowledge base, memória, workflows — regras próprias, **não confundir** com este framework (que governa pedidos humanos de desenvolvimento).
 - **Integrações externas** (Meta, Google, gateways, etc.) — se surgirem novas. *(A fatia de **conectores WhatsApp** — Meta/YCloud/Baileys + coexistência — já está coberta por `ia-studio.whatsapp-connectors@1.0.0`.)*
 - **Segurança / privacidade** (LGPD, retenção, backup, ACL local).
@@ -54,3 +55,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.0.0 | released | Aprovado por Robson em 2026-07-23 | Primeira release. Catálogo local nasce simultaneamente à primeira task (`ia-studio.studio-ux-adoption@1.0.0`) pela mesma execução de `workflow.specialty-creation@1.0.0`. |
 | 1.1.0 | released | Aprovado por Robson em 2026-08-07 | MINOR. Adiciona `ia-studio.tenant-domains@1.0.0` (tenancy/domínios/subdomínios por org), criada por `workflow.specialty-creation@1.0.0` após o relatório de alinhamento de 2026-08-07. |
 | 1.2.0 | released | Aprovado por Robson em 2026-09-08 | MINOR. Adiciona `ia-studio.whatsapp-connectors@1.0.0` (porte dos conectores WhatsApp Meta/YCloud/Baileys + coexistência), criada por `workflow.specialty-creation@1.0.0` após o relatório de alinhamento de 2026-09-08. |
+| 1.3.0 | released | Aprovado por Robson em 2026-09-18 | MINOR. Adiciona `ia-studio.dedicated-instance-operations@1.0.0` para S4: operação de instâncias dedicadas com recursos reais do host e isolamento entre produtos. |

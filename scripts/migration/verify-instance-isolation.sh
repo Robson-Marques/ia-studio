@@ -43,6 +43,12 @@ rg -Fq 'porta $PORT já está em uso' scripts/install-dedicated.sh \
   || fail 'instalação não valida colisão de porta entre aplicações.'
 rg -Fq 'domínio $DOMAIN já aparece em configuração Nginx' scripts/install-dedicated.sh \
   || fail 'instalação não valida colisão de domínio no Nginx.'
+rg -Fq "SHOW port;" scripts/install-dedicated.sh \
+  || fail 'instalação não descobre a porta real do cluster PostgreSQL.'
+rg -Fq 'pg_isready -q -h "$candidate" -p "$PG_PORT"' scripts/install-dedicated.sh \
+  || fail 'instalação não valida conexão TCP com o PostgreSQL antes de criar recursos.'
+rg -Fq '@$PG_HOST:$PG_PORT/$IASTUDIO_DB_NAME?schema=public' scripts/install-dedicated.sh \
+  || fail 'DATABASE_URL dedicado ainda fixa host ou porta PostgreSQL.'
 if ! rg -Fq 'if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then' scripts/upgrade.sh; then
   fail 'bootstrap não possui caminho exclusivo antes do upgrade de instância.'
 fi
