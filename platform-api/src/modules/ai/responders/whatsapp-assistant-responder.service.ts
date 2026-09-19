@@ -123,7 +123,7 @@ export class WhatsappAssistantResponderService {
     const input = linkedNote ? `${linkedNote}\n\n${content}` : content;
 
     const result = await this.runner.run({
-      agentId,
+      agentId: agent.id,
       input,
       scopeKeys: { contact: phone, session: chatId },
       history,

@@ -583,7 +583,7 @@ export class IspTools implements OnModuleInit {
         const chatId = ctx.scopeKeys?.['session'];
         if (!chatId) return { encaminhado: false, motivo: 'Sem conversa em contexto para encaminhar.' };
         if (ctx.dryRun) return { simulated: true, setor };
-        const queueId = await this.settings.getLocalValue(ISP_QUEUE_SETTING_KEYS[setor]);
+        const queueId = await this.settings.getValue(ISP_QUEUE_SETTING_KEYS[setor]);
         if (typeof queueId !== 'string' || !queueId) {
           return {
             encaminhado: false,

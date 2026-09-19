@@ -40,7 +40,7 @@ export class IspPaymentLinkService {
 
   /** TTL do link em horas (1..168). Ausente/ inválido → default. */
   async getTtlHoras(): Promise<number> {
-    const raw = await this.settings.getLocalValue(ISP_PAGAMENTO_TTL_SETTING_KEY);
+    const raw = await this.settings.getValue(ISP_PAGAMENTO_TTL_SETTING_KEY);
     if (typeof raw !== 'string' || !raw.trim()) return ISP_PAGAMENTO_TTL_DEFAULT;
     const n = Number.parseInt(raw, 10);
     return Number.isFinite(n) && n > 0 && n <= 168 ? n : ISP_PAGAMENTO_TTL_DEFAULT;
@@ -48,7 +48,7 @@ export class IspPaymentLinkService {
 
   /** URL pública base (sem barra final). Null = não configurada. */
   async getBaseUrl(): Promise<string | null> {
-    const raw = await this.settings.getLocalValue(ISP_PAGAMENTO_BASE_URL_SETTING_KEY);
+    const raw = await this.settings.getValue(ISP_PAGAMENTO_BASE_URL_SETTING_KEY);
     return typeof raw === 'string' && raw.trim() ? raw.trim().replace(/\/$/, '') : null;
   }
 

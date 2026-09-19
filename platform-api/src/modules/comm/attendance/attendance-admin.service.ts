@@ -2,7 +2,7 @@
 // SOFT-DELETE (is_active=false) com checagem de integridade + reativacao.
 // Criar equipe NAO liga roteamento automatico (V1 = claim/transfer manual).
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { AttendanceQueue, AttendanceTeam, CommTeamRole } from '@prisma/client';
+import { AttendanceQueue, AttendanceTeam, CommTeamRole, Prisma } from '@prisma/client';
 import { AttendanceRepository } from './attendance.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import { PrismaService } from '../../../shared/prisma/prisma.service';

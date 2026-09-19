@@ -5,6 +5,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../shared/permissions.constants';
 import { CurrentUser } from '../../shared/auth/current-user.decorator';
+import { AuthenticatedUser } from '../../shared/auth/auth.types';
 import { Auditable } from '../../shared/audit/auditable.decorator';
 import { DeveloperService } from './developer.service';
 import { CreateApiKeyDto } from './dto/developer.dtos';

@@ -1,5 +1,26 @@
 # Changelog — IA Studio
 
+## v0.11.7 - 2026-09-18 (Build da API dedicada: 26 erros de TypeScript)
+
+A instalação dedicada provisionava o schema mas quebrava no `nest build` do
+platform-api com 26 erros de TypeScript, deixando a instância parcial (sem
+nginx nem `dist`). Correção na fonte, sem tocar em runtime nem reintroduzir
+contrato SaaS:
+
+- `SettingsService` foi renomeado para `getValue`/`set` no corte S1; os módulos
+  ISP (`isp-os-config`, `isp-payment-link`, `isp-tools`) ainda chamavam
+  `getLocalValue`/`setLocal` — realinhados ao contrato real (12 `getValue` + 9
+  `set`).
+- `attendance-admin.service.ts`: `Prisma` passa a ser importado de
+  `@prisma/client` (usado nos casts de create input).
+- `whatsapp-numbers.controller.ts`: importa o decorator `CurrentUser`.
+- `developer.controller.ts`: importa o tipo `AuthenticatedUser`.
+- `whatsapp-assistant-responder.service.ts`: em `respond()` o id do assistente
+  vem de `agent.id` (`agentId` só existia no escopo de `onInbound`).
+
+Sem `db push`; sem mudança de schema. Desbloqueia a instalação limpa da
+primeira instância dedicada (S4).
+
 ## v0.11.6 - 2026-09-18 (Normalização da DATABASE_URL nas operações PostgreSQL)
 
 O `?schema=public` que o Prisma exige na `DATABASE_URL` da instância quebrava
