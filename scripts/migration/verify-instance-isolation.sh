@@ -21,6 +21,19 @@ rg -Fq -- '--from-empty' scripts/provision-dedicated-schema.sh \
   || fail 'schema inicial não é gerado a partir de banco vazio.'
 rg -Fq 'PSQL_DATABASE_URL="${DATABASE_URL%%\?*}"' scripts/provision-dedicated-schema.sh \
   || fail 'provisionamento não remove parâmetros específicos do Prisma antes de chamar psql.'
+# A DATABASE_URL dedicada carrega `?schema=public` (exigido pelo Prisma). psql/
+# pg_dump não entendem esse parâmetro do ORM: todo script operacional que fala
+# com o PostgreSQL precisa normalizar a URL por `db_url_for_psql`, nunca passar
+# $DATABASE_URL cru (fonte única em lib/instance.sh).
+rg -Fq 'db_url_for_psql()' scripts/lib/instance.sh \
+  || fail 'lib/instance.sh não define db_url_for_psql (normalizador único da URL para psql).'
+for db_script in scripts/upgrade.sh scripts/backup-full.sh scripts/restore-full.sh scripts/restore-backup.sh; do
+  rg -Fq 'db_url_for_psql' "$db_script" \
+    || fail "$db_script não normaliza a DATABASE_URL antes de psql/pg_dump."
+  if rg -nF -e 'psql "$DATABASE_URL"' -e 'pg_dump "$DATABASE_URL"' -e 'pg_restore "$DATABASE_URL"' "$db_script"; then
+    fail "$db_script ainda passa DATABASE_URL crua (com ?schema=) para ferramentas libpq."
+  fi
+done
 if rg -n -- '--accept-data-loss' scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/upgrade.sh; then
   fail 'instalação ou atualização dedicada não pode aceitar perda de dados automaticamente.'
 fi

@@ -1,5 +1,23 @@
 # Changelog — IA Studio
 
+## v0.11.6 - 2026-09-18 (Normalização da DATABASE_URL nas operações PostgreSQL)
+
+O `?schema=public` que o Prisma exige na `DATABASE_URL` da instância quebrava
+`psql`/`pg_dump` em toda operação além do provisionamento (o mesmo erro
+`invalid URI query parameter: "schema"` já corrigido na v0.11.4, mas só lá).
+Agora `scripts/lib/instance.sh` expõe `db_url_for_psql()` como fonte única de
+normalização, e `upgrade.sh`, `backup-full.sh`, `restore-full.sh` e
+`restore-backup.sh` falam com o PostgreSQL pela URL sem a query string do ORM —
+sem repetir o strip por script e sem patch manual a cada instalação. O
+provisionador segue com seu strip próprio; o gate
+`verify-instance-isolation.sh` passa a exigir a normalização e a recusar
+`DATABASE_URL` crua nesses scripts.
+
+Reclassificação de estado: no contrato da Capability, S2 volta a `em andamento`
+(o corte de código segue aprovado pelo gate local e a migração de dados
+permanece não aplicável), permanecendo in-progress até a prova de instalação
+limpa da primeira instância dedicada. Sem `db push`; sem mudança de schema.
+
 ## v0.11.5 - 2026-09-18 (Preflight PostgreSQL por host)
 
 O instalador dedicado descobre a porta do cluster PostgreSQL local e valida a

@@ -141,7 +141,7 @@ log_db() {
   ts=$(date -u +%H:%M:%S)
   line=$(sql_escape "[$ts][$step] $msg")
   echo "[$step] $msg"
-  psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
+  psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
 UPDATE system_upgrades
 SET log_lines = array_append(COALESCE(log_lines, ARRAY[]::text[]), '$line')
 WHERE id = '$UPGRADE_ID';
@@ -176,7 +176,7 @@ mark_failed() {
   # a versao lida ja e a antiga e o painel volta a oferecer o upgrade.
   revert_checkout
   local s; s=$(sql_escape "$step")
-  psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
+  psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
 UPDATE system_upgrades
 SET status='FAILED', finished_at=now(), error_step='$s'
 WHERE id = '$UPGRADE_ID';
@@ -188,7 +188,7 @@ trap 'mark_failed "UNEXPECTED" "Erro inesperado na linha $LINENO"' ERR
 
 # ---------- 1) PREFLIGHT ----------
 log_db "PREFLIGHT" "Validando upgrade-id e ambiente"
-STATUS_NOW=$(psql "$DATABASE_URL" -X -tA -c "SELECT status FROM system_upgrades WHERE id = '$UPGRADE_ID'" 2>/dev/null || echo "")
+STATUS_NOW=$(psql "$(db_url_for_psql)" -X -tA -c "SELECT status FROM system_upgrades WHERE id = '$UPGRADE_ID'" 2>/dev/null || echo "")
 [ -z "$STATUS_NOW" ]           && mark_failed "PREFLIGHT" "upgrade-id $UPGRADE_ID nao existe"
 [ "$STATUS_NOW" != "RUNNING" ] && mark_failed "PREFLIGHT" "upgrade-id nao esta RUNNING (atual=$STATUS_NOW)"
 FROM_VERSION=$(cd "$REPO_PATH" && git describe --tags --abbrev=0 2>/dev/null || echo "unknown")
@@ -198,7 +198,7 @@ log_db "PREFLIGHT" "from=$FROM_VERSION to=$TO_VERSION repo=$REPO_PATH"
 TS=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="$BACKUP_DIR/iastudio_db_${FROM_VERSION}-to-${TO_VERSION}_${TS}.sql.gz"
 log_db "BACKUP" "pg_dump -> $(basename "$BACKUP_FILE")"
-if ! pg_dump "$DATABASE_URL" 2>/tmp/iastudio_pgdump.err | gzip > "$BACKUP_FILE"; then
+if ! pg_dump "$(db_url_for_psql)" 2>/tmp/iastudio_pgdump.err | gzip > "$BACKUP_FILE"; then
   mark_failed "BACKUP" "pg_dump falhou: $(head -c 400 /tmp/iastudio_pgdump.err)"
 fi
 log_db "BACKUP" "backup concluido ($(du -h "$BACKUP_FILE" | cut -f1))"
@@ -260,7 +260,7 @@ log_db "ROTATE_BACKUPS" "rotacao concluida"
 
 # ---------- 11) MARK_SUCCESS (antes do restart) ----------
 log_db "DONE" "Upgrade aplicado ($FROM_VERSION -> $TO_VERSION)"
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL
+psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL
 UPDATE system_upgrades SET status='SUCCESS', finished_at=now() WHERE id = '$UPGRADE_ID';
 SQL
 trap - ERR

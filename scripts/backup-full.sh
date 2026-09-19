@@ -37,7 +37,7 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$BACKUP_DIR"
 
 # 1) Dump do banco (formato plain, restauravel com psql).
-pg_dump "$DATABASE_URL" > "$WORK/db.sql"
+pg_dump "$(db_url_for_psql)" > "$WORK/db.sql"
 
 # 2) Arquivos de storage (se existirem).
 mkdir -p "$WORK/storage"

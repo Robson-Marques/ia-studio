@@ -50,7 +50,7 @@ trap restart_app EXIT
 
 mark() { # atualiza a row system_restores (se restore_id foi passado)
   [ -n "$RESTORE_ID" ] || return 0
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -c "$1" >/dev/null 2>&1 || true
+  psql "$(db_url_for_psql)" -v ON_ERROR_STOP=0 -c "$1" >/dev/null 2>&1 || true
 }
 
 # 1) Extrai o pacote.
@@ -64,9 +64,9 @@ pm2 stop "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
 
 # 3) Recria o schema do banco e restaura o dump.
 #    Zera o schema public e recarrega — o dump plain recria as tabelas.
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;"
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$WORK/db.sql"
+psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -f "$WORK/db.sql"
 
 # 4) Restaura os arquivos de storage.
 if [ -d "$WORK/storage" ]; then

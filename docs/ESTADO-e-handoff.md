@@ -6,7 +6,7 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-09-15.
+> Última atualização: 2026-09-18.
 
 ## Checkpoint S3 — Console SaaS → administração local
 
@@ -50,7 +50,8 @@ Atualização de 2026-09-18 (S2): o responsável confirmou que não há clientes
 dados operacionais na instalação de desenvolvimento. A migração seletiva não é
 necessária para a primeira instância; isso foi registrado em
 `docs/migrations/s2-dev-data-disposition.md`, sem backup vazio ou conversão do
-schema SaaS. S2 está concluído pelo gate operacional e pela disposição de dados.
+schema SaaS. O corte de código e a disposição de dados de S2 foram aprovados
+pelo gate operacional; ver a reclassificação de estado abaixo (v0.11.6).
 
 Atualização de 2026-09-18 (S4, evidência real): o SaaS legado foi removido pelo
 removedor restrito sem afetar os processos PM2 de Ctrl Leads ou Finanças. A

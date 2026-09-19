@@ -28,11 +28,11 @@ echo "[restore-backup] Parando PM2..."
 pm2 stop "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
 
 echo "[restore-backup] Recriando schema e restaurando o dump..."
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;"
 case "$DUMP" in
-  *.gz) gunzip -c "$DUMP" | psql "$DATABASE_URL" -v ON_ERROR_STOP=1 ;;
-  *)    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$DUMP" ;;
+  *.gz) gunzip -c "$DUMP" | psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 ;;
+  *)    psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -f "$DUMP" ;;
 esac
 
 echo "[restore-backup] Subindo PM2..."

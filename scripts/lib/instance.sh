@@ -11,6 +11,18 @@ INSTANCE_BACKUP_BASE="${IASTUDIO_INSTANCE_BACKUP_BASE:-/var/backups/iastudio}"
 
 fail_instance() { echo "ERRO: $*" >&2; exit 2; }
 
+# psql/pg_dump/pg_restore não entendem parâmetros específicos do Prisma na URL
+# (ex.: `?schema=public`). A aplicação/Prisma consome DATABASE_URL COM o
+# parâmetro; as ferramentas libpq recebem a MESMA URL SEM a query string do ORM.
+# Fonte única desta normalização: todo script operacional que fala com o
+# PostgreSQL usa `db_url_for_psql` em vez de passar $DATABASE_URL cru — evita o
+# erro `invalid URI query parameter: "schema"` e o patch manual recorrente.
+db_url_for_psql() {
+  local url="${1:-${DATABASE_URL:-}}"
+  [ -n "$url" ] || fail_instance 'DATABASE_URL ausente para operação PostgreSQL.'
+  printf '%s' "${url%%\?*}"
+}
+
 validate_instance_id() {
   local value="$1"
   [[ "$value" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail_instance 'instance-id deve ter 3–32 caracteres: minúsculas, números e hífen; começa por letra.'
