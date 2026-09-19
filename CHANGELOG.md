@@ -1,5 +1,25 @@
 # Changelog — IA Studio
 
+## v0.11.8 - 2026-09-18 (Instalação dedicada: token do registry privado @studio-ux-ds)
+
+Com a API compilando (v0.11.7), a instalação passou a quebrar no `npm install`
+do platform-admin: as deps `@studio-ux-ds/*` vêm do registry privado
+`git.nivoo.dev.br` e o `.npmrc` autentica por `${GITLAB_PACKAGE_TOKEN}`, que o
+`install-dedicated.sh` não fornecia (401 Unauthorized). Correção permanente,
+sem patch manual a cada instalação:
+
+- `install-dedicated.sh` aceita `--gitlab-token <token>` (ou herda
+  `GITLAB_PACKAGE_TOKEN` do ambiente), exige o token antes de criar qualquer
+  recurso, exporta-o para os `npm install` e o grava no `.env` da instância.
+- Como o `upgrade.sh` já lê o token do `.env`, os upgrades seguintes passam a
+  autenticar sozinhos; o `--bootstrap-dedicated` repassa `--gitlab-token` ao
+  instalador.
+- Gate `verify-instance-isolation.sh` e `docs/deploy-e-versionamento.md`
+  atualizados para exigir/documentar o token.
+
+Sem `db push`; sem mudança de schema. Fecha o caminho de instalação limpa da
+primeira instância dedicada (S4).
+
 ## v0.11.7 - 2026-09-18 (Build da API dedicada: 26 erros de TypeScript)
 
 A instalação dedicada provisionava o schema mas quebrava no `nest build` do

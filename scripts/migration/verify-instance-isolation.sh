@@ -62,6 +62,17 @@ rg -Fq 'pg_isready -q -h "$candidate" -p "$PG_PORT"' scripts/install-dedicated.s
   || fail 'instalação não valida conexão TCP com o PostgreSQL antes de criar recursos.'
 rg -Fq '@$PG_HOST:$PG_PORT/$IASTUDIO_DB_NAME?schema=public' scripts/install-dedicated.sh \
   || fail 'DATABASE_URL dedicado ainda fixa host ou porta PostgreSQL.'
+# O platform-admin builda com pacotes do registry privado @studio-ux-ds; o
+# instalador precisa exigir o token, exportá-lo para o npm e gravá-lo no .env
+# (senão o build do admin falha com 401 e o próximo upgrade também).
+rg -Fq -- '--gitlab-token' scripts/install-dedicated.sh \
+  || fail 'instalação não aceita o token do registry privado @studio-ux-ds.'
+rg -Fq 'export GITLAB_PACKAGE_TOKEN=' scripts/install-dedicated.sh \
+  || fail 'instalação não exporta GITLAB_PACKAGE_TOKEN para os npm install.'
+rg -Fq 'GITLAB_PACKAGE_TOKEN=$(env_value "$GITLAB_TOKEN")' scripts/install-dedicated.sh \
+  || fail 'instalação não persiste GITLAB_PACKAGE_TOKEN no .env da instância.'
+rg -Fq -- '--gitlab-token)' scripts/upgrade.sh \
+  || fail 'bootstrap do upgrade não repassa --gitlab-token ao instalador.'
 if ! rg -Fq 'if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then' scripts/upgrade.sh; then
   fail 'bootstrap não possui caminho exclusivo antes do upgrade de instância.'
 fi

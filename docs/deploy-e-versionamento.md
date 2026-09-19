@@ -52,7 +52,8 @@ instância dedicada:
 bash scripts/upgrade.sh --bootstrap-dedicated --to <tag> \
   --instance-id ia-dev --domain ia-dev.exemplo.com \
   --admin-email admin@exemplo.com --admin-password '<senha-forte>' \
-  --redis-db 1 --email ops@exemplo.com
+  --redis-db 1 --email ops@exemplo.com \
+  --gitlab-token '<token-do-registry-@studio-ux-ds>'
 ```
 
 Esse modo clona a tag para a nova instância e chama o instalador dedicado.
@@ -66,14 +67,18 @@ cd /opt/iastudio
 bash scripts/install.sh \
   --instance-id cliente-b --domain cliente-b.exemplo.com \
   --admin-email admin@cliente-b.exemplo.com --admin-password '<senha-forte>' \
-  --redis-db 2 --email ops@exemplo.com --source-revision <tag>
+  --redis-db 2 --email ops@exemplo.com --source-revision <tag> \
+  --gitlab-token '<token-do-registry-@studio-ux-ds>'
 ```
 
 O instalador cria diretório, role/banco PostgreSQL, Redis DB/prefixo, storage,
 backup, nomes PM2 e vhost exclusivos. Ele materializa o schema somente a partir
 de PostgreSQL vazio, sob lock transacional. A porta PostgreSQL é descoberta no
 cluster local e validada por TCP antes de criar qualquer recurso da instância;
-ela não é presumida como `5432`.
+ela não é presumida como `5432`. O build do platform-admin usa o registry
+privado `@studio-ux-ds` (`git.nivoo.dev.br`); o `--gitlab-token` (ou a variável
+`GITLAB_PACKAGE_TOKEN`) é obrigatório e fica gravado no `.env` da instância para
+os upgrades seguintes.
 
 ## Atualização de uma instância já dedicada
 

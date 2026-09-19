@@ -9,13 +9,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/instance.sh"
 
 INSTANCE_ID=''; DOMAIN=''; ADMIN_EMAIL=''; ADMIN_PASSWORD=''; ADMIN_NAME='Administrador da Instalação'
-REDIS_DB=''; CERT_EMAIL=''; SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"; SOURCE_REVISION=''; NO_SSL=0; INSTALL_DEPS=0
+REDIS_DB=''; CERT_EMAIL=''; SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"; SOURCE_REVISION=''; NO_SSL=0; INSTALL_DEPS=0; GITLAB_TOKEN="${GITLAB_PACKAGE_TOKEN:-}"
 usage() {
   cat <<'EOF'
 Uso:
   bash scripts/install-dedicated.sh --instance-id <cliente> --domain <app.exemplo.com> \
     --admin-email <email> --admin-password <senha> --redis-db <0-15> [--email <ssl>] \
-    [--source-dir <repo>] --source-revision <tag> [--no-ssl] [--install-deps]
+    --gitlab-token <token> [--source-dir <repo>] --source-revision <tag> [--no-ssl] [--install-deps]
+
+O --gitlab-token (ou a variável GITLAB_PACKAGE_TOKEN) autentica no registry
+privado @studio-ux-ds (git.nivoo.dev.br) e é obrigatório: sem ele o build do
+platform-admin falha com 401. O token é gravado no .env da instância para os
+upgrades seguintes.
 
 Cada execução cria diretório, role/banco PostgreSQL, banco Redis, prefixo de
 filas, storage, backup, PM2 e vhost exclusivos. Não há modo keep-db nem demo.
@@ -30,6 +35,7 @@ while (($#)); do
     --admin-name) ADMIN_NAME="${2:?valor ausente}"; shift 2 ;;
     --redis-db) REDIS_DB="${2:?valor ausente}"; shift 2 ;;
     --email) CERT_EMAIL="${2:?valor ausente}"; shift 2 ;;
+    --gitlab-token) GITLAB_TOKEN="${2:?valor ausente}"; shift 2 ;;
     --source-dir) SOURCE_DIR="${2:?valor ausente}"; shift 2 ;;
     --source-revision) SOURCE_REVISION="${2:?valor ausente}"; shift 2 ;;
     --no-ssl) NO_SSL=1; shift ;;
@@ -39,6 +45,7 @@ while (($#)); do
   esac
 done
 [ -n "$INSTANCE_ID" ] && [ -n "$DOMAIN" ] && [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] && [ -n "$REDIS_DB" ] && [ -n "$SOURCE_REVISION" ] || { usage >&2; exit 2; }
+[ -n "$GITLAB_TOKEN" ] || fail_instance 'token do registry @studio-ux-ds ausente; use --gitlab-token <token> ou defina GITLAB_PACKAGE_TOKEN (sem ele o build do platform-admin falha com 401).'
 set_instance "$INSTANCE_ID"
 acquire_instance_lock
 [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || fail_instance 'domínio inválido.'
@@ -133,6 +140,7 @@ REDIS_URL=redis://127.0.0.1:6379/$REDIS_DB
 DATABASE_URL=postgresql://$IASTUDIO_DB_USER:$DB_PASS@$PG_HOST:$PG_PORT/$IASTUDIO_DB_NAME?schema=public
 JWT_SECRET=$JWT_SECRET
 ENCRYPTION_KEY=$ENCRYPTION_KEY
+GITLAB_PACKAGE_TOKEN=$(env_value "$GITLAB_TOKEN")
 INSTALLATION_ADMIN_EMAIL=$(env_value "$ADMIN_EMAIL")
 INSTALLATION_ADMIN_PASSWORD=$(env_value "$ADMIN_PASSWORD")
 STORAGE_DRIVER=local
@@ -150,6 +158,10 @@ git -C "$IASTUDIO_APP_DIR" checkout --detach "$SOURCE_COMMIT"
 cp "$IASTUDIO_CONFIG_FILE" "$IASTUDIO_APP_DIR/platform-api/.env"
 chmod 600 "$IASTUDIO_APP_DIR/platform-api/.env"
 
+# O platform-admin importa @studio-ux-ds/* do registry privado (git.nivoo.dev.br);
+# o .npmrc lê ${GITLAB_PACKAGE_TOKEN}. Exportamos para os npm install desta
+# execução — o mesmo token já ficou gravado no .env para os upgrades.
+export GITLAB_PACKAGE_TOKEN="$GITLAB_TOKEN"
 unset NPM_CONFIG_PRODUCTION
 (cd "$IASTUDIO_APP_DIR/platform-api" && npm install)
 # `migrate diff` usa o Prisma recém-instalado; somente depois materializamos o

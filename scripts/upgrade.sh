@@ -49,7 +49,7 @@ Uso normal (somente instância já dedicada):
 Bootstrap da primeira instância dedicada a partir de um checkout SaaS de desenvolvimento:
   bash scripts/upgrade.sh --bootstrap-dedicated --to <tag> [--repo-path <checkout-legado>] \
     --instance-id <id> --domain <domínio> --admin-email <email> --admin-password <senha> \
-    --redis-db <0-15> [--admin-name <nome>] [--email <ssl>] [--no-ssl] [--install-deps]
+    --redis-db <0-15> --gitlab-token <token> [--admin-name <nome>] [--email <ssl>] [--no-ssl] [--install-deps]
 
 O bootstrap não usa nem altera o banco, código ou processos SaaS legados. Ele
 clona a tag no diretório da nova instância e cria banco e recursos limpos.
@@ -63,7 +63,7 @@ while [[ $# -gt 0 ]]; do
     --upgrade-id)  UPGRADE_ID="$2"; shift 2 ;;
     --repo-path)   REPO_PATH="$2"; shift 2 ;;
     --no-restart)  DO_RESTART=0; shift ;;
-    --instance-id|--domain|--admin-email|--admin-password|--admin-name|--redis-db|--email)
+    --instance-id|--domain|--admin-email|--admin-password|--admin-name|--redis-db|--email|--gitlab-token)
                    BOOTSTRAP_ARGS+=("$1" "${2:?valor ausente}"); shift 2 ;;
     --no-ssl|--install-deps)
                    BOOTSTRAP_ARGS+=("$1"); shift ;;
