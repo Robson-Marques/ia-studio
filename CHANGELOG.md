@@ -1,5 +1,20 @@
 # Changelog — IA Studio
 
+## v0.11.10 - 2026-09-19 (Atualização dedicada: bookkeeping fora do schema público)
+
+A primeira atualização de uma instância dedicada falhava no PRISMA_PUSH: o
+provisionamento cria o schema via `migrate diff --from-empty` e deixava a tabela
+de controle `system_schema_migrations` em `public`; o `prisma db push` do
+upgrade (sem `--accept-data-loss`, correto) via essa tabela como estranha ao
+`schema.prisma` e recusava dropá-la (mudança destrutiva). Como `public` é gerido
+pelo Prisma, o provisionador passa a criar o bookkeeping num schema próprio
+(`iastudio_meta`), que o `db push` não toca — `public` fica idêntico ao
+`schema.prisma` e a atualização flui. Gate atualizado.
+
+Instâncias já instaladas (com a tabela em `public`) precisam de um
+`DROP TABLE IF EXISTS public.system_schema_migrations;` uma vez; a partir daí o
+upgrade pelo painel funciona. Sem mudança de schema Prisma.
+
 ## v0.11.9 - 2026-09-19 (Instalação dedicada: nginx 500 no web root do painel)
 
 A primeira instalação limpa (`ia-dev`, v0.11.8) subiu inteira — API, painel,

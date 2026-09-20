@@ -21,6 +21,14 @@ rg -Fq -- '--from-empty' scripts/provision-dedicated-schema.sh \
   || fail 'schema inicial não é gerado a partir de banco vazio.'
 rg -Fq 'PSQL_DATABASE_URL="${DATABASE_URL%%\?*}"' scripts/provision-dedicated-schema.sh \
   || fail 'provisionamento não remove parâmetros específicos do Prisma antes de chamar psql.'
+# O `public` pertence ao Prisma (db push do upgrade). O bookkeeping do
+# provisionamento precisa ficar num schema próprio, senão o db push exige
+# --accept-data-loss para dropá-lo e a 1a atualização quebra.
+rg -Fq 'CREATE SCHEMA IF NOT EXISTS iastudio_meta' scripts/provision-dedicated-schema.sh \
+  || fail 'provisionamento deixa bookkeeping no schema public (quebra o db push do upgrade).'
+if rg -n 'CREATE TABLE IF NOT EXISTS system_schema_migrations' scripts/provision-dedicated-schema.sh; then
+  fail 'tabela de bookkeeping ainda é criada sem schema próprio (public).'
+fi
 # A DATABASE_URL dedicada carrega `?schema=public` (exigido pelo Prisma). psql/
 # pg_dump não entendem esse parâmetro do ORM: todo script operacional que fala
 # com o PostgreSQL precisa normalizar a URL por `db_url_for_psql`, nunca passar

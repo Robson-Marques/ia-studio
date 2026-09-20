@@ -50,13 +50,18 @@ BEGIN
   END IF;
 END
 \$\$;
-CREATE TABLE IF NOT EXISTS system_schema_migrations (
+-- Bookkeeping do provisionamento fica FORA do schema `public` (gerido pelo
+-- Prisma). Em public, o `prisma db push` do upgrade a veria como tabela estranha
+-- e exigiria --accept-data-loss para dropá-la — quebrava a 1a atualização de
+-- toda instância dedicada. Um schema próprio não é tocado pelo db push.
+CREATE SCHEMA IF NOT EXISTS iastudio_meta;
+CREATE TABLE IF NOT EXISTS iastudio_meta.system_schema_migrations (
   id text PRIMARY KEY,
   checksum_sha256 text NOT NULL,
   applied_at timestamptz NOT NULL DEFAULT now()
 );
 $(cat "$sql")
-INSERT INTO system_schema_migrations (id, checksum_sha256)
+INSERT INTO iastudio_meta.system_schema_migrations (id, checksum_sha256)
 VALUES ('dedicated-initial-schema', '$fingerprint');
 COMMIT;
 EOF
