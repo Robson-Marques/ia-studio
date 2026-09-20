@@ -170,6 +170,13 @@ bash "$IASTUDIO_APP_DIR/scripts/provision-dedicated-schema.sh" --instance-id "$I
 (cd "$IASTUDIO_APP_DIR/platform-api" && npm run build)
 (cd "$IASTUDIO_APP_DIR/platform-admin" && npm install && npm run build)
 
+# nginx (www-data) serve os estáticos do platform-admin. Com umask 077 o clone e
+# o dist ficaram só-root e o nginx respondia 500 (EACCES ao atravessar o caminho).
+# Abrimos SÓ o necessário: travessia (o+x) nos diretórios até o dist e leitura
+# (a+rX) no dist. O .env (600), dados e backups seguem restritos.
+chmod o+x "$(dirname "$INSTANCE_ROOT_BASE")" "$INSTANCE_ROOT_BASE" "$IASTUDIO_APP_DIR" "$IASTUDIO_APP_DIR/platform-admin"
+chmod -R a+rX "$IASTUDIO_APP_DIR/platform-admin/dist"
+
 # PM2 avalia ecosystem.config.js antes de o Nest carregar dotenv; portanto o
 # contrato integral da instância precisa estar no ambiente deste comando.
 set -a

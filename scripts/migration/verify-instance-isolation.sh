@@ -73,6 +73,10 @@ rg -Fq 'GITLAB_PACKAGE_TOKEN=$(env_value "$GITLAB_TOKEN")' scripts/install-dedic
   || fail 'instalação não persiste GITLAB_PACKAGE_TOKEN no .env da instância.'
 rg -Fq -- '--gitlab-token)' scripts/upgrade.sh \
   || fail 'bootstrap do upgrade não repassa --gitlab-token ao instalador.'
+# umask 077 deixa o dist só-root e o nginx (www-data) responde 500. A instalação
+# precisa abrir travessia/leitura no web root do platform-admin sem hardcode.
+rg -Fq 'chmod -R a+rX "$IASTUDIO_APP_DIR/platform-admin/dist"' scripts/install-dedicated.sh \
+  || fail 'instalação não torna o dist do platform-admin legível para o nginx.'
 if ! rg -Fq 'if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then' scripts/upgrade.sh; then
   fail 'bootstrap não possui caminho exclusivo antes do upgrade de instância.'
 fi

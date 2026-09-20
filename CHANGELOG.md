@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.11.9 - 2026-09-19 (Instalação dedicada: nginx 500 no web root do painel)
+
+A primeira instalação limpa (`ia-dev`, v0.11.8) subiu inteira — API, painel,
+PM2, vhost e HTTPS — mas o painel respondia 500 no nginx. Causa: o `umask 077`
+do instalador deixou o clone e o `dist` do platform-admin só-root, e o nginx
+(www-data) não conseguia atravessar os diretórios até o `dist` (EACCES de
+diretório retorna 500, não 403). Correção permanente: após o build, o instalador
+abre só o necessário — travessia (`o+x`) nos diretórios do caminho público e
+leitura (`a+rX`) no `dist` —, mantendo `.env` (600), dados e backups restritos.
+Sem hardcode de caminho (deriva de `INSTANCE_ROOT_BASE`); gate atualizado.
+
+Sem `db push`; sem mudança de schema. Completa a instalação limpa da primeira
+instância dedicada (S4).
+
 ## v0.11.8 - 2026-09-18 (Instalação dedicada: token do registry privado @studio-ux-ds)
 
 Com a API compilando (v0.11.7), a instalação passou a quebrar no `npm install`
