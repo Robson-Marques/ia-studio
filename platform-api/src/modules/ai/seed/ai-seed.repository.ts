@@ -20,6 +20,15 @@ export class AiSeedRepository {
     return this.prisma.providerDefinition.update({ where: { key }, data });
   }
 
+  /** Desativa (retira da vitrine) um provider do catalogo. Idempotente e nao
+   *  lanca quando a linha nao existe (instalacao nova). */
+  deactivateProviderDefinition(key: string) {
+    return this.prisma.providerDefinition.updateMany({
+      where: { key, is_active: true },
+      data: { is_active: false },
+    });
+  }
+
   findTool(key: string) {
     return this.prisma.aiTool.findUnique({ where: { key } });
   }

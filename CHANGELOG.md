@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.11.11 - 2026-09-19 (Marketplace: só OpenAI e Anthropic na seção de IA)
+
+O marketplace listava seis provedores de IA como "em breve" (Gemini, Ollama,
+OpenRouter, Groq, DeepSeek, Mistral): o painel não testa a conexão deles (não
+têm implementação do lado de integração), então saem da vitrine. Ficam só
+OpenAI e Anthropic, que têm teste de conexão e motor de LLM. O seed de IA deixa
+de criá-los e passa a desativá-los (is_active=false) no boot, de forma
+idempotente — somem do marketplace e não podem ser instalados, sem apagar a
+linha (arquivar ≠ excluir). Instalação nova nem chega a criá-los; os motores de
+LLM de Gemini/Ollama seguem registrados (dormentes), sem card.
+
+Aplicado pela atualização do painel (roda no boot). Sem `db push`; sem mudança
+de schema.
+
 ## v0.11.10 - 2026-09-19 (Atualização dedicada: bookkeeping fora do schema público)
 
 A primeira atualização de uma instância dedicada falhava no PRISMA_PUSH: o

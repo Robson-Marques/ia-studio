@@ -25,15 +25,16 @@ interface AiProviderSeed {
   baseUrlRequired?: boolean;
 }
 
-// openai e anthropic ja sao semeados na Fase 2 — nao repetimos aqui.
-const AI_PROVIDER_SEEDS: AiProviderSeed[] = [
-  { key: 'gemini', name: 'Google Gemini', description: 'Modelos Gemini do Google (chat + embeddings).' },
-  { key: 'ollama', name: 'Ollama', description: 'Modelos locais/self-hosted via Ollama.', defaultBaseUrl: 'http://localhost:11434', baseUrlRequired: true },
-  { key: 'openrouter', name: 'OpenRouter', description: 'Roteador multi-modelo (API compatível com OpenAI).', defaultBaseUrl: 'https://openrouter.ai/api/v1' },
-  { key: 'groq', name: 'Groq', description: 'Inferência rápida (API compatível com OpenAI).', defaultBaseUrl: 'https://api.groq.com/openai/v1' },
-  { key: 'deepseek', name: 'DeepSeek', description: 'Modelos DeepSeek (API compatível com OpenAI).', defaultBaseUrl: 'https://api.deepseek.com/v1' },
-  { key: 'mistral', name: 'Mistral', description: 'Modelos Mistral (API compatível com OpenAI).', defaultBaseUrl: 'https://api.mistral.ai/v1' },
-];
+// openai e anthropic ja sao semeados na Fase 2 — e sao os UNICOS providers de IA
+// que ficam no marketplace (o painel consegue testar a conexao dos dois).
+// Nenhum outro e semeado aqui.
+const AI_PROVIDER_SEEDS: AiProviderSeed[] = [];
+
+// Providers de IA retirados da vitrine (decisao de produto: deixar so o que o
+// painel verifica). Sao DESATIVADOS (is_active=false) no boot, de forma
+// idempotente — somem do marketplace e nao podem ser instalados —, sem apagar a
+// linha (arquivar != excluir). Em instalacao nova nem chegam a ser criados.
+const AI_PROVIDER_RETIRED = ['gemini', 'ollama', 'openrouter', 'groq', 'deepseek', 'mistral'];
 
 @Injectable()
 export class AiProvidersSeedService implements OnApplicationBootstrap {
@@ -56,7 +57,13 @@ export class AiProvidersSeedService implements OnApplicationBootstrap {
     }
 
     try {
-      // 2) ProviderDefinition categoria AI (create-if-missing).
+      // 2a) Aposenta do catalogo os providers de IA fora da vitrine
+      // (idempotente; instalacao nova nem tem essas linhas).
+      for (const key of AI_PROVIDER_RETIRED) {
+        await this.repository.deactivateProviderDefinition(key);
+      }
+
+      // 2b) ProviderDefinition categoria AI (create-if-missing).
       for (const seed of AI_PROVIDER_SEEDS) {
         const existing = await this.repository.findProviderDefinition(seed.key);
         if (existing) continue;
