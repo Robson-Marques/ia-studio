@@ -26,13 +26,7 @@ const PRICES: Record<string, ModelPrice> = {
   'claude-3-5-haiku': { prompt: 0.0008, completion: 0.004 },
   'claude-3-opus': { prompt: 0.015, completion: 0.075 },
   'claude-sonnet-4': { prompt: 0.003, completion: 0.015 },
-  // Gemini
-  'gemini-1.5-pro': { prompt: 0.00125, completion: 0.005 },
-  'gemini-1.5-flash': { prompt: 0.000075, completion: 0.0003 },
-  'gemini-2.0-flash': { prompt: 0.0001, completion: 0.0004 },
-  'text-embedding-004': { prompt: 0, completion: 0 },
-  // Ollama (local) — sem custo.
-  'llama3': { prompt: 0, completion: 0 },
+  // Mistral (OpenAI-compatível via base_url).
   'mistral': { prompt: 0, completion: 0 },
 };
 
@@ -63,7 +57,5 @@ export function computeCost(model: string, promptTokens: number, completionToken
 export function guessKindByModel(model: string): AiProviderKind {
   const m = model.toLowerCase();
   if (m.startsWith('claude')) return AiProviderKind.ANTHROPIC;
-  if (m.startsWith('gemini') || m.startsWith('text-embedding-004')) return AiProviderKind.GEMINI;
-  if (m.startsWith('llama') || m.startsWith('mistral')) return AiProviderKind.OLLAMA;
   return AiProviderKind.OPENAI;
 }

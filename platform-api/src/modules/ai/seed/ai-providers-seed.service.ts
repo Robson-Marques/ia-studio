@@ -1,8 +1,8 @@
 // Seed da IA no boot (idempotente — nunca derruba o boot):
 //   1) registra as implementacoes ILlmProvider no LlmProviderRegistry;
 //   2) cria (create-if-missing) os ProviderDefinition categoria AI que ainda
-//      nao existem (openai/anthropic ja vem da Fase 2; aqui: gemini, ollama,
-//      openrouter, groq, deepseek, mistral) com wizardSchema (api_key + base_url);
+//      nao existem (openai/anthropic ja vem da Fase 2; os demais provedores de
+//      IA foram retirados) com wizardSchema (api_key + base_url);
 //   3) semeia as tools builtin no catálogo local (ai_tools).
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Prisma, ProviderCategory } from '@prisma/client';
@@ -10,8 +10,6 @@ import { AiSeedRepository } from './ai-seed.repository';
 import { LlmProviderRegistryService } from '../providers/llm-provider-registry.service';
 import { OpenAiLlmProvider } from '../providers/impl/openai.provider';
 import { AnthropicLlmProvider } from '../providers/impl/anthropic.provider';
-import { GeminiLlmProvider } from '../providers/impl/gemini.provider';
-import { OllamaLlmProvider } from '../providers/impl/ollama.provider';
 import { ToolRegistryService } from '../tools/tool-registry.service';
 import { WizardSchema } from '../../../shared/integration/provider.interface';
 
@@ -21,7 +19,7 @@ interface AiProviderSeed {
   description: string;
   /** URL base default (mostrada no wizard; editavel pela connection). */
   defaultBaseUrl?: string;
-  /** true = base_url e obrigatorio (ollama/self-hosted). */
+  /** true = base_url e obrigatorio (self-hosted). */
   baseUrlRequired?: boolean;
 }
 
@@ -34,7 +32,7 @@ const AI_PROVIDER_SEEDS: AiProviderSeed[] = [];
 // painel verifica). Sao DESATIVADOS (is_active=false) no boot, de forma
 // idempotente — somem do marketplace e nao podem ser instalados —, sem apagar a
 // linha (arquivar != excluir). Em instalacao nova nem chegam a ser criados.
-const AI_PROVIDER_RETIRED = ['gemini', 'ollama', 'openrouter', 'groq', 'deepseek', 'mistral'];
+const AI_PROVIDER_RETIRED = ['openrouter', 'groq', 'deepseek', 'mistral'];
 
 @Injectable()
 export class AiProvidersSeedService implements OnApplicationBootstrap {
@@ -45,14 +43,12 @@ export class AiProvidersSeedService implements OnApplicationBootstrap {
     private readonly llmRegistry: LlmProviderRegistryService,
     private readonly openai: OpenAiLlmProvider,
     private readonly anthropic: AnthropicLlmProvider,
-    private readonly gemini: GeminiLlmProvider,
-    private readonly ollama: OllamaLlmProvider,
     private readonly toolRegistry: ToolRegistryService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     // 1) Registro em memoria (diretriz 35).
-    for (const provider of [this.openai, this.anthropic, this.gemini, this.ollama]) {
+    for (const provider of [this.openai, this.anthropic]) {
       this.llmRegistry.register(provider);
     }
 

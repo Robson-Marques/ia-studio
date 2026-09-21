@@ -15,8 +15,6 @@ import { LlmProviderRegistryService } from './providers/llm-provider-registry.se
 import { LlmProviderService } from './providers/llm-provider.service';
 import { OpenAiLlmProvider } from './providers/impl/openai.provider';
 import { AnthropicLlmProvider } from './providers/impl/anthropic.provider';
-import { GeminiLlmProvider } from './providers/impl/gemini.provider';
-import { OllamaLlmProvider } from './providers/impl/ollama.provider';
 
 // Orchestrator
 import { AiOrchestratorService } from './orchestrator/ai-orchestrator.service';
@@ -101,8 +99,6 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     LlmProviderService,
     OpenAiLlmProvider,
     AnthropicLlmProvider,
-    GeminiLlmProvider,
-    OllamaLlmProvider,
     // Orchestrator
     AiOrchestratorService,
     // Memory

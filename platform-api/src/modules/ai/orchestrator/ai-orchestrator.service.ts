@@ -11,7 +11,7 @@ import { priceForModel } from '../providers/pricing';
 
 // provider_keys da categoria AI (espelha KIND_BY_PROVIDER_KEY do LlmProviderService).
 const AI_PROVIDER_KEYS = [
-  'openai', 'anthropic', 'gemini', 'ollama',
+  'openai', 'anthropic',
   'openrouter', 'groq', 'deepseek', 'mistral', 'azure-openai',
 ];
 

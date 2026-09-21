@@ -23,8 +23,6 @@ const ANALYSIS_MAX_TOKENS = 2_000;
 const DEFAULT_MODEL_BY_KIND: Partial<Record<AiProviderKind, string>> = {
   [AiProviderKind.OPENAI]: 'gpt-4o-mini',
   [AiProviderKind.ANTHROPIC]: 'claude-3-5-haiku',
-  [AiProviderKind.GEMINI]: 'gemini-1.5-flash',
-  [AiProviderKind.OLLAMA]: 'llama3',
 };
 
 type AnalysisActor = { userId?: string };

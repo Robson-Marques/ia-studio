@@ -1,5 +1,24 @@
 # Changelog — IA Studio
 
+## v0.11.18 - 2026-09-21 (Faxina Etapa 2a: remove os motores LLM Gemini/Ollama)
+
+Remoção de verdade dos motores de LLM dormentes Gemini e Ollama (já sem card no
+marketplace desde v0.11.11). Saem as implementações
+`providers/impl/gemini.provider.ts` e `ollama.provider.ts` e toda a fiação viva:
+imports e registro no `ai.module`; injeção e laço de registro no
+`ai-providers-seed` (e 'gemini'/'ollama' saem de `AI_PROVIDER_RETIRED`); preços e
+heurística de modelo em `pricing.ts`; mapa `KIND_BY_PROVIDER_KEY` e mensagem de
+embeddings em `llm-provider.service`; lista de fallback do orquestrador; modelos
+default por kind em `content-review` e `analysis`.
+
+O enum `AiProviderKind` (GEMINI/OLLAMA) é do Prisma (modelo de dados) e **não** foi
+tocado — remover valores de enum é mudança de schema/destrutiva, fora do escopo de
+faxina. Ficam só OpenAI e Anthropic com motor; os provedores OpenAI-compatíveis
+(OpenRouter/Groq/DeepSeek/Mistral/Azure) seguem intactos.
+
+Verificado: `nest build` (tsc) verde no estado pós-remoção, sem dangling reference
+(grep), e os quatro gates verdes. Sem mudança de schema.
+
 ## v0.11.17 - 2026-09-21 (Faxina Etapa 1: remoção de mortos por reachability)
 
 Remove o que a Etapa 0 marcou como morto por reachability e o que você aprovou:

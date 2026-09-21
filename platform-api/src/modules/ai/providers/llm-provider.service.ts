@@ -22,8 +22,6 @@ import { computeCost } from './pricing';
 const KIND_BY_PROVIDER_KEY: Record<string, AiProviderKind> = {
   openai: AiProviderKind.OPENAI,
   anthropic: AiProviderKind.ANTHROPIC,
-  gemini: AiProviderKind.GEMINI,
-  ollama: AiProviderKind.OLLAMA,
   openrouter: AiProviderKind.OPENAI,
   groq: AiProviderKind.OPENAI,
   deepseek: AiProviderKind.OPENAI,
@@ -126,7 +124,7 @@ export class LlmProviderService {
     const resolved = await this.resolveConnection(connectionId);
     const provider = this.registry.get(resolved.kind);
     if (!provider.embed) {
-      throw new BadRequestException(`Provedor "${resolved.kind}" não gera embeddings — use OpenAI/Gemini/Ollama.`);
+      throw new BadRequestException(`Provedor "${resolved.kind}" não gera embeddings — use OpenAI.`);
     }
     const req: LlmEmbedRequest = {
       model,
