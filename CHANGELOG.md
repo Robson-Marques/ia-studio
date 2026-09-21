@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.11.12 - 2026-09-21 (Marketplace: retirar WhatsApp Baileys interno e manual)
+
+Os dois conectores WhatsApp via Baileys (interno e manual) saem da vitrine — não
+serão usados nesta operação. Têm implementação, então não são apagados: o seed de
+providers deixa de semeá-los e passa a desativá-los (is_active=false) no boot,
+idempotente — somem do marketplace e não podem ser instalados, sem apagar a linha
+nem tocar no código do provider (fica dormente). Instalação nova nem os cria. Meta
+Cloud API e YCloud (WhatsApp oficial) seguem iguais.
+
+Aplicado pela atualização do painel (roda no boot). Sem `db push`; sem mudança de
+schema.
+
 ## v0.11.11 - 2026-09-19 (Marketplace: só OpenAI e Anthropic na seção de IA)
 
 O marketplace listava seis provedores de IA como "em breve" (Gemini, Ollama,

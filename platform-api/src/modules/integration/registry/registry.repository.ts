@@ -19,4 +19,13 @@ export class RegistryRepository {
   update(key: string, data: Prisma.ProviderDefinitionUpdateInput) {
     return this.prisma.providerDefinition.update({ where: { key }, data });
   }
+
+  /** Retira um conector da vitrine (is_active=false). Idempotente e nao lanca
+   *  quando a linha nao existe (instalacao nova). */
+  deactivate(key: string) {
+    return this.prisma.providerDefinition.updateMany({
+      where: { key, is_active: true },
+      data: { is_active: false },
+    });
+  }
 }

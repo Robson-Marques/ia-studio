@@ -29,6 +29,12 @@ import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 // postgresql: ganhou Schema Discovery + SQL read-only na Fase 7 (wizard/caps).
 const REFRESH_KEYS = new Set<string>(['whatsapp-meta', 'smtp', 'postgresql']);
 
+// Conectores existentes mas retirados da vitrine por decisao de produto (nao
+// serao usados). Sao DESATIVADOS (is_active=false) no boot, de forma idempotente
+// — somem do marketplace e nao podem ser instalados —, sem apagar a linha nem
+// mexer no codigo do provider (fica dormente). Instalacao nova nem os semeia.
+const RETIRED_KEYS = new Set<string>(['whatsapp-baileys-internal', 'whatsapp-baileys-manual']);
+
 @Injectable()
 export class ProviderSeedService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ProviderSeedService.name);
@@ -59,8 +65,13 @@ export class ProviderSeedService implements OnApplicationBootstrap {
 
     // 2) Seed create-if-missing das definicoes (marketplace).
     try {
+      // 2a) Retira da vitrine os conectores aposentados (idempotente).
+      for (const key of RETIRED_KEYS) {
+        await this.repository.deactivate(key);
+      }
       const all: ProviderMetadata[] = [...this.registry.allMetadata(), ...CATALOG_ONLY_PROVIDERS];
       for (const meta of all) {
+        if (RETIRED_KEYS.has(meta.key)) continue; // aposentado — nao semeia card
         const existing = await this.repository.findByKey(meta.key);
         if (existing && REFRESH_KEYS.has(meta.key)) {
           // Definicao pre-existente de um provider que ganhou implementacao:
