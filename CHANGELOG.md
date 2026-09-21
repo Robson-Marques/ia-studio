@@ -1,5 +1,26 @@
 # Changelog — IA Studio
 
+## v0.11.16 - 2026-09-21 (Frente de faxina: especialidade + inventário Etapa 0)
+
+Fica de pé a frente de limpeza de código/arquivos mortos. Cria a especialidade
+local `ia-studio.system-cleanup@1.0.0` (via `workflow.specialty-creation@1.0.0`,
+após o alinhamento aprovado): governa a remoção **de verdade** do que não é usado,
+em etapas (0 inventário read-only → 1 arquivos/módulos → 2 intra-código), sem
+quebrar build/gates/runtime, distinguindo *excluir de verdade* de *arquivar* e
+exigindo decisão do dono sobre motores dormentes. Catálogo local sobe para 1.4.0.
+
+Entrega o primeiro artefato dessa especialidade: `docs/faxina/etapa-0-inventario.md`,
+o inventário **somente-leitura** por reachability sobre `platform-api/src` e
+`platform-admin/src`. Classifica: (A) 8 itens mortos por reachability — excluir de
+verdade (pastas-esqueleto SaaS vazias: `billing`, `licensing`, `core/organizations`,
+`core/workspaces`, `ai/costs`; e 3 arquivos órfãos); (B) motores dormentes — decisão
+do dono (LLM Gemini/Ollama; WhatsApp Baileys); (C) cinza/resquício SaaS (tela de
+pagamento `/pagar`); (D) docs/repo (o catálogo referencia `tenant-domains.md`, que
+não existe). **Nada removido nesta versão.**
+
+Só framework/docs; sem mudança de runtime nem de schema. A Etapa 1 (remoção) exige
+as decisões do inventário e novo alinhamento.
+
 ## v0.11.15 - 2026-09-21 (Gates exigem ripgrep + auditoria pré-S4 em GO)
 
 Os quatro gates de migração (`verify-dedicated-cut`, `verify-operational-dedicated`,
