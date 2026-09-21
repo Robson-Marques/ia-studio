@@ -15,7 +15,6 @@ import { ReplyGateService } from '../attendance/reply-gate.service';
 import { AttendanceRepository } from '../attendance/attendance.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
-import { WhatsappBaileysRegistryService } from './whatsapp-baileys-registry.service';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import {
   MetaApiError,
@@ -62,7 +61,6 @@ export class WhatsappInboxService {
     private readonly attendance: AttendanceRepository,
     private readonly connections: ConnectionsService,
     private readonly connectionsRepository: ConnectionsRepository,
-    private readonly baileys: WhatsappBaileysRegistryService,
   ) {}
 
   // ─── Escopo (a UI monta as abas a partir daqui) ─────
@@ -262,10 +260,6 @@ export class WhatsappInboxService {
     args: UploadMediaArgs,
   ): Promise<{ wamid: string | null; via: 'media' }> {
     const chat = await this.getChat(chatId);
-    if (chat.manual_connection_id) {
-      throw new BadRequestException('O envio de mídia gravada não está disponível no canal manual. Envie por link ou use o número oficial.');
-    }
-
     // Validacao de tamanho por tipo (limites da Cloud API) — erro amigavel.
     const limit = META_MEDIA_LIMITS[args.kind];
     if (args.data.length > limit) {
@@ -329,41 +323,6 @@ export class WhatsappInboxService {
 
     // Reply gate: claim implicito / takeover confirmado / 403 / 409.
     await this.replyGate.assertCanReply(chat, scope, confirmTakeover);
-
-    // Coexistência: conversa em modo manual → envia pelo canal Baileys manual
-    // (sem janela de 24h, sem Meta). Templates não se aplicam ao canal manual.
-    if (chat.manual_connection_id) {
-      if (isTemplate) {
-        throw new BadRequestException('O canal manual não envia modelos. Volte ao número oficial para usar um modelo.');
-      }
-      const sent = await this.baileys.sendViaBaileysConnection(
-        chat.manual_connection_id,
-        chat.phone,
-        message,
-      );
-      // Registra o outbound na MESMA conversa (origem oficial preservada em connection_id).
-      await this.chats.createMessage({
-        chat_id: chat.id,
-        connection_id: chat.connection_id,
-        external_id: sent.providerMessageId,
-        direction: CommMessageDirection.OUTGOING,
-        sender: `user:${user.sub}`,
-        type: message.kind,
-        content: this.previewMessage(message),
-        media: this.mediaJson(message),
-        status: 'sent',
-      });
-      await this.chats.updateChat(chat.id, {
-        last_message: this.previewMessage(message).slice(0, 500),
-        last_message_at: new Date(),
-      });
-      if (!chat.first_response_at) {
-        await this.chats
-          .updateChatConditional(chat.id, { first_response_at: null }, { first_response_at: new Date() })
-          .catch(() => 0);
-      }
-      return { wamid: sent.providerMessageId };
-    }
 
     // Janela de 24h: texto livre/midia manual so DENTRO da janela (template
     // aprovado e o caminho fora dela — a UI ja avisa e sugere).
@@ -445,57 +404,5 @@ export class WhatsappInboxService {
       throw new ConflictException('A conexão WhatsApp desta conversa não está ativa. Verifique em WhatsApp → Números.');
     }
     return connection;
-  }
-
-  // ─── Coexistência: canal manual (Baileys) ───────────
-
-  /** Liga/desliga o modo manual da conversa. connectionId null = volta ao oficial. */
-  async setManualChannel(chatId: string, connectionId: string | null): Promise<WhatsappChat> {
-    const chat = await this.getChat(chatId);
-    if (!connectionId) {
-      return this.chats.updateChat(chatId, { manual_connection_id: null });
-    }
-    const manual = await this.connectionsRepository.findById(connectionId);
-    if (!manual || manual.provider_key !== 'whatsapp-baileys-manual' || !manual.is_active) {
-      throw new NotFoundException('Canal manual Baileys não encontrado ou inativo.');
-    }
-    // Integridade da coexistência: o canal manual deve acompanhar a conexão oficial DESTA conversa.
-    const official = (manual.config as Record<string, unknown>)?.['official_connection_id'];
-    if (typeof official === 'string' && official && official !== chat.connection_id) {
-      throw new BadRequestException('Este canal manual está vinculado a outra conexão oficial.');
-    }
-    return this.chats.updateChat(chatId, { manual_connection_id: connectionId });
-  }
-
-  /** Canais manuais elegíveis para esta conversa (ativos e vinculados à conexão oficial dela). */
-  async listManualChannels(chatId: string): Promise<Array<{ id: string; name: string; status: string }>> {
-    const chat = await this.getChat(chatId);
-    const all = await this.connectionsRepository.findAll({ providerKey: 'whatsapp-baileys-manual' });
-    return all
-      .filter((c) => c.is_active)
-      .filter((c) => {
-        const official = (c.config as Record<string, unknown>)?.['official_connection_id'];
-        return !official || official === chat.connection_id;
-      })
-      .map((c) => ({ id: c.id, name: c.name, status: c.status as unknown as string }));
-  }
-
-  // ─── Helpers do envio manual ────────────────────────
-
-  private previewMessage(message: RichMessage): string {
-    switch (message.kind) {
-      case 'text': return message.body;
-      case 'image': return message.caption ?? '[Imagem]';
-      case 'video': return message.caption ?? '[Vídeo]';
-      case 'audio': return '[Áudio]';
-      case 'document': return message.caption ?? message.filename ?? '[Documento]';
-      default: return '[mensagem]';
-    }
-  }
-
-  private mediaJson(message: RichMessage): Prisma.InputJsonValue | undefined {
-    if (!['image', 'audio', 'video', 'document'].includes(message.kind)) return undefined;
-    const m = message as { url?: string; mediaId?: string; caption?: string; filename?: string };
-    return { url: m.url ?? null, media_id: m.mediaId ?? null, caption: m.caption ?? null, filename: m.filename ?? null } as Prisma.InputJsonValue;
   }
 }

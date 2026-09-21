@@ -108,9 +108,8 @@ export class WhatsappAssistantResponderService {
     // Estado ATUAL da conversa (pode ter mudado durante a espera).
     const chat = await this.inbox.getChat(chatId).catch(() => null);
     if (!chat) return;
-    // Humano no comando → a IA não responde por cima. Modo manual → idem.
+    // Humano no comando → a IA não responde por cima.
     if (chat.current_handler_type === 'USER') return;
-    if (chat.manual_connection_id) return;
 
     // UX: marca como lida (tick azul) e mostra "digitando…". Best-effort.
     if (payload.external_id) {

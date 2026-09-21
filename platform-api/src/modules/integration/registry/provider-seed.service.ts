@@ -20,20 +20,12 @@ import { SmtpProvider } from './providers/smtp.provider';
 import { S3Provider } from './providers/s3.provider';
 import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
 import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
-import { WhatsappBaileysInternalProvider } from './providers/whatsapp-baileys-internal.provider';
-import { WhatsappBaileysManualProvider } from './providers/whatsapp-baileys-manual.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 
 // Providers cuja definicao deve ser atualizada no boot (ganhou implementacao).
 // smtp: virou envio real (email.send) na Fase 7 — wizard/capabilities mudaram.
 // postgresql: ganhou Schema Discovery + SQL read-only na Fase 7 (wizard/caps).
 const REFRESH_KEYS = new Set<string>(['whatsapp-meta', 'smtp', 'postgresql']);
-
-// Conectores existentes mas retirados da vitrine por decisao de produto (nao
-// serao usados). Sao DESATIVADOS (is_active=false) no boot, de forma idempotente
-// — somem do marketplace e nao podem ser instalados —, sem apagar a linha nem
-// mexer no codigo do provider (fica dormente). Instalacao nova nem os semeia.
-const RETIRED_KEYS = new Set<string>(['whatsapp-baileys-internal', 'whatsapp-baileys-manual']);
 
 @Injectable()
 export class ProviderSeedService implements OnApplicationBootstrap {
@@ -52,26 +44,19 @@ export class ProviderSeedService implements OnApplicationBootstrap {
     private readonly s3: S3Provider,
     private readonly whatsappMeta: WhatsappMetaProvider,
     private readonly whatsappYcloud: WhatsappYcloudProvider,
-    private readonly whatsappBaileysInternal: WhatsappBaileysInternalProvider,
-    private readonly whatsappBaileysManual: WhatsappBaileysManualProvider,
     private readonly googleWorkspace: GoogleWorkspaceProvider,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     // 1) Registro em memoria das implementacoes (diretriz 2).
-    for (const provider of [this.altarede, this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.whatsappBaileysInternal, this.whatsappBaileysManual, this.googleWorkspace]) {
+    for (const provider of [this.altarede, this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.googleWorkspace]) {
       this.registry.register(provider);
     }
 
     // 2) Seed create-if-missing das definicoes (marketplace).
     try {
-      // 2a) Retira da vitrine os conectores aposentados (idempotente).
-      for (const key of RETIRED_KEYS) {
-        await this.repository.deactivate(key);
-      }
       const all: ProviderMetadata[] = [...this.registry.allMetadata(), ...CATALOG_ONLY_PROVIDERS];
       for (const meta of all) {
-        if (RETIRED_KEYS.has(meta.key)) continue; // aposentado — nao semeia card
         const existing = await this.repository.findByKey(meta.key);
         if (existing && REFRESH_KEYS.has(meta.key)) {
           // Definicao pre-existente de um provider que ganhou implementacao:

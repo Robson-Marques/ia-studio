@@ -1,5 +1,28 @@
 # Changelog — IA Studio
 
+## v0.11.19 - 2026-09-21 (Faxina Etapa 2b/API: remove o subsistema Baileys)
+
+Remove de verdade, no backend, todo o recurso de canal manual/coexistência do
+WhatsApp (Baileys) — decisão do dono: não será usado. Saem 7 arquivos
+(`whatsapp-baileys.controller`, `-registry.service`, `-session.repository`, os 2
+providers `whatsapp-baileys-internal/manual`, e a pasta `connectors/` inteira:
+`connector.types.ts` + `whatsapp-baileys.runtime.ts`, que só o Baileys usava) e
+toda a fiação: registro no `comm.module`/`registry.module`/`provider-seed` (com o
+mecanismo `RETIRED_KEYS`, que só existia para o Baileys), o caminho de envio manual
+e os métodos `setManual/listManualChannels` do inbox, os 2 endpoints do controller,
+a checagem de modo manual no orquestrador e no responder da IA. Removidas também as
+dependências npm órfãs `@whiskeysockets/baileys`, `qrcode` e `@types/qrcode`.
+
+O enum/coluna do Prisma (`manual_connection_id`, `WhatsappBaileysSession`) **não**
+foi tocado (schema é fora do escopo de faxina); vira coluna/modelo órfão inofensivo.
+Meta Cloud API e YCloud (WhatsApp oficial) seguem intactos.
+
+Verificado: `nest build` (tsc) verde no estado pós-remoção (npm caiu de 532→465
+pacotes), grep sem dangling reference, e os quatro gates verdes. A parte do
+**admin** (ChatWindow/MessageComposer/ConexaoDetalhe/whatsapp.js/whatsappBaileys.js)
+sai na v0.11.20 — enquanto isso o admin degrada de forma limpa (as chamadas de modo
+manual dão 404, são engolidas e a UI fica escondida). Sem mudança de schema.
+
 ## v0.11.18 - 2026-09-21 (Faxina Etapa 2a: remove os motores LLM Gemini/Ollama)
 
 Remoção de verdade dos motores de LLM dormentes Gemini e Ollama (já sem card no

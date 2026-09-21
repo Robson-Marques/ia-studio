@@ -17,9 +17,6 @@ import { WhatsappSyncService } from './whatsapp/whatsapp-sync.service';
 import { WhatsappWebhookController } from './whatsapp/whatsapp-webhook.controller';
 import { WhatsappYcloudWebhookController } from './whatsapp/whatsapp-ycloud-webhook.controller';
 import { WhatsappYcloudInboundService } from './whatsapp/whatsapp-ycloud-inbound.service';
-import { WhatsappBaileysSessionRepository } from './whatsapp/whatsapp-baileys-session.repository';
-import { WhatsappBaileysRegistryService } from './whatsapp/whatsapp-baileys-registry.service';
-import { WhatsappBaileysController } from './whatsapp/whatsapp-baileys.controller';
 import { WhatsappInboxController } from './whatsapp/whatsapp-inbox.controller';
 import { WhatsappTemplatesController } from './whatsapp/whatsapp-templates.controller';
 import { WhatsappNumbersController } from './whatsapp/whatsapp-numbers.controller';
@@ -40,7 +37,6 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
   controllers: [
     WhatsappWebhookController,
     WhatsappYcloudWebhookController,
-    WhatsappBaileysController,
     WhatsappInboxController,
     WhatsappTemplatesController,
     WhatsappNumbersController,
@@ -55,8 +51,6 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
     EmailOrchestratorService,
     WhatsappInboundService,
     WhatsappYcloudInboundService,
-    WhatsappBaileysSessionRepository,
-    WhatsappBaileysRegistryService,
     WhatsappInboxService,
     WhatsappSmartSendService,
     WhatsappTemplatesService,
@@ -73,6 +67,6 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
   ],
   // Orchestrator + smart-send + email sao a porta de envio das Fases 4-7
   // (automacao/IA/notificacoes).
-  exports: [WhatsappOrchestratorService, WhatsappSmartSendService, WhatsappInboxService, ChatAssignmentService, EmailOrchestratorService, WhatsappBaileysRegistryService, WhatsappAssistantService],
+  exports: [WhatsappOrchestratorService, WhatsappSmartSendService, WhatsappInboxService, ChatAssignmentService, EmailOrchestratorService, WhatsappAssistantService],
 })
 export class CommModule {}

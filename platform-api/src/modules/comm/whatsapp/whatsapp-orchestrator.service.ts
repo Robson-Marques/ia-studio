@@ -93,13 +93,6 @@ export class WhatsappOrchestratorService {
 
   async send(args: OrchestratorSendArgs, message: RichMessage): Promise<OrchestratorSendResult> {
     const connection = await this.resolveConnection(args.criteria);
-    // Coexistência: se a conversa (conexão + telefone) está em modo manual, este
-    // caminho automático (IA, relacionamento, cobrança) NÃO envia por ela — só o
-    // atendente responde, pelo canal manual (Baileys), via a inbox.
-    const existing = await this.chats.findChatByConnectionPhone(connection.id, normalizePhone(args.phone));
-    if (existing?.manual_connection_id) {
-      throw new ConflictException('Esta conversa está no modo manual. IA, automações e modelos não enviam por ela.');
-    }
     return this.sendViaConnection(connection, args.phone, message, args.sender ?? 'system');
   }
 

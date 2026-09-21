@@ -242,25 +242,4 @@ export class WhatsappInboxController {
       dto.message as unknown as RichMessage,
     );
   }
-
-  /** Liga/desliga o modo manual (Baileys) da conversa. body.connection_id null = volta ao oficial. */
-  @Post('chats/:id/manual-channel')
-  @RequirePermissions(...ANY_REPLY)
-  setManualChannel(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() body: { connection_id?: string | null },
-  ) {
-    return this.inbox.setManualChannel(id, body?.connection_id ?? null);
-  }
-
-  /** Canais manuais elegíveis para esta conversa. */
-  @Get('chats/:id/manual-channels')
-  @RequirePermissions(...ANY_VIEW)
-  listManualChannels(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
-    return this.inbox.listManualChannels(id);
-  }
 }
