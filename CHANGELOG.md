@@ -1,5 +1,22 @@
 # Changelog — IA Studio
 
+## v0.11.15 - 2026-09-21 (Gates exigem ripgrep + auditoria pré-S4 em GO)
+
+Os quatro gates de migração (`verify-dedicated-cut`, `verify-operational-dedicated`,
+`verify-console-retirement`, `verify-instance-isolation`) dependem do `rg`
+(ripgrep) para toda a evidência. Num host sem ripgrep isso falhava em silêncio: o
+S1 usa `rg ... || true` e ficava **falso-verde**, enquanto S2/S3/S4 (`rg ... || fail`)
+ficavam **falso-vermelhos** — a ausência da ferramenta se confundia com falha de
+conteúdo. Cada gate passa a exigir o `rg` logo após `set -euo pipefail`: sem ele,
+para com mensagem clara e `exit 2` (erro de ambiente), em vez de mascarar de
+verde ou vermelho.
+
+Com o ripgrep presente, os quatro gates passam verdes (`EXIT=0`). A
+`docs/auditoria-pre-s4.md` vira **veredito GO** e registra esse achado de
+ambiente (ripgrep obrigatório) além dos anteriores.
+
+Sem mudança de comportamento de runtime; sem mudança de schema.
+
 ## v0.11.14 - 2026-09-21 (Gate S4 verde + auditoria de prontidão pré-S4)
 
 A auditoria antes da prova operacional do S4 achou que a v0.11.10 tinha deixado o

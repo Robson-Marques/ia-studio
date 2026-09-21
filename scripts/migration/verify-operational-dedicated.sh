@@ -3,6 +3,7 @@
 # Referências à organização de origem só são permitidas no exportador histórico,
 # que é read-only e nunca é carregado pela aplicação da instância dedicada.
 set -euo pipefail
+command -v rg >/dev/null 2>&1 || { echo 'ERRO: ripgrep (rg) é obrigatório para este gate.' >&2; exit 2; }
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"

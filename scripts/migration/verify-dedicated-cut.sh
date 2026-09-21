@@ -3,6 +3,7 @@
 # Não corrige arquivos: evidencia que schema, auth, ACL, API e eventos chegaram
 # juntos ao estado sem tenant antes de S1 poder ser encerrado.
 set -euo pipefail
+command -v rg >/dev/null 2>&1 || { echo 'ERRO: ripgrep (rg) é obrigatório para este gate.' >&2; exit 2; }
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 MODE="${1:---report}"

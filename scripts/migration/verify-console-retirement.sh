@@ -2,6 +2,7 @@
 # Gate S3 — confirma que o antigo Console SaaS não voltou como rota, build,
 # vhost ou superfície de painel. Não substitui os testes de execução no host.
 set -euo pipefail
+command -v rg >/dev/null 2>&1 || { echo 'ERRO: ripgrep (rg) é obrigatório para este gate.' >&2; exit 2; }
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FAILURES=0
