@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.11.13 - 2026-09-21 (Checkpoint: docs vivos — instalação limpa e upgrade comprovados)
+
+Checkpoint de estado (docs vivos), sem mudança de código. `ESTADO-e-handoff.md`
+registra a instalação limpa da primeira instância dedicada (`ia-dev`) e a
+atualização pelo painel funcionando de ponta a ponta, além da sequência de
+correções v0.11.6–v0.11.12. S4 avança para "instalação limpa de A comprovada;
+falta a prova de B (segunda instância isolada)". S2 fica alinhado como "em
+andamento" entre o handoff e o contrato da Capability. S4 e a Capability seguem
+`in-progress`.
+
 ## v0.11.12 - 2026-09-21 (Marketplace: retirar WhatsApp Baileys interno e manual)
 
 Os dois conectores WhatsApp via Baileys (interno e manual) saem da vitrine — não

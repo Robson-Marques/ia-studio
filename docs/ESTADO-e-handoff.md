@@ -6,7 +6,7 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-09-18.
+> Última atualização: 2026-09-21.
 
 ## Checkpoint S3 — Console SaaS → administração local
 
@@ -61,10 +61,43 @@ parcial antes do provisionamento. A correção em andamento descobre a porta do
 cluster e valida TCP antes de criar recursos. S4 permanece 50%: falta remover
 somente `ia-dev`, instalar A limpa e provar B no mesmo host.
 
+Atualização de 2026-09-21 (S4 — instalação limpa comprovada + upgrade validado):
+a `ia-dev` foi instalada do zero em host real, ponta a ponta — schema
+provisionado, `platform-api` (nest build) e `platform-admin` (vite build,
+autenticando no registry privado `@studio-ux-ds`) compilados, PM2
+`iastudio-ia-dev-api`/`-worker` online, vhost e HTTPS (Let's Encrypt) ativos em
+`chat-studio.newnettelecom.com.br`. Ctrl Leads e Finanças seguiram online sem
+cruzamento. A atualização pelo painel (Administração da instalação) também foi
+exercida com sucesso — primeira atualização dedicada de ponta a ponta.
+
+O caminho exigiu uma sequência de correções de fonte, todas permanentes nos
+scripts/código (sem patch manual recorrente):
+- v0.11.6 — normalização da `DATABASE_URL` para psql em upgrade/backup/restore
+  (o `?schema=public` do Prisma quebrava o libpq);
+- v0.11.7 — 26 erros de TypeScript no build da API (SettingsService renomeado,
+  imports de auth/Prisma, `agentId`);
+- v0.11.8 — token do registry privado `@studio-ux-ds` na instalação (401 no
+  build do platform-admin);
+- v0.11.9 — permissão do web root do painel para o nginx (umask 077 → 500);
+- v0.11.10 — bookkeeping do provisionamento fora do schema `public` (o `db push`
+  do upgrade exigia `--accept-data-loss` para dropar a tabela de controle);
+  destravou a atualização pelo painel;
+- v0.11.11 / v0.11.12 — curadoria do Marketplace (IA só com OpenAI e Anthropic;
+  WhatsApp Baileys interno e manual retirados da vitrine).
+
+Falta apenas a prova de B para fechar o S4: uma segunda instância isolada no
+mesmo host, sem cruzamento de banco/role, Redis, PM2, diretório, backup ou vhost.
+
+Reclassificação de estado (alinha ESTADO e contrato): S2 fica **em andamento** —
+o corte de código está aprovado pelo gate e a migração de dados é não aplicável
+(`s2-dev-data-disposition.md`), permanecendo in-progress até a Acceptance
+integrada, como já consta no contrato da Capability.
+
 Progresso da Capability (S1–S5; S0 é Recovery e não entra no denominador):
-S1 100%, S2 100%, S3 100%, S4 50%, S5 0%; geral **70%**. A Capability segue
-`in-progress`; a evidência real de S4 ainda não passou e não há Acceptance ou
-deploy da instância dedicada.
+S1 100%, S2 **em andamento**, S3 100%, S4 **75%** (instalação limpa de A e
+upgrade comprovados; falta a prova de B), S5 0%; geral **in-progress** (gated por
+S2/S4). A instalação limpa de A já passou em host real; faltam a prova de duas
+instâncias e a Acceptance integrada.
 
 ## 🏗️ Conversão SaaS → instalação dedicada — Capability ativa
 
