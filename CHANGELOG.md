@@ -1,5 +1,25 @@
 # Changelog — IA Studio
 
+## v0.11.17 - 2026-09-21 (Faxina Etapa 1: remoção de mortos por reachability)
+
+Remove o que a Etapa 0 marcou como morto por reachability e o que você aprovou:
+
+- Arquivos órfãos (nenhum import em toda a árvore): `platform-admin/src/services/account.js`,
+  `platform-api/src/modules/comm/whatsapp/template-catalog/catalog.seed.ts`,
+  `platform-api/src/modules/integration/marketplace/dto/update-provider-definition.dto.ts`.
+- Tela de pagamento SaaS: `platform-admin/src/pages/PaginaPagamento.jsx` e a rota
+  pública `/pagar/:token` (o módulo `billing` do backend está vazio — estava quebrada
+  no dedicado).
+- Pastas-esqueleto vazias da era SaaS (sem `.ts`): `platform-api/src/modules/billing`,
+  `licensing`, `core/organizations`, `core/workspaces`, `ai/costs`.
+- Docs: remove a referência morta à rota `ai/costs` no `ai/README.md`; remove a linha
+  morta `ia-studio.tenant-domains` do catálogo de especialidades (arquivo inexistente),
+  catálogo sobe para 1.5.0.
+
+Sem dangling reference após a remoção (conferido por grep) e os quatro gates seguem
+verdes. Meta Cloud API/YCloud, OpenAI e Anthropic intactos. Motores dormentes
+(Gemini/Ollama, Baileys) saem em versões próprias (Etapa 2). Sem mudança de schema.
+
 ## v0.11.16 - 2026-09-21 (Frente de faxina: especialidade + inventário Etapa 0)
 
 Fica de pé a frente de limpeza de código/arquivos mortos. Cria a especialidade

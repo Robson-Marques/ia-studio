@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.4.0
+version: 1.5.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-09-08"
 released_at: "2026-09-08"
-change_reason: MINOR. Adiciona `ia-studio.system-cleanup@1.0.0`, criada após aprovação do Robson para remover de verdade código e arquivos mortos em etapas, com o repo passando a representar só o que está em uso.
+change_reason: MINOR. Remove a linha morta `ia-studio.tenant-domains` (arquivo inexistente; a tenancy multi-tenant foi retirada na conversão SaaS→dedicado). A entrada 1.1.0 no histórico é preservada como registro.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -27,7 +27,6 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 | Slug | Identidade operacional | Missão | Prompt |
 |---|---|---|---|
 | `ia-studio.studio-ux-adoption` | Engenheiro Frontend Sênior especializado em adoção controlada de Design Systems | Governar a adoção do Studio UX no `platform-admin` do IA Studio por famílias de tela, respeitando o piloto `/studio-ux-demo` já existente, o contexto multi-tenant e as regras do próprio DS. | [adocao-studio-ux.md](especialidades/adocao-studio-ux.md) |
-| `ia-studio.tenant-domains` | Engenheiro de plataforma multi-tenant (tenancy, domínios, resolução por Host) | Governar mudanças de tenancy no IA Studio — modelagem de domínio/organização, resolução de tenant por Host, branding white-label por domínio e gestão no Console — respeitando `organization_id`/workspace/environment e a fronteira app↔infra (Nginx/TLS fora do deploy por tag). | [tenant-domains.md](especialidades/tenant-domains.md) |
 | `ia-studio.whatsapp-connectors` | Engenheiro de Plataforma de Integrações multi-tenant (conectores de mensageria e coexistência) | Portar para o IA Studio os conectores WhatsApp do Aquapark (Meta/YCloud/Baileys) e o vínculo de coexistência canal oficial↔manual, adaptado ao Provider Registry (`IProvider`) + Secrets Manager e ao contexto `organization_id`/workspace/environment. Conexões ficam em Integrações › Conexões. | [whatsapp-connectors.md](especialidades/whatsapp-connectors.md) |
 | `ia-studio.dedicated-instance-operations` | Engenheiro de operações de instâncias dedicadas | Governar instalação, upgrade, backup, restauração e remoção por instância, com evidência real de host e sem afetar outros produtos. | [dedicated-instance-operations.md](especialidades/dedicated-instance-operations.md) |
 | `ia-studio.system-cleanup` | Engenheiro de manutenção (faxina de código e arquivos mortos por reachability) | Remover de verdade código e arquivos mortos do IA Studio em etapas — sem quebrar build/gates/runtime — distinguindo *excluir de verdade* de *arquivar*, para o repo representar só o que está em uso. | [system-cleanup.md](especialidades/system-cleanup.md) |
@@ -58,3 +57,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.2.0 | released | Aprovado por Robson em 2026-09-08 | MINOR. Adiciona `ia-studio.whatsapp-connectors@1.0.0` (porte dos conectores WhatsApp Meta/YCloud/Baileys + coexistência), criada por `workflow.specialty-creation@1.0.0` após o relatório de alinhamento de 2026-09-08. |
 | 1.3.0 | released | Aprovado por Robson em 2026-09-18 | MINOR. Adiciona `ia-studio.dedicated-instance-operations@1.0.0` para S4: operação de instâncias dedicadas com recursos reais do host e isolamento entre produtos. |
 | 1.4.0 | released | Aprovado por Robson em 2026-09-21 | MINOR. Adiciona `ia-studio.system-cleanup@1.0.0` (faxina de código/arquivos mortos em etapas), criada por `workflow.specialty-creation@1.0.0` após o relatório de alinhamento da frente de faxina. |
+| 1.5.0 | released | Aprovado por Robson em 2026-09-21 | MINOR. Remove a linha morta `ia-studio.tenant-domains` (o arquivo `especialidades/tenant-domains.md` não existe e a tenancy multi-tenant foi retirada no dedicado). Achado na faxina Etapa 0; a entrada 1.1.0 fica no histórico como registro. |

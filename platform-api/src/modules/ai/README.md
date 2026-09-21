@@ -37,6 +37,5 @@ Sem ela, o RAG cai automaticamente para similaridade cosseno em aplicação
 `ai/knowledge/bases` (+ `/:id/documents`, `/:id/query`),
 `ai/memory/profiles` (+ `/:id/entries`),
 `ai/tools`, `ai/approvals` (+ `/policies`, `/:id/decide`),
-`ai/costs/summary` (+ `/budgets`, `/simulate`),
 `ai/collaboration`, `ai/mcp` (+ `/:id/sync`, `/:id/tools`).
 O nó `AGENT` aparece automaticamente em `automation/workflows/nodes/catalog`.

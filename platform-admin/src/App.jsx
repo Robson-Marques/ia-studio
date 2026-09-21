@@ -7,7 +7,6 @@ import Layout from './components/Layout/Layout';
 
 import Login from './pages/Login';
 import AcceptInvite from './pages/AcceptInvite';
-import PaginaPagamento from './pages/PaginaPagamento';
 import Dashboard from './pages/Dashboard';
 import ContaSenha from './pages/ContaSenha';
 import Usuarios from './pages/Usuarios';
@@ -81,7 +80,6 @@ export default function App() {
               {/* Publicas */}
               <Route path="/login" element={<Login />} />
               <Route path="/convite/:token" element={<AcceptInvite />} />
-              <Route path="/pagar/:token" element={<PaginaPagamento />} />
 
               {/* Autenticadas */}
               <Route
