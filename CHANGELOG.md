@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.11.14 - 2026-09-21 (Gate S4 verde + auditoria de prontidão pré-S4)
+
+A auditoria antes da prova operacional do S4 achou que a v0.11.10 tinha deixado o
+gate `verify-instance-isolation.sh` **vermelho**: o comentário do
+`provision-dedicated-schema.sh` continha, em prosa, os literais da flag de perda
+de dados e do comando de sincronização de schema do Prisma, que o gate proíbe por
+grep (sem distinguir comentário de código) — dois falsos positivos. O comentário
+foi reescrito sem esses literais;
+o provisionamento segue usando migration a partir de banco vazio (nunca sincroniza
+schema no lugar). Gate volta a passar (`EXIT=0`). Adiciona
+`docs/auditoria-pre-s4.md` com os achados e o go/no-go.
+
+Sem mudança de comportamento; sem mudança de schema.
+
 ## v0.11.13 - 2026-09-21 (Checkpoint: docs vivos — instalação limpa e upgrade comprovados)
 
 Checkpoint de estado (docs vivos), sem mudança de código. `ESTADO-e-handoff.md`
