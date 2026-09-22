@@ -6,7 +6,7 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-09-21.
+> Última atualização: 2026-09-21 (faxina de código/arquivos mortos concluída).
 
 ## Checkpoint S3 — Console SaaS → administração local
 
@@ -98,6 +98,35 @@ S1 100%, S2 **em andamento**, S3 100%, S4 **75%** (instalação limpa de A e
 upgrade comprovados; falta a prova de B), S5 0%; geral **in-progress** (gated por
 S2/S4). A instalação limpa de A já passou em host real; faltam a prova de duas
 instâncias e a Acceptance integrada.
+
+Atualização de 2026-09-21 (Faxina de código e arquivos mortos — CONCLUÍDA):
+frente executada pela especialidade `ia-studio.system-cleanup@1.0.0`, em etapas,
+para o repo passar a representar só o que está em uso. Inventário read-only em
+[`docs/faxina/etapa-0-inventario.md`](faxina/etapa-0-inventario.md).
+- v0.11.16 — cria a especialidade + inventário Etapa 0 (catálogo local → 1.5.0
+  na v0.11.17).
+- v0.11.17 (Etapa 1) — remove mortos por reachability: pastas-esqueleto SaaS
+  vazias (`billing`, `licensing`, `core/organizations`, `core/workspaces`,
+  `ai/costs`), arquivos órfãos (`account.js`, `catalog.seed.ts`, um DTO), a tela
+  de pagamento SaaS (`PaginaPagamento` + rota `/pagar`) e a linha morta
+  `ia-studio.tenant-domains` do catálogo.
+- v0.11.18 (Etapa 2a) — remove os motores LLM Gemini/Ollama (arquivos + fiação +
+  deps). Enum `AiProviderKind` (Prisma) preservado. `nest build` verde.
+- v0.11.19 (Etapa 2b/API) + v0.11.20 (Etapa 2b/admin) — removem o subsistema
+  WhatsApp Baileys por completo (modo manual/coexistência + pareamento por QR):
+  7 arquivos de API + a pasta `connectors/`, a fiação no inbox/orquestrador/
+  responder/seed, os endpoints do controller, as deps npm (`@whiskeysockets/
+  baileys`, `qrcode`), e no painel o `whatsappBaileys.js` + a UI em
+  `ChatWindow`/`MessageComposer`/`ConexaoDetalhe`/`whatsapp.js`.
+
+Não se tocou no schema (regra da faxina): as colunas/modelos órfãos
+(`WhatsappChat.manual_connection_id`, `WhatsappBaileysSession`, valores de enum
+`AiProviderKind.GEMINI/OLLAMA`) ficam como órfãos inofensivos — remoção de dados
+é frente própria, se um dia desejada. WhatsApp oficial (Meta/YCloud), OpenAI e
+Anthropic seguem intactos. Verificação: `nest build` real da API verde no estado
+pós-remoção; admin conferido por parser JSX (esbuild) + grep; os quatro gates
+verdes em todas as etapas. A prova de build final do admin é a atualização pelo
+painel.
 
 ## 🏗️ Conversão SaaS → instalação dedicada — Capability ativa
 

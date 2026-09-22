@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.11.21 - 2026-09-21 (Docs vivos: faxina concluída)
+
+Checkpoint de docs, sem mudança de código. `ESTADO-e-handoff.md` registra a
+faxina de código/arquivos mortos como CONCLUÍDA (Etapas 1, 2a e 2b, v0.11.17–
+v0.11.20), com o que saiu, o que foi preservado (schema intocado; WhatsApp
+oficial, OpenAI e Anthropic intactos) e como cada etapa foi verificada. O
+inventário `docs/faxina/etapa-0-inventario.md` recebe a nota de conclusão com as
+decisões do dono. Sem mudança de schema.
+
 ## v0.11.20 - 2026-09-21 (Faxina Etapa 2b/admin: remove a UI do Baileys)
 
 Fecha a remoção do Baileys, agora no painel. Sai o service `whatsappBaileys.js`
