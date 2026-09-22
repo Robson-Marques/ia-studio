@@ -119,10 +119,15 @@ para o repo passar a representar só o que está em uso. Inventário read-only e
   baileys`, `qrcode`), e no painel o `whatsappBaileys.js` + a UI em
   `ChatWindow`/`MessageComposer`/`ConexaoDetalhe`/`whatsapp.js`.
 
-Não se tocou no schema (regra da faxina): as colunas/modelos órfãos
-(`WhatsappChat.manual_connection_id`, `WhatsappBaileysSession`, valores de enum
-`AiProviderKind.GEMINI/OLLAMA`) ficam como órfãos inofensivos — remoção de dados
-é frente própria, se um dia desejada. WhatsApp oficial (Meta/YCloud), OpenAI e
+- v0.11.22 — limpa também o schema (a pedido do dono, sem órfãos): remove a
+  coluna `WhatsappChat.manual_connection_id`, a tabela `WhatsappBaileysSession` e
+  os valores de enum `AiProviderKind.GEMINI/OLLAMA`. Como é destrutivo e o upgrade
+  usa `db push`, o `upgrade.sh` ganhou o passo idempotente `SCHEMA_HOUSEKEEPING`
+  (antes do `db push`) que dropa os objetos e recria o enum quando ainda existem —
+  no-op em instalação nova, recuperável (backup roda antes). `nest build` verde com
+  o client já sem os campos.
+
+WhatsApp oficial (Meta/YCloud), OpenAI e
 Anthropic seguem intactos. Verificação: `nest build` real da API verde no estado
 pós-remoção; admin conferido por parser JSX (esbuild) + grep; os quatro gates
 verdes em todas as etapas. A prova de build final do admin é a atualização pelo

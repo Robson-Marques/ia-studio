@@ -358,10 +358,6 @@ model IntegrationLog {
 model WhatsappChat {
   id                   String           @id @default(uuid())
   connection_id        String
-  // Canal manual (baileys_manual) escolhido para escrita manual. Mantém a
-  // origem oficial (connection_id) intacta. Coexistência: enquanto setado,
-  // IA, modelos e automações NÃO podem usar esta conversa. FK solta.
-  manual_connection_id String?
   phone                String
   contact_name         String?
   last_message         String?
@@ -398,7 +394,6 @@ model WhatsappChat {
   @@index([last_message_at])
   @@index([attendance_status])
   @@index([current_handler_id])
-  @@index([manual_connection_id])
   @@map("comm_whatsapp_chats")
 }
 
@@ -850,8 +845,6 @@ model AutomationNotificationLog {
 enum AiProviderKind {
   OPENAI
   ANTHROPIC
-  GEMINI
-  OLLAMA
   OPENROUTER
   GROQ
   DEEPSEEK
@@ -1585,21 +1578,3 @@ model SystemRestore {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────
-// COMM — Sessão do socket Baileys (Checkpoint 3a do porte de conectores).
-// NÃO é um segredo gerenciado pelo usuário: é o estado de auth do socket
-// (creds + chaves Signal), atualizado a cada rotação de chave. 1 por conexão
-// (provider_key whatsapp-baileys-*). Blob serializado (BufferJSON) e cifrado
-// em repouso (AES-256-GCM via shared/crypto). Multi-tenant (regra do tenant).
-// ─────────────────────────────────────────────────────────────────────
-model WhatsappBaileysSession {
-  id              String   @id @default(uuid())
-  connection_id   String   @unique
-  auth_state      String
-  status          String   @default("disconnected")
-  phone_number    String?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  @@map("comm_whatsapp_baileys_sessions")
-}

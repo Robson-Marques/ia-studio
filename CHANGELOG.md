@@ -1,5 +1,25 @@
 # Changelog — IA Studio
 
+## v0.11.22 - 2026-09-21 (Faxina: limpa também o schema — sem órfãos)
+
+Fecha a faxina de verdade removendo os resíduos que tinham ficado no
+`schema.prisma` por serem mudança de banco: a coluna `WhatsappChat.manual_connection_id`
+(+ índice), o modelo `WhatsappBaileysSession` (tabela `comm_whatsapp_baileys_sessions`)
+e os valores de enum `AiProviderKind.GEMINI`/`OLLAMA`. Instalação nova nasce sem
+eles (o provisionamento gera o schema já limpo).
+
+Como remover isso do banco é destrutivo e o upgrade usa `db push` sem aceitar
+perda automática, foi adicionado ao `upgrade.sh` um passo idempotente
+`SCHEMA_HOUSEKEEPING` que roda ANTES do `db push`: dropa a coluna/índice/tabela
+(`IF EXISTS`) e recria o tipo `AiProviderKind` sem `GEMINI`/`OLLAMA` (Postgres não
+remove valor de enum), só quando esses objetos ainda existem — no-op em instalação
+nova, e recuperável (o backup completo roda antes, no passo 2). Assim o `db push`
+seguinte não vê mais mudança destrutiva.
+
+Verificado: `nest build` verde com o Prisma Client já sem os campos removidos;
+zero referência a eles no código; os quatro gates verdes. Nenhuma linha usa esses
+objetos numa instância dedicada, então a limpeza não perde dado real.
+
 ## v0.11.21 - 2026-09-21 (Docs vivos: faxina concluída)
 
 Checkpoint de docs, sem mudança de código. `ESTADO-e-handoff.md` registra a

@@ -223,6 +223,33 @@ log_db "API_INSTALL" "npm install (platform-api)"
 cd "$API_DIR"
 npm install --no-audit --no-fund 2>/tmp/iastudio_npm.err >/dev/null || mark_failed "API_INSTALL" "npm install falhou: $(tail -c 600 /tmp/iastudio_npm.err)"
 
+# ---------- 5b) SCHEMA_HOUSEKEEPING ----------
+# Remove do banco os residuos de schema de recursos retirados (Baileys: coluna
+# e tabela; LLM Gemini/Ollama: valores de enum) ANTES do db push, para que a
+# sincronizacao com o schema nao enxergue mudanca destrutiva e recuse o upgrade.
+# Idempotente: age so onde os objetos ainda existem (instancias antigas) e e
+# no-op em instalacao nova. Nenhuma linha usa esses objetos numa instancia
+# dedicada; o backup completo ja rodou no passo 2, entao a remocao e recuperavel.
+log_db "SCHEMA_HOUSEKEEPING" "remove residuos de schema (Baileys/LLM retirados)"
+psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 >/tmp/iastudio_housekeep.err 2>&1 <<'SQL' || mark_failed "SCHEMA_HOUSEKEEPING" "limpeza de schema falhou: $(tail -c 600 /tmp/iastudio_housekeep.err)"
+DROP INDEX IF EXISTS "comm_whatsapp_chats_manual_connection_id_idx";
+ALTER TABLE IF EXISTS "comm_whatsapp_chats" DROP COLUMN IF EXISTS "manual_connection_id";
+DROP TABLE IF EXISTS "comm_whatsapp_baileys_sessions";
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'AiProviderKind' AND e.enumlabel IN ('GEMINI', 'OLLAMA')
+  ) THEN
+    CREATE TYPE "AiProviderKind_new" AS ENUM ('OPENAI', 'ANTHROPIC', 'OPENROUTER', 'GROQ', 'DEEPSEEK', 'MISTRAL', 'AZURE_OPENAI', 'COHERE');
+    ALTER TABLE "ai_agent_runs" ALTER COLUMN "provider_kind" TYPE "AiProviderKind_new" USING ("provider_kind"::text::"AiProviderKind_new");
+    ALTER TYPE "AiProviderKind" RENAME TO "AiProviderKind_old";
+    ALTER TYPE "AiProviderKind_new" RENAME TO "AiProviderKind";
+    DROP TYPE "AiProviderKind_old";
+  END IF;
+END $$;
+SQL
+
 # ---------- 6) PRISMA_PUSH ----------
 log_db "PRISMA_PUSH" "prisma db push sem aceitação automática de perda"
 npx prisma db push 2>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISMA_PUSH" "db push falhou ou exigiu intervenção para mudança destrutiva: $(tail -c 600 /tmp/iastudio_prisma.err)"
