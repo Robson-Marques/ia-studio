@@ -1,5 +1,23 @@
 # Changelog — IA Studio
 
+## v0.11.20 - 2026-09-21 (Faxina Etapa 2b/admin: remove a UI do Baileys)
+
+Fecha a remoção do Baileys, agora no painel. Sai o service `whatsappBaileys.js`
+e, dos arquivos que o usavam, todo o modo manual/coexistência e o pareamento por
+QR: no `ChatWindow` (badge, botões "Modo manual"/"Voltar ao oficial", banner e o
+modal de escolha de canal — 409→306 linhas), no `MessageComposer` (o ramo de envio
+manual; `effectiveExpired` volta a ser só `expired`), na `ConexaoDetalhe` (a aba
+inteira de Pareamento: estado, polling, reconectar/reiniciar, QR — 444→312 linhas)
+e em `whatsapp.js` (as chamadas `listManualChannels`/`setManualChannel`).
+
+Com isso o subsistema Baileys some por completo (backend na v0.11.19, painel aqui).
+WhatsApp oficial (Meta/YCloud), atendimento, templates e mídia seguem intactos.
+
+Verificado: cada arquivo editado passou no parser JSX (esbuild, sem erro de
+sintaxe), grep sem referência solta em todo o admin, e os quatro gates verdes. Como
+o registry privado `@studio-ux-ds` não instala fora do host, o `vite build` de
+verdade roda na atualização pelo painel. Sem mudança de schema.
+
 ## v0.11.19 - 2026-09-21 (Faxina Etapa 2b/API: remove o subsistema Baileys)
 
 Remove de verdade, no backend, todo o recurso de canal manual/coexistência do

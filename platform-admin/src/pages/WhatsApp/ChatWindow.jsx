@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Badge, Button, IconButton, Avatar, ConfirmDialog, Modal, Field, Select, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
+import { Badge, Button, IconButton, Avatar, ConfirmDialog, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia, unlinkCustomer,
-  listManualChannels, setManualChannel,
 } from '../../services/whatsapp';
 import { ATTENDANCE_STATUS, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
@@ -152,48 +151,16 @@ export default function ChatWindow({
   const [acting, setActing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
 
-  // Coexistência: canais Baileys manuais elegíveis para esta conversa + escolha
-  // no seletor (quando há mais de um). O estado atual do modo vem do próprio
-  // chat (chat.manual_connection_id).
-  const [manualChannels, setManualChannels] = useState(null);
-  const [manualPickerOpen, setManualPickerOpen] = useState(false);
-  const [pickChannelId, setPickChannelId] = useState('');
-
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [chat?.id, messages.length]);
-
-  // Busca os canais manuais elegíveis ao abrir a conversa. Sem eles (e fora do
-  // modo manual), o controle nem aparece — quem não configurou coexistência não
-  // vê ruído. Best-effort: falha silenciosa.
-  useEffect(() => {
-    if (!chat?.id) return;
-    let vivo = true;
-    setManualChannels(null);
-    listManualChannels(chat.id).then((cs) => { if (vivo) setManualChannels(cs); }).catch(() => { if (vivo) setManualChannels([]); });
-    return () => { vivo = false; };
-  }, [chat?.id]);
 
   if (!chat) return null;
   const st = ATTENDANCE_STATUS[chat.attendance_status] || ATTENDANCE_STATUS.OPEN;
   const isMine = chat.current_handler_type === 'USER' && chat.current_handler_id === meId;
   const closed = chat.attendance_status === 'CLOSED';
   const nome = chat.contact_name || formatPhone(chat.phone);
-
-  const manualOn = !!chat.manual_connection_id;
-  const canais = manualChannels || [];
-  const manualName = canais.find((c) => c.id === chat.manual_connection_id)?.name || 'canal manual';
-
-  async function ligarManual(connectionId) {
-    await run(() => setManualChannel(chat.id, connectionId), 'Conversa em modo manual — respondida pelo número Baileys.');
-  }
-
-  function abrirModoManual() {
-    if (canais.length === 1) { ligarManual(canais[0].id); return; }
-    setPickChannelId(canais[0]?.id || '');
-    setManualPickerOpen(true);
-  }
 
   async function run(fn, okMsg) {
     setActing(true);
@@ -246,7 +213,6 @@ export default function ChatWindow({
         </div>
 
         <Badge tone={statusToTone(st.variant)}>{st.label}</Badge>
-        {manualOn && <Badge tone="warning">Modo manual</Badge>}
 
         <div className="flex items-center gap-1">
           {!closed && !isMine && can('comm.whatsapp.claim') && (
@@ -294,27 +260,6 @@ export default function ChatWindow({
               Reabrir
             </Button>
           )}
-          {/* Coexistência: passa a conversa para um número Baileys (modo manual)
-              ou volta ao oficial. Só aparece quando há canal manual elegível
-              (ou já está ligado, para poder desligar). */}
-          {!closed && manualOn && (
-            <Button
-              variant="secondary" size="sm" icon="refresh" disabled={acting}
-              title={`Voltar ao número oficial (hoje respondendo por ${manualName})`}
-              onClick={() => ligarManual(null)}
-            >
-              Voltar ao oficial
-            </Button>
-          )}
-          {!closed && !manualOn && canais.length > 0 && (
-            <Button
-              variant="secondary" size="sm" disabled={acting}
-              title="Passar esta conversa para um número Baileys — IA, automações e modelos ficam de fora até você voltar ao oficial"
-              onClick={abrirModoManual}
-            >
-              Modo manual
-            </Button>
-          )}
           <IconButton
             icon="history"
             aria-label="Ver o histórico de atendimento"
@@ -343,23 +288,6 @@ export default function ChatWindow({
         )}
       </div>
 
-      {manualOn && (
-        <div
-          className="flex items-center gap-2"
-          style={{
-            fontSize: 12, padding: '8px 12px',
-            borderTop: '1px solid var(--su-border-default)',
-            background: 'var(--su-warning-bg)', color: 'var(--su-warning-fg)',
-          }}
-        >
-          <DSIcon name="alert-triangle" size="sm" className="shrink-0" />
-          <span style={{ flex: 1 }}>
-            Modo manual — respondendo por <strong>{manualName}</strong>. IA, automações e modelos ficam fora desta conversa,
-            e o envio sai pelo número Baileys (sem janela de 24h). Volte ao oficial para usar modelos ou mídia gravada.
-          </span>
-        </div>
-      )}
-
       <MessageComposer chat={chat} windowInfo={windowInfo} templates={templates} scope={scope} onSent={onSent} />
 
       <ConfirmDialog
@@ -372,38 +300,6 @@ export default function ChatWindow({
         onClose={() => setConfirmClose(false)}
         onConfirm={() => run(() => closeChat(chat.id), 'Conversa encerrada.').then(() => setConfirmClose(false))}
       />
-
-      {/* Seletor de canal manual — só aparece quando há mais de um elegível. */}
-      <Modal
-        open={manualPickerOpen}
-        onClose={acting ? undefined : () => setManualPickerOpen(false)}
-        title="Passar para modo manual"
-        maxWidth={480}
-        footer={
-          <>
-            <Button variant="secondary" disabled={acting} onClick={() => setManualPickerOpen(false)}>Cancelar</Button>
-            <Button
-              variant="primary" loading={acting} disabled={!pickChannelId}
-              onClick={() => ligarManual(pickChannelId).then(() => setManualPickerOpen(false))}
-            >
-              Ativar modo manual
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
-            A conversa passa a ser respondida por um número Baileys. Enquanto estiver em modo manual, IA, automações e
-            modelos não enviam por ela — e o atendente responde sem a janela de 24h da Meta.
-          </p>
-          <Field label="Número Baileys" required>
-            <Select value={pickChannelId} onChange={(e) => setPickChannelId(e.target.value)}>
-              <option value="">Escolha…</option>
-              {canais.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </Field>
-        </div>
-      </Modal>
     </div>
   );
 }

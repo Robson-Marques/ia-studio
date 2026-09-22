@@ -49,11 +49,6 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
   const closed = chat.attendance_status === 'CLOSED';
   const windowState = windowInfo?.state || 'none';
   const expired = windowState !== 'within';
-  // Modo manual (coexistência): o envio sai por um número Baileys, que NÃO tem a
-  // janela de 24h da Meta — então o atendente escreve sempre. Modelo e mídia
-  // gravada não valem no canal manual (o backend recusa); some com os dois.
-  const manual = !!chat.manual_connection_id;
-  const effectiveExpired = expired && !manual;
   const approved = (templates || []).filter(
     (t) => t.status === 'APPROVED' && t.connection_id === chat.connection_id,
   );
@@ -75,8 +70,7 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
   // "Digitando…" no WhatsApp do cliente. A Meta mostra por ~25s; o throttle local
   // evita uma chamada por tecla.
   function notifyTyping() {
-    // Manual não passa pela Meta — não há "digitando…" para o cliente lá.
-    if (effectiveExpired || closed || sending || manual) return;
+    if (expired || closed || sending) return;
     const now = Date.now();
     if (now - lastTypingRef.current < 8000) return;
     lastTypingRef.current = now;
@@ -195,7 +189,7 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
         paddingBottom: 'calc(var(--su-space-2) + env(safe-area-inset-bottom, 0px))',
       }}
     >
-      {effectiveExpired && (
+      {expired && (
         <div
           className="flex items-center gap-2"
           style={{
@@ -215,7 +209,7 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
         </div>
       )}
 
-      {!rec.isBusy && !effectiveExpired && (
+      {!rec.isBusy && !expired && (
         <AttachDraft
           file={file}
           caption={caption}
@@ -230,15 +224,11 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
 
       {!file && !rec.isBusy && (
         <div className="flex items-end gap-1.5">
-          {/* Anexo do aparelho e áudio gravado não valem no canal manual — o
-              backend recusa. No manual, some o "+" e o botão vira só enviar. */}
-          {!manual && (
-            <AttachButton
-              disabled={effectiveExpired || sending}
-              title={effectiveExpired ? dicaFora : 'Anexar imagem, foto ou arquivo'}
-              onPick={(f) => { setFile(f); setCaption(''); }}
-            />
-          )}
+          <AttachButton
+            disabled={expired || sending}
+            title={expired ? dicaFora : 'Anexar imagem, foto ou arquivo'}
+            onPick={(f) => { setFile(f); setCaption(''); }}
+          />
 
           <textarea
             ref={taRef}
@@ -246,35 +236,35 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
             value={text}
             onChange={(e) => { setText(e.target.value); autoGrow(); notifyTyping(); }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !effectiveExpired) { e.preventDefault(); sendText(); }
+              if (e.key === 'Enter' && !e.shiftKey && !expired) { e.preventDefault(); sendText(); }
             }}
             rows={1}
-            placeholder={effectiveExpired ? dicaFora : 'Mensagem'}
-            disabled={effectiveExpired || sending}
+            placeholder={expired ? dicaFora : 'Mensagem'}
+            disabled={expired || sending}
             style={{ flex: 1, resize: 'none', minHeight: 38, maxHeight: MAX_TA }}
           />
 
-          {/* Com texto → enviar; vazio → gravar (no manual, sempre enviar). O
-              verde é do WhatsApp, de propósito (ver o comentário no topo). */}
+          {/* Com texto → enviar; vazio → grava um áudio. O verde é do WhatsApp,
+              de propósito (ver o comentário no topo). */}
           <button
             type="button"
-            onClick={(manual || text.trim()) ? sendText : rec.start}
-            disabled={effectiveExpired || sending}
-            title={effectiveExpired ? dicaFora : ((manual || text.trim()) ? 'Enviar' : 'Gravar um áudio')}
-            aria-label={(manual || text.trim()) ? 'Enviar mensagem' : 'Gravar um áudio'}
+            onClick={text.trim() ? sendText : rec.start}
+            disabled={expired || sending}
+            title={expired ? dicaFora : (text.trim() ? 'Enviar' : 'Gravar um áudio')}
+            aria-label={text.trim() ? 'Enviar mensagem' : 'Gravar um áudio'}
             className="flex items-center justify-center shrink-0"
             style={{
               width: 36, height: 36, borderRadius: '50%', border: 0, cursor: 'pointer',
               background: '#25d366', color: '#fff',
-              opacity: (effectiveExpired || sending) ? 0.5 : 1,
+              opacity: (expired || sending) ? 0.5 : 1,
             }}
           >
-            {(manual || text.trim()) ? <DSSend sending={sending} /> : <DSIcon name="mic" size="sm" />}
+            {text.trim() ? <DSSend sending={sending} /> : <DSIcon name="mic" size="sm" />}
           </button>
         </div>
       )}
 
-      {!effectiveExpired && !rec.isBusy && !file && (
+      {!expired && !rec.isBusy && !file && (
         <Button variant="ghost" size="sm" icon="external-link" disabled={sending} onClick={() => setMediaOpen(true)}>
           Enviar mídia por endereço público
         </Button>

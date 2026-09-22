@@ -4,9 +4,6 @@ import { DetailScreen, Card, Badge, Button, CopyButton, DescriptionList, Timelin
 import {
   getConnection, listConnectionLogs, discoverConnection, testConnection,
 } from '../../services/integrations';
-import {
-  getBaileysPairingQr, reconnectBaileys, restartBaileysPairing,
-} from '../../services/whatsappBaileys';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import { statusMeta, RESOURCE_KIND_LABELS, prettifyProviderKey } from './integration.constants';
@@ -46,10 +43,6 @@ export default function ConexaoDetalhe() {
   const [recursos, setRecursos] = useState(null);
   const [carregandoRecursos, setCarregandoRecursos] = useState(false);
 
-  // Pareamento (só conexões Baileys). `pareamento` = { status, qr_image }.
-  const [pareamento, setPareamento] = useState(null);
-  const [carregandoPareamento, setCarregandoPareamento] = useState(false);
-  const [acaoPareamento, setAcaoPareamento] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -101,54 +94,6 @@ export default function ConexaoDetalhe() {
     carregarRecursos();
   }, [aba]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pareamento: enquanto a aba está aberta, consulta o estado do socket a cada
-  // ~4s. O QR só existe em `qr_pending` e expira rápido — por isso o intervalo,
-  // e não uma consulta única. Para de consultar ao sair da aba.
-  async function consultarPareamento({ silencioso = false } = {}) {
-    if (!silencioso) setCarregandoPareamento(true);
-    try {
-      setPareamento(await getBaileysPairingQr(id));
-    } catch (err) {
-      if (!silencioso) toast.error(err.message);
-    } finally {
-      if (!silencioso) setCarregandoPareamento(false);
-    }
-  }
-
-  useEffect(() => {
-    if (aba !== 'pareamento') return undefined;
-    let vivo = true;
-    consultarPareamento();
-    const timer = setInterval(() => { if (vivo) consultarPareamento({ silencioso: true }); }, 4000);
-    return () => { vivo = false; clearInterval(timer); };
-  }, [aba, id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleReconectar() {
-    setAcaoPareamento(true);
-    try {
-      await reconnectBaileys(id);
-      toast.success('Reconectando o número…');
-      await consultarPareamento({ silencioso: true });
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setAcaoPareamento(false);
-    }
-  }
-
-  async function handleReiniciarPareamento() {
-    setAcaoPareamento(true);
-    try {
-      await restartBaileysPairing(id);
-      toast.success('Pareamento reiniciado — escaneie o novo QR.');
-      setPareamento(null);
-      await consultarPareamento();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setAcaoPareamento(false);
-    }
-  }
 
   async function handleTest() {
     setTestando(true);
@@ -168,21 +113,7 @@ export default function ConexaoDetalhe() {
 
   const meta = statusMeta(conexao.status);
   const precisaAutorizar = conexao.provider_key === 'google-workspace' && conexao.status !== 'ACTIVE';
-  // Pareamento vale só para os conectores Baileys (número interno e canal
-  // manual de coexistência) — são os únicos com socket para parear.
-  const isBaileys = conexao.provider_key === 'whatsapp-baileys-internal'
-    || conexao.provider_key === 'whatsapp-baileys-manual';
 
-  // Estado do socket → papel semântico + o que fazer. Espelha os literais do
-  // runtime (disconnected | connecting | qr_pending | connected | error).
-  const PAREAMENTO_META = {
-    connected:   { tone: 'success', label: 'Conectado',        hint: 'Este número está pareado e pronto para enviar e receber.' },
-    qr_pending:  { tone: 'warning', label: 'Aguardando leitura', hint: 'Abra o WhatsApp no celular e escaneie o código abaixo.' },
-    connecting:  { tone: 'info',    label: 'Conectando…',       hint: 'Estabelecendo o link com o WhatsApp — aguarde alguns segundos.' },
-    disconnected:{ tone: 'neutral', label: 'Desconectado',      hint: 'O número ainda não foi pareado. Reinicie o pareamento para gerar o QR.' },
-    error:       { tone: 'danger',  label: 'Com erro',          hint: 'O link caiu. Tente reconectar; se não voltar, reinicie o pareamento.' },
-  };
-  const estPar = PAREAMENTO_META[pareamento?.status] || { tone: 'neutral', label: pareamento?.status || 'Verificando…', hint: '' };
 
   // O item do `Tabs` do DS é identificado por **`id`** (não `value` — esse é o
   // da aba ativa, no componente). Declarar `{ value, label }` não dá erro: o
@@ -190,10 +121,6 @@ export default function ConexaoDetalhe() {
   // `undefined` — a tela some ao clicar em qualquer aba. Prop morta de novo.
   const abas = [
     { id: 'dados', label: 'Dados' },
-    // Pareamento só aparece para Baileys e para quem pode escrever conexão (o
-    // endpoint exige connections.write). Fica logo após "Dados" — é o passo que
-    // liga a conexão de verdade.
-    ...(isBaileys && podeEscrever ? [{ id: 'pareamento', label: 'Pareamento' }] : []),
     { id: 'recursos', label: 'Recursos' },
     ...(podeVerLogs ? [{ id: 'logs', label: 'Histórico de chamadas' }] : []),
   ];
@@ -282,66 +209,6 @@ export default function ConexaoDetalhe() {
         </>
       )}
 
-      {aba === 'pareamento' && (
-        <Card>
-          <div style={{ padding: 20 }} className="space-y-4">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="space-y-1" style={{ minWidth: 0 }}>
-                <Badge tone={estPar.tone}>{estPar.label}</Badge>
-                <p style={{ fontSize: 12, margin: 0, maxWidth: 560, color: 'var(--su-text-muted)' }}>
-                  {estPar.hint || 'Consultando o estado do número…'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button variant="ghost" icon="refresh" loading={carregandoPareamento} onClick={() => consultarPareamento()}>
-                  Atualizar
-                </Button>
-                <Button variant="secondary" icon="zap" loading={acaoPareamento} onClick={handleReconectar}>
-                  Reconectar
-                </Button>
-                <Button variant="secondary" icon="refresh" loading={acaoPareamento} onClick={handleReiniciarPareamento}>
-                  Reiniciar pareamento
-                </Button>
-              </div>
-            </div>
-
-            {carregandoPareamento && pareamento === null ? (
-              <div className="flex justify-center py-10">
-                <Spinner size="lg" />
-              </div>
-            ) : pareamento?.status === 'connected' ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-primary)' }}>Este número está pareado.</p>
-                <p style={{ fontSize: 12, margin: 0, maxWidth: 420, color: 'var(--su-text-muted)' }}>
-                  Já envia e recebe por aqui. Para trocar de número, use <b>Reiniciar pareamento</b>.
-                </p>
-              </div>
-            ) : pareamento?.qr_image ? (
-              <div className="flex flex-col items-center gap-3 py-4">
-                {/* Fundo branco obrigatório para a leitura do QR — exceção
-                    consciente aos tokens do DS (a câmera precisa do contraste). */}
-                <div style={{ background: '#ffffff', padding: 16, borderRadius: 12, border: '1px solid var(--su-border-default)' }}>
-                  <img
-                    src={pareamento.qr_image}
-                    alt="QR Code de pareamento do WhatsApp"
-                    style={{ display: 'block', width: 264, height: 264 }}
-                  />
-                </div>
-                <p style={{ fontSize: 12, margin: 0, maxWidth: 440, textAlign: 'center', color: 'var(--su-text-muted)' }}>
-                  No celular: WhatsApp › <b>Aparelhos conectados</b> › <b>Conectar um aparelho</b> e aponte a câmera para o código.
-                  Ele expira em segundos — se sumir, um novo aparece sozinho.
-                </p>
-              </div>
-            ) : (
-              <EmptyState
-                icon="refresh"
-                title="Sem QR no momento"
-                description="Toque em Reiniciar pareamento para gerar um novo código. Se este número já foi pareado antes, use Reconectar."
-              />
-            )}
-          </div>
-        </Card>
-      )}
 
       {aba === 'recursos' && (
         <Card>

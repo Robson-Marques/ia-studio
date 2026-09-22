@@ -114,26 +114,6 @@ export async function downloadChatMedia(chatId, mediaId) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao baixar mídia')); }
 }
 
-// ─── Coexistência (modo manual / Baileys) ────────────────────
-
-// Canais Baileys manuais elegíveis para esta conversa — ativos e vinculados à
-// conexão oficial dela. Retorna [{ id, name, status }].
-export async function listManualChannels(id) {
-  try {
-    const { data } = await api.get(`/comm/whatsapp/chats/${id}/manual-channels`);
-    return Array.isArray(data) ? data : [];
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar canais manuais')); }
-}
-
-// Liga o modo manual (passa o id de um canal Baileys manual) ou desliga (null,
-// volta ao número oficial). Retorna a conversa atualizada.
-export async function setManualChannel(id, connectionId) {
-  try {
-    const { data } = await api.post(`/comm/whatsapp/chats/${id}/manual-channel`, { connection_id: connectionId ?? null });
-    return data;
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao mudar o modo da conversa')); }
-}
-
 // ─── Atendimento (claim/transfer/close/reopen/timeline) ──────
 
 export async function claimChat(id) {
