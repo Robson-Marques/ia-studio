@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.11.23 - 2026-09-21 (Faxina: resíduos de Gemini/Ollama no painel e docs)
+
+Segunda varredura achou o que a remoção dos motores (v0.11.18) tinha deixado no
+**painel** e na doc: `platform-admin/.../IA/ia.constants.js` ainda listava os
+modelos Gemini (em `AGENT_MODELS`) e as opções `GEMINI`/`OLLAMA` em
+`PROVIDER_KINDS`; o `ai/README.md` ainda descrevia Gemini/Ollama como
+implementações e no seed. Tudo removido — `PROVIDER_KINDS` volta a espelhar o
+enum `AiProviderKind` (sem GEMINI/OLLAMA); os provedores OpenAI-compatíveis
+(OpenRouter/Groq/DeepSeek/Mistral/Azure/Cohere) seguem. Também tira um comentário
+que citava Ollama no seed.
+
+Sem mudança de schema. Fecha o resíduo de Gemini/Ollama: agora é zero em código,
+schema, deps e docs.
+
 ## v0.11.22 - 2026-09-21 (Faxina: limpa também o schema — sem órfãos)
 
 Fecha a faxina de verdade removendo os resíduos que tinham ficado no

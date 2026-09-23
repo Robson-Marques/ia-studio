@@ -12,7 +12,7 @@ capacidades de negócio entram por Providers/Tools/Templates.
 - Registries declarativos (diretriz 35): `LlmProviderRegistryService`, `ToolRegistryService`, nó `AGENT` no `NodeRegistryService`.
 
 ## Submódulos
-- **providers/** — `ILlmProvider` + registry; impl OpenAI-compatible (serve OpenRouter/Groq/DeepSeek/Mistral/Azure via `base_url`), Anthropic, Gemini, Ollama; `LlmProviderService` (fachada connection→secret→provider).
+- **providers/** — `ILlmProvider` + registry; impl OpenAI-compatible (serve OpenRouter/Groq/DeepSeek/Mistral/Azure via `base_url`) e Anthropic; `LlmProviderService` (fachada connection→secret→provider).
 - **orchestrator/** — `AiOrchestratorService`: resolve a melhor Connection AI ativa (fallback/menor custo) quando o agente não fixa `connection_id`.
 - **agents/** — CRUD + versões (draft/publish/rollback) + export/import (sem secrets); `AgentRunnerService` (loop tool-calling); `agent-persona`, `prompt-security`.
 - **tools/** — catálogo (`ai_tools`), `ToolRegistryService` (handlers builtin), `ToolRuntimeService` (resolve→gate de aprovação→executa→loga), `builtin-tools.ts` (genéricas: consultar_faq, memory_read/write, http_request, connection_execute, enviar_whatsapp, enviar_notificacao, executar_sql, gerar_documento, consultar_especialista), cron de retenção de logs.
@@ -22,7 +22,7 @@ capacidades de negócio entram por Providers/Tools/Templates.
 - **collaboration/** — regras entre agentes (diretriz 16); `consult()` recebe o `runAgent` por parâmetro (evita ciclo com o runner).
 - **mcp/** — MCP Client (diretriz 15): cadastra servidor, sincroniza/descobre tools (HTTP/SSE via JSON-RPC; STDIO só metadado na V1).
 - **nodes/** — nó `AGENT` (integra com a Automação — Fase 4). O `AiModule` importa o `AutomationModule` (que exporta `NodeRegistryService`); a Automação NÃO importa o `AiModule`.
-- **seed/** — registra providers LLM no boot, cria `ProviderDefinition` categoria AI (gemini/ollama/openrouter/groq/deepseek/mistral) e semeia as tools builtin no catálogo local.
+- **seed/** — registra os providers LLM (OpenAI, Anthropic) no boot e semeia as tools builtin no catálogo local. Marketplace de IA fica só com OpenAI e Anthropic.
 
 ## pgvector (deploy)
 O `db push` desta fase exige a extensão no Postgres:

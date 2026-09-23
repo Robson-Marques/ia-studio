@@ -132,7 +132,7 @@ export class AiProvidersSeedService implements OnApplicationBootstrap {
               label: 'API Key',
               type: 'password',
               secret: true,
-              required: !seed.baseUrlRequired, // Ollama local pode nao exigir key
+              required: !seed.baseUrlRequired, // self-hosted pode nao exigir key
               placeholder: 'chave do provedor',
             },
             {
