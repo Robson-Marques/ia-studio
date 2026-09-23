@@ -32,6 +32,8 @@ Thumbs.db
 *.tar.gz
 *.sql
 *.sql.gz
+# Exceção: hook de limpeza de schema do upgrade é versionado (não é dump).
+!scripts/migration/pre-db-push.sql
 backups/
 /opt/
 

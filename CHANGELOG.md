@@ -1,5 +1,28 @@
 # Changelog — IA Studio
 
+## v0.11.24 - 2026-09-23 (Upgrade: hook de limpeza de schema versionado)
+
+Blindagem do atualizador para que remoções destrutivas de schema se apliquem
+sozinhas, sem passo manual no host. O passo inline `SCHEMA_HOUSEKEEPING` do
+`upgrade.sh` vira um runner genérico: antes do `prisma db push`, executa
+`scripts/migration/pre-db-push.sql` **da versão-alvo** (o repo já está em checkout
+no TO_VERSION). Como o hook vem do alvo, carrega sempre a limpeza correta para o
+schema que o `db push` vai aplicar — e não a da versão de origem, que foi a causa
+da falha ao subir a v0.11.22 (o atualizador antigo não conhecia a limpeza nova).
+
+O hook `pre-db-push.sql` é idempotente (`IF EXISTS`/guarda), no-op em instalação
+nova, e hoje remove os resíduos do Baileys (coluna `manual_connection_id` + tabela
+de sessão) e dos motores LLM Gemini/Ollama (valores de enum). Futuras remoções
+destrutivas só precisam editar esse .sql — o atualizador roda sozinho.
+
+Verificado contra Postgres 16 real (container): aplica, é idempotente na 2ª
+execução, o enum termina exatamente igual ao schema e os dados de `ai_agent_runs`
+são preservados. `bash -n` e os quatro gates verdes. Sem mudança de schema.
+
+Observação de rollout: quem já está numa versão anterior ao runner (ex.: `ia-dev`
+na v0.11.21) ainda precisa da limpeza única no host UMA vez para subir até aqui;
+depois de instalado o atualizador da v0.11.24, as próximas ficam automáticas.
+
 ## v0.11.23 - 2026-09-21 (Faxina: resíduos de Gemini/Ollama no painel e docs)
 
 Segunda varredura achou o que a remoção dos motores (v0.11.18) tinha deixado no
