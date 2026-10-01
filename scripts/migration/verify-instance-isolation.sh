@@ -88,6 +88,17 @@ rg -Fq 'export GITLAB_PACKAGE_TOKEN=' scripts/install-dedicated.sh \
   || fail 'instalação não exporta GITLAB_PACKAGE_TOKEN para os npm install.'
 rg -Fq 'GITLAB_PACKAGE_TOKEN=$(env_value "$GITLAB_TOKEN")' scripts/install-dedicated.sh \
   || fail 'instalação não persiste GITLAB_PACKAGE_TOKEN no .env da instância.'
+# O instalador pode ser chamado a partir de uma instância já em produção. Nesse
+# caso NODE_ENV=production vem do .env e não pode fazer o npm omitir as
+# ferramentas de build antes do PM2 voltar a carregar production.
+rg -Fq 'export NODE_ENV=development' scripts/install-dedicated.sh \
+  || fail 'instalação não força NODE_ENV=development durante npm/build.'
+# O SQL é criado por heredoc expansível para interpolar o schema. Crases nesse
+# conteúdo virariam substituição de comando do shell (ex.: tentaria executar
+# public), portanto o provisionador não pode usá-las em comentários ou SQL.
+if rg -n -F '`' scripts/provision-dedicated-schema.sh; then
+  fail 'provisionador ainda contém crases perigosas em heredoc expansível.'
+fi
 rg -Fq -- '--gitlab-token)' scripts/upgrade.sh \
   || fail 'bootstrap do upgrade não repassa --gitlab-token ao instalador.'
 # umask 077 deixa o dist só-root e o nginx (www-data) responde 500. A instalação

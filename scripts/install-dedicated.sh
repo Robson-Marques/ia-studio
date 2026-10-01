@@ -162,7 +162,12 @@ chmod 600 "$IASTUDIO_APP_DIR/platform-api/.env"
 # o .npmrc lê ${GITLAB_PACKAGE_TOKEN}. Exportamos para os npm install desta
 # execução — o mesmo token já ficou gravado no .env para os upgrades.
 export GITLAB_PACKAGE_TOKEN="$GITLAB_TOKEN"
+# O chamador pode ter carregado o .env de uma instância existente, no qual
+# NODE_ENV=production é correto para PM2, mas faz o npm omitir devDependencies
+# (Prisma, Nest CLI e Vite) necessárias apenas durante a instalação/build.
+# O .env recém-criado volta a definir production antes de iniciar os processos.
 unset NPM_CONFIG_PRODUCTION
+export NODE_ENV=development
 (cd "$IASTUDIO_APP_DIR/platform-api" && npm install)
 # `migrate diff` usa o Prisma recém-instalado; somente depois materializamos o
 # schema vazio, sob advisory lock, e compilamos a API.

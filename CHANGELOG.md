@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.11.27 - 2026-09-30 (Instalação dedicada: build a partir de instância existente)
+
+- Corrige o provisionamento da segunda instância quando o instalador é chamado
+  após carregar o `.env` de uma instância em produção: o build agora força
+  `NODE_ENV=development`, preservando as devDependencies exigidas por Prisma,
+  Nest e Vite; o processo PM2 continua recebendo `production` do `.env` local.
+- Remove crases de comentários no SQL do provisionador, que um heredoc
+  expansível interpretava como comando de shell.
+- O gate S4 verifica os dois contratos para evitar nova regressão.
+
 ## v0.11.26 - 2026-09-30 (Instalação dedicada: wrappers portáveis)
 
 - Corrige os wrappers públicos `scripts/install.sh` e `scripts/uninstall.sh`:

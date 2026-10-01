@@ -25,7 +25,7 @@ acquire_instance_lock
 API_DIR="$IASTUDIO_APP_DIR/platform-api"
 [ -f "$API_DIR/prisma/schema.prisma" ] || fail_instance "schema não encontrado em $API_DIR"
 [ -n "${DATABASE_URL:-}" ] || fail_instance 'DATABASE_URL ausente na configuração da instância.'
-# DATABASE_URL é consumida pela aplicação/Prisma e contém `?schema=public`.
+# DATABASE_URL é consumida pela aplicação/Prisma e contém ?schema=public.
 # libpq/psql não conhece esse parâmetro Prisma; para executar o SQL inicial,
 # usamos a mesma URL sem a query string específica do ORM.
 PSQL_DATABASE_URL="${DATABASE_URL%%\?*}"
@@ -50,7 +50,7 @@ BEGIN
   END IF;
 END
 \$\$;
--- Bookkeeping do provisionamento fica FORA do schema `public` (gerido pelo
+-- Bookkeeping do provisionamento fica FORA do schema public (gerido pelo
 -- Prisma). Em public, a atualização que sincroniza o schema com o Prisma veria
 -- essa tabela como estranha e exigiria confirmar perda de dados para removê-la —
 -- quebrava a 1a atualização de toda instância dedicada. Um schema próprio não é
