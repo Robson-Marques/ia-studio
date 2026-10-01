@@ -80,6 +80,7 @@ export async function getCurrentBackupOperation() {
       log_lines: Array.isArray(row.log_lines) ? row.log_lines : (Array.isArray(row.logLines) ? row.logLines : []),
       error: row.error || null,
       started_at: row.started_at || row.startedAt || null,
+      finished_at: row.finished_at || row.finishedAt || null,
     };
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao consultar a operação de backup')); }
 }

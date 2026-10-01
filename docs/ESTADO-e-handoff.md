@@ -6,14 +6,14 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-09-30 (`v0.11.27`: instalação dedicada a partir de
-> instância existente corrigida; resíduos funcionais ausentes; documentação e
-> especialidades SaaS corrigidas).
+> Última atualização: 2026-10-01 (`v0.11.28`: backup local resiliente a restart
+> da API; resíduos funcionais ausentes; documentação e especialidades SaaS
+> corrigidas).
 
 ## Auditoria pós-faxina — 2026-09-30
 
 Os gates de S1, S2 operacional, S3, S4 estático e removedor SaaS passaram com
-o checkout `v0.11.27`. Não há resíduo funcional de tenant, Console, Baileys,
+o checkout `v0.11.28`. Não há resíduo funcional de tenant, Console, Baileys,
 Gemini/Ollama, licensing ou billing. Foram corrigidos metadados e READMEs vivos
 que ainda descreviam SaaS, e a especialidade WhatsApp que ordenava reintroduzir
 Baileys/coexistência foi aposentada e retirada do catálogo ativo. O diretório
@@ -33,6 +33,13 @@ existente. Também foram removidas crases que o heredoc SQL expansível tentava
 executar como comando. A tentativa parcial de `ia-teste` deve ser removida pelo
 desinstalador dedicado antes de nova execução; S4 continua `in-progress` até a
 prova com as duas instâncias ativas.
+
+Atualização `v0.11.28`: a primeira prova real de backup do `ia-teste` criou o
+pacote mas revelou que a row do painel dependia de callback em memória da API e
+ficava presa em `RUNNING`. O backup passa a rodar via unidade systemd e a
+auto-reportar logs/estado terminal na base local; linhas órfãs por mais de 30
+minutos são marcadas `FAILED`. S4 permanece `in-progress` até repetir backup e
+restauração isolados com o novo mecanismo e confirmar que `ia-dev` não muda.
 
 ## Checkpoint S3 — Console SaaS → administração local
 

@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.11.28 - 2026-10-01 (Backup local: estado terminal resiliente)
+
+- Corrige o backup que podia criar o arquivo e permanecer indefinidamente em
+  `RUNNING` após perder o callback do processo API. Backup e restauração passam
+  a operar em unidades transientes do systemd; o script de backup grava logs e
+  estado `SUCCESS`/`FAILED` diretamente na base da própria instância.
+- Operação órfã por mais de 30 minutos passa a ser marcada `FAILED`, liberando
+  o lock e expondo o erro no painel. A administração local também mostra o
+  último resultado terminal, não apenas uma operação em andamento.
+- O gate S4 valida esse contrato de resiliência. Sem alteração de schema.
+
 ## v0.11.27 - 2026-09-30 (Instalação dedicada: build a partir de instância existente)
 
 - Corrige o provisionamento da segunda instância quando o instalador é chamado

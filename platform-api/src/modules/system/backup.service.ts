@@ -17,6 +17,8 @@ import { SystemRepository } from './system.repository';
 import { AuditLogService } from '../../shared/audit/audit-log.service';
 import { backupDir, instanceId, resolveBackupPath, scriptsDir } from './system.paths';
 
+const STALE_OPERATION_MS = 30 * 60 * 1000;
+
 export interface BackupFileInfo {
   file: string;
   size_bytes: number;
@@ -157,13 +159,15 @@ export class BackupService {
   // ─── Status ─────────────────────────────────────────────────────────
 
   async currentOperation() {
+    await this.reapStaleOperation();
     const running = await this.repository.findRunningRestore();
-    return { operation: running ?? null };
+    return { operation: running ?? await this.repository.findLatestRestore() };
   }
 
   // ─── infra ──────────────────────────────────────────────────────────
 
   private async assertNoOperationRunning(): Promise<void> {
+    await this.reapStaleOperation();
     const running = await this.repository.findRunningRestore();
     if (running) {
       throw new ConflictException('Já existe uma operação de backup/restauração em andamento.');
@@ -172,37 +176,44 @@ export class BackupService {
 
   private spawnBackup(restoreId: string): void {
     const script = path.join(scriptsDir(), 'backup-full.sh');
-    // O backup-full.sh imprime o caminho do arquivo no stdout; capturamos para
-    // registrar o file_name e fechar a row.
-    let out = '';
+    // O script roda fora da árvore do PM2 e atualiza a própria row no banco.
+    // Isso sobrevive a restart da API depois que o pacote já foi criado.
     try {
-      const child = spawn('bash', [script], {
+      const processPath = process.env.PATH ?? '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+      const child = spawn('systemd-run', [
+        '--quiet',
+        '--collect',
+        '--unit', `iastudio-${instanceId()}-backup-${restoreId}`,
+        `--setenv=PATH=${processPath}`,
+        'bash', script, '--operation-id', restoreId,
+      ], {
         detached: true,
         cwd: scriptsDir(),
-        // Explicita o ambiente da instância para o script, mesmo quando a
-        // estratégia de carregamento de .env mudar no processo Nest.
-        env: process.env,
-      });
-      child.stdout?.on('data', (d: Buffer) => {
-        out += d.toString();
+        stdio: 'ignore',
       });
       child.on('error', (err) => {
-        this.logger.error(`Falha ao iniciar backup-full.sh: ${err.message}`);
+        this.logger.error(`Falha ao iniciar backup via systemd-run: ${err.message}`);
         void this.repository.finishRestore(restoreId, 'FAILED', err.message);
       });
-      child.on('close', (code) => {
-        if (code === 0) {
-          const file = path.basename(out.trim());
-          void this.repository.appendRestoreLog(restoreId, `Backup gerado: ${file}`);
-          void this.repository.finishRestore(restoreId, 'SUCCESS');
-        } else {
-          void this.repository.finishRestore(restoreId, 'FAILED', `backup-full.sh saiu com código ${code}`);
+      child.on('exit', (code) => {
+        if (code && code !== 0) {
+          void this.repository.finishRestore(restoreId, 'FAILED', `systemd-run não iniciou o backup (código ${code})`);
         }
       });
       child.unref();
+      this.logger.log(`backup-full.sh disparado via systemd-run (row ${restoreId}).`);
     } catch (e) {
-      this.logger.error(`Erro ao spawnar backup-full.sh: ${(e as Error).message}`);
+      this.logger.error(`Erro ao iniciar backup via systemd-run: ${(e as Error).message}`);
       void this.repository.finishRestore(restoreId, 'FAILED', (e as Error).message);
+    }
+  }
+
+  private async reapStaleOperation(): Promise<void> {
+    try {
+      const result = await this.repository.failStaleRunningRestore(new Date(Date.now() - STALE_OPERATION_MS));
+      if (result.count) this.logger.warn(`Operação(ões) de backup/restauração órfã(s) marcada(s) como FAILED: ${result.count}.`);
+    } catch (error) {
+      this.logger.warn(`Não foi possível liberar operação órfã: ${(error as Error).message}`);
     }
   }
 

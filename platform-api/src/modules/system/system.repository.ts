@@ -69,6 +69,24 @@ export class SystemRepository {
     });
   }
 
+  findLatestRestore() {
+    return this.prisma.systemRestore.findFirst({
+      orderBy: { started_at: 'desc' },
+    });
+  }
+
+  /** Última linha RUNNING sem processo responsável: libera o lock com erro visível. */
+  failStaleRunningRestore(cutoff: Date) {
+    return this.prisma.systemRestore.updateMany({
+      where: { status: SystemJobStatus.RUNNING, started_at: { lt: cutoff } },
+      data: {
+        status: SystemJobStatus.FAILED,
+        error: 'Operação interrompida antes de concluir; inicie um novo backup ou restauração.',
+        finished_at: new Date(),
+      },
+    });
+  }
+
   finishRestore(id: string, status: 'SUCCESS' | 'FAILED', error?: string) {
     return this.prisma.systemRestore.updateMany({
       where: { id, status: SystemJobStatus.RUNNING },

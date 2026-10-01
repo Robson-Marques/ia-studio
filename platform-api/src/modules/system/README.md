@@ -2,9 +2,9 @@
 
 Infra **local da instância** (sem tenant). Todas as rotas são exclusivas da
 administração local (`system.maintain` + `@Controller('system')`). Os serviços
-disparam os scripts de `scripts/` via `child_process.spawn` (detached); o log ao
-vivo é gravado direto na row do banco pelo próprio script (upgrade) ou pelo
-callback do spawn (backup).
+disparam os scripts de `scripts/` via unidade transiente do `systemd`; o próprio
+script grava log e estado terminal na row local, sem depender de callback em
+memória do processo API.
 
 ## Endpoints
 
@@ -16,7 +16,7 @@ callback do spawn (backup).
 | GET | `/system/upgrade/history` | Últimas 20 atualizações. |
 | POST | `/system/upgrade/release-lock` | Lock órfão (>10min) → marca FAILED sem reverter nada. |
 | GET | `/system/backups` | Lista pacotes (`.tar.gz`/`.sql`/`.sql.gz`) com tamanho e data. |
-| GET | `/system/backups/current` | Operação de backup/restore em andamento (se houver). |
+| GET | `/system/backups/current` | Operação em andamento ou o último resultado terminal. |
 | POST | `/system/backups` | Gera backup completo (spawn `backup-full.sh`, row `system_restores` kind=BACKUP). **202**. |
 | GET | `/system/backups/:file/download` | Stream do arquivo (Content-Disposition attachment). Guard anti path-traversal. |
 | POST | `/system/backups/upload` | Upload multipart (`@fastify/multipart`). Nome validado (path-traversal). **201**. |
@@ -38,9 +38,10 @@ callback do spawn (backup).
   aceita `[A-Za-z0-9._-]+`, resolve dentro de `IASTUDIO_BACKUP_DIR` e confere
   que o caminho final não escapa da pasta (defesa em profundidade). Também
   valida a extensão `vX.Y.Z` da tag no DTO (o valor vira argumento do script).
-- **Restore fora da árvore do PM2.** `restore-full.sh` faz `pm2 delete` — se
-  rodasse como filho do PM2 o treekill abortaria o próprio restore. Por isso o
-  `BackupService` o dispara via **`systemd-run`** (unidade transiente).
+- **Operações fora da árvore do PM2.** Backup e restore usam **`systemd-run`**.
+  O backup também se auto-reporta no banco: restart da API não pode deixá-lo
+  preso em `RUNNING`. Operação órfã por mais de 30 minutos é marcada `FAILED`
+  com erro explícito e libera o lock local.
 - **Multipart.** `@fastify/multipart` (adicionado ao `package.json`) é registrado
   no `main.ts`. Se ausente, o boot só loga aviso e o endpoint de upload responde
   400 — o resto do módulo funciona normalmente.

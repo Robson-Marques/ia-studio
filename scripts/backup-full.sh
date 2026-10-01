@@ -1,53 +1,121 @@
 #!/usr/bin/env bash
-# =============================================================================
-# IA Studio — backup COMPLETO de migracao (root, sem sudo).
-# Gera um unico .tar.gz contendo:
-#   * db.sql               → dump lógico do banco da instância (pg_dump plain).
-#   * storage/             → arquivos do Storage Manager (uploads/midias).
-#   * manifest.json        → metadados + SEGREDOS do .env necessarios para
-#                            decifrar os secrets no destino (ENCRYPTION_KEY,
-#                            JWT_SECRET, DATABASE_URL, REDIS_URL, GOOGLE_*).
-#
-# O manifest carrega segredos DE PROPOSITO: sem ENCRYPTION_KEY o destino nao
-# consegue abrir os secrets AES-256-GCM. Guarde o pacote com cuidado.
-#
-# Uso: backup-full.sh [nome-opcional]   → imprime o caminho do arquivo gerado.
-# =============================================================================
+# Backup completo local de uma instância dedicada. Quando disparado pelo painel,
+# recebe --operation-id e fecha a própria row system_restores no PostgreSQL.
+# Assim o resultado não depende de um callback em memória do processo PM2.
 set -euo pipefail
+umask 077
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 API_DIR="$APP_DIR/platform-api"
+ENV_FILE="$API_DIR/.env"
+OPERATION_ID=''
+NAME=''
 
-set -a; . "$API_DIR/.env"; set +a
-: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância}"
-BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da instância}"
-STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
+usage() {
+  cat <<'EOF'
+Uso: backup-full.sh [nome-opcional] [--operation-id <uuid>]
+
+Gera um .tar.gz com banco, storage e manifest da instância atual. O modo
+--operation-id é usado pela administração local para registrar logs e estado.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --operation-id) OPERATION_ID="${2:?valor ausente}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "ERRO: argumento desconhecido: $1" >&2; usage >&2; exit 2 ;;
+    *) [ -z "$NAME" ] || { echo 'ERRO: informe somente um nome opcional.' >&2; exit 2; }; NAME="$1"; shift ;;
+  esac
+done
+
+[[ -z "$OPERATION_ID" || "$OPERATION_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
+  || { echo 'ERRO: operation-id inválido.' >&2; exit 2; }
+[[ -z "$NAME" || "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] \
+  || { echo 'ERRO: nome de backup inválido.' >&2; exit 2; }
+[ -f "$ENV_FILE" ] || { echo "ERRO: .env não encontrado em $ENV_FILE" >&2; exit 2; }
+
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env}"
+: "${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env}"
+
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/lib/instance.sh"
 set_instance "$IASTUDIO_INSTANCE_ID"
-[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || { echo 'Configuração não pertence ao diretório da instância.' >&2; exit 1; }
+[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || { echo 'ERRO: configuração não pertence ao diretório da instância.' >&2; exit 2; }
 acquire_instance_lock
+PSQL_DATABASE_URL="$(db_url_for_psql)"
+STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
+WORK=''
+OUT=''
+SUCCEEDED=0
+FAILURE='Backup interrompido antes de concluir.'
 
+sql_escape() { printf '%s' "$1" | sed "s/'/''/g"; }
+
+append_log() {
+  [ -n "$OPERATION_ID" ] || return 0
+  local message escaped
+  message="$(date -u +%H:%M:%S) $1"
+  escaped="$(sql_escape "$message")"
+  psql "$PSQL_DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+    "UPDATE system_restores SET log_lines = array_append(log_lines, '$escaped') WHERE id = '$OPERATION_ID'::uuid AND status = 'RUNNING';" \
+    >/dev/null 2>&1 || true
+}
+
+finish_operation() {
+  [ -n "$OPERATION_ID" ] || return 0
+  local status="$1" error="${2:-}" file="${3:-}" escaped_error escaped_file
+  escaped_error="$(sql_escape "$error")"
+  escaped_file="$(sql_escape "$file")"
+  psql "$PSQL_DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+    "UPDATE system_restores SET status = '$status', file_name = NULLIF('$escaped_file', ''), error = NULLIF('$escaped_error', ''), finished_at = now() WHERE id = '$OPERATION_ID'::uuid AND status = 'RUNNING';" \
+    >/dev/null 2>&1 || true
+}
+
+finalize() {
+  local exit_code=$?
+  trap - EXIT
+  [ -z "$WORK" ] || rm -rf -- "$WORK" || true
+  if [ "$SUCCEEDED" -eq 1 ]; then
+    append_log "DONE: backup concluído ($(basename "$OUT"))"
+    finish_operation SUCCESS '' "$(basename "$OUT")"
+  else
+    append_log "FAILED: $FAILURE"
+    finish_operation FAILED "$FAILURE"
+  fi
+  exit "$exit_code"
+}
+trap finalize EXIT
+
+fail() {
+  FAILURE="$1"
+  exit 1
+}
+
+mkdir -p "$IASTUDIO_BACKUP_DIR" || fail 'Não foi possível criar o diretório de backups.'
+WORK="$(mktemp -d)" || fail 'Não foi possível criar diretório temporário.'
 STAMP="$(date '+%Y%m%d-%H%M%S')"
-NAME="${1:-full-${STAMP}}"
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+OUT="$IASTUDIO_BACKUP_DIR/${NAME:-full-$STAMP}.tar.gz"
 
-mkdir -p "$BACKUP_DIR"
-
-# 1) Dump do banco (formato plain, restauravel com psql).
-pg_dump "$(db_url_for_psql)" > "$WORK/db.sql"
-
-# 2) Arquivos de storage (se existirem).
-mkdir -p "$WORK/storage"
-if [ -d "$STORAGE_DIR" ]; then
-  cp -a "$STORAGE_DIR/." "$WORK/storage/" 2>/dev/null || true
+append_log 'PREFLIGHT: validando instância e diretórios.'
+append_log 'PG_DUMP: exportando banco local.'
+if ! pg_dump "$PSQL_DATABASE_URL" > "$WORK/db.sql" 2>"$WORK/pg_dump.err"; then
+  fail "pg_dump falhou: $(tail -c 500 "$WORK/pg_dump.err")"
 fi
 
-# 3) Manifest com segredos (necessarios para decifrar no destino).
-#    Extrai os valores do .env de forma simples (KEY=valor).
-env_val() { grep -E "^$1=" "$API_DIR/.env" | head -1 | cut -d= -f2- || true; }
+append_log 'STORAGE: copiando arquivos locais.'
+mkdir -p "$WORK/storage"
+if [ -d "$STORAGE_DIR" ]; then
+  cp -a "$STORAGE_DIR/." "$WORK/storage/" 2>/dev/null || fail 'Não foi possível copiar o storage local.'
+fi
+
+append_log 'MANIFEST: registrando metadados do pacote.'
+env_val() { grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- || true; }
 cat > "$WORK/manifest.json" <<EOF
 {
   "kind": "iastudio-full-backup",
@@ -66,9 +134,10 @@ cat > "$WORK/manifest.json" <<EOF
 }
 EOF
 
-# 4) Empacota tudo.
-OUT="$BACKUP_DIR/${NAME}.tar.gz"
-tar -czf "$OUT" -C "$WORK" db.sql storage manifest.json
-chmod 600 "$OUT"
+append_log 'BUNDLE: compactando pacote.'
+tar -czf "$OUT" -C "$WORK" db.sql storage manifest.json 2>"$WORK/tar.err" \
+  || fail "tar falhou: $(tail -c 500 "$WORK/tar.err")"
+chmod 600 "$OUT" || fail 'Não foi possível restringir permissões do pacote.'
 
-echo "$OUT"
+SUCCEEDED=1
+printf '%s\n' "$OUT"

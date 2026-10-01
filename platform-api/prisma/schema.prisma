@@ -1525,8 +1525,8 @@ model DeveloperApiKey {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// SYSTEM (Fase 8 — deploy/atualizacao/backup). Infra GLOBAL da instancia:
-// não carregam escopo de negócio: são operações do Console sobre o servidor.
+// SYSTEM (Fase 8 — deploy/atualizacao/backup). Infra local da instalação:
+// não carregam escopo de negócio: são operações administrativas da instância.
 // Namespace system_* (permitido no CLAUDE.md).
 // ─────────────────────────────────────────────────────────────────────────
 

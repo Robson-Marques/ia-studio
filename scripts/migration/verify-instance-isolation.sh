@@ -105,6 +105,17 @@ rg -Fq -- '--gitlab-token)' scripts/upgrade.sh \
 # precisa abrir travessia/leitura no web root do platform-admin sem hardcode.
 rg -Fq 'chmod -R a+rX "$IASTUDIO_APP_DIR/platform-admin/dist"' scripts/install-dedicated.sh \
   || fail 'instalação não torna o dist do platform-admin legível para o nginx.'
+# O backup não pode depender de callback do processo PM2 para fechar a row:
+# precisa de unidade systemd própria, operation-id e trap que sempre escreve um
+# estado terminal diretamente na base da mesma instância.
+rg -Fq -- '--operation-id' scripts/backup-full.sh \
+  || fail 'backup dedicado não aceita o id da operação para auto-reportar estado.'
+rg -Fq 'trap finalize EXIT' scripts/backup-full.sh \
+  || fail 'backup dedicado não possui proteção de estado terminal no EXIT.'
+rg -Fq "'systemd-run'" platform-api/src/modules/system/backup.service.ts \
+  || fail 'backup do painel não roda fora da árvore do PM2 via systemd-run.'
+rg -Fq "'--operation-id'" platform-api/src/modules/system/backup.service.ts \
+  || fail 'backup do painel não envia id de operação ao script local.'
 if ! rg -Fq 'if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then' scripts/upgrade.sh; then
   fail 'bootstrap não possui caminho exclusivo antes do upgrade de instância.'
 fi
