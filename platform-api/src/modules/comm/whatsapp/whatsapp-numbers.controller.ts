@@ -1,4 +1,4 @@
-// Números WhatsApp — visao das conexoes whatsapp-meta da organization com
+// Números WhatsApp — visão das conexões whatsapp-meta da instalação com
 // qualidade/limite/status/health (painel da conexao, spec Wizard Meta) +
 // sync manual. A criacao de conexao continua no Connection Wizard (Fase 2).
 import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';

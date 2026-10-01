@@ -3,8 +3,12 @@
 > Como o `platform-admin` consome o design system **Studio UX** (pacotes
 > `@studio-ux-ds/*`, publicados no GitLab da Nivoo).
 > Documento vivo — descreve o estado atual, não o histórico. A frente é
-> governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
+> governada por [`ia-studio.studio-ux-adoption@1.1.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
+
+> **Atualização dedicada (2026-09-30):** qualquer referência anterior a
+> organização, workspace, ambiente, branding multi-tenant ou página de pagamento
+> SaaS está revogada. O `platform-admin` atende somente a instalação local.
 
 ## Estado atual — legado visual extinto (2026-07-27, v0.10.26 / DS ^1.2.49)
 
@@ -19,8 +23,8 @@ editor de passos + `editor/*`) e C (o canvas) —, **WhatsApp inteira** (11
 arquivos, com o contact center) e **Integrações inteira** (v0.10.11: Marketplace,
 Conexões, Cofre + as três rotas que nasceram dos modais), **Recursos** e
 **Desenvolvedor** (v0.10.13) e **as 8 últimas telas** (v0.10.16: pessoas, perfis
-— com editor em rota —, workspaces, auditoria, minha conta, mais as três públicas:
-login, aceitar convite e página de pagamento).
+— com editor em rota —, auditoria, minha conta e as telas públicas de login e
+aceitar convite).
 
 **As telas de acesso e de aviso instanciam moldes do DS** (v0.10.21 / DS ^1.2.40):
 login e aceitar convite usam `AuthScreen` (o molde `login`), 404 e sem-permissão
@@ -125,9 +129,11 @@ O `workflow.consuming-system-adoption@1.0.0` (herdado) proíbe adoção em lote 
 
 Sweep concluído em 2026-07-24; `lib/toast.js` e `UIToastContainer.jsx` foram excluídos com os demais órfãos em 2026-07-26.
 
-### 6. Multi-tenant branding — fora do escopo desta frente
+### 6. Identidade local — fronteira desta frente
 
-Nenhum resolver de branding por organização existe no `platform-admin` hoje. O `AuthContext` recebe `organization` mas só usa `.name` no Dashboard. O AppShell foi configurado com `customize={true}` para permitir personalização local pelo usuário (accent/tema/idioma/layout), mas a integração com branding por org fica para uma frente futura — quando o backend expuser essas preferências.
+O `AppShell` pode permitir personalização local do usuário (accent/tema/idioma/
+layout), mas não recebe resolver de branding, seletor ou preferências por
+organização. A identidade pertence à instalação dedicada.
 
 ### 7. Ícones — mapeamento por proximidade, com fallback
 
@@ -190,7 +196,7 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 - **`Switch` do DS não tem rótulo, e o `onChange` dele entrega o BOOLEANO, não o evento.** Escrever `onChange={(e) => patch({ x: e.target.checked })}` num `Switch` lança exceção ao clicar (`e.target` é `undefined`). Mas antes disso: campo de formulário que só vale ao salvar é **`Checkbox variant="card"`** com `label` + `meta` (padrão da v1.2.20), não `Switch` — `Switch` é para alternância de efeito imediato.
 - **Antes de escrever uma tela de classe recorrente (acesso, aviso, lista, detalhe, formulário, busca, assistente de passos), confira a tabela de moldes** em `STUDIO_UX_TEMPLATES` §Estado da implementação. Só 3 dos 9 estão em React; os outros 6 existem como HTML no gerador — e "existe em HTML" foi exatamente o que não me impediu de escrever login, aceitar convite, 404 e sem-permissão do zero. **Componente que falta você percebe por erro; molde que falta você não percebe por nada** — a tela sai plausível.
 - **Antes de improvisar um estado ou variante**, pergunte: *"a spec já prevê isso e o adapter não expõe?"* Nos 8 casos desta adoção a resposta foi sim — e em 3 deles a spec estava certa desde a v1.0.0 (inclusive o anti-padrão "breadcrumb que não navega", que estava escrito e acontecendo).
-| 6 | Multi-tenant branding via Customize (accent/tema por organização) | Quando o backend expuser as preferências por org |
+| 6 | Personalização local via Customize (accent/tema da instalação) | Quando houver preferência local aprovada |
 | 7 | ~~Aposentar `Header.jsx` + `NotificationsBell.jsx`~~ ✅ **excluídos** (2026-07-26), junto dos 13 órfãos. Com isso o item 8 foi decidido por ação: o dropdown do sino **não volta** por enquanto — o conteúdo dele vive só no histórico do git | — |
 | 8 | **Dropdown do sino — decidido por ação:** o `NotificationsBell.jsx` foi excluído, então hoje o sino é sinal + link para `/automacao/notificacoes` (ADR §3) e assim fica. Se um dia voltar, é sub-frente própria que recupera o conteúdo do git e o põe num `Drawer` do DS | Fechado (reabre se você quiser o dropdown) |
 | 9 | ~~`DELETE` de base de conhecimento não existe no backend~~ → **movido para [`docs/divida-tecnica.md`](divida-tecnica.md) como `DT-003`**. Não é do DS: é buraco de backend que a migração só revelou. Critério do Robson em 2026-07-25: *o que não é responsabilidade do DS vive na dívida técnica do IA Studio* | — |

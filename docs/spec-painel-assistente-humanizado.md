@@ -10,8 +10,8 @@
 Não copiar o Aquapark pixel a pixel. Extrair **por que** ele é intuitivo: o
 painel fala a língua do dono do provedor, não a do programador. A pessoa
 descreve o atendente que quer ("Quem é", "O que faz", "O que pode fazer") e o
-sistema traduz para `persona`, `system_prompt` e `allowed_tools` por baixo. Onde
-o IA Studio já for melhor (arquitetura declarativa, multi-tenant), mantém-se — a
+o sistema traduz para `persona`, `system_prompt` e `allowed_tools` por baixo. Onde
+o IA Studio já for melhor (arquitetura declarativa e instalação dedicada), mantém-se — a
 humanização é da superfície, não da fundação.
 
 ## Dois caminhos até o agente (distintos, o mesmo agente)

@@ -1,24 +1,23 @@
 # Email Orchestrator (Fase 7 — Email Platform)
 
-Porta única de envio de e-mail da plataforma. Espelha o Meta Orchestrator do
-WhatsApp: **o chamador nunca conhece a conta** — informa escopo (org/workspace/
-ambiente) + critério (conexão explícita ou tag) e o orquestrador resolve uma
-`Connection` de e-mail (categoria COMMUNICATION).
+Porta única de envio de e-mail da instalação. Espelha o Meta Orchestrator do
+WhatsApp: **o chamador nunca conhece a conta** — informa o critério (conexão
+explícita ou tag) e o orquestrador resolve uma `Connection` de e-mail local
+(categoria COMMUNICATION).
 
 ## Resolução de conexão
-`resolveConnection(scope, criteria)`:
-1. `criteria.connectionId` explícito (deve estar ACTIVE no escopo);
+`resolveConnection(criteria)`:
+1. `criteria.connectionId` explícito (deve estar ACTIVE na instalação);
 2. `criteria.tag` (Connection.tags);
 3. preferência de provider (`google-workspace` antes de `smtp`) + maior `priority`.
 
 Providers de e-mail: `google-workspace` (Gmail OAuth2) e `smtp` (nodemailer).
 
 ## Envio
-`send(scope, message, criteria)`:
-- checa o limite de plano `email_sends_month` (LimitsService — diretriz 19);
-- chama `ConnectionsService.execute(org, connId, 'email.send', {...})` (Provider
+`send(message, criteria)`:
+- chama `ConnectionsService.execute(connId, 'email.send', {...})` (Provider
   Registry → IntegrationLog + `last_used_at`);
-- registra consumo `emails` **e** `email_sends_month` (UsageService — diretriz 40).
+- não aplica plano, licença, metering ou consumo comercial.
 
 Nunca chama API externa direto (diretriz — IA/fluxo sempre via Integration Manager).
 

@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.5.0
+version: 1.6.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
-reviewed_at: "2026-09-08"
-released_at: "2026-09-08"
-change_reason: MINOR. Remove a linha morta `ia-studio.tenant-domains` (arquivo inexistente; a tenancy multi-tenant foi retirada na conversão SaaS→dedicado). A entrada 1.1.0 no histórico é preservada como registro.
+reviewed_at: "2026-09-30"
+released_at: "2026-09-30"
+change_reason: MINOR. Retira a especialidade WhatsApp legada que mandava reintroduzir Baileys, coexistência manual e multi-tenancy; conectores oficiais futuros voltam a exigir alinhamento local dedicado.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -26,8 +26,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 
 | Slug | Identidade operacional | Missão | Prompt |
 |---|---|---|---|
-| `ia-studio.studio-ux-adoption` | Engenheiro Frontend Sênior especializado em adoção controlada de Design Systems | Governar a adoção do Studio UX no `platform-admin` do IA Studio por famílias de tela, respeitando o piloto `/studio-ux-demo` já existente, o contexto multi-tenant e as regras do próprio DS. | [adocao-studio-ux.md](especialidades/adocao-studio-ux.md) |
-| `ia-studio.whatsapp-connectors` | Engenheiro de Plataforma de Integrações multi-tenant (conectores de mensageria e coexistência) | Portar para o IA Studio os conectores WhatsApp do Aquapark (Meta/YCloud/Baileys) e o vínculo de coexistência canal oficial↔manual, adaptado ao Provider Registry (`IProvider`) + Secrets Manager e ao contexto `organization_id`/workspace/environment. Conexões ficam em Integrações › Conexões. | [whatsapp-connectors.md](especialidades/whatsapp-connectors.md) |
+| `ia-studio.studio-ux-adoption` | Engenheiro Frontend Sênior especializado em adoção controlada de Design Systems | Governar a adoção do Studio UX no `platform-admin` da instalação dedicada por famílias de tela, respeitando os componentes já adotados e as regras do próprio DS. | [adocao-studio-ux.md](especialidades/adocao-studio-ux.md) |
 | `ia-studio.dedicated-instance-operations` | Engenheiro de operações de instâncias dedicadas | Governar instalação, upgrade, backup, restauração e remoção por instância, com evidência real de host e sem afetar outros produtos. | [dedicated-instance-operations.md](especialidades/dedicated-instance-operations.md) |
 | `ia-studio.system-cleanup` | Engenheiro de manutenção (faxina de código e arquivos mortos por reachability) | Remover de verdade código e arquivos mortos do IA Studio em etapas — sem quebrar build/gates/runtime — distinguindo *excluir de verdade* de *arquivar*, para o repo representar só o que está em uso. | [system-cleanup.md](especialidades/system-cleanup.md) |
 
@@ -44,7 +43,7 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 
 - **Backend / API dedicada** (`platform-api`): modelagem de domínio local, ACL e eventos. Operação por instância é coberta por `ia-studio.dedicated-instance-operations@1.0.0`.
 - **Runtime de assistentes**: prompts operacionais, tools, knowledge base, memória, workflows — regras próprias, **não confundir** com este framework (que governa pedidos humanos de desenvolvimento).
-- **Integrações externas** (Meta, Google, gateways, etc.) — se surgirem novas. *(A fatia de **conectores WhatsApp** — Meta/YCloud/Baileys + coexistência — já está coberta por `ia-studio.whatsapp-connectors@1.0.0`.)*
+- **Integrações externas** (Meta, Google, gateways, etc.) — se surgirem novas. Conectores WhatsApp oficiais exigem Capability/contrato dedicado; Baileys, QR e coexistência manual são proibidos no produto alvo.
 - **Segurança / privacidade** (LGPD, retenção, backup, ACL local).
 - **Documentação / continuidade** (handoff, changelog, dívida técnica).
 
@@ -58,3 +57,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.3.0 | released | Aprovado por Robson em 2026-09-18 | MINOR. Adiciona `ia-studio.dedicated-instance-operations@1.0.0` para S4: operação de instâncias dedicadas com recursos reais do host e isolamento entre produtos. |
 | 1.4.0 | released | Aprovado por Robson em 2026-09-21 | MINOR. Adiciona `ia-studio.system-cleanup@1.0.0` (faxina de código/arquivos mortos em etapas), criada por `workflow.specialty-creation@1.0.0` após o relatório de alinhamento da frente de faxina. |
 | 1.5.0 | released | Aprovado por Robson em 2026-09-21 | MINOR. Remove a linha morta `ia-studio.tenant-domains` (o arquivo `especialidades/tenant-domains.md` não existe e a tenancy multi-tenant foi retirada no dedicado). Achado na faxina Etapa 0; a entrada 1.1.0 fica no histórico como registro. |
+| 1.6.0 | released | Aprovado por Robson em 2026-09-30 | MINOR. Retira `ia-studio.whatsapp-connectors` do catálogo ativo: o contrato 1.0.0 mandava reintroduzir Baileys, QR, coexistência manual, metering e escopo SaaS, todos incompatíveis com a instalação dedicada. O arquivo é preservado apenas como registro aposentado. |

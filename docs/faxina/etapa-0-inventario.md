@@ -3,7 +3,7 @@
 - **Data:** 2026-09-21
 - **Especialidade:** `ia-studio.system-cleanup@1.0.0`
 - **Natureza:** somente leitura. Nada foi removido nesta etapa. Este inventário é a base de decisão para as Etapas 1 (arquivos/módulos) e 2 (intra-código).
-- **Status:** CONCLUÍDA em 2026-09-21 — Etapa 1 (v0.11.17), Etapa 2a LLM (v0.11.18) e Etapa 2b Baileys (v0.11.19 API + v0.11.20 admin). Decisões do dono: excluir de verdade LLM Gemini/Ollama e Baileys; remover a tela de pagamento SaaS; remover a linha `tenant-domains` do catálogo. Schema não tocado (colunas/modelos órfãos preservados).
+- **Status:** CONCLUÍDA em 2026-09-21 — Etapa 1 (v0.11.17), Etapa 2a LLM (v0.11.18) e Etapa 2b Baileys (v0.11.19 API + v0.11.20 admin). Decisões do dono: excluir de verdade LLM Gemini/Ollama e Baileys; remover a tela de pagamento SaaS; remover a linha `tenant-domains` do catálogo. O schema não foi tocado nesta etapa read-only; a limpeza posterior dos objetos órfãos ocorreu na v0.11.22 e passou a ser aplicada pelo hook versionado da v0.11.24.
 - **Método:** reachability sobre `platform-api/src` (333 arquivos) e `platform-admin/src` (114). Um item só é "morto" quando nenhuma superfície viva o alcança (import, rota, menu, ACL, seed, DI, controller, build). A evidência acompanha cada item.
 
 ## Resumo

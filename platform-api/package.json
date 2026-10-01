@@ -1,7 +1,7 @@
 {
   "name": "platform-api",
   "version": "0.1.0",
-  "description": "IA Studio — API da plataforma SaaS multi-tenant (monolito modular NestJS + Fastify + Prisma)",
+  "description": "IA Studio — API de uma instalação dedicada (monólito modular NestJS + Fastify + Prisma)",
   "private": true,
   "scripts": {
     "build": "nest build",

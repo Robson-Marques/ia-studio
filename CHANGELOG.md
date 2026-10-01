@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.11.25 - 2026-09-30 (Auditoria pós-faxina de SaaS)
+
+- Corrige metadados e READMEs vivos que ainda descreviam a instalação dedicada
+  como SaaS/multi-tenant ou citavam `LimitsService`/`UsageService` removidos.
+- Atualiza a especialidade de adoção do Studio UX para o contexto local e
+  aposenta a especialidade WhatsApp que instruía reintroduzir Baileys, QR,
+  coexistência manual e escopo SaaS.
+- Registra a casca vazia não versionada de `platform-console/` para housekeeping
+  local. Nenhuma mudança de schema, API, painel executável ou estado dos slices
+  é introduzida.
+
 ## v0.11.24 - 2026-09-23 (Upgrade: hook de limpeza de schema versionado)
 
 Blindagem do atualizador para que remoções destrutivas de schema se apliquem

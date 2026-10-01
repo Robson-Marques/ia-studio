@@ -1,22 +1,24 @@
 # Módulo `comm` — Communication Platform / WhatsApp Meta Cloud API (Fase 3)
 
-Canal WhatsApp **oficial-only (Meta Cloud API)**, portado do Aquapark e adaptado ao modelo multi-tenant da plataforma (Organization → Workspace → Environment). Nenhuma dependência de solução não oficial.
+Canal WhatsApp **oficial-only (Meta Cloud API)**, portado do Aquapark para a
+instalação dedicada. Não há organização, workspace, ambiente, limite comercial
+nem dependência de solução não oficial.
 
 ## Arquitetura
 
 - **Conexão = `Connection` do Integration Manager** (`provider_key = 'whatsapp-meta'`). NÃO existe tabela própria de conexão (diretriz 52).
   - **Secret da conexão** (Secrets Manager, AES-256-GCM): `access_token`, `app_secret`, `verify_token`.
   - **`Connection.config`** (não sensível): `phone_number_id`, `waba_id` (roteiam o webhook), `department`, `is_default` + espelho do sync (`display_name`, `phone`, `quality_rating`, `messaging_limit`).
-- **Provider `WhatsappMetaProvider`** (`integration/registry/providers/whatsapp-meta.provider.ts`): `connect` valida o token (GET phone number), `health` (token/número/templates), `execute` (`sendText`/`sendTemplate`/`sendMedia`/`sendRich`/`listTemplates`/`createTemplate`/`syncStatus`/`downloadMedia`), `discover` (números da WABA + templates). Declara `countMetric: 'whatsapp_numbers'` → o `ConnectionsService.create` aplica o limite do plano via `LimitsService`.
+- **Provider `WhatsappMetaProvider`** (`integration/registry/providers/whatsapp-meta.provider.ts`): `connect` valida o token (GET phone number), `health` (token/número/templates), `execute` (`sendText`/`sendTemplate`/`sendMedia`/`sendRich`/`listTemplates`/`createTemplate`/`syncStatus`/`downloadMedia`) e `discover` (números da WABA + templates). A conexão pertence somente à instalação local.
 - **Cliente Graph API**: `shared/integration/meta-graph.client.ts` (fetch nativo + `MetaApiError` com o código Meta — ex.: **131047** = fora da janela de 24h). Tipos `RichMessage`/`NormalizedMessage`/janela em `shared/integration/whatsapp.types.ts`.
 
 ## Sub-áreas
 
 | Pasta | Responsabilidade |
 |---|---|
-| `whatsapp/whatsapp-orchestrator.service.ts` | **Meta Orchestrator** — o chamador NUNCA conhece o número: resolve a Connection por `criteria` (connectionId explícito → tag/departamento → `is_default` → maior `priority` entre ACTIVE); envia via `ConnectionsService.execute` (IntegrationLog + `last_used_at`); grava o outbound na inbox (a Meta não ecoa); `UsageService.increment('whatsapp_messages')`; `windowState(connection, phone)`. |
-| `whatsapp/whatsapp-webhook.controller.ts` | Rota pública **`GET/POST /api/webhooks/whatsapp`** (VERSION_NEUTRAL, sem `/v1`). GET valida `hub.verify_token` contra o secret de qualquer conexão whatsapp-meta. POST valida **HMAC `x-hub-signature-256`** (rawBody) com o `app_secret` da conexão dona do `phone_number_id` (lookup por `config.phone_number_id`, todas as orgs) e despacha por `field`. |
-| `whatsapp/whatsapp-inbound.service.ts` | Persiste chat/mensagem (dedup por `wamid`; `unread_count`, `last_inbound_at` = base da janela de 24h), reabre conversa CLOSED (SYSTEM), atualiza ACKs (sent/delivered/read/failed → IntegrationLog em falha), sincroniza status de template e **emite `whatsapp.inbound.message`** (EventEmitter2, envelope org/workspace/env/trace_id/source_event_id). |
+| `whatsapp/whatsapp-orchestrator.service.ts` | **Meta Orchestrator** — o chamador NUNCA conhece o número: resolve a Connection por `criteria` (connectionId explícito → tag/departamento → `is_default` → maior `priority` entre ACTIVE); envia via `ConnectionsService.execute` (IntegrationLog + `last_used_at`), grava o outbound na inbox (a Meta não ecoa) e calcula `windowState(connection, phone)`. |
+| `whatsapp/whatsapp-webhook.controller.ts` | Rota pública **`GET/POST /api/webhooks/whatsapp`** (VERSION_NEUTRAL, sem `/v1`). GET valida `hub.verify_token` contra o secret das conexões locais whatsapp-meta. POST valida **HMAC `x-hub-signature-256`** (rawBody) com o `app_secret` da conexão dona do `phone_number_id` e despacha por `field`. |
+| `whatsapp/whatsapp-inbound.service.ts` | Persiste chat/mensagem (dedup por `wamid`; `unread_count`, `last_inbound_at` = base da janela de 24h), reabre conversa CLOSED (SYSTEM), atualiza ACKs (sent/delivered/read/failed → IntegrationLog em falha), sincroniza status de template e **emite `whatsapp.inbound.message`** com `trace_id` e `source_event_id`. |
 | `whatsapp/whatsapp-smart-send.service.ts` | **Smart-send**: dentro da janela de 24h → texto livre; fora (`expired`/`none`) → template HSM (`coldTemplate` no 1º contato); recusa Meta **131047** → backstop no template. `skipIfWithinWindow` p/ emissores que não interrompem conversa ativa. Porta de envio das Fases 4-5. |
 | `whatsapp/whatsapp-inbox.*` | Conversas: listagem com **escopo de visibilidade** (abas mine/unassigned/team/all ∩ perms `comm.whatsapp.view.*`), mensagens, janela, envio manual (reply gate + janela; fora de 24h exige template — 409 amigável), proxy de mídia inbound (`downloadMedia` base64). |
 | `whatsapp/whatsapp-templates.*` | Catálogo `comm_whatsapp_templates` **bidirecional**: criar no painel → publica na Meta (DRAFT→PENDING); sync puxa a WABA (status/razão de rejeição) e publica rascunhos. |
@@ -48,7 +50,7 @@ Passo informativo **"Fluxo oficial (Embedded Signup)" — EM BREVE** (exige App 
 
 ## Decisões e limitações desta fase (documentadas)
 
-1. **`phone_number_id`/`waba_id` ficam no `config`** (não no Secret): são identificadores não sensíveis e o webhook precisa deles pra rotear sem decifrar todos os secrets de todas as orgs.
+1. **`phone_number_id`/`waba_id` ficam no `config`** (não no Secret): são identificadores não sensíveis e o webhook precisa deles para rotear sem decifrar os secrets locais.
 2. **Realtime = polling 5s** no front (lista + conversa aberta). WebSocket fica pra fase posterior (Notification Center/Event Bus — Fase 4).
 3. **Mídia outbound por URL pública** (a Meta baixa por link); upload via Storage Manager entra quando o fluxo de anexos for necessário. **Mídia inbound** é baixada da Meta sob demanda (proxy autenticado, base64) — sem armazenamento local nesta fase.
 4. **Embedded Signup/OAuth**: arquitetura pronta no wizard (passo informativo); ativação depende da aprovação do App Meta.

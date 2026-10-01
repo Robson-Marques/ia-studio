@@ -51,8 +51,8 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 ## storage/ (diretriz 21)
 
 - `IStorageDriver` (`put/get/delete/signedUrl?`): **LocalDriver** (`STORAGE_LOCAL_PATH`, default `./storage`, guard anti path-traversal) e **S3Driver** (SigV4 implementado com crypto nativo em `sigv4.util.ts` — sem SDK; AWS S3/R2/MinIO; config via envs `S3_*` ou `configure()` com dados de uma connection s3).
-- `StorageService.save(buffer, meta)` → grava `StorageFile` + `UsageService.increment('storage_bytes')`. Seleção do driver: env `STORAGE_DRIVER` (`local` default | `s3`).
-- `GET /storage/files` e `GET /storage/files/:id` (download autenticado, org-scoped). Sem perm própria de storage nesta fase — gating por `integrations.connections.read`.
+- `StorageService.save(buffer, meta)` grava `StorageFile` local à instância. Seleção do driver: env `STORAGE_DRIVER` (`local` default | `s3`), sem metering comercial.
+- `GET /storage/files` e `GET /storage/files/:id` fazem download autenticado local. Sem perm própria de storage nesta fase — gating por `integrations.connections.read`.
 
 ## ACL
 

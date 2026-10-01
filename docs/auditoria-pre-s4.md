@@ -1,5 +1,11 @@
 # Auditoria de prontidão — antes da prova operacional do S4
 
+> **Registro histórico, atualizado em 2026-09-30:** este foi o recorte anterior
+> à prova operacional. O Achado nº 4 foi resolvido nas versões v0.11.18–v0.11.24:
+> Gemini/Ollama e Baileys foram excluídos do código/schema e o Console foi
+> aposentado. Os demais achados preservam contexto de operação, não estado atual
+> de produto.
+
 - **Data:** 2026-09-21
 - **Especialidade:** `ia-studio.dedicated-instance-operations@1.0.0` (via `workflow.prompt-alignment@2.4.0`)
 - **Capability:** `ia-studio.capability.saas-to-dedicated-installation` (estado `in-progress`)
@@ -30,9 +36,12 @@ Ao rodar os quatro gates num host **sem ripgrep**, a evidência mentia: o S1 usa
 
 `backup-full.sh` grava no `manifest.json` (dentro do `.tar.gz`) `ENCRYPTION_KEY`, `JWT_SECRET`, `DATABASE_URL`, `REDIS_URL` e credenciais Google, em texto claro — por design (o destino precisa decifrar os secrets AES na restauração). O arquivo sai com `chmod 600`. **Risco:** o pacote de backup é material sensível; se sair do host sem proteção, expõe todos os segredos da instância. **Recomendação:** documentar explicitamente que o pacote deve ser guardado cifrado/restrito e, idealmente, cifrar o `.tar.gz` na origem ou exigir destino seguro. Não bloqueia o S4, mas deve constar na operação.
 
-### Nº 4 — INFO: motores dormentes
+### Nº 4 — INFO histórico: motores dormentes — RESOLVIDO
 
-Gemini/Ollama (LLM) e os providers WhatsApp Baileys seguem registrados por baixo, sem card no marketplace (retirados em v0.11.11/v0.11.12). Sem risco operacional imediato; são alvo explícito da frente de faxina de código/arquivos mortos (política dormente a definir: excluir de verdade vs. arquivar).
+Na data desta auditoria, Gemini/Ollama e os providers WhatsApp Baileys ainda
+seguiam registrados por baixo, sem card no marketplace. A faxina posterior os
+excluiu de verdade: código nas v0.11.18–v0.11.20 e schema na v0.11.22, com hook
+versionado de upgrade na v0.11.24. Não há política dormente pendente.
 
 ### Nº 5 — INFO: token de registry por instância
 

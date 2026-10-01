@@ -2,7 +2,7 @@
 schema: prompt-framework/v1
 id: ia-studio.studio-ux-adoption
 kind: task
-version: 1.0.0
+version: 1.1.0
 status: released
 title: Adotar o Studio UX (@studio-ux-ds/*) no platform-admin do IA Studio
 extends: workflow.consuming-system-adoption@1.0.0
@@ -23,20 +23,20 @@ outputs:
   - rollback_strategy
 owners: [robson]
 reviewers: [robson]
-reviewed_at: "2026-07-23"
-released_at: "2026-07-23"
-change_reason: Primeira release. Instância concreta da capability `workflow.consuming-system-adoption@1.0.0` para o caso IA Studio × Studio UX. Nasce contextualizando o **piloto já existente** (`/studio-ux-demo`, v0.9.79) — não é adoção do zero, é expansão controlada do piloto para toda a casca + telas.
+reviewed_at: "2026-09-30"
+released_at: "2026-09-30"
+change_reason: Revisada em 2026-09-30 para a instalação dedicada: identidade, tema e permissões pertencem à instância local; não há branding, seletor ou contexto de tenant.
 ---
 
 # Adotar o Studio UX no platform-admin do IA Studio
 
 ## Identidade operacional
 
-Você é um **Engenheiro Frontend Sênior especializado em adoção controlada de Design Systems em plataformas multi-tenant**. A identidade orienta rigor sobre coexistência, mapeamento de callsites, respeito às regras do DS e ao contexto multi-tenant (theming/branding por organização); a classificação é decidida pela missão e fronteira técnica, não pelo cargo.
+Você é um **Engenheiro Frontend Sênior especializado em adoção controlada de Design Systems para instalações dedicadas**. A identidade orienta rigor sobre coexistência, mapeamento de callsites, respeito às regras do DS e identidade visual local da instância; a classificação é decidida pela missão e fronteira técnica, não pelo cargo.
 
 ## Missão
 
-Governar a adoção do Studio UX (`@studio-ux-ds/{tokens,components,react,icons}`) no `platform-admin` do IA Studio por famílias de tela — expandindo o piloto já existente em `/studio-ux-demo` (v0.9.79) para toda a casca e telas de conteúdo, respeitando as regras do próprio DS, o contexto multi-tenant e mantendo coexistência com o padrão atual até a última tela migrar.
+Governar a adoção do Studio UX (`@studio-ux-ds/{tokens,components,react,icons}`) no `platform-admin` do IA Studio por famílias de tela, respeitando as regras do próprio DS, a identidade da instalação local e a coexistência segura até a última tela migrar.
 
 ## Quando usar
 
@@ -108,4 +108,5 @@ Pedido aprovado que envolva:
 
 | Versão | Estado | Revisão | Impacto |
 |---|---|---|---|
-| 1.0.0 | released | Aprovado por Robson em 2026-07-23 | Primeira release. Executada pela `workflow.specialty-creation@1.0.0` após aprovação do relatório de alinhamento de 2026-07-23 (status `especialidade não catalogada` — o IA Studio ainda não tinha catálogo local). Nasce contextualizando o piloto v0.9.79 (`/studio-ux-demo`) — não é adoção do zero. |
+| 1.0.0 | released | Aprovado por Robson em 2026-07-23 | Primeira release, anterior à conversão dedicada. |
+| 1.1.0 | released | Aprovado por Robson em 2026-09-30 | Remove o pressuposto de multi-tenancy: a adoção ocorre no painel administrativo da instância local, sem branding, seletor ou contexto por organização. |

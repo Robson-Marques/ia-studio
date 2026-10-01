@@ -2,9 +2,9 @@
 schema: prompt-framework/v1
 id: ia-studio.whatsapp-connectors
 kind: task
-version: 1.0.0
-status: released
-title: Portar conectores WhatsApp (Meta/YCloud/Baileys) e coexistência do Aquapark para o IA Studio
+version: 1.1.0
+status: retired
+title: Aposentada — conectores WhatsApp legados e coexistência manual
 extends: workflow.system-change-base@1.0.0
 policy_refs:
   - ia-studio.project-rules
@@ -23,12 +23,23 @@ owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-09-08"
 released_at: "2026-09-08"
-change_reason: Primeira release. Criada por `workflow.specialty-creation@1.0.0` após o `ok` do Robson no relatório de alinhamento de 2026-09-08 (porte dos menus IA Studio e WhatsApp do Aquapark — status `especialidade não catalogada` para a parte de backend/conectores). A fatia de UI/UX das telas segue com `ia-studio.studio-ux-adoption@1.0.0`; esta task cobre o comportamento/backend dos conectores e a coexistência.
+change_reason: Aposentada em 2026-09-30 pela auditoria da conversão dedicada. A versão 1.0.0 previa Baileys, QR, coexistência manual, metering e escopo SaaS; nenhum deles pode voltar ao produto alvo.
 ---
 
-# Portar conectores WhatsApp e coexistência (Aquapark → IA Studio)
+# Aposentada — conectores WhatsApp e coexistência legados
 
-## Identidade operacional
+## Status
+
+**Não selecionar nem executar esta especialidade.** O IA Studio dedicado aceita
+somente capacidades oficiais da Meta Cloud API; Baileys, QR, vínculo manual,
+coexistência oficial↔manual, `organization_id`, `workspace_id`,
+`environment_id`, Licensing e metering são removidos. Uma integração oficial
+nova precisa nascer de Capability Contract local atual, não deste documento.
+
+O restante do arquivo é preservado apenas como evidência da decisão revogada de
+08/09/2026.
+
+## Conteúdo histórico revogado
 
 Você é um **Engenheiro de Plataforma de Integrações multi-tenant** especializado em conectores de mensageria e coexistência de canais. A identidade orienta rigor sobre o Provider Registry (`IProvider`), o Secrets Manager, o contexto `organization_id`/workspace/environment e a fronteira app↔provider — a classificação é decidida pela missão e fronteira técnica, não pelo cargo.
 
@@ -106,3 +117,4 @@ Pedido aprovado que envolva:
 | Versão | Estado | Revisão | Impacto |
 |---|---|---|---|
 | 1.0.0 | released | Aprovado por Robson em 2026-09-08 | Primeira release. Executada por `workflow.specialty-creation@1.0.0` após o `ok` no relatório de alinhamento de 2026-09-08. Cobre o porte de backend/conectores WhatsApp (Meta/YCloud/Baileys) e a coexistência, adaptado ao Provider Registry + Secrets Manager multi-tenant. A UI das telas segue com `ia-studio.studio-ux-adoption@1.0.0`. |
+| 1.1.0 | retired | Aprovado por Robson em 2026-09-30 | A conversão dedicada removeu os pressupostos do contrato 1.0.0. O arquivo não é mais elegível ao alinhamento; fica somente como histórico. |
