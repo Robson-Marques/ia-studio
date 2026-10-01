@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.11.26 - 2026-09-30 (Instalação dedicada: wrappers portáveis)
+
+- Corrige os wrappers públicos `scripts/install.sh` e `scripts/uninstall.sh`:
+  eles passam a chamar o Bash explicitamente antes de delegar aos scripts
+  dedicados. Assim, um checkout cuja plataforma não preservou o bit executável
+  não falha com `Permissão negada`.
+- O gate S4 passou a verificar esse contrato nos dois wrappers.
+
 ## v0.11.25 - 2026-09-30 (Auditoria pós-faxina de SaaS)
 
 - Corrige metadados e READMEs vivos que ainda descreviam a instalação dedicada

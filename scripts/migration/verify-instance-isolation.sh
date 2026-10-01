@@ -13,6 +13,14 @@ for file in scripts/lib/instance.sh scripts/install-dedicated.sh scripts/provisi
   require_file "$file"
 done
 
+# Scripts rastreados pelo Git podem chegar ao host sem bit executável. Os
+# wrappers públicos devem invocar o interpretador explicitamente, como já faz
+# o bootstrap do upgrade, para que install/uninstall não dependam de chmod.
+rg -Fq 'exec bash "${SCRIPT_DIR}/install-dedicated.sh" "$@"' scripts/install.sh \
+  || fail 'wrapper install.sh não invoca o instalador dedicado via bash.'
+rg -Fq 'exec bash "$SCRIPT_DIR/uninstall-dedicated.sh" "$@"' scripts/uninstall.sh \
+  || fail 'wrapper uninstall.sh não invoca o desinstalador dedicado via bash.'
+
 for script in scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/upgrade.sh scripts/backup-full.sh scripts/restore-full.sh scripts/restore-backup.sh scripts/uninstall-dedicated.sh; do
   rg -Fq 'acquire_instance_lock' "$script" || fail "$script não usa lock da instância."
 done

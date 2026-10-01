@@ -6,13 +6,14 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-09-30 (`v0.11.25`: auditoria pós-faxina; resíduos
-> funcionais ausentes; documentação e especialidades SaaS corrigidas).
+> Última atualização: 2026-09-30 (`v0.11.26`: wrappers de instalação dedicada
+> portáveis; resíduos funcionais ausentes; documentação e especialidades SaaS
+> corrigidas).
 
 ## Auditoria pós-faxina — 2026-09-30
 
 Os gates de S1, S2 operacional, S3, S4 estático e removedor SaaS passaram com
-o checkout `v0.11.25`. Não há resíduo funcional de tenant, Console, Baileys,
+o checkout `v0.11.26`. Não há resíduo funcional de tenant, Console, Baileys,
 Gemini/Ollama, licensing ou billing. Foram corrigidos metadados e READMEs vivos
 que ainda descreviam SaaS, e a especialidade WhatsApp que ordenava reintroduzir
 Baileys/coexistência foi aposentada e retirada do catálogo ativo. O diretório
@@ -20,6 +21,11 @@ físico `platform-console/` foi confirmado vazio e fora do Git; sua remoção é
 somente housekeeping local, sem impacto funcional. S1 permanece 100%; S2/S4 e a
 Capability geral permanecem `in-progress` até a prova real da segunda instância
 e a Acceptance integrada.
+
+Atualização `v0.11.26`: os wrappers públicos de instalação e desinstalação
+chamam explicitamente o Bash antes de delegar. Isso elimina a dependência do bit
+executável que bloqueou a primeira tentativa de criar a segunda instância; o
+gate S4 verifica esse contrato.
 
 ## Checkpoint S3 — Console SaaS → administração local
 
