@@ -23,14 +23,12 @@ são descartáveis e não representam clientes. O destino agora é:
 - o host somente coabita aplicações independentes, cada uma em `/opt/<app-id>`
   e com banco, Redis, PM2, domínio, storage e backup próprios.
 
-S1 e S2 estão 100% concluídos; S4 e a Capability geral seguem `in-progress`. S4 foi
-redefinido para provar instalação limpa da vertente Newnet e coexistência sem
-cruzamento com Finanças, Mercado e os demais produtos reais do host — não exige
-manter uma segunda cópia idêntica do IA Studio. A remoção de `ia-dev` e
-`ia-teste` foi autorizada porque não há dados a preservar, mas só ocorre após a
-tag que materializa este contrato. O backup que criou arquivo e permaneceu em
-`RUNNING` ainda exige evidência de log do host; reinstalação não substitui esse
-diagnóstico nem marca S4 como concluído.
+S1, S2, S3 e S4 estão concluídos; a Capability geral segue `in-progress` em
+S5/Acceptance. S4 foi redefinido para provar instalação limpa da vertente
+Newnet e coexistência sem cruzamento com Finanças, Mercado e os demais produtos
+reais do host — não exige manter uma segunda cópia idêntica do IA Studio. A
+remoção de `ia-dev` e `ia-teste` foi autorizada porque não havia dados a
+preservar.
 
 Atualização de 2026-10-02: a vertente Newnet foi instalada limpa em
 `/opt/newnet-ia-studio`, com banco/role, Redis, PM2, Nginx e HTTPS próprios; Ctrl
@@ -74,6 +72,16 @@ atual pelo último registro terminal do banco. O `202` de backup/restauração
 devolve o identificador que o painel usa no polling; sem esse identificador a
 API expõe somente um lock em execução. Assim um erro histórico não pode ser
 apresentado como falha da operação recém-disparada.
+
+Evidência operacional final de S4 — 2026-10-02: em `v0.11.37`, a instalação
+Newnet gerou `full-20261002-165318.tar.gz` e restaurou esse mesmo pacote. O
+painel apresentou `Restauração concluída`/`SUCCESS`, com os logs
+`DB_RESTORE: banco restaurado com sucesso` e `DONE`; o toast confirmou que a
+aplicação voltou a responder. As respostas `502` vistas exclusivamente no
+DevTools ocorreram enquanto o restore parou o PM2 de propósito e cessaram na
+reconexão; não foram convertidas em falha ou alerta do painel. Essa prova fecha
+S4 e abre S5/Acceptance, mantendo a Capability `in-progress` até a consolidação
+integrada.
 
 ## Auditoria pós-faxina — 2026-09-30
 
