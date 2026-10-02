@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.11.36 - 2026-10-02 (Restauração: diário local independente)
+
+- A restauração não importa mais `system_restores` do pacote como se fosse dado
+  operacional. Ela preserva e reaplica o diário administrativo da instalação
+  receptora, incluindo a operação de restore em curso. Backups e falhas antigas
+  do snapshot não voltam a alterar o estado atual do painel.
+
 ## v0.11.35 - 2026-10-02 (Administração local: reconexão pós-restauração)
 
 - O painel passa a tratar `502/503/504` temporários durante reinício de uma

@@ -63,6 +63,12 @@ HTML cru em toasts repetidos. O painel agora trata essa janela como reconexão
 esperada e apresenta registros herdados como encerrados, não como falso backup
 falho. A fonte de estado também ordena operações terminais por conclusão.
 
+Atualização `v0.11.36`: a solução estrutural separa o diário administrativo
+`system_restores` do banco de negócio restaurado. Antes do restore, o script
+exporta somente essa tabela da instalação receptora; após aplicar o pacote,
+recoloca o diário local e fecha a operação atual. Nenhum status/histórico
+operacional do snapshot passa a determinar a tela local.
+
 ## Auditoria pós-faxina — 2026-09-30
 
 Os gates de S1, S2 operacional, S3, S4 estático e removedor SaaS passaram com

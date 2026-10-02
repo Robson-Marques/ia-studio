@@ -137,6 +137,10 @@ rg -Fq 'PREVIOUS_DATABASE_READY' scripts/restore-full.sh \
   || fail 'restore pode reiniciar serviço após rollback para banco que já estava indisponível.'
 rg -Fq 'close_snapshot_operations' scripts/restore-full.sh \
   || fail 'restore pode ressuscitar operações RUNNING que foram capturadas dentro do próprio backup.'
+rg -Fq 'pre-restore-system-restores.sql' scripts/restore-full.sh \
+  || fail 'restore não preserva o diário operacional local antes de aplicar o snapshot de dados.'
+rg -Fq 'TRUNCATE TABLE system_restores' scripts/restore-full.sh \
+  || fail 'restore pode deixar o histórico administrativo do pacote sobrescrever o da instalação local.'
 rg -Fq 'SAFETY: aplicação permanece parada' scripts/restore-full.sh \
   || fail 'restore completo ainda pode iniciar API contra banco não recuperável.'
 rg -Fq "'systemd-run'" platform-api/src/modules/system/backup.service.ts \

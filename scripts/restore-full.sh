@@ -186,6 +186,13 @@ if ! pg_dump --no-owner --no-privileges --clean --if-exists "$PSQL_DATABASE_URL"
   die 'não foi possível criar snapshot do banco atual; restauração cancelada.'
 fi
 strip_vector_ddl "$WORK/pre-restore.sql"
+# system_restores é o diário operacional da instalação que está recebendo o
+# pacote. Ele não é dado do cliente a ser importado: o próprio backup contém a
+# linha RUNNING que o criou e, se ela voltar, confunde o painel e o lock. Guarde
+# o diário local separadamente para reaplicá-lo após o banco de negócio.
+if ! pg_dump --data-only --no-owner --no-privileges --table=system_restores "$PSQL_DATABASE_URL" > "$WORK/pre-restore-system-restores.sql" 2>>"$LOG_FILE"; then
+  die 'não foi possível preservar o diário local de operações; restauração cancelada.'
+fi
 if psql "$PSQL_DATABASE_URL" -X -Atqc "SELECT to_regclass('public.core_users') IS NOT NULL;" 2>>"$LOG_FILE" | grep -qx 't'; then
   PREVIOUS_DATABASE_READY=1
 fi
@@ -207,6 +214,14 @@ if ! psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$WORK/db.sql" >>"$LOG_F
   fail_after_stop 'psql não conseguiu aplicar o dump; o estado anterior foi restaurado quando possível.'
 fi
 DATABASE_READY=1
+
+log 'OPERATION_HISTORY: preservando o diário administrativo desta instalação.'
+if ! psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'TRUNCATE TABLE system_restores;' >>"$LOG_FILE" 2>&1; then
+  fail_after_stop 'banco restaurado, mas não foi possível preparar o diário local de operações.'
+fi
+if ! psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$WORK/pre-restore-system-restores.sql" >>"$LOG_FILE" 2>&1; then
+  fail_after_stop 'banco restaurado, mas não foi possível restaurar o diário local de operações.'
+fi
 
 if ! ensure_operation_row; then
   fail_after_stop 'banco restaurado, mas não foi possível recriar o registro da operação administrativa.'
