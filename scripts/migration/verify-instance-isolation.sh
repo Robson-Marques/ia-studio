@@ -129,6 +129,8 @@ if rg -n 'DROP SCHEMA public' scripts/restore-full.sh scripts/restore-backup.sh;
 fi
 rg -Fq 'su -s /bin/sh postgres' scripts/restore-full.sh \
   || fail 'restore completo não cria pgvector com o administrador do cluster.'
+rg -Fq 'strip_vector_ddl' scripts/restore-full.sh \
+  || fail 'restore completo pode reaplicar DDL de pgvector com o role da aplicação.'
 rg -Fq 'SAFETY: aplicação permanece parada' scripts/restore-full.sh \
   || fail 'restore completo ainda pode iniciar API contra banco não recuperável.'
 rg -Fq "'systemd-run'" platform-api/src/modules/system/backup.service.ts \

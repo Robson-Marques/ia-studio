@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.11.32 - 2026-10-02 (Restauração: pgvector pertence ao cluster)
+
+- Impede que `db.sql` de um pacote tente executar `DROP`/`CREATE`/`COMMENT` de
+  `pgvector` com o role da aplicação. A extensão é garantida separadamente como
+  `postgres`; dados e tabelas continuam sendo restaurados pelo role local.
+
 ## v0.11.31 - 2026-10-02 (Restauração: não iniciar sobre banco vazio)
 
 - Corrige a restauração completa que apagava `public` antes de carregar o

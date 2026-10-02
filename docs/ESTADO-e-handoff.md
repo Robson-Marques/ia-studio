@@ -42,7 +42,7 @@ cast e deixa falha de persistência visível. O backup na `v0.11.30` chegou a
 `SUCCESS`, com logs e arquivo persistidos; S2 foi concluído. A primeira
 restauração revelou uma regressão operacional: o script removia `public`, perdia
 `pgvector`, abortava antes de aplicar `db.sql` e o trap antigo religava
-API/worker contra banco vazio. A correção `v0.11.31` aplica dumps
+API/worker contra banco vazio. A correção `v0.11.32` aplica dumps
 `--clean --if-exists` sem derrubar `public`, garante a extensão pelo
 administrador do cluster, preserva snapshot para rollback e não inicia serviços
 se o banco não estiver recuperável. S4 continua pendente até a recuperação real

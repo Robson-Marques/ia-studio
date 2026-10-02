@@ -87,6 +87,13 @@ ensure_vector_extension() {
     >>"$LOG_FILE" 2>&1
 }
 
+strip_vector_ddl() {
+  # pg_dump pode serializar o ciclo de vida da extensão. A extensão vector é
+  # infraestrutura do cluster (ownership postgres), não dado da aplicação;
+  # deixar esse DDL no dump faria o role local tentar DROP/CREATE/COMMENT nela.
+  sed -i -E '/^(DROP EXTENSION( IF EXISTS)?|CREATE EXTENSION IF NOT EXISTS|COMMENT ON EXTENSION) vector([ ;]|$)/d' "$1"
+}
+
 restore_previous_state() {
   log 'ROLLBACK: restaurando o estado local anterior após falha.'
   ensure_vector_extension || log 'ROLLBACK WARN: não foi possível garantir pgvector.'
@@ -139,6 +146,7 @@ if ! tar -xzf "$ARCHIVE" -C "$WORK" >>"$LOG_FILE" 2>&1; then
 fi
 [ -f "$WORK/db.sql" ] || die 'pacote inválido: db.sql ausente.'
 [ -f "$WORK/manifest.json" ] || die 'pacote inválido: manifest.json ausente.'
+strip_vector_ddl "$WORK/db.sql"
 
 # Snapshot para rollback real. O dump da origem contém --clean desde v0.11.31;
 # o snapshot também, para recuperar em caso de falha posterior.
@@ -147,6 +155,7 @@ cp "$ENV_FILE" "$WORK/pre-restore.env" || die 'não foi possível preservar .env
 if ! pg_dump --no-owner --no-privileges --clean --if-exists "$PSQL_DATABASE_URL" > "$WORK/pre-restore.sql" 2>>"$LOG_FILE"; then
   die 'não foi possível criar snapshot do banco atual; restauração cancelada.'
 fi
+strip_vector_ddl "$WORK/pre-restore.sql"
 if [ -d "$STORAGE_DIR" ]; then
   mkdir -p "$WORK/pre-restore-storage"
   cp -a "$STORAGE_DIR/." "$WORK/pre-restore-storage/" 2>>"$LOG_FILE" || die 'não foi possível preservar o storage atual.'
