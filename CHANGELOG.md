@@ -1,5 +1,22 @@
 # Changelog — IA Studio
 
+## v0.11.31 - 2026-10-02 (Restauração: não iniciar sobre banco vazio)
+
+- Corrige a restauração completa que apagava `public` antes de carregar o
+  pacote. Como `pgvector` é uma extensão criada pelo administrador do cluster,
+  a tentativa posterior de recriá-la com o role da aplicação falhava e o trap
+  antigo reiniciava API e worker contra um banco sem tabelas.
+- Backups completos passam a gerar SQL com `--clean --if-exists`; a restauração
+  aplica esse dump in-place, garante `pgvector` como `postgres`, preserva um
+  snapshot local para rollback e só religa PM2 quando o banco estiver
+  recuperável. Em falha, a aplicação fica parada em vez de expor saúde falsa.
+- Restaurações preservam a identidade operacional local (`app-id`, banco,
+  Redis e porta): somente segredos necessários para decifrar dados retornam do
+  pacote. O utilitário de restauração somente de banco recebe a mesma proteção.
+- S4 continua em andamento: a correção está validada estaticamente, mas ainda
+  precisa da prova real de recovery do backup Newnet e de uma restauração normal
+  de pacote novo no host.
+
 ## v0.11.30 - 2026-10-02 (Backup: estado terminal no PostgreSQL)
 
 - Corrige o fechamento de backup no painel: `system_restores.id` é uma coluna

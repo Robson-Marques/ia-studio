@@ -39,8 +39,14 @@ o pacote era criado e a unidade systemd concluía, mas `system_restores` ficava
 `RUNNING`. O diagnóstico transacional identificou o motivo: o id físico da
 tabela é `text` e o writer aplicava `::uuid`. A correção versionada remove esse
 cast e deixa falha de persistência visível. O backup na `v0.11.30` chegou a
-`SUCCESS`, com logs e arquivo persistidos; S2 foi concluído. S4 segue pendente
-somente pela prova controlada de restauração isolada.
+`SUCCESS`, com logs e arquivo persistidos; S2 foi concluído. A primeira
+restauração revelou uma regressão operacional: o script removia `public`, perdia
+`pgvector`, abortava antes de aplicar `db.sql` e o trap antigo religava
+API/worker contra banco vazio. A correção `v0.11.31` aplica dumps
+`--clean --if-exists` sem derrubar `public`, garante a extensão pelo
+administrador do cluster, preserva snapshot para rollback e não inicia serviços
+se o banco não estiver recuperável. S4 continua pendente até a recuperação real
+do pacote Newnet e um ciclo novo de backup/restauração verde.
 
 ## Auditoria pós-faxina — 2026-09-30
 

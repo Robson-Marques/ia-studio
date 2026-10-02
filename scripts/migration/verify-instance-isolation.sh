@@ -122,6 +122,15 @@ if rg -n 'system_restores.*::uuid|::uuid.*system_restores' scripts/backup-full.s
 fi
 rg -Fq 'não foi possível persistir o estado do backup' scripts/backup-full.sh \
   || fail 'falha ao persistir estado do backup ainda pode ser silenciosa.'
+rg -Fq 'pg_dump --no-owner --no-privileges --clean --if-exists' scripts/backup-full.sh \
+  || fail 'backup completo não gera dump restaurável in-place com --clean --if-exists.'
+if rg -n 'DROP SCHEMA public' scripts/restore-full.sh scripts/restore-backup.sh; then
+  fail 'restauração derruba public antes de carregar o dump e pode deixar a aplicação sem banco.'
+fi
+rg -Fq 'su -s /bin/sh postgres' scripts/restore-full.sh \
+  || fail 'restore completo não cria pgvector com o administrador do cluster.'
+rg -Fq 'SAFETY: aplicação permanece parada' scripts/restore-full.sh \
+  || fail 'restore completo ainda pode iniciar API contra banco não recuperável.'
 rg -Fq "'systemd-run'" platform-api/src/modules/system/backup.service.ts \
   || fail 'backup do painel não roda fora da árvore do PM2 via systemd-run.'
 rg -Fq "'--operation-id'" platform-api/src/modules/system/backup.service.ts \

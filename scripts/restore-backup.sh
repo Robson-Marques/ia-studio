@@ -27,9 +27,12 @@ acquire_application_lock
 echo "[restore-backup] Parando PM2..."
 pm2 stop "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
 
-echo "[restore-backup] Recriando schema e restaurando o dump..."
-psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;"
+echo "[restore-backup] Garantindo pgvector e restaurando o dump..."
+# A extensão do cluster é criada por postgres, não pelo role da aplicação.
+# Não derrube public aqui: dumps novos usam --clean --if-exists e preservam as
+# extensões; apagar o schema antes do load deixa a aplicação sem banco se o
+# restore falhar.
+su -s /bin/sh postgres -c "psql -v ON_ERROR_STOP=1 -d '$IASTUDIO_DB_NAME' -c 'CREATE EXTENSION IF NOT EXISTS vector;'"
 case "$DUMP" in
   *.gz) gunzip -c "$DUMP" | psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 ;;
   *)    psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -f "$DUMP" ;;

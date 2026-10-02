@@ -113,7 +113,9 @@ OUT="$IASTUDIO_BACKUP_DIR/${NAME:-full-$STAMP}.tar.gz"
 
 append_log 'PREFLIGHT: validando aplicação e diretórios.'
 append_log 'PG_DUMP: exportando banco local.'
-if ! pg_dump "$PSQL_DATABASE_URL" > "$WORK/db.sql" 2>"$WORK/pg_dump.err"; then
+# O restore aplica o dump no banco local sem derrubar o schema public. O próprio
+# dump precisa, portanto, carregar a remoção segura dos objetos anteriores.
+if ! pg_dump --no-owner --no-privileges --clean --if-exists "$PSQL_DATABASE_URL" > "$WORK/db.sql" 2>"$WORK/pg_dump.err"; then
   fail "pg_dump falhou: $(tail -c 500 "$WORK/pg_dump.err")"
 fi
 

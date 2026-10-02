@@ -57,5 +57,11 @@ GitHub atual e o backup `SUCCESS` foi comprovado. Para concluir S4:
 O backup preso em `RUNNING` não é considerado resolvido por esta auditoria. A
 evidência no host confirmou a unidade systemd e o arquivo concluídos, mas
 identificou cast `::uuid` incompatível com o id `text` de `system_restores`.
-A correção foi validada por novo backup em estado terminal. A restauração
-controlada permanece como a única evidência operacional pendente de S4.
+A correção foi validada por novo backup em estado terminal. A primeira
+restauração controlada revelou um defeito adicional: o script eliminava o schema
+`public`, removendo `pgvector`, e tentava recriar a extensão com o role local da
+aplicação. A versão `v0.11.31` remove esse desenho: dumps novos carregam
+`--clean --if-exists`, a extensão é garantida por `postgres`, existe snapshot de
+rollback e PM2 não reinicia se o banco não for recuperável. A recuperação do
+backup existente e um ciclo completo com pacote novo permanecem evidência
+operacional obrigatória de S4.

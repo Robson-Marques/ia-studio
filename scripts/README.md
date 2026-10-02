@@ -13,7 +13,7 @@ banco/role PostgreSQL, Redis, fila, storage, backup, PM2 e vhost próprios.
 | `uninstall-discarded-dev-apps.sh` | Removedor transitório e restrito a `ia-dev` e `ia-teste` do modelo antigo, para reinício limpo do desenvolvimento. |
 | `uninstall-legacy-saas.sh` | Remove o SaaS antigo somente após prévia e confirmação literal; preserva serviços compartilhados do host. |
 | `upgrade.sh` | Atualiza a aplicação dedicada a partir das tags do repositório da própria vertente. |
-| `backup-full.sh` / `restore-full.sh` | Backup e restauração completos da aplicação. |
+| `backup-full.sh` / `restore-full.sh` | Backup e restauração completos da aplicação. O dump usa `--clean --if-exists`; a restauração preserva o schema `public`, garante `pgvector` via administrador do cluster e mantém a aplicação parada se não conseguir recuperar o banco. |
 | `migration/export-isp-operational-data.sh` | Exportação seletiva e somente leitura da base histórica. |
 | `migration/backup-saas-historical.sh` / `verify-saas-historical-backup.sh` | Snapshot verificável da fonte SaaS, exclusivo para rollback e nunca restaurável no dedicado. |
 | `migration/verify-isp-operational-export.sh` | Valida backup, manifesto, checksums, NDJSON e ausência de chaves sensíveis antes da revisão para importação. |
