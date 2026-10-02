@@ -135,6 +135,8 @@ rg -Fq 'DROP SCHEMA IF EXISTS iastudio_meta CASCADE' scripts/restore-full.sh \
   || fail 'restore não prepara o bookkeeping iastudio_meta para backups legados sem --clean.'
 rg -Fq 'PREVIOUS_DATABASE_READY' scripts/restore-full.sh \
   || fail 'restore pode reiniciar serviço após rollback para banco que já estava indisponível.'
+rg -Fq 'close_snapshot_operations' scripts/restore-full.sh \
+  || fail 'restore pode ressuscitar operações RUNNING que foram capturadas dentro do próprio backup.'
 rg -Fq 'SAFETY: aplicação permanece parada' scripts/restore-full.sh \
   || fail 'restore completo ainda pode iniciar API contra banco não recuperável.'
 rg -Fq "'systemd-run'" platform-api/src/modules/system/backup.service.ts \

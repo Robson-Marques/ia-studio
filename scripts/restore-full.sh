@@ -72,6 +72,20 @@ ensure_operation_row() {
     >/dev/null || return 1
 }
 
+close_snapshot_operations() {
+  # Um backup captura system_restores antes de o próprio backup conseguir
+  # marcar sua row como SUCCESS. Ao restaurar esse snapshot, tais rows voltam
+  # como RUNNING, embora suas unidades systemd já tenham terminado. Elas não
+  # são operações reais da aplicação restaurada e bloqueariam a tela para
+  # sempre; encerre-as explicitamente, preservando o motivo para auditoria.
+  local current_id escaped_current
+  current_id="$RESTORE_ID"
+  escaped_current="$(sql_escape "$current_id")"
+  psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c \
+    "UPDATE system_restores SET status='FAILED', error=COALESCE(error, 'Operação herdada do snapshot de backup; encerrada pela restauração.'), finished_at=COALESCE(finished_at, now()) WHERE status='RUNNING' AND id <> '$escaped_current';" \
+    >/dev/null
+}
+
 finish_operation() {
   [ -n "$RESTORE_ID" ] || return 0
   local status="$1" error="${2:-}" escaped
@@ -196,6 +210,9 @@ DATABASE_READY=1
 
 if ! ensure_operation_row; then
   fail_after_stop 'banco restaurado, mas não foi possível recriar o registro da operação administrativa.'
+fi
+if ! close_snapshot_operations; then
+  fail_after_stop 'banco restaurado, mas não foi possível encerrar operações herdadas do snapshot.'
 fi
 append_operation_log 'DB_RESTORE: banco restaurado com sucesso.'
 

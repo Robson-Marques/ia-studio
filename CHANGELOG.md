@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.11.34 - 2026-10-02 (Restauração: operações do snapshot)
+
+- Encerra como `FAILED` — com justificativa auditável — as operações que o
+  próprio backup capturou em `RUNNING` antes de registrar seu resultado final.
+  Ao restaurar, elas não voltam mais como falso bloqueio no painel local.
+
 ## v0.11.33 - 2026-10-02 (Recovery de backup anterior a `--clean`)
 
 - Permite recuperar o pacote Newnet criado antes de `v0.11.32`: remove somente

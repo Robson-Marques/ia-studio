@@ -51,6 +51,12 @@ se o banco não estiver recuperável. O primeiro recovery do pacote anterior a
 prévio também não tinha `core_users`. S4 continua pendente até a recuperação
 real do pacote Newnet e um ciclo novo de backup/restauração verde.
 
+Atualização `v0.11.34`: a restauração do pacote Newnet foi comprovada no host
+(`core_users|1`, PM2 e healthcheck verdes). O backup capturou sua própria row
+antes de fechá-la, e por isso a restauração trouxe uma operação `RUNNING` já
+concluída. O restore agora encerra essas rows herdadas como `FAILED`, com motivo
+auditável; a reconciliação única da row já presente no host ainda é necessária.
+
 ## Auditoria pós-faxina — 2026-09-30
 
 Os gates de S1, S2 operacional, S3, S4 estático e removedor SaaS passaram com
