@@ -60,7 +60,7 @@ identificou cast `::uuid` incompatível com o id `text` de `system_restores`.
 A correção foi validada por novo backup em estado terminal. A primeira
 restauração controlada revelou um defeito adicional: o script eliminava o schema
 `public`, removendo `pgvector`, e tentava recriar a extensão com o role local da
-aplicação. A versão `v0.11.32` remove esse desenho: dumps novos carregam
+aplicação. A versão `v0.11.33` remove esse desenho: dumps novos carregam
 `--clean --if-exists`, a extensão é garantida por `postgres`, existe snapshot de
 rollback e PM2 não reinicia se o banco não for recuperável. A recuperação do
 backup existente e um ciclo completo com pacote novo permanecem evidência

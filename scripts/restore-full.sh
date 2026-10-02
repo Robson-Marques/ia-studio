@@ -23,6 +23,7 @@ PSQL_DATABASE_URL=''
 LOG_FILE=''
 DATABASE_READY=0
 SERVICES_STOPPED=0
+PREVIOUS_DATABASE_READY=0
 
 die() { echo "ERRO: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die 'execute a restauração como root.'
@@ -94,13 +95,28 @@ strip_vector_ddl() {
   sed -i -E '/^(DROP EXTENSION( IF EXISTS)?|CREATE EXTENSION IF NOT EXISTS|COMMENT ON EXTENSION) vector([ ;]|$)/d' "$1"
 }
 
+prepare_restore_target() {
+  # iastudio_meta é bookkeeping de provisionamento, fora de public. Backups
+  # anteriores ao --clean podem trazê-lo como CREATE SCHEMA e abortariam se o
+  # alvo mantivesse a cópia do provisionamento. Ele pertence exclusivamente a
+  # esta base dedicada e será recriado pelo dump, quando presente.
+  psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'DROP SCHEMA IF EXISTS iastudio_meta CASCADE;' \
+    >>"$LOG_FILE" 2>&1
+}
+
 restore_previous_state() {
   log 'ROLLBACK: restaurando o estado local anterior após falha.'
   ensure_vector_extension || log 'ROLLBACK WARN: não foi possível garantir pgvector.'
   if [ -f "$WORK/pre-restore.sql" ]; then
-    psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$WORK/pre-restore.sql" >>"$LOG_FILE" 2>&1 \
-      && DATABASE_READY=1 \
-      || log 'ROLLBACK ERROR: não foi possível restaurar o banco anterior.'
+    if psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$WORK/pre-restore.sql" >>"$LOG_FILE" 2>&1; then
+      if [ "$PREVIOUS_DATABASE_READY" -eq 1 ]; then
+        DATABASE_READY=1
+      else
+        log 'ROLLBACK: snapshot anterior não tinha core_users; serviços permanecerão parados.'
+      fi
+    else
+      log 'ROLLBACK ERROR: não foi possível restaurar o banco anterior.'
+    fi
   fi
   if [ -d "$WORK/pre-restore-storage" ]; then
     rm -rf "${STORAGE_DIR:?}"/* 2>/dev/null || true
@@ -156,6 +172,9 @@ if ! pg_dump --no-owner --no-privileges --clean --if-exists "$PSQL_DATABASE_URL"
   die 'não foi possível criar snapshot do banco atual; restauração cancelada.'
 fi
 strip_vector_ddl "$WORK/pre-restore.sql"
+if psql "$PSQL_DATABASE_URL" -X -Atqc "SELECT to_regclass('public.core_users') IS NOT NULL;" 2>>"$LOG_FILE" | grep -qx 't'; then
+  PREVIOUS_DATABASE_READY=1
+fi
 if [ -d "$STORAGE_DIR" ]; then
   mkdir -p "$WORK/pre-restore-storage"
   cp -a "$STORAGE_DIR/." "$WORK/pre-restore-storage/" 2>>"$LOG_FILE" || die 'não foi possível preservar o storage atual.'
@@ -167,6 +186,8 @@ SERVICES_STOPPED=1
 
 log 'DB_RESTORE: garantindo extensão pgvector no cluster.'
 ensure_vector_extension || fail_after_stop 'não foi possível garantir a extensão pgvector antes da restauração.'
+log 'DB_RESTORE: removendo somente o bookkeeping local anterior ao carregamento.'
+prepare_restore_target || fail_after_stop 'não foi possível preparar o bookkeeping local para a restauração.'
 log 'DB_RESTORE: aplicando dump sem apagar o schema public.'
 if ! psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$WORK/db.sql" >>"$LOG_FILE" 2>&1; then
   fail_after_stop 'psql não conseguiu aplicar o dump; o estado anterior foi restaurado quando possível.'

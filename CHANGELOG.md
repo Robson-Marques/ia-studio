@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.11.33 - 2026-10-02 (Recovery de backup anterior a `--clean`)
+
+- Permite recuperar o pacote Newnet criado antes de `v0.11.32`: remove somente
+  o schema técnico `iastudio_meta` do alvo antes de o dump antigo recriá-lo.
+  Não toca em `public` e não muda recursos de outras aplicações do host.
+- O rollback só religa PM2 se o banco anterior já tinha `core_users`. Um banco
+  vazio que não pôde ser restaurado deixa o Newnet parado, em vez de produzir
+  healthcheck enganoso.
+
 ## v0.11.32 - 2026-10-02 (Restauração: pgvector pertence ao cluster)
 
 - Impede que `db.sql` de um pacote tente executar `DROP`/`CREATE`/`COMMENT` de

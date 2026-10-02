@@ -131,6 +131,10 @@ rg -Fq 'su -s /bin/sh postgres' scripts/restore-full.sh \
   || fail 'restore completo não cria pgvector com o administrador do cluster.'
 rg -Fq 'strip_vector_ddl' scripts/restore-full.sh \
   || fail 'restore completo pode reaplicar DDL de pgvector com o role da aplicação.'
+rg -Fq 'DROP SCHEMA IF EXISTS iastudio_meta CASCADE' scripts/restore-full.sh \
+  || fail 'restore não prepara o bookkeeping iastudio_meta para backups legados sem --clean.'
+rg -Fq 'PREVIOUS_DATABASE_READY' scripts/restore-full.sh \
+  || fail 'restore pode reiniciar serviço após rollback para banco que já estava indisponível.'
 rg -Fq 'SAFETY: aplicação permanece parada' scripts/restore-full.sh \
   || fail 'restore completo ainda pode iniciar API contra banco não recuperável.'
 rg -Fq "'systemd-run'" platform-api/src/modules/system/backup.service.ts \

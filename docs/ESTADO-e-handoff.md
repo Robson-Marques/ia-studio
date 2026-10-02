@@ -45,8 +45,11 @@ restauração revelou uma regressão operacional: o script removia `public`, per
 API/worker contra banco vazio. A correção `v0.11.32` aplica dumps
 `--clean --if-exists` sem derrubar `public`, garante a extensão pelo
 administrador do cluster, preserva snapshot para rollback e não inicia serviços
-se o banco não estiver recuperável. S4 continua pendente até a recuperação real
-do pacote Newnet e um ciclo novo de backup/restauração verde.
+se o banco não estiver recuperável. O primeiro recovery do pacote anterior a
+`--clean` parou corretamente no schema técnico `iastudio_meta` já existente;
+`v0.11.33` prepara somente esse bookkeeping e não religa PM2 quando o snapshot
+prévio também não tinha `core_users`. S4 continua pendente até a recuperação
+real do pacote Newnet e um ciclo novo de backup/restauração verde.
 
 ## Auditoria pós-faxina — 2026-09-30
 
