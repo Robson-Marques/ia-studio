@@ -14,7 +14,7 @@ recursos de host não colidiam. Elas não representam o modelo de produto e não
 serão mantidas como clientes fictícios. O modelo aprovado é:
 
 ```text
-IA Studio base → repositório da vertente → /opt/<app-id>
+estrutura-base IA Studio → repositório da vertente → /opt/<app-id>
 ```
 
 Uma vertente futura de loja, por exemplo, recebe seu próprio repositório e só os
@@ -45,18 +45,17 @@ Nest/Vite segue obrigatório no host, que contém Node e o registry privado.
 
 ## Go / No-Go para o host
 
-**GO para criar a tag da base corrigida.** Antes de instalar Newnet do zero:
+**Evidência parcial aprovada.** A Newnet já foi instalada do zero na fonte
+GitHub atual e o backup `SUCCESS` foi comprovado. Para concluir S4:
 
-1. criar/publicar o repositório da vertente Newnet a partir da tag da base;
-2. executar `uninstall-discarded-dev-apps.sh` em prévia e, então, com a
-   confirmação literal `RESET-IASTUDIO-DEV`; ele só aceita `ia-dev` e
-   `ia-teste`;
-3. instalar a vertente Newnet em `/opt/<app-id>`;
-4. validar seus processos, banco, Redis, domínio e backup sem efeito em Finanças,
-   Mercado e demais produtos reais do host.
+1. manter o backup concluído disponível para a prova;
+2. executar uma restauração controlada somente quando a janela operacional for
+   aprovada, pois ela reinicia os processos Newnet;
+3. validar que a restauração afeta apenas Newnet e preserva Ctrl Leads, Finanças
+   e demais produtos reais do host.
 
 O backup preso em `RUNNING` não é considerado resolvido por esta auditoria. A
 evidência no host confirmou a unidade systemd e o arquivo concluídos, mas
 identificou cast `::uuid` incompatível com o id `text` de `system_restores`.
-A correção deve ser validada por um novo backup em estado terminal antes de
-concluir S4; recriar o ambiente não substitui essa evidência.
+A correção foi validada por novo backup em estado terminal. A restauração
+controlada permanece como a única evidência operacional pendente de S4.

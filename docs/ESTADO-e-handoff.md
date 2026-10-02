@@ -15,14 +15,15 @@ O modelo anterior de “duas instâncias do mesmo checkout” foi corrigido. A p
 com `ia-dev` e `ia-teste` demonstrou isolamento de recursos, mas essas instalações
 são descartáveis e não representam clientes. O destino agora é:
 
-- IA Studio permanece a estrutura-base;
-- Newnet ISP nasce em repositório/vertente próprio;
+- IA Studio permanece a estrutura-base conceitual;
+- este repositório GitHub atual é a implementação Newnet ISP e sua fonte de
+  instalação neste momento;
 - uma futura loja ou outro cliente nasce em outro repositório/vertente, com os
   módulos pertinentes a seu negócio;
 - o host somente coabita aplicações independentes, cada uma em `/opt/<app-id>`
   e com banco, Redis, PM2, domínio, storage e backup próprios.
 
-S1 segue 100%; S2, S4 e a Capability geral seguem `in-progress`. S4 foi
+S1 e S2 estão 100% concluídos; S4 e a Capability geral seguem `in-progress`. S4 foi
 redefinido para provar instalação limpa da vertente Newnet e coexistência sem
 cruzamento com Finanças, Mercado e os demais produtos reais do host — não exige
 manter uma segunda cópia idêntica do IA Studio. A remoção de `ia-dev` e
@@ -37,8 +38,9 @@ Leads e Finanças permaneceram online. A primeira prova de backup confirmou que
 o pacote era criado e a unidade systemd concluía, mas `system_restores` ficava
 `RUNNING`. O diagnóstico transacional identificou o motivo: o id físico da
 tabela é `text` e o writer aplicava `::uuid`. A correção versionada remove esse
-cast e deixa falha de persistência visível; S2/S4 continuam `in-progress` até o
-backup da versão corrigida chegar a estado terminal no host.
+cast e deixa falha de persistência visível. O backup na `v0.11.30` chegou a
+`SUCCESS`, com logs e arquivo persistidos; S2 foi concluído. S4 segue pendente
+somente pela prova controlada de restauração isolada.
 
 ## Auditoria pós-faxina — 2026-09-30
 
