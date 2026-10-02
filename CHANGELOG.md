@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.11.30 - 2026-10-02 (Backup: estado terminal no PostgreSQL)
+
+- Corrige o fechamento de backup no painel: `system_restores.id` é uma coluna
+  `text` no PostgreSQL, mas o script e o repositório a comparavam com cast
+  `::uuid`. O arquivo era criado, porém os logs e o estado terminal falhavam
+  silenciosamente, deixando a operação em `RUNNING`.
+- Remove o cast incorreto no script e no repositório e torna erro de
+  persistência visível no journal da unidade systemd, em vez de descartá-lo.
+- O gate S4 agora recusa o cast incompatível. A confirmação operacional desta
+  correção ainda exige gerar um backup após atualizar a aplicação Newnet.
+
 ## v0.11.29 - 2026-10-02 (Vertentes próprias e coabitação de aplicações)
 
 - Corrige o contrato de implantação: IA Studio é a estrutura-base e cada

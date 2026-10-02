@@ -117,6 +117,11 @@ rg -Fq -- '--operation-id' scripts/backup-full.sh \
   || fail 'backup dedicado não aceita o id da operação para auto-reportar estado.'
 rg -Fq 'trap finalize EXIT' scripts/backup-full.sh \
   || fail 'backup dedicado não possui proteção de estado terminal no EXIT.'
+if rg -n 'system_restores.*::uuid|::uuid.*system_restores' scripts/backup-full.sh platform-api/src/modules/system; then
+  fail 'operação administrativa faz cast uuid em id text de system_restores e pode ficar RUNNING.'
+fi
+rg -Fq 'não foi possível persistir o estado do backup' scripts/backup-full.sh \
+  || fail 'falha ao persistir estado do backup ainda pode ser silenciosa.'
 rg -Fq "'systemd-run'" platform-api/src/modules/system/backup.service.ts \
   || fail 'backup do painel não roda fora da árvore do PM2 via systemd-run.'
 rg -Fq "'--operation-id'" platform-api/src/modules/system/backup.service.ts \

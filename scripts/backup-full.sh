@@ -57,14 +57,24 @@ FAILURE='Backup interrompido antes de concluir.'
 
 sql_escape() { printf '%s' "$1" | sed "s/'/''/g"; }
 
+persist_operation() {
+  # system_restores.id é String/UUID no Prisma, mas é uma coluna text no
+  # PostgreSQL. Nunca faça cast para uuid nesta fronteira. Um erro de escrita
+  # precisa chegar ao journal/systemd: silenciá-lo deixaria o arquivo criado e
+  # a operação eternamente RUNNING no painel.
+  psql "$PSQL_DATABASE_URL" -v ON_ERROR_STOP=1 -c "$1" >/dev/null || {
+    echo 'ERRO: não foi possível persistir o estado do backup em system_restores.' >&2
+    return 1
+  }
+}
+
 append_log() {
   [ -n "$OPERATION_ID" ] || return 0
   local message escaped
   message="$(date -u +%H:%M:%S) $1"
   escaped="$(sql_escape "$message")"
-  psql "$PSQL_DATABASE_URL" -v ON_ERROR_STOP=1 -c \
-    "UPDATE system_restores SET log_lines = array_append(log_lines, '$escaped') WHERE id = '$OPERATION_ID'::uuid AND status = 'RUNNING';" \
-    >/dev/null 2>&1 || true
+  persist_operation \
+    "UPDATE system_restores SET log_lines = array_append(log_lines, '$escaped') WHERE id = '$OPERATION_ID' AND status = 'RUNNING';"
 }
 
 finish_operation() {
@@ -72,9 +82,8 @@ finish_operation() {
   local status="$1" error="${2:-}" file="${3:-}" escaped_error escaped_file
   escaped_error="$(sql_escape "$error")"
   escaped_file="$(sql_escape "$file")"
-  psql "$PSQL_DATABASE_URL" -v ON_ERROR_STOP=1 -c \
-    "UPDATE system_restores SET status = '$status', file_name = NULLIF('$escaped_file', ''), error = NULLIF('$escaped_error', ''), finished_at = now() WHERE id = '$OPERATION_ID'::uuid AND status = 'RUNNING';" \
-    >/dev/null 2>&1 || true
+  persist_operation \
+    "UPDATE system_restores SET status = '$status', file_name = NULLIF('$escaped_file', ''), error = NULLIF('$escaped_error', ''), finished_at = now() WHERE id = '$OPERATION_ID' AND status = 'RUNNING';"
 }
 
 finalize() {

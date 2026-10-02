@@ -102,6 +102,6 @@ export class SystemRepository {
     return this.prisma.$executeRaw`
       UPDATE system_restores
       SET log_lines = array_append(log_lines, ${line})
-      WHERE id = ${id}::uuid`;
+      WHERE id = ${id}`;
   }
 }

@@ -56,5 +56,7 @@ Nest/Vite segue obrigatório no host, que contém Node e o registry privado.
    Mercado e demais produtos reais do host.
 
 O backup preso em `RUNNING` não é considerado resolvido por esta auditoria. A
-correção exige logs da unidade systemd e da linha `system_restores` do host antes
-de mudar o código; recriar o ambiente não substitui essa evidência.
+evidência no host confirmou a unidade systemd e o arquivo concluídos, mas
+identificou cast `::uuid` incompatível com o id `text` de `system_restores`.
+A correção deve ser validada por um novo backup em estado terminal antes de
+concluir S4; recriar o ambiente não substitui essa evidência.

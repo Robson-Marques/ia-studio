@@ -31,6 +31,15 @@ tag que materializa este contrato. O backup que criou arquivo e permaneceu em
 `RUNNING` ainda exige evidência de log do host; reinstalação não substitui esse
 diagnóstico nem marca S4 como concluído.
 
+Atualização de 2026-10-02: a vertente Newnet foi instalada limpa em
+`/opt/newnet-ia-studio`, com banco/role, Redis, PM2, Nginx e HTTPS próprios; Ctrl
+Leads e Finanças permaneceram online. A primeira prova de backup confirmou que
+o pacote era criado e a unidade systemd concluía, mas `system_restores` ficava
+`RUNNING`. O diagnóstico transacional identificou o motivo: o id físico da
+tabela é `text` e o writer aplicava `::uuid`. A correção versionada remove esse
+cast e deixa falha de persistência visível; S2/S4 continuam `in-progress` até o
+backup da versão corrigida chegar a estado terminal no host.
+
 ## Auditoria pós-faxina — 2026-09-30
 
 Os gates de S1, S2 operacional, S3, S4 estático e removedor SaaS passaram com
