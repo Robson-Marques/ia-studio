@@ -1,6 +1,6 @@
 # Módulo `system/` — Atualização, Backup e Restauração (Fase 8)
 
-Infra **local da instância** (sem tenant). Todas as rotas são exclusivas da
+Infra **local da aplicação** (sem tenant). Todas as rotas são exclusivas da
 administração local (`system.maintain` + `@Controller('system')`). Os serviços
 disparam os scripts de `scripts/` via unidade transiente do `systemd`; o próprio
 script grava log e estado terminal na row local, sem depender de callback em
@@ -50,6 +50,6 @@ memória do processo API.
 
 ## Envs
 
-`IASTUDIO_INSTANCE_ID`, `IASTUDIO_SCRIPTS_DIR`, `IASTUDIO_BACKUP_DIR`,
+`IASTUDIO_APP_ID`, `IASTUDIO_SCRIPTS_DIR`, `IASTUDIO_BACKUP_DIR`,
 `IASTUDIO_APP_DIR`, `IASTUDIO_PM2_API` e `IASTUDIO_PM2_WORKER` são definidos
 pela instalação. Não há caminho, processo ou backup global de fallback.

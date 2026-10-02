@@ -2,17 +2,12 @@
 # ============================================================
 # IA Studio - upgrade.sh v1.0
 # Aplica um upgrade de versao (git tag) com backup automatico, build e restart.
-# Roda como ROOT no diretório exclusivo da instância.
+# Roda como ROOT no diretório exclusivo da aplicação da vertente.
 #
 # Disparado pelo painel local de Administração da instalação (spawn detached), que ja criou
 # a row em system_upgrades (status=RUNNING) e chama com args POSICIONAIS:
 #     bash scripts/upgrade.sh <tag> <upgrade_id>
 # (também aceita --to / --upgrade-id / --repo-path para uso manual).
-#
-# A primeira conversão de uma checkout SaaS de desenvolvimento NÃO usa este
-# fluxo normal: use --bootstrap-dedicated. Ele lê uma tag no checkout histórico
-# e cria uma instância dedicada limpa ao lado, sem alterar banco, código ou
-# processos do legado.
 #
 # Cada fase grava UMA linha em system_upgrades.log_lines (String[]) via psql
 # array_append — o front faz polling a cada 2s. Falha em qualquer fase:
@@ -39,34 +34,19 @@ fi
 # ---------- ARGS (posicionais OU flags) ----------
 SCRIPT_DIR="${IASTUDIO_UPGRADE_SOURCE_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"; DO_RESTART=1
-BOOTSTRAP_DEDICATED=0
-BOOTSTRAP_ARGS=()
 usage() {
   cat <<'EOF'
-Uso normal (somente instância já dedicada):
-  bash scripts/upgrade.sh --to <tag> --upgrade-id <uuid> [--repo-path <instância>]
-
-Bootstrap da primeira instância dedicada a partir de um checkout SaaS de desenvolvimento:
-  bash scripts/upgrade.sh --bootstrap-dedicated --to <tag> [--repo-path <checkout-legado>] \
-    --instance-id <id> --domain <domínio> --admin-email <email> --admin-password <senha> \
-    --redis-db <0-15> --gitlab-token <token> [--admin-name <nome>] [--email <ssl>] [--no-ssl] [--install-deps]
-
-O bootstrap não usa nem altera o banco, código ou processos SaaS legados. Ele
-clona a tag no diretório da nova instância e cria banco e recursos limpos.
+Uso normal (somente aplicação já instalada):
+  bash scripts/upgrade.sh --to <tag> --upgrade-id <uuid> [--repo-path <aplicação>]
 EOF
 }
 POS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --bootstrap-dedicated) BOOTSTRAP_DEDICATED=1; shift ;;
     --to)          TO_VERSION="$2"; shift 2 ;;
     --upgrade-id)  UPGRADE_ID="$2"; shift 2 ;;
     --repo-path)   REPO_PATH="$2"; shift 2 ;;
     --no-restart)  DO_RESTART=0; shift ;;
-    --instance-id|--domain|--admin-email|--admin-password|--admin-name|--redis-db|--email|--gitlab-token)
-                   BOOTSTRAP_ARGS+=("$1" "${2:?valor ausente}"); shift 2 ;;
-    --no-ssl|--install-deps)
-                   BOOTSTRAP_ARGS+=("$1"); shift ;;
     -h|--help)     usage; exit 0 ;;
     *)             POS+=("$1"); shift ;;
   esac
@@ -75,23 +55,6 @@ done
 [ -z "${UPGRADE_ID}" ] && [ "${#POS[@]}" -ge 2 ] && UPGRADE_ID="${POS[1]}"
 
 [ ! -d "$REPO_PATH" ] && echo "ERRO: repo nao encontrado: $REPO_PATH" && exit 1
-
-if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then
-  [ -z "$TO_VERSION" ] && { echo "ERRO: tag obrigatória para --bootstrap-dedicated" >&2; exit 1; }
-  [ "${#POS[@]}" -eq 0 ] || { echo "ERRO: argumentos posicionais não são aceitos no bootstrap." >&2; exit 1; }
-  [ "${#BOOTSTRAP_ARGS[@]}" -gt 0 ] || { echo "ERRO: parâmetros da nova instância são obrigatórios." >&2; usage >&2; exit 1; }
-  git -C "$REPO_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
-    || { echo "ERRO: repo-path não é um checkout git." >&2; exit 1; }
-  [ -z "$(git -C "$REPO_PATH" status --porcelain --untracked-files=no)" ] \
-    || { echo "ERRO: checkout-fonte tem alterações versionadas; faça commit/stash antes do bootstrap." >&2; exit 1; }
-  git -C "$REPO_PATH" fetch --tags origin
-  git -C "$REPO_PATH" rev-parse --verify "refs/tags/${TO_VERSION}^{commit}" >/dev/null \
-    || { echo "ERRO: tag/revisão não encontrada: $TO_VERSION" >&2; exit 1; }
-  # SCRIPT_DIR pertence ao checkout que contém este bootstrap. Assim ele pode
-  # ser um clone novo na tag, enquanto REPO_PATH permanece apenas como fonte
-  # histórica — sem alterar o código da instalação antiga.
-  exec bash "$SCRIPT_DIR/install-dedicated.sh" --source-dir "$REPO_PATH" --source-revision "$TO_VERSION" "${BOOTSTRAP_ARGS[@]}"
-fi
 
 [ -z "$TO_VERSION" ]  && echo "ERRO: versao (tag) obrigatoria" && exit 1
 [ -z "$UPGRADE_ID" ]  && echo "ERRO: upgrade-id obrigatorio" && exit 1
@@ -115,19 +78,19 @@ set -a
 source "$ENV_FILE"
 set +a
 
-: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância. Para criar a primeira instância dedicada, use --bootstrap-dedicated.}"
-: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da instância}"
-: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da instância}"
-BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da instância}"
+: "${IASTUDIO_APP_ID:?IASTUDIO_APP_ID ausente no .env da aplicação. Instalações novas usam scripts/install.sh --app-id.}"
+: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da aplicação}"
+: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da aplicação}"
+BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da aplicação}"
 mkdir -p "$BACKUP_DIR"
 
-# Serializa upgrades/restore/provision da mesma instalação. Não há lock global:
-# instâncias distintas podem operar sem compartilhar processo, banco ou backup.
+# Serializa upgrades/restore/provision da mesma aplicação. Não há lock global:
+# aplicações distintas podem operar sem compartilhar processo, banco ou backup.
 # shellcheck disable=SC1091
 . "$REPO_PATH/scripts/lib/instance.sh"
-set_instance "$IASTUDIO_INSTANCE_ID"
-[ "$IASTUDIO_APP_DIR" = "$REPO_PATH" ] || { echo 'ERRO: .env não pertence ao repo da instância.' >&2; exit 1; }
-acquire_instance_lock
+set_application "$IASTUDIO_APP_ID"
+[ "$IASTUDIO_APP_DIR" = "$REPO_PATH" ] || { echo 'ERRO: .env não pertence ao repo da aplicação.' >&2; exit 1; }
+acquire_application_lock
 
 # pm2 spawn herda NODE_ENV=production -> npm pula devDependencies (tsc/vite
 # quebram). Forcamos development pro build ter @types/* e as ferramentas.
@@ -259,7 +222,7 @@ build_front() {
   VITE_API_URL="$api_url" npm run build -- --base="$base" 2>/tmp/iastudio_build.err >/dev/null || mark_failed "$step" "vite build falhou: $(tail -c 800 /tmp/iastudio_build.err)"
 }
 
-# Painel e API vivem no domínio exclusivo da instância dedicada.
+# Painel e API vivem no domínio exclusivo da aplicação dedicada.
 ADMIN_API="/api/v1"; ADMIN_BASE="/"
 
 # ---------- 8-9) ADMIN ----------

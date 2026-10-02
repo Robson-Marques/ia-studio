@@ -1,10 +1,10 @@
-// PM2 — definição dos processos de uma instância dedicada IA Studio.
+// PM2 — definição dos processos de uma aplicação dedicada IA Studio.
 // Dois apps (modo fork):
-//   * <instância>-api    → API HTTP (NestJS + Fastify).
-//   * <instância>-worker → workers BullMQ em processo separado (diretriz 33):
+//   * <aplicação>-api    → API HTTP (NestJS + Fastify).
+//   * <aplicação>-worker → workers BullMQ em processo separado (diretriz 33):
 //                       estado em Redis/Postgres, nunca em memoria do processo.
 //
-// O cwd e os nomes vêm do ambiente da instância. As variáveis vêm do
+// O cwd e os nomes vêm do ambiente da aplicação. As variáveis vêm do
 // arquivo .env (carregado por dotenv/config no bootstrap) — aqui declaramos
 // apenas o minimo que diferencia cada processo. `pm2 start ecosystem.config.js`
 // (ou `pm2 reload`) re-le este arquivo; o restore usa `pm2 delete + start` pra

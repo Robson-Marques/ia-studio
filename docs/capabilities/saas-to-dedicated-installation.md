@@ -2,7 +2,7 @@
 schema: prompt-framework/v1
 id: ia-studio.capability.saas-to-dedicated-installation
 kind: capability
-version: 1.0.0
+version: 1.1.0
 status: in-progress
 title: Conversão de SaaS para instalação dedicada
 policy_refs:
@@ -18,10 +18,11 @@ owners:
 
 ## Objetivo e fronteira
 
-Entregar o IA Studio como aplicação dedicada por cliente: sem multi-tenancy,
-Console SaaS ou comercialização/gestão compartilhada. Uma instância pode coexistir
-com outras no mesmo host, mas é independente em aplicação, processo, banco, dados,
-configuração, armazenamento, fila, backup e domínio.
+Entregar o IA Studio como estrutura-base para vertentes dedicadas por cliente:
+sem multi-tenancy, Console SaaS ou comercialização/gestão compartilhada. Cada
+cliente recebe um repositório e aplicação próprios; aplicações de vertentes
+distintas podem coexistir no mesmo host, mas são independentes em processo,
+banco, dados, configuração, armazenamento, fila, backup e domínio.
 
 Esta Capability transforma a estrutura-base. Ela não cria automaticamente uma
 vertente de negócio; ISP/IXC será Capability dependente.
@@ -31,8 +32,8 @@ vertente de negócio; ISP/IXC será Capability dependente.
 | Elemento | Definição |
 |---|---|
 | Atores | Administrador local, usuários com perfis locais e administrador de infraestrutura. |
-| Entradas | Credenciais/permissões/configurações locais, integrações da instância e identificador explícito de instância nos scripts. |
-| Saídas | Operação dedicada e ciclo independente de instalação, upgrade, backup, restore e uninstall. |
+| Entradas | Credenciais/permissões/configurações locais, integrações da aplicação e `app-id` explícito nos scripts. |
+| Saídas | Operação dedicada e ciclo independente de instalação, upgrade, backup, restore e uninstall da vertente. |
 | Não há | Ator de plataforma, organização/tenant, workspace/ambiente, plano, licença, trial, cobrança, consumo comercial, Console ou roteamento por tenant. |
 
 ## Estado alvo e fluxos
@@ -41,11 +42,11 @@ O estado é `in-progress`: Recovery, RFC e contrato estão concluídos; a conver
 ainda não. Só passa a `structurally-complete` quando os itens obrigatórios
 existirem e a `accepted` após Capability Acceptance integrada.
 
-**Uso local:** usuário → JWT local → ACL → rota; registros pertencem à instância;
+**Uso local:** usuário → JWT local → ACL → rota; registros pertencem à aplicação;
 eventos/jobs conservam trace e idempotência sem tenant.
 
-**Infraestrutura:** ID de instância validado → recursos exclusivos resolvidos →
-install/upgrade/backup/restore/uninstall dessa instância. Falha de A não afeta B.
+**Infraestrutura:** `app-id` validado → recursos exclusivos resolvidos →
+install/upgrade/backup/restore/uninstall dessa aplicação. Falha de A não afeta B.
 
 ## Dados, contratos e dependências
 
@@ -65,7 +66,7 @@ install/upgrade/backup/restore/uninstall dessa instância. Falha de A não afeta
 
 - Segredos permanecem cifrados e não retornam decifrados por API.
 - Toda mutation sensível continua ACL + auditoria; auditoria passa a ser local.
-- Logs, filas, backups e artefatos usam identificadores exclusivos por instância;
+- Logs, filas, backups e artefatos usam identificadores exclusivos por aplicação;
   falhas são explícitas, nunca caem em recurso global/padrão.
 - Scripts validam o identificador antes de compor caminho, processo, banco ou vhost.
 
@@ -75,9 +76,9 @@ install/upgrade/backup/restore/uninstall dessa instância. Falha de A não afeta
 |---|---|---|---|
 | S0 — Recovery e contrato | Baseline, Capability Map, RFC e contrato local | decisão do produto | concluído neste slice |
 | S1 — núcleo dedicado | Modelo de dados alvo, exportação seletiva controlada, auth/ACL/eventos locais e retirada do tenant context | política de dados decidida | concluído — gate transversal 100%, sem bloqueantes nas cinco camadas |
-| S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | em andamento — corte de código aprovado pelo gate local e migração de dados não aplicável (`migrations/s2-dev-data-disposition.md`); permanece in-progress até a prova de instalação limpa da primeira instância dedicada. |
+| S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | em andamento — corte de código aprovado pelo gate local e migração de dados não aplicável (`migrations/s2-dev-data-disposition.md`); permanece in-progress até a prova de instalação limpa da primeira vertente dedicada. |
 | S3 — superfícies dedicadas | Migração de atualização/backup/restauração para a administração local; remoção de Console e UI/rotas/contextos SaaS | S1 | concluído — matriz e gate em `saas-to-dedicated-s3-console-matrix.md` |
-| S4 — instâncias no mesmo host | Install/upgrade/backup/restore/uninstall isolados | S1 e contratos de runtime finais | em andamento — isolamento estático aprovado; a instalação limpa de A e a atualização pelo painel foram comprovadas em host real (`ia-dev`, HTTPS ativo), após corrigir na fonte porta do PostgreSQL, token do registry privado, permissão do web root e o bookkeeping fora do `public`. Falta a prova de B (segunda instância isolada no mesmo host, sem cruzamento). |
+| S4 — coabitação de vertentes no host | Install/upgrade/backup/restore/uninstall isolados por aplicação e repositório | S1 e contratos de runtime finais | em andamento — o isolamento estático anterior foi reorientado: a base não opera uma coleção de cópias iguais. O reset estritamente limitado de `ia-dev`/`ia-teste` está pronto nesta tag; falta publicar a correção, instalar a vertente Newnet limpa e registrar a coexistência sem cruzamento com os demais produtos reais do host. |
 | S5 — Acceptance | Evidência integrada e documentação viva | S1–S4 | pendente |
 
 S1 é o corte estrutural concluído: dados, autenticação, ACL, API e eventos foram
@@ -107,10 +108,10 @@ essa parte é formalmente não aplicável em
 substituída por backup vazio ou schema SaaS reutilizado.
 
 S4 usa `scripts/migration/verify-instance-isolation.sh` como gate estático: ele
-deriva recursos de dois IDs distintos e exige banco/role, Redis, PM2, diretório,
-vhost e lock exclusivos, além de schema inicial `--from-empty` sob advisory
-lock. A prova final ainda requer criar e operar duas instâncias reais no mesmo
-host, sem cruzamento de dados ou processos.
+deriva recursos de duas vertentes distintas e exige banco/role, Redis, PM2,
+diretório, vhost e lock exclusivos, além de schema inicial `--from-empty` sob
+advisory lock. A prova final requer instalar uma vertente limpa e provar que sua
+operação não cruza com os demais produtos reais do host.
 
 ## Critérios de Acceptance
 
@@ -123,9 +124,10 @@ host, sem cruzamento de dados ou processos.
    system e workers funcionam sem `LimitsService`, `UsageService` ou filtros SaaS.
 4. Console, endpoints, guards, builds, dependências e permissões SaaS não existem;
    o painel local não mostra workspace/ambiente ou gestão comercial SaaS.
-5. Duas instâncias são operáveis no mesmo host com bancos/roles, diretórios,
-   storage, Redis, PM2, backups e vhosts distintos; operar A não altera B.
-6. A instância ISP começa em base limpa. Quando existir dado operacional a
+5. Vertentes independentes coexistem no mesmo host com bancos/roles, diretórios,
+   storage, Redis, PM2, backups e vhosts distintos; operar uma não altera outra
+   aplicação do host.
+6. A vertente ISP começa em base limpa. Quando existir dado operacional a
    preservar, há backup verificável, exportação seletiva e importação
    mapeada/auditável, sem perda silenciosa. Para a primeira instalação de
    desenvolvimento, sem clientes nem dados operacionais, a não aplicabilidade
@@ -148,8 +150,8 @@ host, sem cruzamento de dados ou processos.
 | Regra | Dados | API/evento | Interface/infra | Evidência |
 |---|---|---|---|---|
 | Sem tenant | schema sem escopo | JWT/headers/envelope locais | painel sem seletor | schema, contratos e login/job |
-| Um cliente por instalação | configuração/storage locais | sem resolução por organização | identidade local | duas instâncias isoladas |
-| Operação segura | banco/backup exclusivos | scripts validam ID | PM2/Nginx/Redis por instância | operação cruzada sem efeito |
+| Uma vertente por cliente | configuração/storage locais | sem resolução por organização | identidade local | aplicações independentes coexistem |
+| Operação segura | banco/backup exclusivos | scripts validam `app-id` | PM2/Nginx/Redis por aplicação | operação cruzada sem efeito |
 | Funções preservadas | registros locais | serviços sem Limits/Usage | painel funcional | regressão integrada |
 
 ## Política de validação

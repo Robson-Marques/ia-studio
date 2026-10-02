@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Instala uma única instância dedicada, sem Console SaaS e sem recursos globais.
+# Instala uma aplicação dedicada de uma vertente, sem Console SaaS e sem
+# recursos globais compartilhados.
 set -euo pipefail
 umask 077
 [ "$(id -u)" -eq 0 ] || { echo 'ERRO: execute como root.' >&2; exit 2; }
@@ -8,27 +9,28 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/lib/instance.sh"
 
-INSTANCE_ID=''; DOMAIN=''; ADMIN_EMAIL=''; ADMIN_PASSWORD=''; ADMIN_NAME='Administrador da Instalação'
+APP_ID=''; DOMAIN=''; ADMIN_EMAIL=''; ADMIN_PASSWORD=''; ADMIN_NAME='Administrador da Instalação'
 REDIS_DB=''; CERT_EMAIL=''; SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"; SOURCE_REVISION=''; NO_SSL=0; INSTALL_DEPS=0; GITLAB_TOKEN="${GITLAB_PACKAGE_TOKEN:-}"
 usage() {
   cat <<'EOF'
 Uso:
-  bash scripts/install-dedicated.sh --instance-id <cliente> --domain <app.exemplo.com> \
+  bash scripts/install-dedicated.sh --app-id <produto> --domain <app.exemplo.com> \
     --admin-email <email> --admin-password <senha> --redis-db <0-15> [--email <ssl>] \
     --gitlab-token <token> [--source-dir <repo>] --source-revision <tag> [--no-ssl] [--install-deps]
 
 O --gitlab-token (ou a variável GITLAB_PACKAGE_TOKEN) autentica no registry
 privado @studio-ux-ds (git.nivoo.dev.br) e é obrigatório: sem ele o build do
-platform-admin falha com 401. O token é gravado no .env da instância para os
+platform-admin falha com 401. O token é gravado no .env da aplicação para os
 upgrades seguintes.
 
-Cada execução cria diretório, role/banco PostgreSQL, banco Redis, prefixo de
-filas, storage, backup, PM2 e vhost exclusivos. Não há modo keep-db nem demo.
+Cada execução clona a revisão marcada do repositório da vertente em
+`/opt/<app-id>` e cria role/banco PostgreSQL, banco Redis, prefixo de filas,
+storage, backup, PM2 e vhost exclusivos. Não há modo keep-db nem demo.
 EOF
 }
 while (($#)); do
   case "$1" in
-    --instance-id) INSTANCE_ID="${2:?valor ausente}"; shift 2 ;;
+    --app-id) APP_ID="${2:?valor ausente}"; shift 2 ;;
     --domain) DOMAIN="${2:?valor ausente}"; shift 2 ;;
     --admin-email) ADMIN_EMAIL="${2:?valor ausente}"; shift 2 ;;
     --admin-password) ADMIN_PASSWORD="${2:?valor ausente}"; shift 2 ;;
@@ -44,23 +46,23 @@ while (($#)); do
     *) fail_instance "argumento desconhecido: $1" ;;
   esac
 done
-[ -n "$INSTANCE_ID" ] && [ -n "$DOMAIN" ] && [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] && [ -n "$REDIS_DB" ] && [ -n "$SOURCE_REVISION" ] || { usage >&2; exit 2; }
+[ -n "$APP_ID" ] && [ -n "$DOMAIN" ] && [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] && [ -n "$REDIS_DB" ] && [ -n "$SOURCE_REVISION" ] || { usage >&2; exit 2; }
 [ -n "$GITLAB_TOKEN" ] || fail_instance 'token do registry @studio-ux-ds ausente; use --gitlab-token <token> ou defina GITLAB_PACKAGE_TOKEN (sem ele o build do platform-admin falha com 401).'
-set_instance "$INSTANCE_ID"
-acquire_instance_lock
+set_application "$APP_ID"
+acquire_application_lock
 [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || fail_instance 'domínio inválido.'
 [[ "$ADMIN_EMAIL" =~ ^[^@]+@[^@]+\.[^@]+$ ]] || fail_instance 'e-mail administrativo inválido.'
 [[ ${#ADMIN_PASSWORD} -ge 8 ]] || fail_instance 'senha administrativa precisa ter ao menos 8 caracteres.'
 [[ "$REDIS_DB" =~ ^([0-9]|1[0-5])$ ]] || fail_instance '--redis-db deve estar entre 0 e 15.'
 [ -d "$SOURCE_DIR/platform-api" ] || fail_instance "fonte não contém platform-api: $SOURCE_DIR"
-[ ! -e "$IASTUDIO_APP_DIR" ] || fail_instance "diretório da instância já existe: $IASTUDIO_APP_DIR"
-[ ! -e "$IASTUDIO_CONFIG_FILE" ] || fail_instance "configuração da instância já existe: $IASTUDIO_CONFIG_FILE"
+[ ! -e "$IASTUDIO_APP_DIR" ] || fail_instance "diretório da aplicação já existe: $IASTUDIO_APP_DIR"
+[ ! -e "$IASTUDIO_CONFIG_FILE" ] || fail_instance "configuração da aplicação já existe: $IASTUDIO_CONFIG_FILE"
 git -C "$SOURCE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || fail_instance "fonte não é um checkout git: $SOURCE_DIR"
 SOURCE_COMMIT="$(git -C "$SOURCE_DIR" rev-parse --verify "refs/tags/$SOURCE_REVISION^{commit}" 2>/dev/null)" \
   || fail_instance "tag de origem não encontrada: $SOURCE_REVISION"
 SOURCE_REMOTE="$(git -C "$SOURCE_DIR" remote get-url origin 2>/dev/null || true)"
-[ -n "$SOURCE_REMOTE" ] || fail_instance 'a fonte precisa possuir o remote origin para futuras atualizações da instância.'
+[ -n "$SOURCE_REMOTE" ] || fail_instance 'a fonte precisa possuir o remote origin para futuras atualizações da aplicação.'
 
 if [ "$INSTALL_DEPS" = 1 ]; then
   apt-get update -y
@@ -71,11 +73,11 @@ command -v pg_isready >/dev/null || fail_instance 'pg_isready é obrigatório pa
 command -v redis-cli >/dev/null || fail_instance 'Redis client ausente; use --install-deps ou prepare o host.'
 command -v node >/dev/null || fail_instance 'Node.js ausente; prepare o runtime no host.'
 command -v pm2 >/dev/null || fail_instance 'PM2 ausente; prepare o runtime no host.'
-command -v ss >/dev/null || fail_instance 'ss é obrigatório para validar a porta exclusiva da instância.'
+command -v ss >/dev/null || fail_instance 'ss é obrigatório para validar a porta exclusiva da aplicação.'
 
 # O host pode usar um cluster PostgreSQL em porta diferente de 5432. A porta é
 # descoberta pelo próprio cluster ativo antes de criar qualquer recurso da
-# instância; nenhuma configuração global do PostgreSQL é alterada.
+# aplicação; nenhuma configuração global do PostgreSQL é alterada.
 PG_PORT="$(su -s /bin/sh postgres -c "psql -At -d postgres -c 'SHOW port;'" | tr -d '[:space:]')"
 [[ "$PG_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$PG_PORT" -gt 0 ] && [ "$PG_PORT" -le 65535 ] \
   || fail_instance "porta PostgreSQL inválida detectada: ${PG_PORT:-vazia}."
@@ -86,12 +88,12 @@ for candidate in 127.0.0.1 localhost; do
     break
   fi
 done
-[ -n "$PG_HOST" ] || fail_instance "PostgreSQL ativo na porta $PG_PORT não aceita conexão TCP local. Nenhum recurso da instância foi criado."
+[ -n "$PG_HOST" ] || fail_instance "PostgreSQL ativo na porta $PG_PORT não aceita conexão TCP local. Nenhum recurso da aplicação foi criado."
 
-# A alocação do banco Redis é explícita e é recusada se outra instância já usa
+# A alocação do banco Redis é explícita e é recusada se outra aplicação já usa
 # o mesmo número. O prefixo também é exclusivo, protegendo chaves BullMQ.
-if grep -Rqs "^REDIS_DB=$REDIS_DB$" "$INSTANCE_CONFIG_BASE" 2>/dev/null; then
-  fail_instance "REDIS_DB=$REDIS_DB já pertence a outra instância."
+if grep -Rqs "^REDIS_DB=$REDIS_DB$" "$APPLICATION_CONFIG_BASE" 2>/dev/null; then
+  fail_instance "REDIS_DB=$REDIS_DB já pertence a outra aplicação."
 fi
 REDIS_KEY_COUNT="$(redis-cli -n "$REDIS_DB" DBSIZE 2>/dev/null || true)"
 [[ "$REDIS_KEY_COUNT" =~ ^[0-9]+$ ]] || fail_instance "não foi possível inspecionar REDIS_DB=$REDIS_DB."
@@ -104,7 +106,7 @@ PORT="$((3000 + REDIS_DB))"
 ss -ltnH "sport = :$PORT" | grep -q . \
   && fail_instance "porta $PORT já está em uso; escolha outro --redis-db para derivar uma porta livre."
 
-# O domínio é uma fronteira de instância. Não sobrescrevemos vhost de outro
+# O domínio é uma fronteira de aplicação. Não sobrescrevemos vhost de outro
 # produto, mesmo quando ele está no mesmo servidor físico.
 DOMAIN_REGEX="${DOMAIN//./\\.}"
 if grep -RqsE "^[[:space:]]*server_name[[:space:]].*([[:space:]]|^)$DOMAIN_REGEX([[:space:];]|$)" \
@@ -116,8 +118,8 @@ fi
 # simples tornam a senha do administrador um valor, nunca código ao carregar o
 # .env; apóstrofos são escapados no formato POSIX/dotenv.
 env_value() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
-mkdir -p "$INSTANCE_CONFIG_BASE" "$IASTUDIO_DATA_DIR" "$IASTUDIO_STORAGE_DIR" "$IASTUDIO_BACKUP_DIR" "/var/log/iastudio/$INSTANCE_ID"
-chmod 700 "$INSTANCE_CONFIG_BASE" "$IASTUDIO_DATA_DIR" "$IASTUDIO_STORAGE_DIR" "$IASTUDIO_BACKUP_DIR"
+mkdir -p "$APPLICATION_CONFIG_BASE" "$IASTUDIO_DATA_DIR" "$IASTUDIO_STORAGE_DIR" "$IASTUDIO_BACKUP_DIR" "/var/log/iastudio/$APP_ID"
+chmod 700 "$APPLICATION_CONFIG_BASE" "$IASTUDIO_DATA_DIR" "$IASTUDIO_STORAGE_DIR" "$IASTUDIO_BACKUP_DIR"
 
 su -s /bin/sh postgres -c "psql -v ON_ERROR_STOP=1 -c \"CREATE ROLE $IASTUDIO_DB_USER LOGIN PASSWORD '$DB_PASS';\"" \
   || fail_instance "não foi possível criar a role PostgreSQL $IASTUDIO_DB_USER."
@@ -126,7 +128,7 @@ su -s /bin/sh postgres -c "psql -v ON_ERROR_STOP=1 -c \"CREATE DATABASE $IASTUDI
 su -s /bin/sh postgres -c "psql -d $IASTUDIO_DB_NAME -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS vector;'"
 
 cat > "$IASTUDIO_CONFIG_FILE" <<EOF
-IASTUDIO_INSTANCE_ID=$IASTUDIO_INSTANCE_ID
+IASTUDIO_APP_ID=$IASTUDIO_APP_ID
 IASTUDIO_APP_DIR=$IASTUDIO_APP_DIR
 IASTUDIO_DATA_DIR=$IASTUDIO_DATA_DIR
 IASTUDIO_STORAGE_DIR=$IASTUDIO_STORAGE_DIR
@@ -162,7 +164,7 @@ chmod 600 "$IASTUDIO_APP_DIR/platform-api/.env"
 # o .npmrc lê ${GITLAB_PACKAGE_TOKEN}. Exportamos para os npm install desta
 # execução — o mesmo token já ficou gravado no .env para os upgrades.
 export GITLAB_PACKAGE_TOKEN="$GITLAB_TOKEN"
-# O chamador pode ter carregado o .env de uma instância existente, no qual
+# O chamador pode ter carregado o .env de uma aplicação existente, no qual
 # NODE_ENV=production é correto para PM2, mas faz o npm omitir devDependencies
 # (Prisma, Nest CLI e Vite) necessárias apenas durante a instalação/build.
 # O .env recém-criado volta a definir production antes de iniciar os processos.
@@ -171,7 +173,7 @@ export NODE_ENV=development
 (cd "$IASTUDIO_APP_DIR/platform-api" && npm install)
 # `migrate diff` usa o Prisma recém-instalado; somente depois materializamos o
 # schema vazio, sob advisory lock, e compilamos a API.
-bash "$IASTUDIO_APP_DIR/scripts/provision-dedicated-schema.sh" --instance-id "$IASTUDIO_INSTANCE_ID"
+bash "$IASTUDIO_APP_DIR/scripts/provision-dedicated-schema.sh" --app-id "$IASTUDIO_APP_ID"
 (cd "$IASTUDIO_APP_DIR/platform-api" && npm run build)
 (cd "$IASTUDIO_APP_DIR/platform-admin" && npm install && npm run build)
 
@@ -179,16 +181,16 @@ bash "$IASTUDIO_APP_DIR/scripts/provision-dedicated-schema.sh" --instance-id "$I
 # o dist ficaram só-root e o nginx respondia 500 (EACCES ao atravessar o caminho).
 # Abrimos SÓ o necessário: travessia (o+x) nos diretórios até o dist e leitura
 # (a+rX) no dist. O .env (600), dados e backups seguem restritos.
-chmod o+x "$(dirname "$INSTANCE_ROOT_BASE")" "$INSTANCE_ROOT_BASE" "$IASTUDIO_APP_DIR" "$IASTUDIO_APP_DIR/platform-admin"
+chmod o+x "$APPLICATION_ROOT_BASE" "$IASTUDIO_APP_DIR" "$IASTUDIO_APP_DIR/platform-admin"
 chmod -R a+rX "$IASTUDIO_APP_DIR/platform-admin/dist"
 
 # PM2 avalia ecosystem.config.js antes de o Nest carregar dotenv; portanto o
-# contrato integral da instância precisa estar no ambiente deste comando.
+# contrato integral da aplicação precisa estar no ambiente deste comando.
 set -a
 # shellcheck disable=SC1090
 . "$IASTUDIO_CONFIG_FILE"
 set +a
-IASTUDIO_LOG_DIR="/var/log/iastudio/$INSTANCE_ID" pm2 start "$IASTUDIO_APP_DIR/scripts/ecosystem.config.js"
+IASTUDIO_LOG_DIR="/var/log/iastudio/$APP_ID" pm2 start "$IASTUDIO_APP_DIR/scripts/ecosystem.config.js"
 pm2 save
 
 cat > "/etc/nginx/sites-available/$IASTUDIO_NGINX_SITE" <<EOF
@@ -206,4 +208,4 @@ if [ "$NO_SSL" = 0 ]; then
   [ -n "$CERT_EMAIL" ] || fail_instance '--email é obrigatório sem --no-ssl.'
   certbot --nginx --non-interactive --agree-tos -m "$CERT_EMAIL" -d "$DOMAIN"
 fi
-echo "Instância dedicada '$IASTUDIO_INSTANCE_ID' instalada em $IASTUDIO_APP_DIR."
+echo "Aplicação dedicada '$IASTUDIO_APP_ID' instalada em $IASTUDIO_APP_DIR."

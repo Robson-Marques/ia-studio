@@ -5,7 +5,7 @@ import * as path from 'node:path';
 function installationEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
-    throw new InternalServerErrorException(`Configuração obrigatória da instância ausente: ${name}.`);
+    throw new InternalServerErrorException(`Configuração obrigatória da aplicação ausente: ${name}.`);
   }
   return value;
 }
@@ -25,11 +25,11 @@ export function appDir(): string {
   return installationEnv('IASTUDIO_APP_DIR');
 }
 
-/** Identificador validado da instância, seguro para compor uma unidade systemd. */
-export function instanceId(): string {
-  const value = installationEnv('IASTUDIO_INSTANCE_ID');
+/** Identificador validado da aplicação, seguro para compor uma unidade systemd. */
+export function appId(): string {
+  const value = installationEnv('IASTUDIO_APP_ID');
   if (!/^[a-z][a-z0-9-]{2,31}$/.test(value)) {
-    throw new InternalServerErrorException('IASTUDIO_INSTANCE_ID inválido.');
+    throw new InternalServerErrorException('IASTUDIO_APP_ID inválido.');
   }
   return value;
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backup completo local de uma instância dedicada. Quando disparado pelo painel,
+# Backup completo local de uma aplicação dedicada. Quando disparado pelo painel,
 # recebe --operation-id e fecha a própria row system_restores no PostgreSQL.
 # Assim o resultado não depende de um callback em memória do processo PM2.
 set -euo pipefail
@@ -16,7 +16,7 @@ usage() {
   cat <<'EOF'
 Uso: backup-full.sh [nome-opcional] [--operation-id <uuid>]
 
-Gera um .tar.gz com banco, storage e manifest da instância atual. O modo
+Gera um .tar.gz com banco, storage e manifest da aplicação atual. O modo
 --operation-id é usado pela administração local para registrar logs e estado.
 EOF
 }
@@ -40,14 +40,14 @@ set -a
 # shellcheck disable=SC1090
 . "$ENV_FILE"
 set +a
-: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env}"
+: "${IASTUDIO_APP_ID:?IASTUDIO_APP_ID ausente no .env}"
 : "${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env}"
 
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/lib/instance.sh"
-set_instance "$IASTUDIO_INSTANCE_ID"
-[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || { echo 'ERRO: configuração não pertence ao diretório da instância.' >&2; exit 2; }
-acquire_instance_lock
+set_application "$IASTUDIO_APP_ID"
+[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || { echo 'ERRO: configuração não pertence ao diretório da aplicação.' >&2; exit 2; }
+acquire_application_lock
 PSQL_DATABASE_URL="$(db_url_for_psql)"
 STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
 WORK=''
@@ -102,7 +102,7 @@ WORK="$(mktemp -d)" || fail 'Não foi possível criar diretório temporário.'
 STAMP="$(date '+%Y%m%d-%H%M%S')"
 OUT="$IASTUDIO_BACKUP_DIR/${NAME:-full-$STAMP}.tar.gz"
 
-append_log 'PREFLIGHT: validando instância e diretórios.'
+append_log 'PREFLIGHT: validando aplicação e diretórios.'
 append_log 'PG_DUMP: exportando banco local.'
 if ! pg_dump "$PSQL_DATABASE_URL" > "$WORK/db.sql" 2>"$WORK/pg_dump.err"; then
   fail "pg_dump falhou: $(tail -c 500 "$WORK/pg_dump.err")"

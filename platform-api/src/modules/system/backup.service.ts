@@ -15,7 +15,7 @@ import type { ReadStream } from 'node:fs';
 import * as path from 'node:path';
 import { SystemRepository } from './system.repository';
 import { AuditLogService } from '../../shared/audit/audit-log.service';
-import { backupDir, instanceId, resolveBackupPath, scriptsDir } from './system.paths';
+import { appId, backupDir, resolveBackupPath, scriptsDir } from './system.paths';
 
 const STALE_OPERATION_MS = 30 * 60 * 1000;
 
@@ -183,7 +183,7 @@ export class BackupService {
       const child = spawn('systemd-run', [
         '--quiet',
         '--collect',
-        '--unit', `iastudio-${instanceId()}-backup-${restoreId}`,
+        '--unit', `iastudio-${appId()}-backup-${restoreId}`,
         `--setenv=PATH=${processPath}`,
         'bash', script, '--operation-id', restoreId,
       ], {
@@ -226,7 +226,7 @@ export class BackupService {
       const child = spawn(
         'systemd-run',
         [
-          '--unit', `iastudio-${instanceId()}-restore-${restoreId}`,
+          '--unit', `iastudio-${appId()}-restore-${restoreId}`,
           '--collect',
           'bash', script, archivePath, restoreId,
         ],

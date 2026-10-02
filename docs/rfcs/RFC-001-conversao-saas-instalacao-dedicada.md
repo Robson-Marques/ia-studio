@@ -6,15 +6,17 @@
 
 O IA Studio foi projetado como SaaS multi-tenant: organização, workspace e
 ambiente escopam dados; um Console administra clientes, planos, licenças, billing,
-consumo e domínios. A estratégia aprovada é uma aplicação independente por
-cliente, mesmo quando várias instalações coexistem no mesmo servidor.
+consumo e domínios. A estratégia aprovada é uma vertente independente por
+cliente, em repositório próprio, mesmo quando aplicações diferentes coexistem
+no mesmo servidor.
 
 ## Decisão
 
-Converter o IA Studio em estrutura-base de software dedicado. Cada instalação
-terá dados, configurações, identidade, integrações, processos e recursos de
-infraestrutura próprios. Multi-tenancy e superfícies/comercialização SaaS não
-fazem parte do produto alvo.
+Converter o IA Studio em estrutura-base de software dedicado. Cada cliente parte
+da base para uma vertente e repositório próprios; sua aplicação terá dados,
+configurações, identidade, integrações, processos e recursos de infraestrutura
+próprios. Multi-tenancy e superfícies/comercialização SaaS não fazem parte do
+produto alvo.
 
 A primeira vertente será para provedor de internet, usando ISP/IXC existentes. A
 verticalização depende desta conversão e não altera o core dedicado antes de ter
@@ -29,8 +31,8 @@ Capability Contract próprio.
 | Auth/ACL | Um ator local por JWT e ACL granular; sem PLATFORM_ADMIN, Console ou bypass. |
 | Painel | Adaptar `platform-admin`; remover `platform-console` e dependências SaaS. |
 | Integrações | Preservar Registry, Connection, Secret, Storage e logs; retirar curadoria/install por organização e Limits/Usage. |
-| Workers | Manter API e worker separados; isolar cada instância por processo, fila/namespace e configuração. |
-| Infra | Parametrizar diretório, banco, storage, Redis, PM2, backup e vhost por instância. |
+| Workers | Manter API e worker separados; isolar cada aplicação por processo, fila/namespace e configuração. |
+| Infra | Parametrizar diretório, banco, storage, Redis, PM2, backup e vhost por aplicação da vertente. |
 
 ## Alternativa recusada
 
@@ -44,7 +46,7 @@ independentes por negócio.
   GAP-001 e obter backup verificável.
 - A retirada de escopo é transversal a API, filas, jobs, ACL, consultas e painel;
   todos avançam pelo mesmo Capability Contract.
-- O Acceptance exige coexistência comprovada de duas instâncias isoladas no host.
+- O Acceptance exige coexistência comprovada entre aplicações independentes no host.
 - ISP fica fora do core desta RFC até sua Capability própria.
 
 O escopo e a prova de completude vivem em

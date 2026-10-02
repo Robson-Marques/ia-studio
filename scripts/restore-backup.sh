@@ -15,14 +15,14 @@ API_DIR="$APP_DIR/platform-api"
 
 [ -f "$DUMP" ] || { echo "Dump nao encontrado: $DUMP"; exit 1; }
 set -a; . "$API_DIR/.env"; set +a
-: "${IASTUDIO_INSTANCE_ID:?IASTUDIO_INSTANCE_ID ausente no .env da instância}"
-: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da instância}"
-: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da instância}"
+: "${IASTUDIO_APP_ID:?IASTUDIO_APP_ID ausente no .env da aplicação}"
+: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da aplicação}"
+: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da aplicação}"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/lib/instance.sh"
-set_instance "$IASTUDIO_INSTANCE_ID"
-[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || { echo 'Configuração não pertence ao diretório da instância.' >&2; exit 1; }
-acquire_instance_lock
+set_application "$IASTUDIO_APP_ID"
+[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || { echo 'Configuração não pertence ao diretório da aplicação.' >&2; exit 1; }
+acquire_application_lock
 
 echo "[restore-backup] Parando PM2..."
 pm2 stop "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true

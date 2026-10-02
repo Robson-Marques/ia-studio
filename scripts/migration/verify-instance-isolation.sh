@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Gate S4 estático — valida o contrato de recursos por instância sem tocar no host.
+# Gate S4 estático — valida que vertentes independentes usam recursos próprios
+# no host, sem tocar no host.
 set -euo pipefail
 command -v rg >/dev/null 2>&1 || { echo 'ERRO: ripgrep (rg) é obrigatório para este gate.' >&2; exit 2; }
 
@@ -9,20 +10,20 @@ FAILURES=0
 fail() { printf 'FALHA: %s\n' "$*" >&2; FAILURES=1; }
 require_file() { [ -f "$1" ] || fail "arquivo obrigatório ausente: $1"; }
 
-for file in scripts/lib/instance.sh scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/uninstall-dedicated.sh scripts/ecosystem.config.js; do
+for file in scripts/lib/instance.sh scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/uninstall-dedicated.sh scripts/uninstall-discarded-dev-apps.sh scripts/ecosystem.config.js; do
   require_file "$file"
 done
 
 # Scripts rastreados pelo Git podem chegar ao host sem bit executável. Os
-# wrappers públicos devem invocar o interpretador explicitamente, como já faz
-# o bootstrap do upgrade, para que install/uninstall não dependam de chmod.
+# wrappers públicos devem invocar o interpretador explicitamente, para que
+# install/uninstall não dependam de chmod.
 rg -Fq 'exec bash "${SCRIPT_DIR}/install-dedicated.sh" "$@"' scripts/install.sh \
   || fail 'wrapper install.sh não invoca o instalador dedicado via bash.'
 rg -Fq 'exec bash "$SCRIPT_DIR/uninstall-dedicated.sh" "$@"' scripts/uninstall.sh \
   || fail 'wrapper uninstall.sh não invoca o desinstalador dedicado via bash.'
 
 for script in scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/upgrade.sh scripts/backup-full.sh scripts/restore-full.sh scripts/restore-backup.sh scripts/uninstall-dedicated.sh; do
-  rg -Fq 'acquire_instance_lock' "$script" || fail "$script não usa lock da instância."
+  rg -Fq 'acquire_application_lock' "$script" || fail "$script não usa lock da aplicação."
 done
 rg -Fq 'pg_advisory_xact_lock' scripts/provision-dedicated-schema.sh \
   || fail 'provisionamento do schema não possui advisory lock transacional.'
@@ -57,16 +58,22 @@ fi
 if rg -n -- 'prisma db push' scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh; then
   fail 'provisionamento dedicado deve usar migrations a partir de banco vazio, não db push.'
 fi
-rg -Fq -- '--bootstrap-dedicated' scripts/upgrade.sh \
-  || fail 'upgrade não oferece bootstrap explícito da primeira instância dedicada.'
-rg -Fq 'install-dedicated.sh' scripts/upgrade.sh \
-  || fail 'bootstrap não delega ao instalador dedicado.'
-rg -Fq -- '--source-revision "$TO_VERSION"' scripts/upgrade.sh \
-  || fail 'bootstrap não fixa explicitamente a revisão de origem.'
 rg -Fq 'git clone --no-checkout' scripts/install-dedicated.sh \
-  || fail 'instalação não cria um checkout próprio para futuras atualizações.'
+  || fail 'instalação não cria um checkout próprio da vertente para futuras atualizações.'
 rg -Fq 'remote set-url origin' scripts/install-dedicated.sh \
-  || fail 'checkout da instância não preserva a origem das atualizações.'
+  || fail 'checkout da aplicação não preserva a origem das atualizações.'
+rg -Fq -- '--app-id' scripts/install-dedicated.sh \
+  || fail 'instalação não exige o identificador explícito da aplicação.'
+rg -Fq 'IASTUDIO_APPLICATION_ROOT_BASE:-/opt' scripts/lib/instance.sh \
+  || fail 'a raiz padrão da aplicação não é /opt.'
+rg -Fq 'LEGACY_IDS=(ia-dev ia-teste)' scripts/uninstall-discarded-dev-apps.sh \
+  || fail 'removedor transitório não está limitado aos dois ambientes descartáveis autorizados.'
+rg -Fq 'RESET-IASTUDIO-DEV' scripts/uninstall-discarded-dev-apps.sh \
+  || fail 'removedor transitório não exige confirmação exclusiva de reinício do desenvolvimento.'
+if rg -n '/opt/iastudio/instances|--instance-id|IASTUDIO_INSTANCE_ID|set_instance|acquire_instance_lock' \
+  scripts/lib/instance.sh scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/uninstall-dedicated.sh scripts/backup-full.sh scripts/restore-full.sh scripts/restore-backup.sh scripts/upgrade.sh; then
+  fail 'scripts operacionais ainda descrevem ou aceitam o modelo de instâncias irmãs.'
+fi
 rg -Fq 'REDIS_KEY_COUNT' scripts/install-dedicated.sh \
   || fail 'instalação não recusa banco Redis já ocupado por outro serviço.'
 rg -Fq 'porta $PORT já está em uso' scripts/install-dedicated.sh \
@@ -87,8 +94,8 @@ rg -Fq -- '--gitlab-token' scripts/install-dedicated.sh \
 rg -Fq 'export GITLAB_PACKAGE_TOKEN=' scripts/install-dedicated.sh \
   || fail 'instalação não exporta GITLAB_PACKAGE_TOKEN para os npm install.'
 rg -Fq 'GITLAB_PACKAGE_TOKEN=$(env_value "$GITLAB_TOKEN")' scripts/install-dedicated.sh \
-  || fail 'instalação não persiste GITLAB_PACKAGE_TOKEN no .env da instância.'
-# O instalador pode ser chamado a partir de uma instância já em produção. Nesse
+  || fail 'instalação não persiste GITLAB_PACKAGE_TOKEN no .env da aplicação.'
+# O instalador pode ser chamado a partir de uma aplicação já em produção. Nesse
 # caso NODE_ENV=production vem do .env e não pode fazer o npm omitir as
 # ferramentas de build antes do PM2 voltar a carregar production.
 rg -Fq 'export NODE_ENV=development' scripts/install-dedicated.sh \
@@ -99,15 +106,13 @@ rg -Fq 'export NODE_ENV=development' scripts/install-dedicated.sh \
 if rg -n -F '`' scripts/provision-dedicated-schema.sh; then
   fail 'provisionador ainda contém crases perigosas em heredoc expansível.'
 fi
-rg -Fq -- '--gitlab-token)' scripts/upgrade.sh \
-  || fail 'bootstrap do upgrade não repassa --gitlab-token ao instalador.'
 # umask 077 deixa o dist só-root e o nginx (www-data) responde 500. A instalação
 # precisa abrir travessia/leitura no web root do platform-admin sem hardcode.
 rg -Fq 'chmod -R a+rX "$IASTUDIO_APP_DIR/platform-admin/dist"' scripts/install-dedicated.sh \
   || fail 'instalação não torna o dist do platform-admin legível para o nginx.'
 # O backup não pode depender de callback do processo PM2 para fechar a row:
 # precisa de unidade systemd própria, operation-id e trap que sempre escreve um
-# estado terminal diretamente na base da mesma instância.
+# estado terminal diretamente na base da mesma aplicação.
 rg -Fq -- '--operation-id' scripts/backup-full.sh \
   || fail 'backup dedicado não aceita o id da operação para auto-reportar estado.'
 rg -Fq 'trap finalize EXIT' scripts/backup-full.sh \
@@ -116,28 +121,25 @@ rg -Fq "'systemd-run'" platform-api/src/modules/system/backup.service.ts \
   || fail 'backup do painel não roda fora da árvore do PM2 via systemd-run.'
 rg -Fq "'--operation-id'" platform-api/src/modules/system/backup.service.ts \
   || fail 'backup do painel não envia id de operação ao script local.'
-if ! rg -Fq 'if [ "$BOOTSTRAP_DEDICATED" -eq 1 ]; then' scripts/upgrade.sh; then
-  fail 'bootstrap não possui caminho exclusivo antes do upgrade de instância.'
-fi
 if rg -n '/opt/iastudio\b|iastudio_db\b|iastudio-api\b|iastudio-worker\b|platform-console|/console/' \
   scripts/install-dedicated.sh scripts/provision-dedicated-schema.sh scripts/uninstall-dedicated.sh scripts/backup-full.sh scripts/restore-full.sh scripts/restore-backup.sh scripts/upgrade.sh; then
   fail 'script operacional conserva recurso global ou Console SaaS.'
 fi
 
 derive() {
-  local id="$1"
+  local app_id="$1"
   # shellcheck disable=SC1091
   . "$ROOT/scripts/lib/instance.sh"
-  set_instance "$id"
+  set_application "$app_id"
   printf '%s|%s|%s|%s|%s|%s\n' "$IASTUDIO_APP_DIR" "$IASTUDIO_DB_NAME" "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" "$IASTUDIO_REDIS_PREFIX" "$IASTUDIO_NGINX_SITE"
 }
-a="$(derive isp-a)"
-b="$(derive loja-b)"
-[ "$a" != "$b" ] || fail 'ids distintos resolveram os mesmos recursos.'
-case "$a" in *'isp-a'* ) ;; *) fail 'recursos de isp-a não preservam o identificador.' ;; esac
-case "$b" in *'loja-b'* ) ;; *) fail 'recursos de loja-b não preservam o identificador.' ;; esac
+a="$(derive newnet-isp)"
+b="$(derive loja-assistente)"
+[ "$a" != "$b" ] || fail 'vertentes distintas resolveram os mesmos recursos.'
+case "$a" in *'/opt/newnet-isp'* ) ;; *) fail 'a vertente Newnet não resolve diretório próprio em /opt.' ;; esac
+case "$b" in *'/opt/loja-assistente'* ) ;; *) fail 'a vertente Loja não resolve diretório próprio em /opt.' ;; esac
 
 if [ "$FAILURES" -ne 0 ]; then
   exit 1
 fi
-printf '%s\n' 'S4 isolamento: aprovado estaticamente — recursos e locks são derivados por instância; validação em host com duas instâncias ainda é obrigatória.'
+printf '%s\n' 'S4 coabitação: aprovado estaticamente — recursos e locks são derivados por aplicação; validação em host com aplicações independentes ainda é obrigatória.'

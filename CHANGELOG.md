@@ -1,5 +1,23 @@
 # Changelog — IA Studio
 
+## v0.11.29 - 2026-10-02 (Vertentes próprias e coabitação de aplicações)
+
+- Corrige o contrato de implantação: IA Studio é a estrutura-base e cada
+  cliente recebe uma vertente em repositório próprio. O host pode coabitar
+  produtos independentes, mas não instala cópias idênticas de um checkout SaaS.
+- O contrato operacional passa de `instance-id` para `app-id`: diretório,
+  configuração, banco/role PostgreSQL, Redis, PM2, lock, storage, backup e
+  vhost são derivados de `/opt/<app-id>` e do repositório da vertente.
+- Remove o bootstrap de instalação a partir do checkout SaaS. Instalações novas
+  usam `scripts/install.sh --app-id` diretamente a partir de uma tag da
+  vertente; upgrade continua limitado ao `origin` daquela aplicação.
+- Adiciona `uninstall-discarded-dev-apps.sh`, um removedor transitório com
+  prévia e confirmação exclusiva, limitado a `ia-dev` e `ia-teste`. Ele não
+  aceita outros IDs e preserva os demais produtos e serviços do host.
+- Atualiza Capability Contract, RFC, baseline, runbook, auditoria S4 e as
+  diretrizes arquiteturais para o modelo dedicado vigente. S1 permanece 100%;
+  S2, S4 e Acceptance continuam `in-progress` até a evidência operacional real.
+
 ## v0.11.28 - 2026-10-01 (Backup local: estado terminal resiliente)
 
 - Corrige o backup que podia criar o arquivo e permanecer indefinidamente em

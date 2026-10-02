@@ -2,7 +2,7 @@
 schema: prompt-framework/v1
 id: ia-studio.architecture-baseline
 kind: shared
-version: 1.0.0
+version: 1.1.0
 status: reviewed
 title: Architecture Baseline — IA Studio
 policy_refs:
@@ -10,19 +10,19 @@ policy_refs:
   - workflow.capability-contract@1.0.0
 owners:
   - robson
-reviewed_at: "2026-09-14"
-scope: "Recovery proporcional à conversão de SaaS multi-tenant para instalação dedicada"
+reviewed_at: "2026-10-02"
+scope: "Recovery proporcional à conversão de SaaS multi-tenant para estrutura-base e vertentes dedicadas"
 ---
 
 # Architecture Baseline — IA Studio
 
 ## Decisão e maturidade
 
-O IA Studio é uma estrutura-base de automação, comunicação, IA e integrações
-instalada de forma **dedicada para um único cliente**. Cada cliente recebe uma
-instância independente, com aplicação, banco, dados, configurações, identidade e
-integrações próprias. Instâncias podem compartilhar um host, mas nunca processo,
-banco, diretório de dados, fila, configuração ou aplicação.
+O IA Studio é uma estrutura-base de automação, comunicação, IA e integrações.
+Cada cliente recebe uma **vertente e repositório próprios**, com aplicação,
+banco, dados, configurações, identidade e integrações próprias. Aplicações de
+vertentes distintas podem compartilhar um host, mas nunca processo, banco,
+diretório de dados, fila, configuração ou aplicação.
 
 O projeto é existente. Código, `CLAUDE.md`, `ARCHITECTURE_LOCK.md` e diretrizes
 registravam SaaS; não havia Architecture Baseline nem Blueprint adotado. Este
@@ -36,9 +36,9 @@ do produto.
 | Dados e relações | existente | `platform-api/prisma/schema.prisma` | Hierarquia SaaS e escopos atingem entidades operacionais. |
 | Auth e ACL | existente | `shared/auth/*`, `permissions.constants.ts` | JWT e ACL existem; dois atores e tenant context são SaaS. |
 | Integrações/eventos | existente | `modules/integration`, `shared/events` | Registry, Secrets, Storage, Event Bus e BullMQ são preserváveis. |
-| Superfícies | existente | `platform-admin` | O painel local é a única superfície administrativa da instância. |
-| Infraestrutura | parcial | `scripts/*`, deploy | Nomes globais impedem coexistência segura de instalações. |
-| Observabilidade/auditoria | existente | `shared/audit`, logs, system | Devem se tornar locais à instância. |
+| Superfícies | existente | `platform-admin` | O painel local é a única superfície administrativa da aplicação. |
+| Infraestrutura | parcial | `scripts/*`, deploy | O contrato ainda precisa separar base, vertente e aplicação no host. |
+| Observabilidade/auditoria | existente | `shared/audit`, logs, system | Devem se tornar locais à aplicação. |
 | Estratégia de testes | parcial | documentação e código inspecionados | Cada slice exige evidência proporcional; Acceptance é integrada no fim. |
 | Capability Map | existente para esta frente | seção abaixo | Outras capacidades ainda não foram avaliadas contractualmente. |
 
@@ -60,12 +60,12 @@ seletiva verificável de dados operacionais. A importação futura será mapeada
 auditável, sem secrets nem estruturas SaaS; ver
 `docs/migrations/isp-dedicated-operational-data-export.md`.
 
-### GAP-002 — isolamento de múltiplas instâncias no mesmo host
+### GAP-002 — coabitação de vertentes independentes no mesmo host
 
 Scripts, PM2, backups, banco e vhosts usam nomes globais (`/opt/iastudio`,
 `iastudio_db`, `iastudio-api`, `iastudio-worker`). A Capability precisa substituir
-todos por recursos parametrizados por instância e provar que operações de uma não
-atingem outra.
+todos por recursos parametrizados por aplicação e provar que operações de uma
+vertente não atingem outros produtos do host.
 
 ### GAP-003 — governança das vertentes de cliente
 
@@ -94,13 +94,13 @@ possuem Capability Contract e Acceptance registrados.
 | Integrações | Curadoria Console e install por organização; connections, secrets e storage escopados | Registry, Connection, Secret e Storage locais; curadoria e install SaaS saem. |
 | Eventos/workers | Envelope contém organização/workspace/ambiente; BullMQ separado | Correlação e idempotência ficam, sem tenant. |
 | Painéis | Admin do cliente e Console SaaS | Apenas painel da aplicação dedicada. |
-| Infra | Caminho, banco, PM2, backup e Nginx globais | Recursos exclusivos e parametrizados por instância. |
+| Infra | Caminho, banco, PM2, backup e Nginx globais | Recursos exclusivos e parametrizados por aplicação da vertente. |
 
 ## Invariantes e fluxos críticos
 
-1. Uma instância atende um cliente e não recebe tenant em request, JWT, evento,
+1. Uma vertente atende um cliente e não recebe tenant em request, JWT, evento,
    fila ou persistência.
-2. Install, upgrade, backup, restore e uninstall só afetam a instância informada.
+2. Install, upgrade, backup, restore e uninstall só afetam a aplicação informada.
 3. Credenciais continuam cifradas e nunca aparecem em API, backup comum ou logs.
 4. ACL, auditoria, Event Bus, workers e integrações mantêm suas responsabilidades
    depois da retirada do escopo SaaS.
@@ -110,8 +110,8 @@ possuem Capability Contract e Acceptance registrados.
 - **Login local:** usuário → JWT local → PermissionsGuard → rota.
 - **Operação integrada:** painel → API → módulo → Connection/Secret/Provider →
   evento ou worker, com correlação local.
-- **Operação de instância:** identificador validado → recursos exclusivos →
-  instalação, atualização, backup, restore ou remoção dessa instância.
+- **Operação da aplicação:** `app-id` validado → recursos exclusivos →
+  instalação, atualização, backup, restore ou remoção dessa aplicação.
 
 ## Fontes de verdade
 

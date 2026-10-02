@@ -1,115 +1,116 @@
-# Deploy e versionamento — instâncias dedicadas
+# Deploy e versionamento — vertentes dedicadas
 
-Cada instalação do IA Studio é independente. Não há deploy SaaS compartilhado,
-Console, banco `iastudio_db`, processos PM2 globais ou vhost `/console/`.
+O repositório IA Studio é a estrutura-base. Cada cliente recebe uma vertente em
+repositório Git próprio, com identidade, módulos e ciclo de versões próprios.
+O host pode executar várias aplicações independentes — incluindo outros produtos
+da Nivoo — mas não há uma aplicação SaaS compartilhada nem uma coleção de cópias
+idênticas sob um único checkout.
 
-## Pré-requisitos do host
+## Contrato de uma aplicação instalada
 
-- Debian com PostgreSQL, Redis, PM2, Nginx, Node e `git`.
-- Um domínio, uma porta HTTP livre e um banco Redis (`0`–`15`) por instância.
-- Checkout Git limpo usado somente como fonte para criar instâncias.
+Uma vertente é instalada com um `app-id` explícito. O instalador clona a tag do
+**repositório da própria vertente** para `/opt/<app-id>` e deriva os demais
+recursos exclusivamente desse identificador:
 
-## Refazer o servidor de desenvolvimento do zero
+- configuração: `/etc/iastudio/apps/<app-id>.env`;
+- dados e storage: `/var/lib/iastudio/apps/<app-id>`;
+- backups: `/var/backups/iastudio/apps/<app-id>`;
+- PostgreSQL: role e banco `iastudio_<app_id>`;
+- Redis: DB explícito e prefixo `iastudio:<app-id>`;
+- PM2, lock e vhost: nomes exclusivos da aplicação;
+- domínio e porta HTTP: recusados se já pertencerem a outro produto do host.
 
-Não há dados a preservar neste ambiente. A primeira instância dedicada nasce em
-banco limpo sob `/opt/iastudio/instances/<instance-id>`, depois de remover o
-legado somente pelo script restrito abaixo. Ele não toca nos demais produtos do
-host.
+`app-id` não representa tenant, workspace nem cliente dentro da aplicação. É
+somente a identidade operacional de uma instalação de uma vertente já dedicada.
 
-Crie primeiro um checkout temporário da tag. Ele continuará disponível depois
-da remoção de `/opt/iastudio` para executar o bootstrap:
+## Preparar uma nova vertente
+
+1. Parta de uma tag da estrutura-base e crie no GitLab o repositório da
+   vertente, por exemplo `newnet-ia-studio`.
+2. Aplique nesse repositório somente os módulos, integrações e identidade
+   aprovados para aquele cliente.
+3. Versione a vertente em uma tag própria. Atualizações futuras dessa aplicação
+   consultam apenas esse mesmo `origin`.
+
+Criar a vertente é uma decisão de produto e repositório; o instalador não cria
+branches nem escolhe módulos por conta própria.
+
+## Recriar o ambiente de desenvolvimento do zero
+
+Não há dados a preservar no ambiente atual. A tag que materializa este contrato
+inclui um removedor de migração limitado aos dois ambientes descartáveis
+`ia-dev` e `ia-teste`; ele não aceita outros identificadores e não toca em
+Finanças, Mercado, Redis de outros DBs, certificados ou demais produtos do host.
+
+Execute primeiro a prévia e só então a remoção confirmada:
 
 ```bash
-git clone --branch <tag> https://github.com/Robson-Marques/ia-studio.git \
-  /opt/iastudio-bootstrap-<tag>
-cd /opt/iastudio-bootstrap-<tag>
+bash scripts/uninstall-discarded-dev-apps.sh --dry-run
+bash scripts/uninstall-discarded-dev-apps.sh --remove --confirm RESET-IASTUDIO-DEV
 ```
 
-## Remover o SaaS legado (somente quando o ambiente puder ser refeito)
-
-Não use o antigo `uninstall.sh`: ele tinha modo de purge global e poderia afetar
-outros produtos instalados no servidor. Primeiro confira a prévia:
+Depois, clone temporariamente a tag da **vertente Newnet** em um diretório que
+não seja o destino de produção:
 
 ```bash
-bash scripts/uninstall-legacy-saas.sh --dry-run
+git clone --branch <tag-da-vertente> <url-git-da-vertente> \
+  /opt/newnet-ia-studio-source
+cd /opt/newnet-ia-studio-source
 ```
 
-Se a lista mostrar apenas o legado esperado, execute a remoção restrita:
+Instale a aplicação limpa a partir dessa fonte:
 
 ```bash
-bash scripts/uninstall-legacy-saas.sh --remove --confirm LEGACY-IASTUDIO
-```
-
-Ele só remove `/opt/iastudio`, `/opt/iastudio-backups`, banco/role
-`iastudio_db`/`iastudio`, os dois processos PM2 históricos e vhosts
-`iastudio*`. Redis, Node, PostgreSQL, PM2, Nginx, SSL e as aplicações
-`ctrl-leads` e `financas-pessoais` permanecem intactos.
-
-Com a remoção concluída, ainda no checkout temporário, crie a primeira
-instância dedicada:
-
-```bash
-bash scripts/upgrade.sh --bootstrap-dedicated --to <tag> \
-  --instance-id ia-dev --domain ia-dev.exemplo.com \
-  --admin-email admin@exemplo.com --admin-password '<senha-forte>' \
-  --redis-db 1 --email ops@exemplo.com \
-  --gitlab-token '<token-do-registry-@studio-ux-ds>'
-```
-
-Esse modo clona a tag para a nova instância e chama o instalador dedicado.
-Depois da validação, o checkout temporário pode ser removido; ele não é uma
-instância em execução.
-
-## Nova instância no mesmo host
-
-```bash
-cd /opt/iastudio
 bash scripts/install.sh \
-  --instance-id cliente-b --domain cliente-b.exemplo.com \
-  --admin-email admin@cliente-b.exemplo.com --admin-password '<senha-forte>' \
-  --redis-db 2 --email ops@exemplo.com --source-revision <tag> \
+  --app-id newnet-ia-studio \
+  --domain <dominio-newnet> \
+  --admin-email <email-admin> \
+  --admin-password '<senha-forte>' \
+  --redis-db <db-livre-0-a-15> \
+  --email <email-ssl> \
+  --source-dir /opt/newnet-ia-studio-source \
+  --source-revision <tag-da-vertente> \
   --gitlab-token '<token-do-registry-@studio-ux-ds>'
 ```
 
-O instalador cria diretório, role/banco PostgreSQL, Redis DB/prefixo, storage,
-backup, nomes PM2 e vhost exclusivos. Ele materializa o schema somente a partir
-de PostgreSQL vazio, sob lock transacional. A porta PostgreSQL é descoberta no
-cluster local e validada por TCP antes de criar qualquer recurso da instância;
-ela não é presumida como `5432`. O build do platform-admin usa o registry
-privado `@studio-ux-ds` (`git.nivoo.dev.br`); o `--gitlab-token` (ou a variável
-`GITLAB_PACKAGE_TOKEN`) é obrigatório e fica gravado no `.env` da instância para
-os upgrades seguintes.
+O checkout temporário é somente fonte de instalação; a aplicação em execução
+fica em `/opt/newnet-ia-studio`. Depois da validação ele pode ser removido.
 
-## Atualização de uma instância já dedicada
+## Atualizar uma aplicação instalada
 
-Pelo painel local ou via script, informe uma tag e o `upgrade-id` criado no
-registro local. O upgrade só aceita uma instância cuja configuração contenha
-`IASTUDIO_INSTANCE_ID`; alterações destrutivas de schema falham explicitamente,
-sem `--accept-data-loss` automático.
+A atualização normal acontece pelo painel local em **Configurações →
+Administração da instalação**. O processo consulta as tags do repositório da
+vertente instalada, cria backup próprio, compila e reinicia somente seus
+processos. Em caso de falha, a aplicação permanece na revisão anterior.
+
+Uso manual excepcional:
 
 ```bash
-bash /opt/iastudio/instances/ia-dev/scripts/upgrade.sh \
-  --to <tag> --upgrade-id <uuid> \
-  --repo-path /opt/iastudio/instances/ia-dev
+bash /opt/newnet-ia-studio/scripts/upgrade.sh \
+  --to <tag-da-vertente> --upgrade-id <uuid> \
+  --repo-path /opt/newnet-ia-studio
 ```
 
-## Backup, rollback e remoção
+## Backup, restauração e remoção
 
-- `backup-full.sh` / `restore-full.sh` operam apenas a instância indicada pelo
-  `.env` local e usam lock por ID.
-- Dados SaaS antigos só seriam preservados por `backup-saas-historical.sh`; como
-  o ambiente atual não possui clientes ou dados operacionais aprovados para
-  migração, esse caminho não é executado nesta primeira instalação.
-- Remova uma instância com confirmação explícita:
+- `backup-full.sh` e `restore-full.sh` só leem o `.env` da aplicação em que
+  vivem e usam lock por `app-id`.
+- Backup contém segredos necessários para restaurar dados cifrados; mantenha o
+  arquivo com permissões restritas e armazenamento seguro.
+- Dados SaaS históricos, quando existirem, usam o fluxo seletivo auditável e
+  nunca são restaurados diretamente na aplicação dedicada.
+- A remoção exige confirmação literal e só atua na aplicação indicada:
 
 ```bash
-bash scripts/uninstall.sh --instance-id cliente-b --confirm cliente-b
+bash /opt/newnet-ia-studio/scripts/uninstall.sh \
+  --app-id newnet-ia-studio --confirm newnet-ia-studio
 ```
 
-Dependências do host e outras instâncias são preservadas.
+PostgreSQL, Redis, Nginx, PM2, certificados e aplicações de outros produtos são
+preservados.
 
 ## Versionamento
 
-Uma tag é criada somente após commit e validação dos gates. A tag não realiza
-deploy por si só neste repositório; a aplicação da tag é uma ação explícita no
-host, pelos comandos acima. Nunca reutilize uma tag existente.
+Cada repositório de vertente possui seu próprio histórico e tags. Uma tag é
+criada somente após commit e validação dos gates; a aplicação da tag no host é
+uma ação explícita pelo painel local. Nunca reutilize uma tag existente.

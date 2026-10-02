@@ -6,9 +6,30 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-10-01 (`v0.11.28`: backup local resiliente a restart
-> da API; resíduos funcionais ausentes; documentação e especialidades SaaS
-> corrigidas).
+> Última atualização: 2026-10-02 (alinhamento aprovado: IA Studio é
+> estrutura-base; cada cliente recebe vertente e repositório próprios).
+
+## Frente atual — vertentes próprias e reinício limpo do desenvolvimento
+
+O modelo anterior de “duas instâncias do mesmo checkout” foi corrigido. A prova
+com `ia-dev` e `ia-teste` demonstrou isolamento de recursos, mas essas instalações
+são descartáveis e não representam clientes. O destino agora é:
+
+- IA Studio permanece a estrutura-base;
+- Newnet ISP nasce em repositório/vertente próprio;
+- uma futura loja ou outro cliente nasce em outro repositório/vertente, com os
+  módulos pertinentes a seu negócio;
+- o host somente coabita aplicações independentes, cada uma em `/opt/<app-id>`
+  e com banco, Redis, PM2, domínio, storage e backup próprios.
+
+S1 segue 100%; S2, S4 e a Capability geral seguem `in-progress`. S4 foi
+redefinido para provar instalação limpa da vertente Newnet e coexistência sem
+cruzamento com Finanças, Mercado e os demais produtos reais do host — não exige
+manter uma segunda cópia idêntica do IA Studio. A remoção de `ia-dev` e
+`ia-teste` foi autorizada porque não há dados a preservar, mas só ocorre após a
+tag que materializa este contrato. O backup que criou arquivo e permaneceu em
+`RUNNING` ainda exige evidência de log do host; reinstalação não substitui esse
+diagnóstico nem marca S4 como concluído.
 
 ## Auditoria pós-faxina — 2026-09-30
 
