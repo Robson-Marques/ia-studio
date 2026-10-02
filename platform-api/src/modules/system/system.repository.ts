@@ -69,16 +69,6 @@ export class SystemRepository {
     });
   }
 
-  findLatestRestore() {
-    // Um pacote captura a própria operação de backup antes do fechamento. Após
-    // uma restauração, a operação restaurada pode ter started_at maior por
-    // diferença de fuso/snapshot; o resultado que terminou por último é o que
-    // deve aparecer como estado atual para a administração local.
-    return this.prisma.systemRestore.findFirst({
-      orderBy: [{ finished_at: 'desc' }, { started_at: 'desc' }],
-    });
-  }
-
   /** Última linha RUNNING sem processo responsável: libera o lock com erro visível. */
   failStaleRunningRestore(cutoff: Date) {
     return this.prisma.systemRestore.updateMany({

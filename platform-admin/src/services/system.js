@@ -68,12 +68,13 @@ export async function createBackup() {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao gerar backup')); }
 }
 
-export async function getCurrentBackupOperation() {
+export async function getCurrentBackupOperation(id) {
   try {
-    const { data } = await api.get('/system/backups/current');
+    const { data } = await api.get('/system/backups/current', { params: id ? { id } : {} });
     const row = data?.operation ?? (data?.status ? data : null);
     if (!row) return null;
     return {
+      id: row.id || null,
       kind: row.kind || null,
       status: row.status || null,
       file_name: row.file_name || row.fileName || null,

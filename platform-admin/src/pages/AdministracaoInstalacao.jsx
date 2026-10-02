@@ -159,6 +159,7 @@ function Backups() {
   const toastRef = useRef(toast);
   const inputRef = useRef(null);
   const lastOperationStatus = useRef(null);
+  const operationId = useRef(null);
   const restoreSubmitted = useRef(false);
   const [items, setItems] = useState([]);
   const [operation, setOperation] = useState(null);
@@ -171,9 +172,10 @@ function Backups() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [files, current] = await Promise.all([listBackups(), getCurrentBackupOperation()]);
+      const [files, current] = await Promise.all([listBackups(), getCurrentBackupOperation(operationId.current)]);
       setItems(files);
       setOperation(current);
+      if (current?.id && current.status === 'RUNNING') operationId.current = current.id;
       setReconnecting(false);
       const previous = lastOperationStatus.current;
       if (previous === 'RUNNING' && current?.status === 'SUCCESS') {
@@ -183,7 +185,10 @@ function Backups() {
         toastRef.current.error(`A ${current.kind === 'RESTORE' ? 'restauração' : 'geração de backup'} falhou.`);
       }
       lastOperationStatus.current = current?.status ?? null;
-      if (current?.status !== 'RUNNING') restoreSubmitted.current = false;
+      if (current?.status !== 'RUNNING') {
+        restoreSubmitted.current = false;
+        operationId.current = null;
+      }
     } catch (err) {
       // Durante restore a API é deliberadamente parada. Nginx responde 502 por
       // alguns segundos; não transforme polling em uma chuva de alertas.
@@ -210,9 +215,10 @@ function Backups() {
   async function generate() {
     setBusy(true);
     try {
-      await createBackup();
+      const created = await createBackup();
+      operationId.current = created?.id || null;
       lastOperationStatus.current = 'RUNNING';
-      setOperation({ kind: 'BACKUP', status: 'RUNNING', log_lines: [] });
+      setOperation({ id: operationId.current, kind: 'BACKUP', status: 'RUNNING', log_lines: [] });
       toast.success('Backup iniciado.');
       await load(true);
     }
@@ -241,10 +247,11 @@ function Backups() {
     try {
       if (confirm.type === 'delete') { await deleteBackup(confirm.file); toast.success('Backup excluído.'); }
       else {
-        await restoreBackup(confirm.file);
+        const created = await restoreBackup(confirm.file);
+        operationId.current = created?.id || null;
         restoreSubmitted.current = true;
         lastOperationStatus.current = 'RUNNING';
-        setOperation({ kind: 'RESTORE', status: 'RUNNING', file_name: confirm.file, log_lines: [] });
+        setOperation({ id: operationId.current, kind: 'RESTORE', status: 'RUNNING', file_name: confirm.file, log_lines: [] });
         toast.success('Restauração iniciada. A aplicação será reconectada automaticamente ao final.');
       }
       setConfirm(null);

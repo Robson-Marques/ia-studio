@@ -1,5 +1,12 @@
 # Changelog — IA Studio
 
+## v0.11.37 - 2026-10-02 (Administração: estado por operação)
+
+- O painel acompanha backup e restauração pelo identificador retornado no
+  aceite (`202`). A consulta sem identificador informa exclusivamente o lock
+  vivo da instalação; registros terminais históricos não podem mais aparecer
+  como resultado da operação recém-iniciada nem disparar toast de falha falso.
+
 ## v0.11.36 - 2026-10-02 (Restauração: diário local independente)
 
 - A restauração não importa mais `system_restores` do pacote como se fosse dado

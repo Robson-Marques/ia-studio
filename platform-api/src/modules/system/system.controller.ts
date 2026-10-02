@@ -84,9 +84,9 @@ export class SystemController {
   }
 
   @Get('backups/current')
-  @ApiOperation({ summary: 'Operação de backup/restore em andamento (se houver)' })
-  currentOperation() {
-    return this.backups.currentOperation();
+  @ApiOperation({ summary: 'Operação em andamento ou status da operação identificada por ?id' })
+  currentOperation(@Query('id') id?: string) {
+    return this.backups.currentOperation(id);
   }
 
   @Post('backups')

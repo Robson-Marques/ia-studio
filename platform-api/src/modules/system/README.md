@@ -16,7 +16,7 @@ memória do processo API.
 | GET | `/system/upgrade/history` | Últimas 20 atualizações. |
 | POST | `/system/upgrade/release-lock` | Lock órfão (>10min) → marca FAILED sem reverter nada. |
 | GET | `/system/backups` | Lista pacotes (`.tar.gz`/`.sql`/`.sql.gz`) com tamanho e data. |
-| GET | `/system/backups/current` | Operação em andamento ou o último resultado terminal. |
+| GET | `/system/backups/current` | Operação em andamento; use `?id=<operationId>` para acompanhar o resultado terminal da operação iniciada. |
 | POST | `/system/backups` | Gera backup completo (spawn `backup-full.sh`, row `system_restores` kind=BACKUP). **202**. |
 | GET | `/system/backups/:file/download` | Stream do arquivo (Content-Disposition attachment). Guard anti path-traversal. |
 | POST | `/system/backups/upload` | Upload multipart (`@fastify/multipart`). Nome validado (path-traversal). **201**. |

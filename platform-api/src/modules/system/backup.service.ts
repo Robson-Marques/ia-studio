@@ -158,10 +158,19 @@ export class BackupService {
 
   // ─── Status ─────────────────────────────────────────────────────────
 
-  async currentOperation() {
+  async currentOperation(operationId?: string) {
     await this.reapStaleOperation();
+    // Uma tela que iniciou uma operação acompanha explicitamente a sua própria
+    // row. Nunca substitua esse resultado por uma falha histórica de outro
+    // backup/restauração: isso gerava mensagens falsas após um restore.
+    if (operationId) {
+      return { operation: await this.repository.findRestoreById(operationId) };
+    }
     const running = await this.repository.findRunningRestore();
-    return { operation: running ?? await this.repository.findLatestRestore() };
+    // Sem id a superfície "current" é somente o lock vivo da instalação. O
+    // histórico pertence à auditoria; uma operação terminal antiga não é
+    // estado atual e não deve ocupar o painel ao abrir a página.
+    return { operation: running };
   }
 
   // ─── infra ──────────────────────────────────────────────────────────

@@ -69,6 +69,12 @@ exporta somente essa tabela da instalação receptora; após aplicar o pacote,
 recoloca o diário local e fecha a operação atual. Nenhum status/histórico
 operacional do snapshot passa a determinar a tela local.
 
+Atualização `v0.11.37`: o protocolo de status deixa de inferir a operação
+atual pelo último registro terminal do banco. O `202` de backup/restauração
+devolve o identificador que o painel usa no polling; sem esse identificador a
+API expõe somente um lock em execução. Assim um erro histórico não pode ser
+apresentado como falha da operação recém-disparada.
+
 ## Auditoria pós-faxina — 2026-09-30
 
 Os gates de S1, S2 operacional, S3, S4 estático e removedor SaaS passaram com
