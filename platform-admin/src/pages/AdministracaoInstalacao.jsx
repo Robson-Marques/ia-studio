@@ -156,12 +156,17 @@ function Atualizacao() {
 
 function Backups() {
   const toast = useToast();
+  const toastRef = useRef(toast);
   const inputRef = useRef(null);
+  const lastOperationStatus = useRef(null);
+  const restoreSubmitted = useRef(false);
   const [items, setItems] = useState([]);
   const [operation, setOperation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(null);
+  const [reconnecting, setReconnecting] = useState(false);
+  toastRef.current = toast;
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -169,9 +174,30 @@ function Backups() {
       const [files, current] = await Promise.all([listBackups(), getCurrentBackupOperation()]);
       setItems(files);
       setOperation(current);
-    } catch (err) { if (!silent) toast.error(err.message); }
+      setReconnecting(false);
+      const previous = lastOperationStatus.current;
+      if (previous === 'RUNNING' && current?.status === 'SUCCESS') {
+        toastRef.current.success(current.kind === 'RESTORE' ? 'Restauração concluída. A aplicação voltou a responder.' : 'Backup concluído.');
+      }
+      if (previous === 'RUNNING' && current?.status === 'FAILED' && !isSnapshotOperation(current)) {
+        toastRef.current.error(`A ${current.kind === 'RESTORE' ? 'restauração' : 'geração de backup'} falhou.`);
+      }
+      lastOperationStatus.current = current?.status ?? null;
+      if (current?.status !== 'RUNNING') restoreSubmitted.current = false;
+    } catch (err) {
+      // Durante restore a API é deliberadamente parada. Nginx responde 502 por
+      // alguns segundos; não transforme polling em uma chuva de alertas.
+      if (restoreSubmitted.current && isTemporaryRestartError(err)) {
+        setReconnecting(true);
+      } else if (!silent) {
+        toastRef.current.error(err.message);
+      }
+    }
     finally { if (!silent) setLoading(false); }
-  }, [toast]);
+  // useToast muda quando uma notificação é adicionada. Mantê-lo nas
+  // dependências reexecutaria o carregamento inicial a cada toast e, durante
+  // um 502 de restart, criaria uma cascata infinita de mensagens.
+  }, []);
 
   useEffect(() => { load(); }, [load]);
   const active = operation?.status === 'RUNNING';
@@ -183,7 +209,13 @@ function Backups() {
 
   async function generate() {
     setBusy(true);
-    try { await createBackup(); setOperation({ kind: 'BACKUP', status: 'RUNNING', log_lines: [] }); toast.success('Backup iniciado.'); await load(true); }
+    try {
+      await createBackup();
+      lastOperationStatus.current = 'RUNNING';
+      setOperation({ kind: 'BACKUP', status: 'RUNNING', log_lines: [] });
+      toast.success('Backup iniciado.');
+      await load(true);
+    }
     catch (err) { toast.error(err.message); } finally { setBusy(false); }
   }
   async function upload(event) {
@@ -208,14 +240,24 @@ function Backups() {
     setBusy(true);
     try {
       if (confirm.type === 'delete') { await deleteBackup(confirm.file); toast.success('Backup excluído.'); }
-      else { await restoreBackup(confirm.file); setOperation({ kind: 'RESTORE', status: 'RUNNING', file_name: confirm.file, log_lines: [] }); toast.success('Restauração iniciada.'); }
-      setConfirm(null); await load(true);
+      else {
+        await restoreBackup(confirm.file);
+        restoreSubmitted.current = true;
+        lastOperationStatus.current = 'RUNNING';
+        setOperation({ kind: 'RESTORE', status: 'RUNNING', file_name: confirm.file, log_lines: [] });
+        toast.success('Restauração iniciada. A aplicação será reconectada automaticamente ao final.');
+      }
+      setConfirm(null);
+      // O restore para PM2 logo após o 202. A primeira consulta só deve ocorrer
+      // depois de a unidade transiente ter iniciado, nunca no mesmo tick.
+      if (confirm.type === 'restore') window.setTimeout(() => { void load(true); }, 1_000);
+      else await load(true);
     } catch (err) { toast.error(err.message); } finally { setBusy(false); }
   }
 
   return <div className="space-y-4">
     <Banner tone="warning" title="Restauração substitui a instância">Antes de restaurar, gere e baixe um backup atual. A restauração substitui banco e arquivos e reinicia os serviços.</Banner>
-    {operation && <OperationLog operation={operation} />}
+    {operation && <OperationLog operation={operation} reconnecting={reconnecting} />}
     <Card><div className="p-5 space-y-4">
       <div className="flex flex-wrap gap-2"><Button variant="primary" loading={busy} disabled={active} onClick={generate}>Gerar backup</Button><Button variant="secondary" disabled={busy || active} onClick={() => inputRef.current?.click()}>Enviar backup</Button><input ref={inputRef} className="hidden" type="file" onChange={upload} /></div>
       {loading ? <Spinner size="md" /> : !items.length ? <EmptyState icon="database" title="Nenhum backup" description="Gere um backup antes de qualquer manutenção de risco." /> : <div className="space-y-2">{items.map((backup) => {
@@ -230,10 +272,17 @@ function Backups() {
 function Metric({ label, value, detail }) { return <Card><div className="p-5"><p className="text-sm m-0" style={{ color: 'var(--su-text-muted)' }}>{label}</p><p className="text-xl font-bold mt-1 mb-0">{value}</p>{detail && <p className="text-xs m-0" style={{ color: 'var(--su-text-muted)' }}>{detail}</p>}</div></Card>; }
 function statusTone(status) { return status === 'SUCCESS' ? 'success' : status === 'FAILED' ? 'danger' : status === 'RUNNING' ? 'warning' : 'neutral'; }
 function UpgradeLog({ current }) { return <Card><div className="p-5 space-y-3"><div className="flex items-center justify-between gap-3"><p className="font-semibold m-0">Atualização {current.to_version ? `para ${current.to_version}` : ''}</p><Badge tone={statusTone(current.status)}>{current.status || 'desconhecido'}</Badge></div>{current.error_step && <Banner tone="danger">Falha na etapa: {current.error_step}</Banner>}<Log lines={current.log_lines} empty={current.status === 'RUNNING' ? 'Aguardando saída do script…' : 'Nenhum log registrado.'} /></div></Card>; }
-function OperationLog({ operation }) {
+function isTemporaryRestartError(error) {
+  return /\b(502|503|504)\b|bad gateway|service unavailable|gateway timeout/i.test(String(error?.message || ''));
+}
+function isSnapshotOperation(operation) {
+  return String(operation?.error || '').startsWith('Operação herdada do snapshot de backup');
+}
+function OperationLog({ operation, reconnecting }) {
   const noun = operation.kind === 'RESTORE' ? 'Restauração' : 'Backup';
-  const title = operation.status === 'RUNNING' ? `${noun} em andamento` : operation.status === 'SUCCESS' ? `${noun} concluído` : `${noun} falhou`;
-  return <Card><div className="p-5 space-y-3"><div className="flex items-center justify-between gap-3"><p className="font-semibold m-0">{title}</p><Badge tone={statusTone(operation.status)}>{operation.status}</Badge></div>{operation.error && <Banner tone="danger">{operation.error}</Banner>}<Log lines={operation.log_lines} empty={operation.status === 'RUNNING' ? 'Aguardando saída da operação…' : 'Nenhum detalhe adicional foi registrado.'} /></div></Card>;
+  const inherited = isSnapshotOperation(operation);
+  const title = inherited ? 'Registro anterior encerrado' : operation.status === 'RUNNING' ? `${noun} em andamento` : operation.status === 'SUCCESS' ? `${noun} concluído` : `${noun} falhou`;
+  return <Card><div className="p-5 space-y-3"><div className="flex items-center justify-between gap-3"><p className="font-semibold m-0">{title}</p><Badge tone={inherited ? 'warning' : statusTone(operation.status)}>{inherited ? 'ENCERRADO' : operation.status}</Badge></div>{reconnecting && <Banner tone="info">A restauração está em andamento. Aguarde a reconexão automática; não atualize a página nem repita a operação.</Banner>}{inherited ? <Banner tone="warning">Este registro foi capturado dentro do pacote antes de o backup anterior terminar. Ele foi encerrado para não bloquear esta instalação.</Banner> : operation.error && <Banner tone="danger">{operation.error}</Banner>}<Log lines={operation.log_lines} empty={operation.status === 'RUNNING' ? 'Aguardando saída da operação…' : 'Nenhum detalhe adicional foi registrado.'} /></div></Card>;
 }
 function Log({ lines, empty }) { return <pre style={{ margin: 0, padding: 12, maxHeight: 320, overflow: 'auto', borderRadius: 8, border: '1px solid var(--su-border-default)', background: 'var(--su-surface-subtle)', color: 'var(--su-text-secondary)', fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{lines?.length ? lines.join('\n') : empty}</pre>; }
 function History({ entries }) { return <div className="space-y-2">{entries.map((entry) => <div key={entry.id || `${entry.started_at}-${entry.to_version}`} className="flex flex-wrap items-center justify-between gap-3 rounded p-3" style={{ border: '1px solid var(--su-border-default)' }}><div><code style={{ fontFamily: 'var(--su-font-mono, monospace)' }}>{entry.from_version || '—'} → {entry.to_version || '—'}</code><p className="text-xs m-0" style={{ color: 'var(--su-text-muted)' }}>{formatDateTime(entry.started_at || entry.created_at)}</p></div><Badge tone={statusTone(entry.status)}>{entry.status || 'desconhecido'}</Badge></div>)}</div>; }

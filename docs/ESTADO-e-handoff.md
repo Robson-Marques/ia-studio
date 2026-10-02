@@ -57,6 +57,12 @@ antes de fechá-la, e por isso a restauração trouxe uma operação `RUNNING` j
 concluída. O restore agora encerra essas rows herdadas como `FAILED`, com motivo
 auditável; a reconciliação única da row já presente no host ainda é necessária.
 
+Atualização `v0.11.35`: a prova de restauração revelou uma superfície UX
+operacional: enquanto PM2 reinicia, Nginx responde `502` e o polling expunha
+HTML cru em toasts repetidos. O painel agora trata essa janela como reconexão
+esperada e apresenta registros herdados como encerrados, não como falso backup
+falho. A fonte de estado também ordena operações terminais por conclusão.
+
 ## Auditoria pós-faxina — 2026-09-30
 
 Os gates de S1, S2 operacional, S3, S4 estático e removedor SaaS passaram com

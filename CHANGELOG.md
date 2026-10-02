@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.11.35 - 2026-10-02 (Administração local: reconexão pós-restauração)
+
+- O painel passa a tratar `502/503/504` temporários durante reinício de uma
+  restauração como reconexão aguardada, sem despejar HTML do Nginx em toasts.
+- Registros herdados do snapshot são apresentados como encerrados, não como um
+  falso backup falho. A API prioriza a operação terminal mais recente ao exibir
+  o estado atual.
+
 ## v0.11.34 - 2026-10-02 (Restauração: operações do snapshot)
 
 - Encerra como `FAILED` — com justificativa auditável — as operações que o
