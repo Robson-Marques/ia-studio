@@ -1,8 +1,11 @@
 # S5 — Capability Acceptance: SaaS → instalação dedicada
 
-**Capability:** `ia-studio.capability.saas-to-dedicated-installation`  
-**Data da Acceptance:** 2026-10-03  
-**Versão operacional comprovada:** `v0.11.37`  
+**Capability:** `ia-studio.capability.saas-to-dedicated-installation`
+
+**Data da Acceptance:** 2026-10-03
+
+**Versão operacional comprovada:** `v0.11.37`
+
 **Resultado:** aceito
 
 ## Escopo da aceitação integrada
