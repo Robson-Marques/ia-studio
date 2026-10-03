@@ -1,17 +1,18 @@
-# ARCHITECTURE_LOCK.md — Congelamento da Arquitetura V1
+# ARCHITECTURE_LOCK.md — Registro histórico do congelamento SaaS V1
 
-**Data do congelamento:** 02/07/2026 · **Status: substituída para a conversão dedicada** · Autoridade: Robson (product owner)
+**Data do congelamento:** 02/07/2026 · **Status: arquivada e substituída pela arquitetura dedicada** · Autoridade: Robson (product owner)
 
-> A decisão posterior do product owner substitui o congelamento SaaS para a
-> Capability `ia-studio.capability.saas-to-dedicated-installation`, registrada em
-> `docs/capabilities/saas-to-dedicated-installation.md` e decidida pela
-> `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md`. Este arquivo continua
-> sendo evidência do estado recuperado, não autorização para ampliar ou preservar
-> contratos SaaS incompatíveis com a conversão.
+> Este arquivo preserva somente a fotografia do estado SaaS recuperado. A
+> arquitetura oficial vigente é a dedicada, definida em
+> `docs/diretrizes-arquiteturais.md`, decidida em
+> `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md` e aceita em
+> `docs/capabilities/saas-to-dedicated-installation.md`. Nada abaixo autoriza
+> ampliar, preservar ou recriar contratos SaaS.
 
-## Declaração
+## Registro histórico: declaração SaaS substituída
 
-A arquitetura oficial da V1 do **IA Studio** é composta por, e somente por:
+Na data do congelamento, a arquitetura SaaS proposta para a V1 do **IA Studio**
+era composta por, e somente por:
 
 | # | Bloco | Escopo resumido |
 |---|---|---|

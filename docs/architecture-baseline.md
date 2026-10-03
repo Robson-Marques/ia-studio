@@ -31,18 +31,21 @@ do produto.
 
 | Dimensão | Estado | Evidência | Leitura para a Capability |
 |---|---|---|---|
-| Visão e limites | existente | `README.md`, `CLAUDE.md`, decisão do produto | O destino dedicado está definido; o código atual diverge. |
+| Visão e limites | existente | `README.md`, `CLAUDE.md`, decisão do produto | O destino dedicado estava definido; a divergência foi removida pela Capability aceita. |
 | Módulos e fronteiras | existente | `platform-api/src/app.module.ts` | Monólito modular com API, workers e painel local. |
-| Dados e relações | existente | `platform-api/prisma/schema.prisma` | Hierarquia SaaS e escopos atingem entidades operacionais. |
-| Auth e ACL | existente | `shared/auth/*`, `permissions.constants.ts` | JWT e ACL existem; dois atores e tenant context são SaaS. |
+| Dados e relações | existente | `platform-api/prisma/schema.prisma` | A recuperação identificou hierarquia SaaS; o S1 a removeu do estado vigente. |
+| Auth e ACL | existente | `shared/auth/*`, `permissions.constants.ts` | A recuperação identificou dois atores e tenant context; o S1 os reduziu ao usuário local. |
 | Integrações/eventos | existente | `modules/integration`, `shared/events` | Registry, Secrets, Storage, Event Bus e BullMQ são preserváveis. |
 | Superfícies | existente | `platform-admin` | O painel local é a única superfície administrativa da aplicação. |
-| Infraestrutura | parcial | `scripts/*`, deploy | O contrato ainda precisa separar base, vertente e aplicação no host. |
-| Observabilidade/auditoria | existente | `shared/audit`, logs, system | Devem se tornar locais à aplicação. |
+| Infraestrutura | parcial | `scripts/*`, deploy | O contrato foi completado: recursos são derivados por aplicação no host. |
+| Observabilidade/auditoria | existente | `shared/audit`, logs, system | Permanecem locais à aplicação após a conversão. |
 | Estratégia de testes | parcial | documentação e código inspecionados | Cada slice exige evidência proporcional; Acceptance é integrada no fim. |
 | Capability Map | existente para esta frente | seção abaixo | Outras capacidades ainda não foram avaliadas contractualmente. |
 
-## Drift e gaps recuperados
+> A tabela acima é o diagnóstico do Recovery que originou a Capability. O estado
+> vigente é o dedicado, comprovado pela Acceptance e detalhado nas diretrizes.
+
+## Drift e gaps recuperados (histórico e resolução)
 
 ### DR-001 — arquitetura SaaS declarada vs. destino aprovado
 
@@ -52,6 +55,9 @@ uma instalação dedicada por cliente. O Capability Contract
 `ia-studio.capability.saas-to-dedicated-installation` governa a transição; nenhuma
 nova mudança pode ampliar o modelo SaaS.
 
+**Resolução:** S1–S3 removeram o modelo, contratos e superfícies SaaS; o gate
+transversal e o gate de aposentadoria do Console passaram na Acceptance.
+
 ### GAP-001 — transição dos dados existentes (decisão registrada)
 
 A instância ISP dedicada começa com banco limpo; não haverá conversão in-place do
@@ -60,6 +66,9 @@ seletiva verificável de dados operacionais. A importação futura será mapeada
 auditável, sem secrets nem estruturas SaaS; ver
 `docs/migrations/isp-dedicated-operational-data-export.md`.
 
+**Resolução para o desenvolvimento Newnet:** não existiam dados operacionais;
+essa não aplicabilidade foi registrada em `migrations/s2-dev-data-disposition.md`.
+
 ### GAP-002 — coabitação de vertentes independentes no mesmo host
 
 Scripts, PM2, backups, banco e vhosts usam nomes globais (`/opt/iastudio`,
@@ -67,17 +76,24 @@ Scripts, PM2, backups, banco e vhosts usam nomes globais (`/opt/iastudio`,
 todos por recursos parametrizados por aplicação e provar que operações de uma
 vertente não atingem outros produtos do host.
 
+**Resolução:** S4 comprovou recursos exclusivos em scripts e no host Newnet,
+sem cruzamento com Ctrl Leads e Finanças.
+
 ### GAP-003 — governança das vertentes de cliente
 
 A estratégia de branch/repositório e o momento de criar uma vertente ainda não
 estão formalizados. Não bloqueia remover SaaS, mas bloqueia declarar uma
 verticalização ISP (ou de outro cliente) concluída.
 
+**Resolução de governança:** `docs/deploy-e-versionamento.md` formaliza que cada
+vertente nasce em repositório próprio; a Capability ISP continua planejada e não
+faz parte desta Acceptance.
+
 ## Mapa de capacidades relevante
 
 | ID | Capability | Estado | Contrato / limite |
 |---|---|---|---|
-| `ia-studio.capability.saas-to-dedicated-installation` | Converter a plataforma compartilhada em aplicação dedicada | `in-progress` | `docs/capabilities/saas-to-dedicated-installation.md` |
+| `ia-studio.capability.saas-to-dedicated-installation` | Converter a plataforma compartilhada em aplicação dedicada | `accepted` | `docs/capabilities/saas-to-dedicated-installation.md` |
 | `ia-studio.capability.isp-dedicated-product` | Consolidar uma vertente específica para provedor | `planned` | Depende da conversão; receberá contrato próprio antes de implementação. |
 
 O mapa não afirma que capacidades preexistentes estão aceitas: elas ainda não

@@ -5,14 +5,14 @@
 > Toda IA/desenvolvedor que atuar neste projeto DEVE seguir estas regras sem exceção.
 > Documentos normativos vivos: `docs/diretrizes-arquiteturais.md`, `docs/deploy-e-versionamento.md` (runbook de deploy), `RELATORIO-ANALISE-E-ARQUITETURA.md` (Parte 2 — contrato da API do ERP Altarede). Índice de estado/re-ancoragem: `docs/ESTADO-e-handoff.md`.
 >
-> **Conversão em andamento:** S1 retirou o núcleo SaaS; os slices operacionais
-> e a Acceptance ainda dependem de evidência real no host.
+> **Conversão concluída:** a Capability de remoção SaaS foi aceita após os
+> gates estruturais e a evidência operacional integrada no host.
 > A fonte de verdade da transição é
 > `docs/capabilities/saas-to-dedicated-installation.md`, com o Baseline em
 > `docs/architecture-baseline.md` e a decisão em
 > `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md`. Não criar, ampliar ou
 > corrigir código no sentido de multi-tenancy, Console, billing, licensing ou
-> domínios por tenant; cada slice deve reduzi-los até a remoção completa.
+> domínios por tenant; esses conceitos não podem ser reintroduzidos.
 >
 > **Como interagir com o Robson** (idioma, re-ancorar pós-compactação, erro silencioso, docs vivos, ambiente/deploy, governança de mudanças, tom de resposta) está em **`COMO-INTERAGIR-COM-ROBSON.md`** (raiz do projeto — mesmo conteúdo em todos os projetos do Robson). Este arquivo aqui é só regra técnica/de produto do IA Studio.
 

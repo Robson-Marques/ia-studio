@@ -3,7 +3,7 @@ schema: prompt-framework/v1
 id: ia-studio.capability.saas-to-dedicated-installation
 kind: capability
 version: 1.1.0
-status: in-progress
+status: accepted
 title: Conversão de SaaS para instalação dedicada
 policy_refs:
   - workflow.capability-contract@1.0.0
@@ -38,9 +38,9 @@ vertente de negócio; ISP/IXC será Capability dependente.
 
 ## Estado alvo e fluxos
 
-O estado é `in-progress`: Recovery, RFC e contrato estão concluídos; a conversão
-ainda não. Só passa a `structurally-complete` quando os itens obrigatórios
-existirem e a `accepted` após Capability Acceptance integrada.
+O estado é `accepted`: Recovery, RFC, S1–S4 e a Capability Acceptance integrada
+estão concluídos. A alteração futura que reintroduza escopo compartilhado exige
+nova decisão arquitetural e Capability própria.
 
 **Uso local:** usuário → JWT local → ACL → rota; registros pertencem à aplicação;
 eventos/jobs conservam trace e idempotência sem tenant.
@@ -79,7 +79,7 @@ install/upgrade/backup/restore/uninstall dessa aplicação. Falha de A não afet
 | S2 — propagação operacional | Repositories, serviços, DTOs, módulos, jobs e integrações sem escopo SaaS; retirada de Licensing/Billing | S1 | concluído — gate operacional aprovado; a vertente Newnet foi instalada em PostgreSQL limpo e a ausência de dados operacionais foi formalizada em `migrations/s2-dev-data-disposition.md`. |
 | S3 — superfícies dedicadas | Migração de atualização/backup/restauração para a administração local; remoção de Console e UI/rotas/contextos SaaS | S1 | concluído — matriz e gate em `saas-to-dedicated-s3-console-matrix.md` |
 | S4 — coabitação de vertentes no host | Install/upgrade/backup/restore/uninstall isolados por aplicação e repositório | S1 e contratos de runtime finais | concluído — Newnet foi instalada limpa em `/opt/newnet-ia-studio`, atualizada até `v0.11.37`, gerou `full-20261002-165318.tar.gz` e restaurou esse mesmo pacote com `SUCCESS` no painel. Ctrl Leads/Finanças permaneceram processos independentes no host. `v0.11.36` preserva o diário local e `v0.11.37` acompanha cada operação pelo seu id. |
-| S5 — Acceptance | Evidência integrada e documentação viva | S1–S4 | em andamento — S1–S4 estão concluídos; consolidar os gates e a evidência operacional antes de alterar o estado da Capability. |
+| S5 — Acceptance | Evidência integrada e documentação viva | S1–S4 | concluído — matriz integrada e evidências em `saas-to-dedicated-s5-acceptance.md`. |
 
 S1 é o corte estrutural concluído: dados, autenticação, ACL, API e eventos foram
 reduzidos juntos ao escopo local. S2–S4 continuam necessários para a aceitação
@@ -156,6 +156,6 @@ operação não cruza com os demais produtos reais do host.
 
 ## Política de validação
 
-Cada slice recebe validação técnica mínima proporcional e atualiza esta Capability
-sem antecipar homologação. Capability Acceptance ocorre uma vez, após S1–S4,
-conforme `workflow.doctrine.testing`; até então o estado permanece `in-progress`.
+Cada slice recebeu validação técnica mínima proporcional. A Capability Acceptance
+ocorreu uma vez após S1–S4, conforme `workflow.doctrine.testing`; a evidência
+integrada está registrada em `saas-to-dedicated-s5-acceptance.md`.

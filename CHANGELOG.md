@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.11.38 - 2026-10-03 (Capability dedicada aceita)
+
+- Fechada a Capability de conversão SaaS → instalação dedicada após Acceptance
+  integrada: S1–S4, gates de regressão e restauração real do backup Newnet em
+  `v0.11.37` estão registrados em `docs/capabilities/saas-to-dedicated-s5-acceptance.md`.
+- O antigo Architecture Lock SaaS foi marcado explicitamente como registro
+  histórico sem autoridade normativa; as fontes de estado corrente agora
+  descrevem somente o modelo dedicado aceito.
+
 ## v0.11.37 - 2026-10-02 (Administração: estado por operação)
 
 - O painel acompanha backup e restauração pelo identificador retornado no

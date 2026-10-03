@@ -23,8 +23,8 @@ são descartáveis e não representam clientes. O destino agora é:
 - o host somente coabita aplicações independentes, cada uma em `/opt/<app-id>`
   e com banco, Redis, PM2, domínio, storage e backup próprios.
 
-S1, S2, S3 e S4 estão concluídos; a Capability geral segue `in-progress` em
-S5/Acceptance. S4 foi redefinido para provar instalação limpa da vertente
+S1, S2, S3, S4 e S5 estão concluídos; a Capability geral está `accepted`. S4 foi
+redefinido para provar instalação limpa da vertente
 Newnet e coexistência sem cruzamento com Finanças, Mercado e os demais produtos
 reais do host — não exige manter uma segunda cópia idêntica do IA Studio. A
 remoção de `ia-dev` e `ia-teste` foi autorizada porque não havia dados a
@@ -82,6 +82,13 @@ DevTools ocorreram enquanto o restore parou o PM2 de propósito e cessaram na
 reconexão; não foram convertidas em falha ou alerta do painel. Essa prova fecha
 S4 e abre S5/Acceptance, mantendo a Capability `in-progress` até a consolidação
 integrada.
+
+Acceptance integrada — 2026-10-03: S5 consolidou os oito critérios do contrato,
+os gates S1–S4 e a prova do host em
+[`capabilities/saas-to-dedicated-s5-acceptance.md`](capabilities/saas-to-dedicated-s5-acceptance.md).
+A Capability `ia-studio.capability.saas-to-dedicated-installation` está
+**`accepted`**. Novas vertentes (ISP ou outro segmento) exigem Capability e
+contrato próprios; não reabrem nem reutilizam o modelo SaaS aposentado.
 
 ## Auditoria pós-faxina — 2026-09-30
 
