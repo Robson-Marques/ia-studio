@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.8.0
+version: 1.9.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-10-05"
 released_at: "2026-10-05"
-change_reason: MINOR. Adiciona a especialidade de configuração de integrações locais, aprovada para remover o fluxo de instalação SaaS de conectores.
+change_reason: MINOR. Adiciona a especialidade de análise assistida de chamados IXC, limitada a consulta e síntese sem mutações no ERP.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -30,6 +30,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 | `ia-studio.dedicated-instance-operations` | Engenheiro de operações de aplicações dedicadas | Governar instalação, upgrade, backup, restauração e remoção por vertente, com evidência real de host e sem afetar outros produtos. | [dedicated-instance-operations.md](especialidades/dedicated-instance-operations.md) |
 | `ia-studio.system-cleanup` | Engenheiro de manutenção (faxina de código e arquivos mortos por reachability) | Remover de verdade código e arquivos mortos do IA Studio em etapas — sem quebrar build/gates/runtime — distinguindo *excluir de verdade* de *arquivar*, para o repo representar só o que está em uso. | [system-cleanup.md](especialidades/system-cleanup.md) |
 | `ia-studio.local-integrations-configuration` | Engenheiro de integrações locais | Governar providers embarcados, catálogo interno e conexões da instalação dedicada, sem etapa de instalação SaaS. | [local-integrations-configuration.md](especialidades/local-integrations-configuration.md) |
+| `ia-studio.assistant-ticket-analysis` | Engenheiro de runtime assistido e integrações operacionais | Governar consulta delimitada e análise rastreável de chamados IXC pelo assistente, sem mutações no ERP. | [assistant-ticket-analysis.md](especialidades/assistant-ticket-analysis.md) |
 
 ## Critérios de aceite
 
@@ -61,3 +62,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.6.0 | released | Aprovado por Robson em 2026-09-30 | MINOR. Retira `ia-studio.whatsapp-connectors` do catálogo ativo: o contrato 1.0.0 mandava reintroduzir Baileys, QR, coexistência manual, metering e escopo SaaS, todos incompatíveis com a instalação dedicada. O arquivo é preservado apenas como registro aposentado. |
 | 1.7.0 | released | Aprovado por Robson em 2026-10-02 | MINOR. A especialidade de operações passa a apontar para `ia-studio.dedicated-instance-operations@2.0.0`: IA Studio é a base; operações governam aplicações de vertentes/repositórios independentes no mesmo host, não cópias irmãs do mesmo checkout. |
 | 1.8.0 | released | Aprovado por Robson em 2026-10-05 | MINOR. Adiciona `ia-studio.local-integrations-configuration@1.0.0`, criada após o alinhamento da remoção do Marketplace como etapa SaaS. |
+| 1.9.0 | released | Aprovado por Robson em 2026-10-05 | MINOR. Adiciona `ia-studio.assistant-ticket-analysis@1.0.0`, criada após o alinhamento da análise assistida de chamados IXC. |
