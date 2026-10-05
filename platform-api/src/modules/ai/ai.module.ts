@@ -147,8 +147,8 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
   // AgentRunnerService exportado pra futura orquestracao externa (workers).
   // ToolRegistryService exportado pra Fase 6: o IspModule registra as tools ISP
   // no MESMO registry (sem que o AiModule importe o IspModule — evita ciclo).
-  // Fase 7: LlmProviderService + AiOrchestratorService exportados pro Mapper
-  // Inteligente (ResourceModule) e pro Console do Desenvolvedor (DevtoolsModule);
+  // LlmProviderService + AiOrchestratorService exportados pro Console do
+  // Desenvolvedor (DevtoolsModule);
   // ToolRuntimeService exportado pro Console rodar tools do catalogo.
   exports: [AgentRunnerService, ToolRegistryService, LlmProviderService, AiOrchestratorService, ToolRuntimeService],
 })

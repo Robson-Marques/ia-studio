@@ -7,7 +7,7 @@
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
 > Última atualização: 2026-10-05 (análise assistida de chamados IXC em
-> construção; Marketplace já removido).
+> construção; vertente ISP opera somente com IXC).
 
 ## Frente atual — vertentes próprias e reinício limpo do desenvolvimento
 
@@ -25,6 +25,14 @@ continua sendo o catálogo interno semeado pelo Registry; em
 implementado para configurar. Conexões, segredos e logs existentes foram
 preservados. A tabela física de instalações legada não é mais lida nem escrita,
 evitando uma migração destrutiva em instalações existentes.
+
+Atualização de 2026-10-05 — **Retirada de legado ISP:** Recursos
+(Mapeamentos/Explorador), seus endpoints e permissões, e o provider Altarede
+foram retirados por não atenderem fluxo ativo da vertente Newnet. Incidentes e
+tools ISP resolvem somente conexões IXC; a análise de chamados continua
+independente do módulo removido. Os registros antigos de conexão, segredo, log e
+`resource_mappings` foram preservadas fisicamente e ficaram inacessíveis ao
+runtime, para que o upgrade não exija apagamento de dados.
 
 O modelo anterior de “duas instâncias do mesmo checkout” foi corrigido. A prova
 com `ia-dev` e `ia-teste` demonstrou isolamento de recursos, mas essas instalações
@@ -703,7 +711,7 @@ Regras e estado:
 Arquitetura viva:
 - `docs/diretrizes-arquiteturais.md` — 58 diretrizes que governam o desenho.
 - `docs/deploy-e-versionamento.md` — runbook de deploy/release/backup.
-- `RELATORIO-ANALISE-E-ARQUITETURA.md` — **Parte 2** = contrato da API do ERP Altarede (referência viva da integração ISP). Parte 1 é histórico.
+- `platform-api/src/modules/isp/README.md` — contrato vivo da integração IXC e das tools ISP.
 - `docs/base-doc-e-portes-aquapark.md` — backlog do que ainda falta portar do Aquapark.
 
 Estado por módulo ("o que existe e como funciona hoje"):

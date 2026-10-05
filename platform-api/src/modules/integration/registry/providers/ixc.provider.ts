@@ -13,9 +13,8 @@
 //
 // Este provider expoe DUAS familias de operacoes:
 //   1) O CONTRATO CANONICO da solucao ISP (`cliente.dados`, `financeiro.*`,
-//      `os.cadastrar`, `conectividade.listar_com_status`...) — as mesmas chaves
-//      do AltaredeProvider. Assim as tools do agente (isp-tools.ts) funcionam
-//      com qualquer um dos dois ERPs, sem tocar em tool nenhuma.
+//      `os.cadastrar`, `conectividade.listar_com_status`...) — as chaves que
+//      as tools do agente ISP consomem sem chamar HTTP diretamente.
 //   2) Operacoes GENERICAS (`ixc.listar/inserir/editar/excluir`) pra qualquer
 //      tabela — usadas por nos de workflow e usuarios avancados.
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
@@ -75,9 +74,9 @@ const T = {
 
 // Catalogo de operacoes (sem path arbitrario — a chave decide o que roda).
 const OPERATIONS = [
-  // Contrato canonico ISP (mesmas chaves do AltaredeProvider)
+  // Contrato canônico ISP.
   'cliente.dados',
-  // Extensao do IXC (sem equivalente no Altarede hoje): identificar por telefone.
+  // Extensão IXC: identificar por telefone.
   'cliente.por_telefone',
   'cliente.planos',
   'cliente.acesso',
@@ -91,7 +90,7 @@ const OPERATIONS = [
   'os.cadastrar',
   'os.listar_abertas',
   // Extensão IXC: histórico limitado para análise assistida. Não é operação
-  // canônica multi-ERP porque ainda não há equivalente confirmado no Altarede.
+  // do contrato comum de atendimento; a tool que a usa força uma conexão IXC.
   'atendimento.listar_chamados_recentes',
   'atendimento.listar_setor',
   'atendimento.listar_motivo_atendimento',
@@ -207,11 +206,6 @@ export class IxcProvider extends BaseProvider {
 
   async execute(ctx: ProviderContext, operation: string, params: unknown): Promise<unknown> {
     if (!(OPERATIONS as readonly string[]).includes(operation)) {
-      if (operation === 'financeiro.boleto_por_email') {
-        throw new BadRequestException(
-          'O IXC não expõe envio de boleto por e-mail pela API. Use formato "linha" (linha digitável/PIX) ou "pdf".',
-        );
-      }
       throw new BadRequestException(
         `Operação desconhecida "${operation}". Disponíveis: ${OPERATIONS.join(', ')}.`,
       );

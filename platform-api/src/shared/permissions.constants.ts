@@ -93,18 +93,12 @@ export const PERMISSIONS = {
   AI_ANALYSIS_READ: 'ai.analysis.read',
   AI_ANALYSIS_RUN: 'ai.analysis.run',
 
-  // ─── ISP (Fase 6 — Solução Altarede / Manutenção) ───
+  // ─── ISP (Fase 6 — Solução IXC / Manutenção) ───
   ISP_INCIDENTS_READ: 'isp.incidents.read',
   ISP_INCIDENTS_WRITE: 'isp.incidents.write',
   ISP_INCIDENTS_ACTIVATE: 'isp.incidents.activate',
   ISP_INCIDENTS_DISPATCH: 'isp.incidents.dispatch',
   ISP_TOOLS_USE: 'isp.tools.use',
-
-  // ─── Recursos (Fase 7 — Resource Model/Mapper/Explorer) ─────
-  RESOURCE_MAPPINGS_READ: 'resource.mappings.read',
-  RESOURCE_MAPPINGS_WRITE: 'resource.mappings.write',
-  RESOURCE_EXPLORE_READ: 'resource.explore.read',
-  RESOURCE_MAPPER_SUGGEST: 'resource.mapper.suggest',
 
   // ─── Desenvolvedor (Fase 7 — DevTools + Developer Center) ───
   DEVTOOLS_USE: 'devtools.use',
@@ -236,16 +230,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
-    key: 'resources',
-    label: 'Recursos',
-    permissions: [
-      PERMISSIONS.RESOURCE_MAPPINGS_READ,
-      PERMISSIONS.RESOURCE_MAPPINGS_WRITE,
-      PERMISSIONS.RESOURCE_EXPLORE_READ,
-      PERMISSIONS.RESOURCE_MAPPER_SUGGEST,
-    ],
-  },
-  {
     key: 'developer',
     label: 'Desenvolvedor',
     permissions: [
@@ -329,10 +313,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.ISP_INCIDENTS_ACTIVATE]: 'Ativar/encerrar incidentes (ISP)',
   [PERMISSIONS.ISP_INCIDENTS_DISPATCH]: 'Disparar informativo em massa (ISP)',
   [PERMISSIONS.ISP_TOOLS_USE]: 'Usar ferramentas ISP do agente',
-  [PERMISSIONS.RESOURCE_MAPPINGS_READ]: 'Ver mapeamentos de recursos',
-  [PERMISSIONS.RESOURCE_MAPPINGS_WRITE]: 'Criar/editar mapeamentos de recursos',
-  [PERMISSIONS.RESOURCE_EXPLORE_READ]: 'Explorar recursos (somente leitura)',
-  [PERMISSIONS.RESOURCE_MAPPER_SUGGEST]: 'Sugerir mapeamento com IA',
   [PERMISSIONS.DEVTOOLS_USE]: 'Usar o Console do Desenvolvedor',
   [PERMISSIONS.DEVELOPER_APIKEYS_READ]: 'Ver chaves de API (metadados)',
   [PERMISSIONS.DEVELOPER_APIKEYS_MANAGE]: 'Criar/revogar chaves de API',
@@ -417,12 +397,8 @@ export const SYSTEM_PROFILES: SystemProfileDef[] = [
   },
   {
     name: 'Desenvolvedor',
-    description: 'Mapeia recursos, explora dados e usa bancada/Chaves de API',
+    description: 'Usa a bancada e gerencia Chaves de API',
     permissions: [
-      PERMISSIONS.RESOURCE_MAPPINGS_READ,
-      PERMISSIONS.RESOURCE_MAPPINGS_WRITE,
-      PERMISSIONS.RESOURCE_EXPLORE_READ,
-      PERMISSIONS.RESOURCE_MAPPER_SUGGEST,
       PERMISSIONS.DEVTOOLS_USE,
       PERMISSIONS.DEVELOPER_APIKEYS_READ,
       PERMISSIONS.DEVELOPER_APIKEYS_MANAGE,

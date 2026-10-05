@@ -1,13 +1,12 @@
 // Tools do agente ISP (Fase 6 §2) — registradas no MESMO mecanismo das tools
 // builtin (ToolRegistryService), semeadas no catalogo ai_tools pelo seed da
 // Fase 5 (AiProvidersSeedService itera toolRegistry.all()). Cada tool:
-//   * resolve a conexao de ERP (IspConnectionResolver — nunca sabe QUAL ERP);
+//   * resolve uma conexão IXC (IspConnectionResolver — nunca recebe o ID);
 //   * chama ConnectionsService.execute (Provider Registry → IntegrationLog);
 //   * A IA NUNCA chama a API do ERP direto.
 // As chaves de operacao abaixo (`cliente.dados`, `financeiro.*`, `os.cadastrar`)
-// sao o CONTRATO CANONICO do ERP de provedor: Altarede e IXC implementam as
-// mesmas chaves, cada um traduzindo pra sua API. Trocar de ERP = trocar a
-// conexao; nenhuma tool muda.
+// são o contrato canônico do módulo ISP: as tools dependem de operações e não
+// da API HTTP do IXC.
 // abrir_os e status_regiao consultam IncidentLookupService (modo reativo):
 // se o cliente pertence a incidente ATIVO, devolvem o informativo e suprimem OS.
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
@@ -377,7 +376,7 @@ export class IspTools implements OnModuleInit {
       key: 'segunda_via_boleto',
       name: '2ª via de boleto (ISP)',
       description:
-        'Gera a 2ª via de boleto no ERP do provedor. No IXC devolve linha digitável e link do boleto no gateway (não há PIX copia-e-cola); no Altarede, linha digitável e PIX quando disponível.',
+        'Gera a 2ª via de boleto no IXC com linha digitável e link do boleto no gateway. Não há PIX copia-e-cola.',
       category: 'isp',
       input_schema: {
         type: 'object',
@@ -385,10 +384,9 @@ export class IspTools implements OnModuleInit {
           cpf: { type: 'string' },
           formato: {
             type: 'string',
-            enum: ['linha', 'pdf', 'email'],
-            description: 'linha (padrão), pdf (base64) ou email. O IXC não suporta "email" — use linha ou pdf.',
+            enum: ['linha', 'pdf'],
+            description: 'linha (padrão) ou pdf (base64).',
           },
-          email: { type: 'string', description: 'Destino quando formato=email.' },
         },
         required: ['cpf'],
       },
@@ -399,10 +397,6 @@ export class IspTools implements OnModuleInit {
         const connectionId = await this.connectionId(args, ctx);
         if (formato === 'pdf') {
           return this.connections.execute(connectionId, 'financeiro.boleto_base64', { cpf });
-        }
-        if (formato === 'email') {
-          const email = asString(args['email'], 'email');
-          return this.connections.execute(connectionId, 'financeiro.boleto_por_email', { cpf, email });
         }
         const raw = await this.connections.execute(connectionId, 'financeiro.boleto_aberto', { cpf });
         const max = await this.osConfig.getBoletoMax();

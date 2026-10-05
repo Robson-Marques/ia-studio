@@ -2,7 +2,7 @@
 
 Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51, 52 e a spec do Connection Wizard.
 
-**Linguagem oficial (diretriz 52):** **Provider** = tipo/conector (Altarede, OpenAI, Meta…); **Instance (Connection)** = a conexão nomeada configurada. Conexão **NUNCA é excluída** — não existe endpoint DELETE; só mudança de estado via state machine.
+**Linguagem oficial (diretriz 52):** **Provider** = tipo/conector (IXC, OpenAI, Meta…); **Instance (Connection)** = a conexão nomeada configurada. Conexão **NUNCA é excluída** — não existe endpoint DELETE; só mudança de estado via state machine.
 
 ## Submódulos
 
@@ -20,7 +20,6 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 - Interface única em `src/shared/integration/provider.interface.ts`: `metadata() / connect / disconnect / health / execute(operation, params) / discover` com `ctx = { connection, secrets: SecretsAccessor, logger }`.
 - `ProviderSeedService` (boot, create-if-missing): semeia `ProviderDefinition` (`integration_providers`) a partir do `metadata()` das implementações. O catálogo é local à instância.
 - Implementações da Fase 2 (`registry/providers/`):
-  - **altarede** (ERP): stub HTTP genérico — `execute` chama a API com appkey/token do Secret. Operações: `cliente.dados`, `financeiro.boleto_aberto`, `cliente.acesso`, `cliente.desbloqueio`, `os.cadastrar`, `conectividade.listar_com_status`.
   - **ixc** (ERP): contrato ISP e operações genéricas com Basic Auth. A extensão
     de leitura `atendimento.listar_chamados_recentes` retorna no máximo cinco
     `su_ticket` do cliente, em ordem decrescente, para uma tool ISP projetar ao

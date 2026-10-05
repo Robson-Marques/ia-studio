@@ -9,7 +9,6 @@ import { Prisma } from '@prisma/client';
 import { RegistryRepository } from './registry.repository';
 import { ProviderRegistryService } from './provider-registry.service';
 import { ProviderMetadata } from '../../../shared/integration/provider.interface';
-import { AltaredeProvider } from './providers/altarede.provider';
 import { IxcProvider } from './providers/ixc.provider';
 import { OpenAiProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
@@ -33,7 +32,6 @@ export class ProviderSeedService implements OnApplicationBootstrap {
   constructor(
     private readonly repository: RegistryRepository,
     private readonly registry: ProviderRegistryService,
-    private readonly altarede: AltaredeProvider,
     private readonly ixc: IxcProvider,
     private readonly openai: OpenAiProvider,
     private readonly anthropic: AnthropicProvider,
@@ -48,7 +46,7 @@ export class ProviderSeedService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     // 1) Registro em memoria das implementacoes (diretriz 2).
-    for (const provider of [this.altarede, this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.googleWorkspace]) {
+    for (const provider of [this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.googleWorkspace]) {
       this.registry.register(provider);
     }
 

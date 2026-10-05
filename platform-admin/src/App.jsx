@@ -54,9 +54,6 @@ import AnaliseAtendimento from './pages/IA/AnaliseAtendimento';
 import Incidentes from './pages/ISP/Incidentes';
 import IncidenteEditor from './pages/ISP/IncidenteEditor';
 import AberturaChamado from './pages/ISP/AberturaChamado';
-import Mapeamentos from './pages/Recursos/Mapeamentos';
-import MapeamentoEditor from './pages/Recursos/MapeamentoEditor';
-import Explorer from './pages/Recursos/Explorer';
 import ConsoleDev from './pages/Desenvolvedor/Console';
 import ApiKeys from './pages/Desenvolvedor/ApiKeys';
 import StudioUxDemo from './pages/StudioUxDemo';
@@ -161,11 +158,6 @@ export default function App() {
                     próprio por permissão dentro da tela. */}
                 <Route path="/isp/incidentes/:id" element={<PermissionRoute perm="isp.incidents.read"><IncidenteEditor /></PermissionRoute>} />
                 <Route path="/isp/abertura-chamado" element={<PermissionRoute perm="isp.incidents.read"><AberturaChamado /></PermissionRoute>} />
-                <Route path="/recursos/mapeamentos" element={<PermissionRoute perm="resource.mappings.read"><Mapeamentos /></PermissionRoute>} />
-                {/* `novo` antes de `:id` — senão a rota dinâmica casa primeiro e trata "novo" como um id. */}
-                <Route path="/recursos/mapeamentos/novo" element={<PermissionRoute perm="resource.mappings.write"><MapeamentoEditor /></PermissionRoute>} />
-                <Route path="/recursos/mapeamentos/:id" element={<PermissionRoute perm="resource.mappings.read"><MapeamentoEditor /></PermissionRoute>} />
-                <Route path="/recursos/explorer" element={<PermissionRoute perm="resource.explore.read"><Explorer /></PermissionRoute>} />
                 <Route path="/desenvolvedor/bancada" element={<PermissionRoute perm="devtools.use"><ConsoleDev /></PermissionRoute>} />
                 <Route path="/desenvolvedor/api-keys" element={<PermissionRoute perm="developer.apikeys.read"><ApiKeys /></PermissionRoute>} />
                 <Route path="/studio-ux-demo" element={<StudioUxDemo />} />

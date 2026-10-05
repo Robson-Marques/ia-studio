@@ -97,13 +97,6 @@ const NAV = [
     ],
   },
   {
-    label: 'Recursos', icon: 'database',
-    children: [
-      { label: 'Mapeamentos', icon: 'layers',  path: '/recursos/mapeamentos', perm: 'resource.mappings.read' },
-      { label: 'Explorador',  icon: 'compass', path: '/recursos/explorer',    perm: 'resource.explore.read' },
-    ],
-  },
-  {
     label: 'Desenvolvedor', icon: 'terminal',
     children: [
       { label: 'Bancada de testes', icon: 'code', path: '/desenvolvedor/bancada',  perm: 'devtools.use' },
@@ -148,8 +141,6 @@ const BREADCRUMBS = {
   '/ia/aprovacoes':   'IA Studio / Pendências',
   '/ia/analise':      'IA Studio / Análise de atendimento',
   '/ia/ajustes':      'IA Studio / Ajustes gerais',
-  '/recursos/mapeamentos':  'Recursos / Mapeamentos',
-  '/recursos/explorer':     'Recursos / Explorador',
   '/desenvolvedor/bancada': 'Desenvolvedor / Bancada de testes',
   '/desenvolvedor/api-keys':'Desenvolvedor / Chaves de API',
   '/studio-ux-demo':        'Studio UX (piloto)',
@@ -176,8 +167,6 @@ const BREADCRUMB_PATTERNS = [
   [/^\/ia\/conhecimento\/[^/]+$/,                  'IA Studio / Conhecimento / Base'],
   [/^\/perfis\/novo$/,                            'Configurações / Perfis de acesso / Novo'],
   [/^\/perfis\/[^/]+$/,                           'Configurações / Perfis de acesso / Detalhe'],
-  [/^\/recursos\/mapeamentos\/novo$/,              'Recursos / Mapeamentos / Novo'],
-  [/^\/recursos\/mapeamentos\/[^/]+$/,             'Recursos / Mapeamentos / Editar'],
   [/^\/integracoes\/conexoes\/nova$/,              'Integrações / Conexões / Nova'],
   [/^\/integracoes\/conexoes\/[^/]+\/editar$/,     'Integrações / Conexões / Editar'],
   [/^\/integracoes\/conexoes\/[^/]+$/,             'Integrações / Conexões / Detalhe'],

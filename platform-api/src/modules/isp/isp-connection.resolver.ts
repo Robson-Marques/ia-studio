@@ -1,5 +1,5 @@
 // Resolvedor da conexao de ERP do provedor — a solucao ISP e multi-instancia e
-// multi-ERP: matriz/filiais/clientes distintos = N conexoes (Altarede e/ou IXC).
+// múltiplas conexões IXC: matriz/filiais/clientes distintos = N conexões.
 // As tools do agente nunca conhecem a conexao nem o ERP; passam apenas os
 // tag opcional) e este resolver escolhe uma Connection ACTIVE de um dos ERPs
 // suportados. Espelha a logica do Meta Orchestrator.
@@ -13,12 +13,9 @@ export interface IspErpResolveScope {
   connectionId?: string;
   /** Tag/filial (Connection.tags) quando ha multiplas conexoes de ERP. */
   tag?: string;
-  /** Forca um ERP especifico (`altarede` | `ixc`) quando a org tem os dois. */
+  /** Restringe a resolução a um provider configurado. */
   providerKey?: string;
 }
-
-/** @deprecated Nome antigo, mantido pra nao quebrar chamadores. */
-export type AltaredeResolveScope = IspErpResolveScope;
 
 @Injectable()
 export class IspConnectionResolver {
@@ -38,7 +35,7 @@ export class IspConnectionResolver {
       throw new BadRequestException(
         wantedProvider
           ? `Nenhuma conexão "${wantedProvider}" ativa nesta instalação.`
-          : 'Nenhuma conexão de ERP do provedor (Altarede ou IXC) ativa nesta instalação. Conecte o ERP primeiro.',
+          : 'Nenhuma conexão IXC ativa nesta instalação. Conecte o ERP primeiro.',
       );
     }
 

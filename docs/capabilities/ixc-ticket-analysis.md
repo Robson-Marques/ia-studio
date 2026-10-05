@@ -55,7 +55,7 @@ Entra: consulta delimitada, minimização de dados, indicação de evidência,
 proteção contra texto histórico como instrução e análise pelo modelo já
 configurado. Ficam fora: mutações no IXC, busca livre por tabela, análise de
 todos os chamados, automação de encerramento, memória/persistência de tickets,
-equivalente Altarede, tela dedicada e conclusão automática de qualidade.
+tela dedicada e conclusão automática de qualidade.
 
 ## Slices e progresso
 

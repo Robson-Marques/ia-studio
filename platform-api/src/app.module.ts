@@ -27,7 +27,6 @@ import { CommModule } from './modules/comm/comm.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { AiModule } from './modules/ai/ai.module';
 import { IspModule } from './modules/isp/isp.module';
-import { ResourceModule } from './modules/resource/resource.module';
 import { DevtoolsModule } from './modules/devtools/devtools.module';
 import { DeveloperModule } from './modules/developer/developer.module';
 import { SystemModule } from './modules/system/system.module';
@@ -66,9 +65,7 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
     AutomationModule,
     AiModule,
     IspModule,
-    // Fase 7 (diretrizes 9/23/24/25/28/57): Resource Model + Mapper + Explorer,
     // Console do Desenvolvedor e Developer Center (Public API + API Keys).
-    ResourceModule,
     DevtoolsModule,
     DeveloperModule,
     // Administração local: atualização/backup/restauração e resumo dedicado.

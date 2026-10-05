@@ -1288,7 +1288,7 @@ model AiMcpServer {
 // FORA dos namespaces do core (respeita "nada de ISP no core"): a plataforma
 // e generica, esta e a primeira solucao de segmento (provedores/ISP) como
 // Resource Extension. Nenhum dado de negocio do ERP mora aqui — so o
-// informativo de manutencao e os alvos resolvidos via conectividade Altarede.
+// informativo de manutenção e os alvos resolvidos via conectividade IXC.
 // ─────────────────────────────────────────────────────────────────────────
 
 enum IspIncidentStatus {
@@ -1318,7 +1318,7 @@ enum IspIncidentDispatchStatus {
   FAILED
 }
 
-// Incidente/manutencao de rede. scope = filtros de conectividade Altarede
+// Incidente/manutenção de rede. scope = filtros de conectividade IXC
 // ({cidade?,bairro?,ip_concentrador?,interface_concentrador?,id_olt?,id_slot?,id_cto?}).
 // toggles = {suppress_os,inform_forecast,notify_normalization}. auto_detect e
 // modo proativo nascem OFF (diretriz de automatismos).
@@ -1466,18 +1466,13 @@ model IspPaymentLink {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Resource Model + Mapper (Fase 7 — diretrizes 9/23/24/25). A plataforma NAO
-// e dona de dados de negocio: os TIPOS canonicos (Customer/Invoice/...) vivem
-// EM CODIGO (resource-model.catalog.ts) e aqui persistimos SO o MAPEAMENTO
-// (provider/operacao de origem → campos canonicos). Nenhum registro de negocio
-// (cliente, fatura, OS) e gravado em lugar nenhum.
+// Tabela legada de mapeamentos, preservada fisicamente para atualização não
+// destrutiva. O módulo de Recursos foi retirado da instalação dedicada e o
+// runtime não lê nem escreve esta tabela.
 // ─────────────────────────────────────────────────────────────────────────
 
-// Mapeamento de uma operacao de um provider (ou conexao especifica) para um
-// tipo canonico. field_map = { canonicalField: "sourcePath" } (dot-path na
-// resposta bruta). extensions = mapa das extensoes verticais (ex.: ISP
-// connection_status/olt/cto/slot). is_active nasce OFF ate o usuario confirmar
-// (Mapper Inteligente sugere, nunca aplica sozinho — diretriz 25).
+// Mantido no schema somente para não induzir `db push` a remover dados de
+// instalações existentes. Não criar novos consumidores deste model.
 model ResourceMapping {
   id              String   @id @default(uuid())
   provider_key    String

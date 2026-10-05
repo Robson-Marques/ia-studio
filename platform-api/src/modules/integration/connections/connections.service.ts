@@ -55,8 +55,12 @@ export class ConnectionsService {
   ) {}
 
   // ─── Leitura ────────────────────────────────────────
-  findAll() {
-    return this.repository.findAll();
+  async findAll() {
+    const connections = await this.repository.findAll();
+    // Providers retirados da instalação podem ter registros históricos no banco.
+    // Eles continuam preservados (sem apagar segredo/log), mas não reaparecem na
+    // superfície operacional nem podem ser selecionados por fluxos atuais.
+    return connections.filter((connection) => this.registry.has(connection.provider_key));
   }
 
   listAvailableProviders() {

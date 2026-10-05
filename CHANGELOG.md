@@ -1,5 +1,17 @@
 # Changelog — IA Studio
 
+## v0.11.40 - 2026-10-05 (IXC como ERP único da vertente)
+
+- Retirado o módulo de **Recursos**: menu, rotas, telas, endpoints, ACL e os
+  exemplos inativos de mapeamento não faziam parte de nenhum fluxo ativo da
+  vertente Newnet nem da análise de chamados IXC.
+- O provider Altarede e seus vínculos de Registry foram removidos. O catálogo e
+  a lista operacional passam a expor somente providers com implementação
+  embarcada; conexões, segredos, logs e a tabela legada de mapeamentos seguem
+  preservados fisicamente, mas não são lidos pelo runtime.
+- Incidentes e tools ISP agora resolvem somente conexões IXC. A 2ª via deixa de
+  aceitar o formato de e-mail, que o IXC não suporta.
+
 ## v0.11.39 - 2026-10-05 (Integrações locais e análise IXC)
 
 - Adicionada `ia-studio.local-integrations-configuration@1.0.0`, criada após

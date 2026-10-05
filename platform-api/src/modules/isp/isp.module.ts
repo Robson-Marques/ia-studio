@@ -1,5 +1,5 @@
 // Solucao vertical ISP (Fase 6) — Manutencao/Incidentes + tools do agente ISP.
-// "Nada de ISP no core": tudo mora aqui, no AltaredeProvider (Integration) e nas
+// "Nada de ISP no core": tudo mora aqui, no IxcProvider (Integration) e nas
 // tools ISP (registradas no registry exportado pelo AiModule).
 //
 // Sem ciclo de modulo: IspModule importa AiModule (pega ToolRegistryService),

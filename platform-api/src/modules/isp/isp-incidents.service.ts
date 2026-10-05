@@ -1,6 +1,6 @@
 // Servico de Incidentes/Manutencao (Fase 6). Regras:
 //   * CRUD de incidentes (nasce DRAFT);
-//   * resolver afetados via conectividade Altarede no escopo → grava targets;
+//   * resolve afetados via conectividade IXC no escopo → grava targets;
 //   * vinculos manuais (incluir/excluir cliente);
 //   * ativar (DRAFT/RESOLVED → ACTIVE): se modo PROACTIVE/COMBINED, dispara em
 //     massa COM confirmacao (rate limit + log); reativo nao dispara;
@@ -78,7 +78,7 @@ export class IspIncidentsService {
   // ─── CRUD ───────────────────────────────────────────
 
   async create(dto: CreateIncidentDto, createdBy: string | null) {
-    // Valida que a conexao Altarede existe/ativa na instalação (não resolve aqui).
+    // Valida que a conexão IXC existe/ativa na instalação (não resolve aqui).
     await this.resolver.resolve({
       connectionId: dto.connection_id,
     });
@@ -128,7 +128,7 @@ export class IspIncidentsService {
     return incident;
   }
 
-  // ─── Resolver afetados (conectividade Altarede no escopo) ───────────
+  // ─── Resolver afetados (conectividade IXC no escopo) ───────────
 
   async resolveAffected(id: string) {
     const incident = await this.findOne(id);

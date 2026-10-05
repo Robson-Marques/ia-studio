@@ -133,8 +133,8 @@ export function chunk<T>(items: T[], size: number): T[][] {
 }
 
 /**
- * Traducao dos filtros de escopo canonicos da solucao ISP (SCOPE_KEYS, nomeados
- * a partir do Altarede) para colunas de `radusuarios` no IXC. Nomes conferidos
+ * Tradução dos filtros de escopo canônicos da solução ISP (`SCOPE_KEYS`) para
+ * colunas de `radusuarios` no IXC. Nomes conferidos
  * contra a collection oficial da API (CRUD radusuarios).
  *
  * Precisao decrescente pra delimitar um incidente: `porta_pon` (todos os

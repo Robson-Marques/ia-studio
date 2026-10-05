@@ -1,4 +1,4 @@
-// Leitura de conectividade Altarede (conectividade/listar/com_status) — usada
+// Leitura de conectividade IXC (conectividade/listar/com_status) — usada
 // para resolver afetados de um incidente e para a deteccao de outage. A IA/
 // servicos NUNCA chamam a API direto: tudo via ConnectionsService.execute.
 import { Injectable, Logger } from '@nestjs/common';

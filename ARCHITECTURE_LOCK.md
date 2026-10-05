@@ -26,11 +26,14 @@ era composta por, e somente por:
 | 8 | **Console** | Painel administrativo da operação SaaS (tenants, planos, licenças, flags globais, consumo, marketplace, atualizações) — isolado do painel do cliente |
 | 9 | **IA Studio (módulo Studio)** | Camada visual: editor de fluxos/agentes, publicação, testes, versionamento — execução sempre na Automation Platform |
 
-Documentos vinculados ao congelamento: `CLAUDE.md`, `docs/plano-de-execucao.md`, `docs/diretrizes-arquiteturais.md` (58 diretrizes, blocos 1–4), `docs/deploy-e-versionamento.md`, `RELATORIO-ANALISE-E-ARQUITETURA.md`.
+Documentos vinculados ao congelamento: `CLAUDE.md`, `docs/plano-de-execucao.md`, `docs/diretrizes-arquiteturais.md` (58 diretrizes, blocos 1–4) e `docs/deploy-e-versionamento.md`.
 
 ## Princípio reitor (parte do lock)
 
-> A plataforma é totalmente genérica e orientada a integrações. A primeira solução oficial será para provedores (ISP) com o Altarede como primeiro Provider ERP. Nenhuma decisão arquitetural pode depender de segmento específico; funcionalidade de negócio entra via Providers, Tools, Resource Extensions e Templates.
+> Registro histórico: a plataforma é orientada a integrações. A solução ISP
+> atualmente embarcada usa o IXC; nenhuma decisão arquitetural pode depender de
+> segmento específico, e funcionalidade de negócio entra via Providers, Tools e
+> Templates.
 
 ## Regra de mudança a partir de agora
 

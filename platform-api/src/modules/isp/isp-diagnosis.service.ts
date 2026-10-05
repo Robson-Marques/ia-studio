@@ -6,9 +6,9 @@
 // raso. Aqui o SISTEMA decide as etapas; o modelo so APRESENTA o resultado.
 //
 // Compoe os ops CANONICOS do ERP (cliente.dados / cliente.planos / cliente.acesso)
-// — funciona com Altarede e IXC sem tocar nenhum provider. As projecoes
-// (isp-projections) normalizam os campos dos dois ERPs; este service so consome
-// o normalizado e decide.
+// — funciona com o IXC sem tocar HTTP ou o provider diretamente. As projeções
+// (isp-projections) normalizam os campos; este service só consome o normalizado
+// e decide.
 //
 // Regra de endereco (DECISAO A, confirmada na base real): contrato/login quase
 // sempre HERDAM o endereco do cliente (endereco_proprio=false, campos vazios).

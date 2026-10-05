@@ -92,7 +92,7 @@ export default function IncidenteEditor() {
   useEffect(() => {
     let alive = true;
     listConnections()
-      .then((r) => { if (alive) setConnections((r.items || []).filter((c) => c.provider_key === 'altarede')); })
+      .then((r) => { if (alive) setConnections((r.items || []).filter((c) => c.provider_key === 'ixc')); })
       .catch(() => { if (alive) setConnections([]); });
     return () => { alive = false; };
   }, []);

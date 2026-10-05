@@ -1,34 +1,33 @@
 # Módulo ISP — Solução para provedores (Fase 6)
 
 Primeira solução vertical oficial da plataforma (provedores/ISP), implementada
-como **Resource Extension** (diretriz 50): **nada de ISP no core**. Toda a
+como módulo vertical: **nada de ISP no core**. Toda a
 funcionalidade de negócio mora aqui, nos **providers de ERP**
-(`integration/registry/providers/{altarede,ixc}.provider.ts`) e nas **tools ISP**
+(`integration/registry/providers/ixc.provider.ts`) e nas **tools ISP**
 (registradas no catálogo `ai_tools` da Fase 5). A plataforma nunca é dona de
 dados de negócio — os dados vivem no ERP do provedor.
 
-## Contrato canônico de ERP (multi-ERP)
+## Contrato canônico do IXC
 
-Os ERPs suportados (`altarede`, `ixc` — ver `ISP_ERP_PROVIDER_KEYS`) implementam
-as **mesmas chaves de operação**, cada um traduzindo para a sua API. Trocar de
-ERP é trocar a Connection: **nenhuma tool, serviço ou cron muda**.
+O IXC implementa as chaves de operação consumidas por tools, serviços e crons
+do módulo. Eles nunca chamam a API HTTP diretamente e a IA nunca escolhe uma
+conexão.
 
-| Operação canônica | Altarede | IXC Soft |
-| --- | --- | --- |
-| `cliente.dados` | `cliente/dados` | `cliente` filtrado por `cnpj_cpf` |
-| `cliente.planos` | `cliente/planos` | `cliente_contrato` |
-| `cliente.acesso` | `cliente/acesso` | `radusuarios` (campo `online` S/N) |
-| `cliente.desbloqueio` | `cliente/desbloqueio` | rota `desbloqueio_confianca` (id do contrato) |
-| `financeiro.boleto_aberto` | `financeiro/boleto_aberto` | `fn_areceber` status `A`, vencimento asc, 1 registro |
-| `financeiro.boleto_aberto_todos` | idem `_todos` | `fn_areceber` status `A` |
-| `financeiro.historico` | `financeiro/historico` | `fn_areceber` do cliente (desc) |
-| `financeiro.boleto_base64` | `financeiro/boleto_base64` | rota `get_boleto` (base64) |
-| `financeiro.boleto_por_email` | `financeiro/boleto_por_email` | ❌ não existe na API do IXC |
-| `conectividade.listar_com_status` | `conectividade/listar/com_status` | `radusuarios` + lote de `cliente` (nome/telefone) |
-| `os.cadastrar` | `os/cadastrar` | insert em `su_oss_chamado` (exige `id_assunto`) |
-| `atendimento.listar_chamados_recentes` | — | extensão somente IXC: até 5 `su_ticket` do cliente, por id desc; não infere encerramento por status ou data ausente |
-| `atendimento.listar_setor` | `atendimento/listar_setor` | `su_oss_setor` |
-| `atendimento.listar_motivo_atendimento` | `atendimento/listar_motivo_atendimento` | `su_oss_assunto` |
+| Operação | IXC Soft |
+| --- | --- |
+| `cliente.dados` | `cliente` filtrado por `cnpj_cpf` |
+| `cliente.planos` | `cliente_contrato` |
+| `cliente.acesso` | `radusuarios` (campo `online` S/N) |
+| `cliente.desbloqueio` | rota `desbloqueio_confianca` (id do contrato) |
+| `financeiro.boleto_aberto` | `fn_areceber` status `A`, vencimento asc, 1 registro |
+| `financeiro.boleto_aberto_todos` | `fn_areceber` status `A` |
+| `financeiro.historico` | `fn_areceber` do cliente (desc) |
+| `financeiro.boleto_base64` | rota `get_boleto` (base64) |
+| `conectividade.listar_com_status` | `radusuarios` + lote de `cliente` (nome/telefone) |
+| `os.cadastrar` | insert em `su_oss_chamado` (exige `id_assunto`) |
+| `atendimento.listar_chamados_recentes` | até 5 `su_ticket` do cliente, por id desc; não infere encerramento por status ou data ausente |
+| `atendimento.listar_setor` | `su_oss_setor` |
+| `atendimento.listar_motivo_atendimento` | `su_oss_assunto` |
 
 > **Verificação:** todas as operações do IXC foram exercitadas contra uma base
 > real em 09/07/2026 (leitura, abertura de OS e desbloqueio de confiança).
@@ -44,8 +43,8 @@ ERP é trocar a Connection: **nenhuma tool, serviço ou cron muda**.
 
 Diferenças conhecidas do IXC (assumidas, não contornadas):
 
-- **Sem envio de boleto por e-mail** pela API → `segunda_via_boleto` só aceita
-  `linha` ou `pdf`. E **não há PIX copia-e-cola**: `fn_areceber` traz
+- **Sem envio de boleto por e-mail** pela API → `segunda_via_boleto` aceita
+  somente `linha` ou `pdf`. E **não há PIX copia-e-cola**: `fn_areceber` traz
   `linha_digitavel` e `gateway_link` (link do boleto no gateway); `pix_txid` vem
   vazio.
 - **O operador `IN` falha em silêncio** com listas grandes: o IXC responde
@@ -71,7 +70,7 @@ do agente.
 | Arquivo | Responsabilidade |
 | --- | --- |
 | `isp.repository.ts` | Porta única ao banco (`isp_incidents`, `isp_incident_targets`, `isp_incident_dispatches`, `isp_incident_team_alerts`) + destinatários do plantão (membros com telefone+opt-in) e dedup por `scope_hash`. |
-| `isp-connection.resolver.ts` | Resolve a Connection de ERP ACTIVE do escopo (multi-instância: matriz/filiais; multi-ERP: Altarede/IXC). Nunca expõe a conexão à IA. |
+| `isp-connection.resolver.ts` | Resolve uma Connection IXC ACTIVE do escopo (matriz/filiais). Nunca expõe a conexão à IA. |
 | `isp-connectivity.service.ts` | Lê `conectividade.listar_com_status` via `ConnectionsService.execute` e agrega % offline. |
 | `isp-diagnosis.service.ts` | **Diagnóstico determinístico contrato→login** (spec §2). Compõe `cliente.dados`+`cliente.planos`+`cliente.acesso`, suprime contratos/logins inativos e devolve a próxima etapa (`escolher_contrato`/`escolher_login`/`resolvido`) — o sistema decide, o modelo só apresenta. Rótulo por plano (contrato) e login+referência (login); endereço só quando é próprio (senão herda o do cliente). |
 | `incident-lookup.service.ts` | **Modo reativo**: `activeFor(customer)` que as tools `abrir_os`/`status_regiao` consultam. |
@@ -140,7 +139,7 @@ chama a API do ERP direto e nunca sabe qual ERP está do outro lado**.
 | `consultar_debitos` | `financeiro.boleto_aberto_todos` + `financeiro.historico` | — |
 | `status_conexao` | `cliente.acesso` | — |
 | `status_regiao` | `conectividade.listar_com_status` (+ incidente ativo + **detecção de anomalia**) | — |
-| `segunda_via_boleto` | `financeiro.boleto_aberto` / `boleto_base64` / `boleto_por_email` | — |
+| `segunda_via_boleto` | `financeiro.boleto_aberto` / `boleto_base64` | — |
 | `desbloqueio_confianca` | `cliente.desbloqueio` | ✅ requires_approval |
 | `abrir_os` | `os.cadastrar` (suprime OS se incidente ativo) | ✅ requires_approval |
 | `consultar_chamados_recentes` | `atendimento.listar_chamados_recentes` (somente IXC) | — |
@@ -153,9 +152,9 @@ decrescente. A tool projeta somente campos úteis, avisa que os textos históric
 são não confiáveis e não transforma status ou data ausente em conclusão de
 encerramento. Não há escrita no IXC nem persistência do histórico.
 
-Quando a organização tem **mais de uma** conexão de ERP, a escolha é do operador,
+Quando a instalação tem **mais de uma** conexão IXC, a escolha é do operador,
 não do modelo: prioridade da Connection → tag/filial (`filial`) → `connection_id`
-explícito. Nós de workflow podem ainda fixar o ERP com `erp: "ixc" | "altarede"`.
+explícito. Nós de workflow podem ainda restringir a resolução a `erp: "ixc"`.
 
 ### Diagnóstico determinístico contrato→login (`diagnosticar_conexao`)
 
@@ -183,15 +182,3 @@ endereço efetivo do ponto é: próprio do login → próprio do contrato → do
 Grupo **ISP** em `permissions.constants.ts`: `isp.incidents.read/write/activate/
 dispatch` + `isp.tools.use`. Administrador herda tudo; Operador herda `.read`;
 perfil opcional **Operador ISP** (gerencia sem disparo em massa).
-
-## Conector PHP de contingência (`iastudio_connector.php`) — plano, não implementado
-
-Arquivo único (Slim/PDO) autenticando por `appkey`+`token` contra
-`INTEGRACAO_API`, a ser criado **apenas se a API oficial não cobrir algo** que a
-UI precise — por exemplo, catálogos que a API atual não expõe (lista de OLTs/
-CTOs/slots para preencher os filtros de escopo do incidente sem digitação
-manual). Enquanto a API cobrir os fluxos, o conector **não é implementado**
-(diretriz de não duplicar o que o provider oficial já resolve). Quando/se for
-necessário, ele entra como uma segunda Connection Altarede (mesmo provider,
-endpoint distinto) ou um provider `altarede-connector` dedicado — sem tocar o
-core.

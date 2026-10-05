@@ -19,7 +19,7 @@ const POR_PAGINA = 20;
 //    linha de auditoria, e a lista já tem o objeto inteiro em mão — abrir rota
 //    obrigaria a buscar de novo um dado que já está aqui.
 //  · **Filtro com o botão junto**: o "Filtrar" fica ao lado do último campo, pela
-//    mesma razão do Explorador (botão como item do grid precisaria de coluna
+//    mesma razão de qualquer lista com filtro (botão como item do grid precisaria de coluna
 //    própria e desalinharia a linha).
 //
 // A tela aceita `fetcher`/`title`/`subtitle` porque nasceu para ser reaproveitada
