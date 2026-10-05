@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.9.0
+version: 1.10.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-10-05"
 released_at: "2026-10-05"
-change_reason: MINOR. Adiciona a especialidade de análise assistida de chamados IXC, limitada a consulta e síntese sem mutações no ERP.
+change_reason: MINOR. Atualiza a especialidade de integrações locais com a regra de aposentadoria segura de provider embarcado.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -35,7 +35,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 ## Critérios de aceite
 
 - Todo slug aponta para um único arquivo `released` em `especialidades/`.
-- Toda especialidade herda `workflow.system-change-base@1.0.0` — diretamente ou via capability derivada (ex.: `ia-studio.studio-ux-adoption` herda `workflow.consuming-system-adoption@1.0.0`, que por sua vez herda `workflow.system-change-base@1.0.0`).
+- Toda especialidade herda uma versão compatível de `workflow.system-change-base` — diretamente ou via capability derivada (ex.: `ia-studio.studio-ux-adoption` herda `workflow.consuming-system-adoption@1.0.0`, que por sua vez herda `workflow.system-change-base@1.0.0`). As especialidades novas usam a base vigente `@1.1.0`.
 - Nenhuma especialidade é escolhida apenas pela identidade profissional.
 - Especialidade ausente exige novo relatório e aprovação explícita antes da criação (`workflow.specialty-creation@1.0.0` executa após `ok`).
 
@@ -63,3 +63,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.7.0 | released | Aprovado por Robson em 2026-10-02 | MINOR. A especialidade de operações passa a apontar para `ia-studio.dedicated-instance-operations@2.0.0`: IA Studio é a base; operações governam aplicações de vertentes/repositórios independentes no mesmo host, não cópias irmãs do mesmo checkout. |
 | 1.8.0 | released | Aprovado por Robson em 2026-10-05 | MINOR. Adiciona `ia-studio.local-integrations-configuration@1.0.0`, criada após o alinhamento da remoção do Marketplace como etapa SaaS. |
 | 1.9.0 | released | Aprovado por Robson em 2026-10-05 | MINOR. Adiciona `ia-studio.assistant-ticket-analysis@1.0.0`, criada após o alinhamento da análise assistida de chamados IXC. |
+| 1.10.0 | released | Revisado em 2026-10-05 | MINOR. Atualiza `ia-studio.local-integrations-configuration@1.1.0` com a aposentadoria segura de provider sem remoção destrutiva de dados. |

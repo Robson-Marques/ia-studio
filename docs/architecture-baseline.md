@@ -2,7 +2,7 @@
 schema: prompt-framework/v1
 id: ia-studio.architecture-baseline
 kind: shared
-version: 1.1.0
+version: 1.2.0
 status: reviewed
 title: Architecture Baseline — IA Studio
 policy_refs:
@@ -10,7 +10,7 @@ policy_refs:
   - workflow.capability-contract@1.0.0
 owners:
   - robson
-reviewed_at: "2026-10-02"
+reviewed_at: "2026-10-05"
 scope: "Recovery proporcional à conversão de SaaS multi-tenant para estrutura-base e vertentes dedicadas"
 ---
 
@@ -35,7 +35,7 @@ do produto.
 | Módulos e fronteiras | existente | `platform-api/src/app.module.ts` | Monólito modular com API, workers e painel local. |
 | Dados e relações | existente | `platform-api/prisma/schema.prisma` | A recuperação identificou hierarquia SaaS; o S1 a removeu do estado vigente. |
 | Auth e ACL | existente | `shared/auth/*`, `permissions.constants.ts` | A recuperação identificou dois atores e tenant context; o S1 os reduziu ao usuário local. |
-| Integrações/eventos | existente | `modules/integration`, `shared/events` | Registry, Secrets, Storage, Event Bus e BullMQ são preserváveis. |
+| Integrações/eventos | existente | `modules/integration`, `shared/events` | Registry, Secrets, Storage, Event Bus e BullMQ são preserváveis; IXC é o único ERP ISP embarcado. |
 | Superfícies | existente | `platform-admin` | O painel local é a única superfície administrativa da aplicação. |
 | Infraestrutura | parcial | `scripts/*`, deploy | O contrato foi completado: recursos são derivados por aplicação no host. |
 | Observabilidade/auditoria | existente | `shared/audit`, logs, system | Permanecem locais à aplicação após a conversão. |
@@ -108,7 +108,7 @@ possuem Capability Contract e Acceptance registrados.
 | Auth | JWT distingue ator `org` e `platform`; headers selecionam escopo | JWT de usuário local e ACL sem ator de plataforma ou headers de tenant. |
 | Dados | `organization_id` em quase todas as entidades e demais escopos onde há operação | Dados pertencem implicitamente à instância; relações SaaS saem. |
 | Comercial | Licensing, plans, usage, subscriptions, charges e limites | Removido; configurações funcionais não dependem de plano ou billing. |
-| Integrações | Curadoria Console e install por organização; connections, secrets e storage escopados | Registry, Connection, Secret e Storage locais; curadoria e install SaaS saem. |
+| Integrações | Curadoria Console e install por organização; connections, secrets e storage escopados | Registry, Connection, Secret e Storage locais; curadoria e install SaaS saem. IXC é o ERP ISP atual; provider e mapeador de recursos aposentados não têm runtime. |
 | Eventos/workers | Envelope contém organização/workspace/ambiente; BullMQ separado | Correlação e idempotência ficam, sem tenant. |
 | Painéis | Admin do cliente e Console SaaS | Apenas painel da aplicação dedicada. |
 | Infra | Caminho, banco, PM2, backup e Nginx globais | Recursos exclusivos e parametrizados por aplicação da vertente. |

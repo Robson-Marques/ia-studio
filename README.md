@@ -42,3 +42,7 @@ base SaaS histórica. Swagger: `http://localhost:3000/api/docs`.
 2. `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md` — decisão de arquitetura.
 3. `docs/capabilities/saas-to-dedicated-installation.md` — contrato e Acceptance.
 4. `docs/capabilities/saas-to-dedicated-s3-console-matrix.md` — aposentadoria do Console.
+5. `platform-api/src/modules/integration/README.md` — catálogo local, conexões e segredos.
+6. `platform-api/src/modules/isp/README.md` — contrato operacional IXC e tools ISP.
+7. `docs/capabilities/ixc-ticket-analysis.md` — capability em construção para análise assistida de chamados.
+8. `docs/deploy-e-versionamento.md` — atualização, backup e versionamento da vertente.

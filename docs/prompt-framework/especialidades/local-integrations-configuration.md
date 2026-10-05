@@ -2,7 +2,7 @@
 schema: prompt-framework/v1
 id: ia-studio.local-integrations-configuration
 kind: task
-version: 1.0.0
+version: 1.1.0
 status: released
 title: Configurar integrações locais da instalação dedicada
 extends: workflow.system-change-base@1.1.0
@@ -21,7 +21,7 @@ owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-10-05"
 released_at: "2026-10-05"
-change_reason: Cria a especialidade aprovada no relatório de alinhamento para governar providers embarcados e conexões locais sem reinstalar um catálogo SaaS.
+change_reason: MINOR. Explicita a aposentadoria segura de um provider embarcado: registros persistidos são preservados, mas não permanecem operacionais sem implementação registrada.
 ---
 
 # Configurar integrações locais da instalação dedicada
@@ -58,6 +58,10 @@ por organização ou outro comportamento SaaS.
   e a superfície administrativa antes de alterar comportamento.
 - Preservar conexões, segredos, logs e histórico operacional existentes; uma
   conexão nunca é apagada apenas por uma mudança de catálogo.
+- Ao aposentar um provider, retirar sua implementação, catálogo e superfícies
+  operacionais somente depois de confirmar os consumidores. Registros legados
+  continuam no banco para fins de upgrade e auditoria, mas ficam inertes e não
+  são listados como conexões configuráveis.
 - Fazer a criação de conexão partir de providers embarcados e implementados,
   usando seus metadados internos para renderizar o wizard correto.
 - Remover estados, permissões, rotas e textos que só existam para uma etapa
@@ -104,7 +108,8 @@ pelo painel da instalação.
 |---|---|
 | Provider embarcado e implementado | Pode ser escolhido diretamente ao criar uma conexão |
 | Provider indisponível | Não aparece como opção configurável e informa motivo claro |
-| Conexão existente | Continua acessível, testável e preserva seus segredos e logs |
+| Conexão de provider mantido | Continua acessível, testável e preserva seus segredos e logs |
+| Provider aposentado | Não aparece no catálogo nem em conexões operacionais; registros e logs permanecem preservados no banco |
 | Usuário sem permissão | Não vê nem executa mutation de conexão |
 | Remoção de estado SaaS | Não deixa rota, menu, ACL, texto ou consumidor órfão |
 | Alteração concluída | Documentação viva, CHANGELOG e validação técnica proporcional atualizados |
@@ -114,3 +119,4 @@ pelo painel da instalação.
 | Versão | Estado | Revisão | Impacto |
 |---|---|---|---|
 | 1.0.0 | released | Aprovado por Robson em 2026-10-05 | Especialidade local criada após relatório de alinhamento para substituir o fluxo de instalação SaaS pela configuração direta de conexões. |
+| 1.1.0 | released | Revisado em 2026-10-05 | Documenta a retirada segura de provider sem apagar conexões, segredos ou logs persistidos. |

@@ -40,8 +40,8 @@ limitadas à fonte consultada e sem executar ações no ERP.
   falhas do provider IXC já embarcado.
 - `assistant_runtime_contract`: runtime, tools, regras de resposta e contexto
   do assistente que consumirá a análise.
-- `ticket_analysis_scope`: cliente, janela temporal, limite de chamados e
-  perguntas operacionais permitidas.
+- `ticket_analysis_scope`: cliente, critério de recência confirmado no provider,
+  limite de chamados e perguntas operacionais permitidas.
 
 ## Conhecimento e referências
 
@@ -58,7 +58,7 @@ limitadas à fonte consultada e sem executar ações no ERP.
 
 - Mapear o fluxo real entre o assistente, a tool, a conexão IXC, o provider e
   os logs antes de alterar o comportamento.
-- Delimitar a consulta por cliente, período e quantidade de chamados, sem
+- Delimitar a consulta por cliente, critério de recência e quantidade de chamados, sem
   permitir busca ampla ou identificação ambígua de infraestrutura pelo modelo.
 - Expor ao assistente apenas os dados necessários para analisar os chamados
   recentes e o fechamento, preservando segredos e reduzindo dados pessoais.
@@ -85,7 +85,7 @@ limitadas à fonte consultada e sem executar ações no ERP.
 
 1. Ler o alinhamento aprovado e inventariar o provider IXC, runtime, conexões,
    ACL, logs e consumidores reais.
-2. Confirmar o escopo operacional da consulta: cliente, período, máximo de
+2. Confirmar o escopo operacional da consulta: cliente, critério de recência, máximo de
    chamados, campos disponíveis e comportamento quando não houver resultado.
 3. Desenhar a menor tool/contrato que devolva dados minimizados e rastreáveis ao
    runtime, sem mutação no IXC.
@@ -106,7 +106,7 @@ síntese e lacunas; nunca conter segredos ou IDs internos.
 
 | Caso | Resultado esperado |
 |---|---|
-| Consulta delimitada | Retorna somente chamados recentes do cliente e período autorizados, respeitando limite explícito. |
+| Consulta delimitada | Retorna somente chamados do cliente no critério de recência confirmado, respeitando limite explícito. |
 | Análise de fechamento | Distingue fatos do IXC, síntese e incertezas sem inventar diagnóstico. |
 | IXC indisponível | Informa falha compreensível e não executa ação corretiva no ERP. |
 | Sem resultado | Explica que não há chamados no recorte solicitado, sem gerar conclusão falsa. |

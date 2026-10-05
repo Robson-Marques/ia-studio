@@ -14,9 +14,16 @@
 Atualização de 2026-10-05 — **Análise de chamados IXC:** a Capability
 `ia-studio.capability.ixc-ticket-analysis` está `in-progress`. O S0 (Recovery
 proporcional + contrato) foi concluído; o S1 adiciona uma leitura limitada dos
-cinco atendimentos mais recentes do cliente para uma tool de assistente, sem
+cinco atendimentos de maior ID do cliente para uma tool de assistente, sem
 mutação ou persistência de histórico. S2 continua pendente de build no servidor
 e evidência integrada com uma conexão IXC e um assistente autorizados.
+
+O release `v0.11.40` retirou Mapeamentos/Explorador e o provider Altarede;
+esta vertente agora usa IXC como único ERP ISP. A documentação vigente passa a
+ser o contrato do módulo ISP, o Integration Manager e a Capability IXC — o
+relatório pré-build que descrevia o provider aposentado foi removido. A próxima
+evidência funcional continua sendo a atualização da instalação pelo painel,
+build no host e uma consulta real registrada nos logs de integração e de tool.
 
 Atualização de 2026-10-05 — **Integrações locais:** o Marketplace deixou de
 existir como menu, rota, API, ACL ou etapa de instalação. `ProviderDefinition`
@@ -31,7 +38,7 @@ Atualização de 2026-10-05 — **Retirada de legado ISP:** Recursos
 foram retirados por não atenderem fluxo ativo da vertente Newnet. Incidentes e
 tools ISP resolvem somente conexões IXC; a análise de chamados continua
 independente do módulo removido. Os registros antigos de conexão, segredo, log e
-`resource_mappings` foram preservadas fisicamente e ficaram inacessíveis ao
+`resource_mappings` permaneceram preservados fisicamente e ficaram inacessíveis ao
 runtime, para que o upgrade não exija apagamento de dados.
 
 O modelo anterior de “duas instâncias do mesmo checkout” foi corrigido. A prova

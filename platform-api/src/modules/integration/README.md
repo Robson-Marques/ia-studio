@@ -34,6 +34,9 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 - `ProviderCatalogService` lista somente `ProviderDefinition` ativo com
   implementação registrada e valida o provider antes de criar ou editar uma
   conexão.
+- Uma definição ou conexão histórica sem implementação registrada é preservada
+  no banco, mas não aparece na lista operacional nem pode voltar a ser usada
+  por uma tool, fluxo ou wizard.
 - Não existe instalação ou desinstalação de conector: o provider já acompanha a
   instalação; a ação operacional é configurar uma Connection.
 - O estado físico legado de instalação não é lido nem escrito, para que upgrades
@@ -41,7 +44,9 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 
 ## connections/ (diretriz 52 + Connection Wizard)
 
-- `GET /connections/providers` → providers ativos e implementados que podem ser configurados. Perm `integrations.connections.read`.
+- `GET /connections` e `GET /connections/providers` → somente conexões e
+  providers com implementação registrada que podem operar ou ser configurados.
+  Perm `integrations.connections.read`.
 - `POST /connections` `{ provider_key, name, config, secrets }` → exige provider disponível → cria Secret (campos secretos do wizard **nunca** entram no `config`; defesa extra: `stripSecretFields` pelo `wizard_schema`) → Connection `PENDING_AUTH` → `connect()`+`health()` → `ACTIVE`/`ERROR`.
 - `PATCH /connections/:id` — nome/tags/prioridade. `PATCH /connections/:id/state` `{ action: enable|disable|maintenance }` — via `assertConnectionTransition` (`connection-state.machine.ts`). DISABLED/MAINTENANCE são estados "do usuário": health não os sobrepõe.
 - `POST /connections/:id/test` — health → atualiza `last_health_at/last_health_ok/status`.

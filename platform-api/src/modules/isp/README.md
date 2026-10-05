@@ -148,13 +148,15 @@ chama a API do ERP direto e nunca sabe qual ERP está do outro lado**.
 histórico e fechamento com cautela. A conexão IXC é resolvida pelo
 `IspConnectionResolver` e nunca é escolhida pelo modelo; o provider fixa cinco
 linhas de `su_ticket`, filtradas pelo cliente e ordenadas pelo identificador
-decrescente. A tool projeta somente campos úteis, avisa que os textos históricos
-são não confiáveis e não transforma status ou data ausente em conclusão de
-encerramento. Não há escrita no IXC nem persistência do histórico.
+decrescente. “Recente” significa essa ordem por ID: não há filtro temporal nem
+inferência de encerramento por status ou data ausente. A tool projeta somente
+campos úteis, avisa que os textos históricos são não confiáveis e não escreve
+nem persiste o histórico no IXC.
 
 Quando a instalação tem **mais de uma** conexão IXC, a escolha é do operador,
 não do modelo: prioridade da Connection → tag/filial (`filial`) → `connection_id`
-explícito. Nós de workflow podem ainda restringir a resolução a `erp: "ixc"`.
+explícito no contexto curado do workflow. Esses valores não fazem parte do
+schema exposto à IA.
 
 ### Diagnóstico determinístico contrato→login (`diagnosticar_conexao`)
 

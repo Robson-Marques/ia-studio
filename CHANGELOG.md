@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.11.41 - 2026-10-05 (Documentação de continuidade IXC)
+
+- Consolidada a fonte de verdade após a retirada de Mapeamentos e Altarede:
+  Baseline, handoff, README, contratos de integração/ISP e especialidades agora
+  descrevem o IXC como ERP ISP único e o estado legado como inerte.
+- Corrigido o contrato da análise assistida: “recente” significa os cinco
+  `su_ticket` de maior ID do cliente, não uma janela temporal.
+
 ## v0.11.40 - 2026-10-05 (IXC como ERP único da vertente)
 
 - Retirado o módulo de **Recursos**: menu, rotas, telas, endpoints, ACL e os

@@ -31,14 +31,15 @@ reabre chamado, nem persiste o histórico retornado.
 | Ator | Assistente configurado por operador local e executado pelo runtime de IA. |
 | Entrada | CPF/CNPJ confirmado do cliente e uma conexão IXC ativa resolvida pela configuração local. |
 | Saída | Até cinco chamados recentes, projetados e identificados como evidência histórica para a síntese do assistente. |
-| Limite | O modelo não escolhe conexão, ERP, tabela, filtro, período ou quantidade; a operação fixa esses limites. |
+| Limite | O modelo não escolhe conexão, ERP, tabela, filtro ou quantidade. “Recente” é definido por ID decrescente do IXC; não há filtro temporal. |
 
 ## Fluxo, segurança e rastreabilidade
 
 1. O assistente recebe um CPF/CNPJ confirmado e chama a tool de leitura.
 2. A tool resolve uma Connection IXC ativa sem expor seu identificador ao modelo.
 3. O provider lê no máximo cinco `su_ticket` daquele cliente, por identificador
-   decrescente; campos sensíveis são redigidos na porta única de leitura.
+   decrescente; “recente” não significa uma janela de datas. Campos sensíveis
+   são redigidos na porta única de leitura.
 4. A tool reduz cada linha aos campos úteis e sinaliza que texto de ticket é
    dado histórico não confiável, nunca instrução executável.
 5. O runtime registra a chamada de tool; `ConnectionsService.execute` registra
