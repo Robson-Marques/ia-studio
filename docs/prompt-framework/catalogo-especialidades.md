@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.7.0
+version: 1.8.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
-reviewed_at: "2026-10-02"
-released_at: "2026-10-02"
-change_reason: MINOR. Atualiza a especialidade de operações para o modelo de vertente/repositório por cliente, sem cópias irmãs do mesmo checkout.
+reviewed_at: "2026-10-05"
+released_at: "2026-10-05"
+change_reason: MINOR. Adiciona a especialidade de configuração de integrações locais, aprovada para remover o fluxo de instalação SaaS de conectores.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -29,6 +29,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 | `ia-studio.studio-ux-adoption` | Engenheiro Frontend Sênior especializado em adoção controlada de Design Systems | Governar a adoção do Studio UX no `platform-admin` da instalação dedicada por famílias de tela, respeitando os componentes já adotados e as regras do próprio DS. | [adocao-studio-ux.md](especialidades/adocao-studio-ux.md) |
 | `ia-studio.dedicated-instance-operations` | Engenheiro de operações de aplicações dedicadas | Governar instalação, upgrade, backup, restauração e remoção por vertente, com evidência real de host e sem afetar outros produtos. | [dedicated-instance-operations.md](especialidades/dedicated-instance-operations.md) |
 | `ia-studio.system-cleanup` | Engenheiro de manutenção (faxina de código e arquivos mortos por reachability) | Remover de verdade código e arquivos mortos do IA Studio em etapas — sem quebrar build/gates/runtime — distinguindo *excluir de verdade* de *arquivar*, para o repo representar só o que está em uso. | [system-cleanup.md](especialidades/system-cleanup.md) |
+| `ia-studio.local-integrations-configuration` | Engenheiro de integrações locais | Governar providers embarcados, catálogo interno e conexões da instalação dedicada, sem etapa de instalação SaaS. | [local-integrations-configuration.md](especialidades/local-integrations-configuration.md) |
 
 ## Critérios de aceite
 
@@ -43,7 +44,7 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 
 - **Backend / API dedicada** (`platform-api`): modelagem de domínio local, ACL e eventos. Operação por aplicação/vertente é coberta por `ia-studio.dedicated-instance-operations@2.0.0`.
 - **Runtime de assistentes**: prompts operacionais, tools, knowledge base, memória, workflows — regras próprias, **não confundir** com este framework (que governa pedidos humanos de desenvolvimento).
-- **Integrações externas** (Meta, Google, gateways, etc.) — se surgirem novas. Conectores WhatsApp oficiais exigem Capability/contrato dedicado; Baileys, QR e coexistência manual são proibidos no produto alvo.
+- **Novos conectores e contratos externos** (Meta, Google, gateways, etc.) — se surgirem. Conectores WhatsApp oficiais exigem Capability/contrato dedicado; Baileys, QR e coexistência manual são proibidos no produto alvo.
 - **Segurança / privacidade** (LGPD, retenção, backup, ACL local).
 - **Documentação / continuidade** (handoff, changelog, dívida técnica).
 
@@ -59,3 +60,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.5.0 | released | Aprovado por Robson em 2026-09-21 | MINOR. Remove a linha morta `ia-studio.tenant-domains` (o arquivo `especialidades/tenant-domains.md` não existe e a tenancy multi-tenant foi retirada no dedicado). Achado na faxina Etapa 0; a entrada 1.1.0 fica no histórico como registro. |
 | 1.6.0 | released | Aprovado por Robson em 2026-09-30 | MINOR. Retira `ia-studio.whatsapp-connectors` do catálogo ativo: o contrato 1.0.0 mandava reintroduzir Baileys, QR, coexistência manual, metering e escopo SaaS, todos incompatíveis com a instalação dedicada. O arquivo é preservado apenas como registro aposentado. |
 | 1.7.0 | released | Aprovado por Robson em 2026-10-02 | MINOR. A especialidade de operações passa a apontar para `ia-studio.dedicated-instance-operations@2.0.0`: IA Studio é a base; operações governam aplicações de vertentes/repositórios independentes no mesmo host, não cópias irmãs do mesmo checkout. |
+| 1.8.0 | released | Aprovado por Robson em 2026-10-05 | MINOR. Adiciona `ia-studio.local-integrations-configuration@1.0.0`, criada após o alinhamento da remoção do Marketplace como etapa SaaS. |

@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.11.39 - 2026-10-05 (Especialidade de integrações locais)
+
+- Adicionada `ia-studio.local-integrations-configuration@1.0.0`, criada após
+  alinhamento aprovado para governar providers embarcados e conexões locais sem
+  reinstalar um catálogo SaaS.
+
 ## v0.11.38 - 2026-10-03 (Capability dedicada aceita)
 
 - Fechada a Capability de conversão SaaS → instalação dedicada após Acceptance
