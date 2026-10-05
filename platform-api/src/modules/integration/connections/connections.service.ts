@@ -22,9 +22,8 @@ import { ConnectionsRepository } from './connections.repository';
 import { IntegrationLogsRepository } from './integration-logs.repository';
 import { assertConnectionTransition } from './connection-state.machine';
 import { SecretsService } from '../secrets/secrets.service';
-import { MarketplaceService } from '../marketplace/marketplace.service';
+import { ProviderCatalogService } from '../catalog/provider-catalog.service';
 import { ProviderRegistryService } from '../registry/provider-registry.service';
-import { CATALOG_ONLY_PROVIDERS } from '../registry/provider-catalog';
 import { AuditLogService, redactSensitive } from '../../../shared/audit/audit-log.service';
 import { getRequestStore } from '../../../shared/audit/request-context';
 import {
@@ -50,7 +49,7 @@ export class ConnectionsService {
     private readonly repository: ConnectionsRepository,
     private readonly integrationLogs: IntegrationLogsRepository,
     private readonly secrets: SecretsService,
-    private readonly marketplace: MarketplaceService,
+    private readonly providerCatalog: ProviderCatalogService,
     private readonly registry: ProviderRegistryService,
     private readonly audit: AuditLogService,
   ) {}
@@ -58,6 +57,10 @@ export class ConnectionsService {
   // ─── Leitura ────────────────────────────────────────
   findAll() {
     return this.repository.findAll();
+  }
+
+  listAvailableProviders() {
+    return this.providerCatalog.listAvailable();
   }
 
   async findById(id: string): Promise<Connection> {
@@ -73,8 +76,7 @@ export class ConnectionsService {
 
   // ─── Criacao via wizard ─────────────────────────────
   async create(dto: CreateConnectionDto, createdBy: string | null) {
-    // Provider instalado + ativo no marketplace.
-    const definition = await this.marketplace.assertInstalled(dto.provider_key);
+    const definition = await this.providerCatalog.definitionForConnection(dto.provider_key);
 
     // Higiene: campo marcado como secret no wizard NUNCA entra no config.
     const config = this.stripSecretFields(dto.config ?? {}, definition);
@@ -148,7 +150,7 @@ export class ConnectionsService {
     // Config: merge shallow (novos valores sobrescrevem, mantem os nao
     // enviados). Higiene: remove qualquer campo secreto que tenha vazado.
     if (dto.config !== undefined) {
-      const definition = await this.marketplace.assertInstalled(before.provider_key);
+      const definition = await this.providerCatalog.definitionForConnection(before.provider_key);
       const incoming = this.stripSecretFields(dto.config, definition);
       const currentConfig = (before.config ?? {}) as Record<string, unknown>;
       data.config = { ...currentConfig, ...incoming } as Prisma.InputJsonValue;
@@ -545,8 +547,6 @@ export class ConnectionsService {
       const kind = this.registry.get(providerKey).metadata().secretKind;
       if (kind) return kind as SecretKind;
     }
-    const catalogMeta = CATALOG_ONLY_PROVIDERS.find((m) => m.key === providerKey);
-    if (catalogMeta?.secretKind) return catalogMeta.secretKind as SecretKind;
     return SecretKind.API_KEY;
   }
 

@@ -5,6 +5,9 @@
 - Adicionada `ia-studio.local-integrations-configuration@1.0.0`, criada após
   alinhamento aprovado para governar providers embarcados e conexões locais sem
   reinstalar um catálogo SaaS.
+- Marketplace removido do painel, API e ACL. Providers ativos e implementados
+  agora são escolhidos diretamente em **Integrações → Conexões**; conexões,
+  segredos e logs existentes são preservados.
 
 ## v0.11.38 - 2026-10-03 (Capability dedicada aceita)
 

@@ -248,12 +248,11 @@ model SystemSetting {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// INTEGRATION — Marketplace + Provider Registry + Connections + Secrets
+// INTEGRATION — Catálogo local + Provider Registry + Connections + Secrets
 // + Integration Logs + Storage (Fase 2)
 // ─────────────────────────────────────────────────────────────────────
 
-// Provider = o TIPO/conector do marketplace (diretriz 52). Catalogo global
-// (curadoria pelo Console — diretriz 43). wizard_schema descreve os passos
+// Provider = o TIPO/conector local (diretriz 52). wizard_schema descreve os passos
 // do Connection Wizard (declarativo — o front renderiza sem codigo por tipo).
 model ProviderDefinition {
   id                      String           @id @default(uuid())
@@ -264,6 +263,7 @@ model ProviderDefinition {
   icon                    String?
   wizard_schema           Json
   capabilities            Json             @default("[]")
+  // Campo legado da instalação SaaS. Não é lido nem escrito pelo runtime dedicado.
   is_installed_by_default Boolean          @default(false)
   is_active               Boolean          @default(true)
   created_at              DateTime         @default(now())
@@ -272,7 +272,8 @@ model ProviderDefinition {
   @@map("integration_providers")
 }
 
-// "Instalar do marketplace": habilita o provider pra organization (diretriz 1).
+// Registro legado da instalação SaaS. Preservado fisicamente para upgrades não
+// destrutivos; o runtime dedicado não o lê nem escreve.
 model ProviderInstall {
   id           String   @id @default(uuid())
   provider_key String   @unique

@@ -27,8 +27,6 @@ export const PERMISSIONS = {
   SYSTEM_MAINTAIN: 'system.maintain',
 
   // ─── Integrações (Fase 2 — Integration Manager) ─────
-  INTEGRATIONS_MARKETPLACE_READ: 'integrations.marketplace.read',
-  INTEGRATIONS_MARKETPLACE_MANAGE: 'integrations.marketplace.manage',
   INTEGRATIONS_CONNECTIONS_READ: 'integrations.connections.read',
   INTEGRATIONS_CONNECTIONS_WRITE: 'integrations.connections.write',
   INTEGRATIONS_CONNECTIONS_EXECUTE: 'integrations.connections.execute',
@@ -152,8 +150,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     key: 'integrations',
     label: 'Integrações',
     permissions: [
-      PERMISSIONS.INTEGRATIONS_MARKETPLACE_READ,
-      PERMISSIONS.INTEGRATIONS_MARKETPLACE_MANAGE,
       PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ,
       PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE,
       PERMISSIONS.INTEGRATIONS_CONNECTIONS_EXECUTE,
@@ -274,8 +270,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.CORE_SETTINGS_READ]: 'Ver configurações',
   [PERMISSIONS.CORE_SETTINGS_WRITE]: 'Alterar configurações',
   [PERMISSIONS.SYSTEM_MAINTAIN]: 'Administrar atualização, backup e restauração da instalação',
-  [PERMISSIONS.INTEGRATIONS_MARKETPLACE_READ]: 'Ver marketplace de conectores',
-  [PERMISSIONS.INTEGRATIONS_MARKETPLACE_MANAGE]: 'Instalar/desinstalar conectores',
   [PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ]: 'Ver conexões',
   [PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE]: 'Criar/gerenciar conexões',
   [PERMISSIONS.INTEGRATIONS_CONNECTIONS_EXECUTE]: 'Executar operações em conexões',

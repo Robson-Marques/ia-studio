@@ -48,8 +48,9 @@ automatismo nasce desligado, explícito e auditável.
 
 Providers são registrados centralmente e implementam uma porta comum para
 conectar, testar saúde, descobrir recursos e executar operações. Não espalhar
-switches por tipo de provider. O catálogo pode expor itens instaláveis da
-vertente, mas não é marketplace SaaS nem exige deploy compartilhado.
+switches por tipo de provider. O catálogo expõe somente providers embarcados e
+configuráveis na vertente; não há marketplace, instalação por usuário nem deploy
+compartilhado.
 
 O primeiro pacote de referência é ISP/IXC. Ele não torna o core dependente de
 ISP: novas vertentes selecionam somente os módulos relevantes — por exemplo,

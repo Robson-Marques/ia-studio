@@ -92,7 +92,6 @@ const NAV = [
   {
     label: 'Integrações', icon: 'grid',
     children: [
-      { label: 'Marketplace',       icon: 'store', path: '/integracoes/marketplace', perm: 'integrations.marketplace.read' },
       { label: 'Conexões',          icon: 'plug',  path: '/integracoes/conexoes',    perm: 'integrations.connections.read' },
       { label: 'Cofre de segredos', icon: 'lock',  path: '/integracoes/segredos',    perm: 'integrations.secrets.read' },
     ],
@@ -131,7 +130,6 @@ const BREADCRUMBS = {
   '/auditoria':   'Configurações / Auditoria',
   '/administracao/instalacao': 'Configurações / Administração da instalação',
   '/conta/senha': 'Configurações / Trocar senha',
-  '/integracoes/marketplace': 'Integrações / Marketplace',
   '/integracoes/conexoes':    'Integrações / Conexões',
   '/integracoes/segredos':    'Integrações / Cofre de segredos',
   '/whatsapp/conversas': 'WhatsApp / Conversas',

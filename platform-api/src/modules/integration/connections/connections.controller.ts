@@ -25,6 +25,12 @@ export class ConnectionsController {
     return this.connections.findAll();
   }
 
+  @Get('providers')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ)
+  listAvailableProviders() {
+    return this.connections.listAvailableProviders();
+  }
+
   @Get(':id')
   @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ)
   findById(

@@ -34,6 +34,6 @@ import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
   ],
   // GoogleWorkspaceProvider exportado: o OAuth controller monta a URL de
   // consentimento (buildConsentUrl) direto no provider.
-  exports: [ProviderRegistryService, GoogleWorkspaceProvider],
+  exports: [ProviderRegistryService, RegistryRepository, GoogleWorkspaceProvider],
 })
 export class RegistryModule {}

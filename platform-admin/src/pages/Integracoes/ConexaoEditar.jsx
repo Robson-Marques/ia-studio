@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FormScreen, Field, Input, NumericInput, useToast } from '@studio-ux-ds/react';
-import { getConnection, getMarketplace, updateConnection } from '../../services/integrations';
+import { getConnection, listConnectionProviders, updateConnection } from '../../services/integrations';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
 import { prettifyProviderKey } from './integration.constants';
 
@@ -46,7 +46,7 @@ export default function ConexaoEditar() {
         setPrioridade(conn.priority ?? 0);
         // Pré-preenche só o que NÃO é secreto — o cofre não devolve o resto.
         setValores({ ...(conn.config || {}) });
-        const { items } = await getMarketplace();
+        const { items } = await listConnectionProviders();
         if (cancelado) return;
         const provider = items.find((i) => i.key === conn.provider_key);
         setSchema(provider?.wizard_schema || { steps: [] });

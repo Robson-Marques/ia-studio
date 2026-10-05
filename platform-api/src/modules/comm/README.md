@@ -46,7 +46,7 @@ nem dependência de solução não oficial.
 
 ## Wizard Meta (Connection Wizard)
 
-Passo informativo **"Fluxo oficial (Embedded Signup)" — EM BREVE** (exige App Meta aprovado / Tech Provider) + modo **manual** (Phone Number ID, WABA ID, Access Token, App Secret, Verify Token) + passo de roteamento (departamento, conexão padrão) + teste final. A definição no marketplace é atualizada no boot (`REFRESH_KEYS`) porque o wizard da Fase 2 não capturava app_secret/verify_token.
+Passo informativo **"Fluxo oficial (Embedded Signup)" — EM BREVE** (exige App Meta aprovado / Tech Provider) + modo **manual** (Phone Number ID, WABA ID, Access Token, App Secret, Verify Token) + passo de roteamento (departamento, conexão padrão) + teste final. A definição no catálogo local é atualizada no boot (`REFRESH_KEYS`) porque o wizard da Fase 2 não capturava app_secret/verify_token.
 
 ## Decisões e limitações desta fase (documentadas)
 

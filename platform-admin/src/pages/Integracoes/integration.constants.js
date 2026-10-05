@@ -88,7 +88,7 @@ export function categoryLabel(category) {
   return CATEGORY_LABELS[category] || category;
 }
 
-// Nome amigável do conector a partir da chave, quando o marketplace ainda não
+// Nome amigável do conector a partir da chave, quando o catálogo local ainda não
 // respondeu (ixc → Ixc, whatsapp-meta → Whatsapp Meta). Melhor um nome
 // aproximado do que a chave crua na tela (P11).
 export function prettifyProviderKey(key) {

@@ -6,10 +6,18 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-10-02 (alinhamento aprovado: IA Studio é
-> estrutura-base; cada cliente recebe vertente e repositório próprios).
+> Última atualização: 2026-10-05 (Marketplace removido; integrações são
+> configuradas diretamente em Conexões).
 
 ## Frente atual — vertentes próprias e reinício limpo do desenvolvimento
+
+Atualização de 2026-10-05 — **Integrações locais:** o Marketplace deixou de
+existir como menu, rota, API, ACL ou etapa de instalação. `ProviderDefinition`
+continua sendo o catálogo interno semeado pelo Registry; em
+**Integrações → Conexões**, o operador escolhe diretamente um provider ativo e
+implementado para configurar. Conexões, segredos e logs existentes foram
+preservados. A tabela física de instalações legada não é mais lida nem escrita,
+evitando uma migração destrutiva em instalações existentes.
 
 O modelo anterior de “duas instâncias do mesmo checkout” foi corrigido. A prova
 com `ia-dev` e `ia-teste` demonstrou isolamento de recursos, mas essas instalações

@@ -22,7 +22,7 @@ capacidades de negócio entram por Providers/Tools/Templates.
 - **collaboration/** — regras entre agentes (diretriz 16); `consult()` recebe o `runAgent` por parâmetro (evita ciclo com o runner).
 - **mcp/** — MCP Client (diretriz 15): cadastra servidor, sincroniza/descobre tools (HTTP/SSE via JSON-RPC; STDIO só metadado na V1).
 - **nodes/** — nó `AGENT` (integra com a Automação — Fase 4). O `AiModule` importa o `AutomationModule` (que exporta `NodeRegistryService`); a Automação NÃO importa o `AiModule`.
-- **seed/** — registra os providers LLM (OpenAI, Anthropic) no boot e semeia as tools builtin no catálogo local. Marketplace de IA fica só com OpenAI e Anthropic.
+- **seed/** — registra os providers LLM (OpenAI, Anthropic) no boot e semeia as tools builtin no catálogo local. Só providers de IA ativos e implementados aparecem para configuração de conexão.
 
 ## pgvector (deploy)
 O `db push` desta fase exige a extensão no Postgres:

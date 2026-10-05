@@ -24,13 +24,13 @@ interface AiProviderSeed {
 }
 
 // openai e anthropic ja sao semeados na Fase 2 — e sao os UNICOS providers de IA
-// que ficam no marketplace (o painel consegue testar a conexao dos dois).
+// que ficam disponíveis para configuração de conexão no painel.
 // Nenhum outro e semeado aqui.
 const AI_PROVIDER_SEEDS: AiProviderSeed[] = [];
 
-// Providers de IA retirados da vitrine (decisao de produto: deixar so o que o
+// Providers de IA retirados do catálogo (decisao de produto: deixar so o que o
 // painel verifica). Sao DESATIVADOS (is_active=false) no boot, de forma
-// idempotente — somem do marketplace e nao podem ser instalados —, sem apagar a
+// idempotente — não aparecem para configuração —, sem apagar a
 // linha (arquivar != excluir). Em instalacao nova nem chegam a ser criados.
 const AI_PROVIDER_RETIRED = ['openrouter', 'groq', 'deepseek', 'mistral'];
 
@@ -71,7 +71,6 @@ export class AiProvidersSeedService implements OnApplicationBootstrap {
           icon: 'sparkles',
           wizard_schema: this.buildWizard(seed) as unknown as Prisma.InputJsonValue,
           capabilities: ['chat', 'embed'] as unknown as Prisma.InputJsonValue,
-          is_installed_by_default: false,
           is_active: true,
         });
         this.logger.log(`ProviderDefinition AI semeado: ${seed.key}`);

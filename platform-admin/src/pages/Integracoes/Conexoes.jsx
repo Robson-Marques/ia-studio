@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import {
-  listConnections, changeConnectionState, testConnection, getMarketplace,
+  listConnections, changeConnectionState, testConnection, listConnectionProviders,
 } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import { statusMeta, STATE_ACTIONS, prettifyProviderKey } from './integration.constants';
 
-// Integrações/Conexões — as instâncias nomeadas dos conectores instalados.
+// Integrações/Conexões — as instâncias nomeadas dos conectores disponíveis.
 // Migrada pro DS na v0.10.11.
 //
 // Decisões de composição:
@@ -65,11 +65,11 @@ export default function Conexoes() {
 
   useEffect(() => {
     load();
-    // O nome amigável do conector vem do marketplace; sem isto a coluna mostra a
+    // O nome amigável do conector vem do catálogo local; sem isto a coluna mostra a
     // chave crua ("whatsapp-meta") — linguagem de código na tela.
-    getMarketplace()
+    listConnectionProviders()
       .then(({ items: list }) => setProviderNames(Object.fromEntries((list || []).map((p) => [p.key, p.name]))))
-      .catch(() => {});
+      .catch((err) => toast.error(err.message));
   }, []);
 
   // `?open=<id>` legado (v0.10.10, deep-link da tela de Números): agora que a
@@ -251,7 +251,7 @@ export default function Conexoes() {
         emptyNew={{
           icon: 'zap',
           title: 'Nenhuma conexão ainda',
-          description: 'Instale um conector no Marketplace e crie a primeira conexão — o passo a passo pede só o que aquele sistema precisa.',
+          description: 'Crie a primeira conexão e escolha o sistema que ela vai configurar.',
           action: novaConexao,
         }}
         emptyFiltered={{ title: 'Nenhuma conexão encontrada', description: 'Nenhuma conexão com esse nome, conector ou etiqueta.', onClear: () => setQ('') }}

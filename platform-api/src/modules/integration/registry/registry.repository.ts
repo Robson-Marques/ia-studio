@@ -12,6 +12,13 @@ export class RegistryRepository {
     return this.prisma.providerDefinition.findUnique({ where: { key } });
   }
 
+  findActiveDefinitions() {
+    return this.prisma.providerDefinition.findMany({
+      where: { is_active: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   create(data: Prisma.ProviderDefinitionCreateInput) {
     return this.prisma.providerDefinition.create({ data });
   }

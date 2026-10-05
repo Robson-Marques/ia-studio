@@ -13,7 +13,6 @@ import Usuarios from './pages/Usuarios';
 import PerfisAcesso from './pages/PerfisAcesso';
 import PerfilEditor from './pages/PerfilEditor';
 import Auditoria from './pages/Auditoria';
-import Marketplace from './pages/Integracoes/Marketplace';
 import Conexoes from './pages/Integracoes/Conexoes';
 import ConexaoNova from './pages/Integracoes/ConexaoNova';
 import ConexaoDetalhe from './pages/Integracoes/ConexaoDetalhe';
@@ -98,7 +97,6 @@ export default function App() {
                 <Route path="/auditoria" element={<PermissionRoute perm="core.audit.read"><Auditoria /></PermissionRoute>} />
                 <Route path="/administracao/instalacao" element={<PermissionRoute perm="system.maintain"><AdministracaoInstalacao /></PermissionRoute>} />
                 <Route path="/conta/senha" element={<ContaSenha />} />
-                <Route path="/integracoes/marketplace" element={<PermissionRoute perm="integrations.marketplace.read"><Marketplace /></PermissionRoute>} />
                 <Route path="/integracoes/conexoes" element={<PermissionRoute perm="integrations.connections.read"><Conexoes /></PermissionRoute>} />
                 {/* `nova` antes de `:id` — senão a rota dinâmica casa primeiro e trata "nova" como um id. */}
                 <Route path="/integracoes/conexoes/nova" element={<PermissionRoute perm="integrations.connections.write"><ConexaoNova /></PermissionRoute>} />

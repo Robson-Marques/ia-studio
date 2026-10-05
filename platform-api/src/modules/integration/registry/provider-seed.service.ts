@@ -8,7 +8,6 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { RegistryRepository } from './registry.repository';
 import { ProviderRegistryService } from './provider-registry.service';
-import { CATALOG_ONLY_PROVIDERS } from './provider-catalog';
 import { ProviderMetadata } from '../../../shared/integration/provider.interface';
 import { AltaredeProvider } from './providers/altarede.provider';
 import { IxcProvider } from './providers/ixc.provider';
@@ -53,9 +52,9 @@ export class ProviderSeedService implements OnApplicationBootstrap {
       this.registry.register(provider);
     }
 
-    // 2) Seed create-if-missing das definicoes (marketplace).
+    // 2) Seed create-if-missing das definições do catálogo local.
     try {
-      const all: ProviderMetadata[] = [...this.registry.allMetadata(), ...CATALOG_ONLY_PROVIDERS];
+      const all: ProviderMetadata[] = this.registry.allMetadata();
       for (const meta of all) {
         const existing = await this.repository.findByKey(meta.key);
         if (existing && REFRESH_KEYS.has(meta.key)) {
@@ -81,7 +80,6 @@ export class ProviderSeedService implements OnApplicationBootstrap {
           icon: meta.icon ?? null,
           wizard_schema: meta.wizardSchema as unknown as Prisma.InputJsonValue,
           capabilities: meta.capabilities as unknown as Prisma.InputJsonValue,
-          is_installed_by_default: false,
           is_active: true,
         });
         this.logger.log(`ProviderDefinition semeado: ${meta.key}`);

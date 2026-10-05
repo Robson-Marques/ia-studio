@@ -12,7 +12,7 @@ razão de existir era operar vários clientes.
 | Log ao vivo, falha, lock órfão, recuperação e histórico de atualização | migrar | Mesma tela e serviços `SystemUpgrade`; autorização local explícita. |
 | Gerar, enviar, baixar, excluir e restaurar backup | migrar | Mesma tela; operações continuam auditadas e serializadas por instância. |
 | Auditoria | substituir | A auditoria já existe no painel local em `/auditoria`; a visão global por organização é removida. |
-| Catálogo e instalação de integrações | substituir | O marketplace operacional local já existe em `/integracoes/marketplace`; a curadoria global de `ProviderDefinition` não pertence à instalação. |
+| Catálogo e instalação de integrações | substituir | O catálogo local nasce do Registry e é consumido em `/integracoes/conexoes`; a curadoria e a instalação SaaS não pertencem à instalação dedicada. |
 | Feature flags | substituir | A curadoria global e overrides por organização deixam de existir. Flags e overrides por usuário/perfil continuam como configuração técnica local em `/administration/flags`, restrita ao administrador da instalação. |
 | Dashboard consolidado | remover | Era uma visão de operação SaaS. O painel dedicado usa o Dashboard local. |
 | Organizações, usuários por organização e memberships | remover | Não há clientes ou organizações dentro de uma instância dedicada. |
