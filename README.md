@@ -39,10 +39,12 @@ base SaaS histórica. Swagger: `http://localhost:3000/api/docs`.
 ## Fontes de verdade
 
 1. `docs/architecture-baseline.md` — fronteiras e maturidade recuperadas.
-2. `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md` — decisão de arquitetura.
-3. `docs/capabilities/saas-to-dedicated-installation.md` — contrato e Acceptance.
-4. `docs/capabilities/saas-to-dedicated-s3-console-matrix.md` — aposentadoria do Console.
-5. `platform-api/src/modules/integration/README.md` — catálogo local, conexões e segredos.
-6. `platform-api/src/modules/isp/README.md` — contrato operacional IXC e tools ISP.
-7. `docs/capabilities/ixc-ticket-analysis.md` — capability em construção para análise assistida de chamados.
-8. `docs/deploy-e-versionamento.md` — atualização, backup e versionamento da vertente.
+2. `docs/base-replicavel.md` — tag de referência para novas vertentes e matriz
+   não destrutiva da vertical Newnet/ISP.
+3. `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md` — decisão de arquitetura.
+4. `docs/capabilities/saas-to-dedicated-installation.md` — contrato e Acceptance.
+5. `docs/capabilities/saas-to-dedicated-s3-console-matrix.md` — aposentadoria do Console.
+6. `platform-api/src/modules/integration/README.md` — catálogo local, conexões e segredos.
+7. `platform-api/src/modules/isp/README.md` — contrato operacional IXC e tools ISP da Newnet.
+8. `docs/capabilities/ixc-ticket-analysis.md` — capability em construção para análise assistida de chamados IXC da Newnet.
+9. `docs/deploy-e-versionamento.md` — atualização, backup e versionamento da vertente.

@@ -2,7 +2,7 @@
 schema: prompt-framework/v1
 id: ia-studio.architecture-baseline
 kind: shared
-version: 1.2.0
+version: 1.3.0
 status: reviewed
 title: Architecture Baseline — IA Studio
 policy_refs:
@@ -11,7 +11,7 @@ policy_refs:
 owners:
   - robson
 reviewed_at: "2026-10-05"
-scope: "Recovery proporcional à conversão de SaaS multi-tenant para estrutura-base e vertentes dedicadas"
+scope: "Recovery proporcional à conversão de SaaS multi-tenant para estrutura-base, referência Newnet e vertentes dedicadas"
 ---
 
 # Architecture Baseline — IA Studio
@@ -23,6 +23,11 @@ Cada cliente recebe uma **vertente e repositório próprios**, com aplicação,
 banco, dados, configurações, identidade e integrações próprias. Aplicações de
 vertentes distintas podem compartilhar um host, mas nunca processo, banco,
 diretório de dados, fila, configuração ou aplicação.
+
+Este repositório também preserva a referência funcional da Newnet. A tag de
+base replicável contém a vertical ISP/IXC completa; ela não é uma variante
+genérica da qual a vertical foi apagada. A separação entre núcleo reutilizável
+e decisões futuras para uma cópia está em `docs/base-replicavel.md`.
 
 O projeto é existente. Código, `CLAUDE.md`, `ARCHITECTURE_LOCK.md` e diretrizes
 registravam SaaS; não havia Architecture Baseline nem Blueprint adotado. Este

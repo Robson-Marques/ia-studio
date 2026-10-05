@@ -1,5 +1,13 @@
 # Changelog — IA Studio
 
+## v0.11.42 - 2026-10-05 (Base de referência replicável)
+
+- Fixada a tag como referência estável e completa da vertente Newnet para
+  criação de novos repositórios dedicados.
+- Adicionado `docs/base-replicavel.md`, que separa núcleo reutilizável e
+  vertical ISP/IXC somente como matriz de decisão futura para uma cópia. Nenhum
+  código, dado, rota, provider ou comportamento foi removido nesta entrega.
+
 ## v0.11.41 - 2026-10-05 (Documentação de continuidade IXC)
 
 - Consolidada a fonte de verdade após a retirada de Mapeamentos e Altarede:

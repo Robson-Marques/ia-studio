@@ -3,7 +3,7 @@
 > Estrutura-base de Automação Empresarial, Integrações, IA e Comunicação para
 > vertentes dedicadas por cliente.
 > Toda IA/desenvolvedor que atuar neste projeto DEVE seguir estas regras sem exceção.
-> Documentos normativos vivos: `docs/diretrizes-arquiteturais.md`, `docs/deploy-e-versionamento.md` (runbook de deploy), `platform-api/src/modules/isp/README.md` (contrato vivo da integração IXC). Índice de estado/re-ancoragem: `docs/ESTADO-e-handoff.md`.
+> Documentos normativos vivos: `docs/diretrizes-arquiteturais.md`, `docs/deploy-e-versionamento.md` (runbook de deploy), `docs/base-replicavel.md` (fronteira entre referência Newnet e novas vertentes) e `platform-api/src/modules/isp/README.md` (contrato vivo da integração IXC da Newnet). Índice de estado/re-ancoragem: `docs/ESTADO-e-handoff.md`.
 >
 > **Conversão concluída:** a Capability de remoção SaaS foi aceita após os
 > gates estruturais e a evidência operacional integrada no host.
@@ -17,8 +17,10 @@
 > **Como interagir com o Robson** (idioma, re-ancorar pós-compactação, erro silencioso, docs vivos, ambiente/deploy, governança de mudanças, tom de resposta) está em **`COMO-INTERAGIR-COM-ROBSON.md`** (raiz do projeto — mesmo conteúdo em todos os projetos do Robson). Este arquivo aqui é só regra técnica/de produto do IA Studio.
 
 ## ⚖️ PRINCÍPIO REITOR
-A plataforma é orientada a integrações. A solução atual para provedores (ISP)
-usa o IXC como ERP embarcado. **Nenhuma decisão arquitetural pode depender de
+A plataforma é orientada a integrações. A solução atual da vertente Newnet para
+provedores (ISP) usa o IXC como ERP embarcado. A tag de referência preserva
+essa vertical; uma nova cópia decide explicitamente se a mantém, conforme
+`docs/base-replicavel.md`. **Nenhuma decisão arquitetural pode depender de
 segmento específico** — funcionalidade de negócio entra via Providers, Tools e
 Templates. A plataforma NUNCA é dona de dados de negócio.
 

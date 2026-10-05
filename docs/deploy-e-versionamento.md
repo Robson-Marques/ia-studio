@@ -35,6 +35,19 @@ somente a identidade operacional de uma instalação de uma vertente já dedicad
 Criar a vertente é uma decisão de produto e repositório; o instalador não cria
 branches nem escolhe módulos por conta própria.
 
+## Replicar a base de referência
+
+A tag de referência é uma fotografia completa da vertente Newnet, inclusive os
+módulos ISP/IXC. Para iniciar uma nova aplicação, crie primeiro um diretório e
+repositório próprios a partir de uma tag estável. Não reutilize o checkout, o
+`app-id`, os recursos ou os scripts de upgrade da instalação Newnet.
+
+Antes de adaptar a cópia, consulte `docs/base-replicavel.md`. A matriz desse
+documento identifica a vertical Newnet que pode ser avaliada em uma tarefa
+futura para outro segmento, mas não autoriza remoção automática. A nova
+vertente deve ter contrato aprovado, alterações versionadas, build no servidor
+e smoke test próprios antes de ganhar uma tag estável.
+
 ## Recriar o ambiente de desenvolvimento do zero
 
 Não há dados a preservar no ambiente atual. A tag que materializa este contrato

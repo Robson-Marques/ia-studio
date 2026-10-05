@@ -6,10 +6,18 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-10-05 (análise assistida de chamados IXC em
-> construção; vertente ISP opera somente com IXC).
+> Última atualização: 2026-10-05 (base de referência `v0.11.42` marcada;
+> análise assistida de chamados IXC em construção; vertente ISP opera somente
+> com IXC).
 
 ## Frente atual — vertentes próprias e reinício limpo do desenvolvimento
+
+Atualização de 2026-10-05 — **Base replicável:** a tag `v0.11.42` fixa uma
+referência completa e estável da Newnet para criação manual de novas vertentes.
+Não houve retirada de código, dados, integrações ou comportamento. O manifesto
+`docs/base-replicavel.md` distingue o núcleo reutilizável da vertical ISP/IXC
+que uma futura cópia poderá avaliar em tarefa própria; a Newnet permanece
+intacta e não é a versão "limpa" dessa futura extração.
 
 Atualização de 2026-10-05 — **Análise de chamados IXC:** a Capability
 `ia-studio.capability.ixc-ticket-analysis` está `in-progress`. O S0 (Recovery
