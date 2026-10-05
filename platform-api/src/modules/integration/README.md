@@ -21,6 +21,10 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
 - `ProviderSeedService` (boot, create-if-missing): semeia `ProviderDefinition` (`integration_providers`) a partir do `metadata()` das implementações. O catálogo é local à instância.
 - Implementações da Fase 2 (`registry/providers/`):
   - **altarede** (ERP): stub HTTP genérico — `execute` chama a API com appkey/token do Secret. Operações: `cliente.dados`, `financeiro.boleto_aberto`, `cliente.acesso`, `cliente.desbloqueio`, `os.cadastrar`, `conectividade.listar_com_status`.
+  - **ixc** (ERP): contrato ISP e operações genéricas com Basic Auth. A extensão
+    de leitura `atendimento.listar_chamados_recentes` retorna no máximo cinco
+    `su_ticket` do cliente, em ordem decrescente, para uma tool ISP projetar ao
+    assistente; não grava nem oferece busca livre ao modelo.
   - **openai / anthropic** (AI): health = GET `/v1/models` com a API Key; `discover` lista modelos.
   - **postgresql** (DATABASE): health via socket TCP (`require('net')`) — sem driver `pg` nesta fase.
   - **smtp / s3**: health stub OK (validação de configuração; handshake real nas Fases 7 / Storage).

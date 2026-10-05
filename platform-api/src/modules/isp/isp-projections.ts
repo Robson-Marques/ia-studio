@@ -34,6 +34,21 @@ function compact(obj: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+/** Primeiro campo preenchido entre variações conhecidas de instalações do IXC. */
+function firstString(row: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = str(row[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+/** Texto histórico suficiente para análise, sem transferir uma transcrição inteira ao modelo. */
+function excerpt(value: unknown, max = 900): string | undefined {
+  const text = str(value)?.replace(/\s+/g, ' ');
+  return text ? text.slice(0, max) : undefined;
+}
+
 /** Cadastro do cliente: identificacao, contato e endereco. Nada de CRM/RH/fiscal. */
 export function projectCliente(row: Record<string, unknown>): Record<string, unknown> {
   return compact({
@@ -153,5 +168,24 @@ export function projectContrato(row: Record<string, unknown>): Record<string, un
     bairro: str(row['bairro']),
     referencia: str(row['referencia']),
     endereco_proprio: str(row['endereco_padrao_cliente']) === 'N',
+  });
+}
+
+/**
+ * Atendimento IXC projetado para o assistente. O IXC varia os campos de data
+ * entre instalações; por isso o contrato só expõe a data quando ela veio na
+ * resposta e nunca converte status em diagnóstico de encerramento.
+ */
+export function projectChamado(row: Record<string, unknown>): Record<string, unknown> {
+  return compact({
+    id: str(row['id']),
+    protocolo: str(row['protocolo']),
+    titulo: str(row['titulo']) ?? str(row['assunto']),
+    status: str(row['status']),
+    situacao_interna: str(row['su_status']),
+    aberto_em: firstString(row, ['data_abertura', 'data_cadastro', 'data']),
+    encerrado_em: firstString(row, ['data_fechamento', 'data_finalizacao', 'data_encerramento', 'data_conclusao']),
+    descricao: excerpt(row['menssagem'] ?? row['mensagem'] ?? row['descricao']),
+    resolucao: excerpt(row['solucao'] ?? row['resposta'] ?? row['parecer']),
   });
 }

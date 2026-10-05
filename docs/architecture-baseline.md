@@ -40,7 +40,7 @@ do produto.
 | Infraestrutura | parcial | `scripts/*`, deploy | O contrato foi completado: recursos são derivados por aplicação no host. |
 | Observabilidade/auditoria | existente | `shared/audit`, logs, system | Permanecem locais à aplicação após a conversão. |
 | Estratégia de testes | parcial | documentação e código inspecionados | Cada slice exige evidência proporcional; Acceptance é integrada no fim. |
-| Capability Map | existente para esta frente | seção abaixo | Outras capacidades ainda não foram avaliadas contractualmente. |
+| Capability Map | parcial | seção abaixo | A conversão foi aceita; análise assistida de chamados IXC está em construção contratada. |
 
 > A tabela acima é o diagnóstico do Recovery que originou a Capability. O estado
 > vigente é o dedicado, comprovado pela Acceptance e detalhado nas diretrizes.
@@ -95,6 +95,7 @@ faz parte desta Acceptance.
 |---|---|---|---|
 | `ia-studio.capability.saas-to-dedicated-installation` | Converter a plataforma compartilhada em aplicação dedicada | `accepted` | `docs/capabilities/saas-to-dedicated-installation.md` |
 | `ia-studio.capability.isp-dedicated-product` | Consolidar uma vertente específica para provedor | `planned` | Depende da conversão; receberá contrato próprio antes de implementação. |
+| `ia-studio.capability.ixc-ticket-analysis` | Consultar e analisar de forma assistida chamados recentes do IXC | `in-progress` | `docs/capabilities/ixc-ticket-analysis.md`; leitura limitada, sem mutação no ERP. |
 
 O mapa não afirma que capacidades preexistentes estão aceitas: elas ainda não
 possuem Capability Contract e Acceptance registrados.

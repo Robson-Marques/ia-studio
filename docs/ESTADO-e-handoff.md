@@ -6,10 +6,17 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-10-05 (Marketplace removido; integrações são
-> configuradas diretamente em Conexões).
+> Última atualização: 2026-10-05 (análise assistida de chamados IXC em
+> construção; Marketplace já removido).
 
 ## Frente atual — vertentes próprias e reinício limpo do desenvolvimento
+
+Atualização de 2026-10-05 — **Análise de chamados IXC:** a Capability
+`ia-studio.capability.ixc-ticket-analysis` está `in-progress`. O S0 (Recovery
+proporcional + contrato) foi concluído; o S1 adiciona uma leitura limitada dos
+cinco atendimentos mais recentes do cliente para uma tool de assistente, sem
+mutação ou persistência de histórico. S2 continua pendente de build no servidor
+e evidência integrada com uma conexão IXC e um assistente autorizados.
 
 Atualização de 2026-10-05 — **Integrações locais:** o Marketplace deixou de
 existir como menu, rota, API, ACL ou etapa de instalação. `ProviderDefinition`

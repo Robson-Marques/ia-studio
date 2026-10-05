@@ -1,6 +1,6 @@
 # Changelog — IA Studio
 
-## v0.11.39 - 2026-10-05 (Especialidades de integrações locais e análise IXC)
+## v0.11.39 - 2026-10-05 (Integrações locais e análise IXC)
 
 - Adicionada `ia-studio.local-integrations-configuration@1.0.0`, criada após
   alinhamento aprovado para governar providers embarcados e conexões locais sem
@@ -11,6 +11,10 @@
 - Adicionada `ia-studio.assistant-ticket-analysis@1.0.0`, criada após
   alinhamento aprovado para governar consulta delimitada e análise assistida de
   chamados IXC, sem alterar chamados nem criar contratos externos.
+- Em construção, `ia-studio.capability.ixc-ticket-analysis@1.0.0`: a tool
+  `consultar_chamados_recentes` consulta no máximo cinco `su_ticket` do cliente
+  em uma conexão IXC curada, reduz os dados enviados ao assistente e não executa
+  mutações no ERP.
 
 ## v0.11.38 - 2026-10-03 (Capability dedicada aceita)
 

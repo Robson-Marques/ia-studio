@@ -90,6 +90,9 @@ const OPERATIONS = [
   'conectividade.listar_com_status',
   'os.cadastrar',
   'os.listar_abertas',
+  // Extensão IXC: histórico limitado para análise assistida. Não é operação
+  // canônica multi-ERP porque ainda não há equivalente confirmado no Altarede.
+  'atendimento.listar_chamados_recentes',
   'atendimento.listar_setor',
   'atendimento.listar_motivo_atendimento',
   // Acesso generico a qualquer tabela do IXC
@@ -267,6 +270,9 @@ export class IxcProvider extends BaseProvider {
 
       case 'os.listar_abertas':
         return { data: await this.osAbertas(ctx, token, args) };
+
+      case 'atendimento.listar_chamados_recentes':
+        return { data: await this.chamadosRecentes(ctx, token, args) };
 
       case 'atendimento.listar_setor':
         return { data: await this.list(ctx, token, T.ticketSetor, { rp: '200', sortname: `${T.ticketSetor}.id` }) };
@@ -716,6 +722,33 @@ export class IxcProvider extends BaseProvider {
       if (IxcProvider.OS_CLOSED_STATUS.has(status)) return false;
       if (login && r['id_login'] && String(r['id_login']) !== login) return false;
       return true;
+    });
+  }
+
+  /**
+   * Histórico recente de atendimentos do cliente para leitura assistida.
+   * O limite é fechado no provider: mesmo um chamador interno não consegue
+   * transformar a consulta numa varredura do IXC. "Recente" é a ordem
+   * decrescente do identificador do próprio atendimento; não inferimos datas
+   * ou status de encerramento que possam variar entre instalações do IXC.
+   */
+  private async chamadosRecentes(
+    ctx: ProviderContext,
+    token: string,
+    args: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
+    let idCliente = this.str(args, 'id_cliente');
+    if (!idCliente) {
+      const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true)!);
+      idCliente = String(cliente['id']);
+    }
+    return this.list(ctx, token, T.ticket, {
+      qtype: `${T.ticket}.id_cliente`,
+      query: idCliente,
+      oper: '=',
+      rp: '5',
+      sortname: `${T.ticket}.id`,
+      sortorder: 'desc',
     });
   }
 

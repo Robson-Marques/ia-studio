@@ -26,6 +26,7 @@ ERP é trocar a Connection: **nenhuma tool, serviço ou cron muda**.
 | `financeiro.boleto_por_email` | `financeiro/boleto_por_email` | ❌ não existe na API do IXC |
 | `conectividade.listar_com_status` | `conectividade/listar/com_status` | `radusuarios` + lote de `cliente` (nome/telefone) |
 | `os.cadastrar` | `os/cadastrar` | insert em `su_oss_chamado` (exige `id_assunto`) |
+| `atendimento.listar_chamados_recentes` | — | extensão somente IXC: até 5 `su_ticket` do cliente, por id desc; não infere encerramento por status ou data ausente |
 | `atendimento.listar_setor` | `atendimento/listar_setor` | `su_oss_setor` |
 | `atendimento.listar_motivo_atendimento` | `atendimento/listar_motivo_atendimento` | `su_oss_assunto` |
 
@@ -142,6 +143,15 @@ chama a API do ERP direto e nunca sabe qual ERP está do outro lado**.
 | `segunda_via_boleto` | `financeiro.boleto_aberto` / `boleto_base64` / `boleto_por_email` | — |
 | `desbloqueio_confianca` | `cliente.desbloqueio` | ✅ requires_approval |
 | `abrir_os` | `os.cadastrar` (suprime OS se incidente ativo) | ✅ requires_approval |
+| `consultar_chamados_recentes` | `atendimento.listar_chamados_recentes` (somente IXC) | — |
+
+`consultar_chamados_recentes` é leitura limitada para o assistente analisar
+histórico e fechamento com cautela. A conexão IXC é resolvida pelo
+`IspConnectionResolver` e nunca é escolhida pelo modelo; o provider fixa cinco
+linhas de `su_ticket`, filtradas pelo cliente e ordenadas pelo identificador
+decrescente. A tool projeta somente campos úteis, avisa que os textos históricos
+são não confiáveis e não transforma status ou data ausente em conclusão de
+encerramento. Não há escrita no IXC nem persistência do histórico.
 
 Quando a organização tem **mais de uma** conexão de ERP, a escolha é do operador,
 não do modelo: prioridade da Connection → tag/filial (`filial`) → `connection_id`
