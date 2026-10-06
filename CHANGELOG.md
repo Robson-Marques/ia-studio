@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.11.43 - 2026-10-06 (Especialidade ConnectChat)
+
+- Adicionada `ia-studio.connectchat-channel@1.0.0`, criada após alinhamento
+  aprovado para governar a integração segura do canal ConnectChat ao atendimento
+  do IA Studio, sem expor chave técnica nem alterar a API ConnectChat.
+- Adicionado adaptador HTTP exclusivo do backend, com autenticação técnica,
+  actor por usuário, timeout, retry idempotente e polling incremental por
+  sequência; a Central de Atendimento agora possui a tela **ConnectChat →
+  Conversas**, protegida por permissões próprias.
+
 ## v0.11.42 - 2026-10-05 (Base de referência replicável)
 
 - Fixada a tag como referência estável e completa da vertente Newnet para

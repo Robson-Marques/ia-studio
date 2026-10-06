@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.10.0
+version: 1.11.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-10-05"
 released_at: "2026-10-05"
-change_reason: MINOR. Atualiza a especialidade de integrações locais com a regra de aposentadoria segura de provider embarcado.
+change_reason: MINOR. Adiciona a especialidade de integração do canal externo ConnectChat ao atendimento do IA Studio.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -31,6 +31,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 | `ia-studio.system-cleanup` | Engenheiro de manutenção (faxina de código e arquivos mortos por reachability) | Remover de verdade código e arquivos mortos do IA Studio em etapas — sem quebrar build/gates/runtime — distinguindo *excluir de verdade* de *arquivar*, para o repo representar só o que está em uso. | [system-cleanup.md](especialidades/system-cleanup.md) |
 | `ia-studio.local-integrations-configuration` | Engenheiro de integrações locais | Governar providers embarcados, catálogo interno e conexões da instalação dedicada, sem etapa de instalação SaaS. | [local-integrations-configuration.md](especialidades/local-integrations-configuration.md) |
 | `ia-studio.assistant-ticket-analysis` | Engenheiro de runtime assistido e integrações operacionais | Governar consulta delimitada e análise rastreável de chamados IXC pelo assistente, sem mutações no ERP. | [assistant-ticket-analysis.md](especialidades/assistant-ticket-analysis.md) |
+| `ia-studio.connectchat-channel` | Engenheiro de integração de canais de atendimento | Governar o consumo seguro da API ConnectChat no atendimento do IA Studio, sem expor a chave nem alterar o ConnectChat. | [connectchat-channel.md](especialidades/connectchat-channel.md) |
 
 ## Critérios de aceite
 
@@ -64,3 +65,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.8.0 | released | Aprovado por Robson em 2026-10-05 | MINOR. Adiciona `ia-studio.local-integrations-configuration@1.0.0`, criada após o alinhamento da remoção do Marketplace como etapa SaaS. |
 | 1.9.0 | released | Aprovado por Robson em 2026-10-05 | MINOR. Adiciona `ia-studio.assistant-ticket-analysis@1.0.0`, criada após o alinhamento da análise assistida de chamados IXC. |
 | 1.10.0 | released | Revisado em 2026-10-05 | MINOR. Atualiza `ia-studio.local-integrations-configuration@1.1.0` com a aposentadoria segura de provider sem remoção destrutiva de dados. |
+| 1.11.0 | released | Aprovado por Robson em 2026-10-06 | MINOR. Adiciona `ia-studio.connectchat-channel@1.0.0`, criada após alinhamento aprovado para integrar o canal externo ConnectChat ao atendimento. |

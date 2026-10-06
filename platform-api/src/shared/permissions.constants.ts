@@ -55,6 +55,10 @@ export const PERMISSIONS = {
   // Vincular um assistente de IA a um número (quem atende sozinho o canal).
   COMM_WHATSAPP_ASSISTANT_MANAGE: 'comm.whatsapp.assistant.manage',
 
+  // ─── ConnectChat (canal interno de atendimento) ───────
+  COMM_CONNECTCHAT_READ: 'comm.connectchat.read',
+  COMM_CONNECTCHAT_WRITE: 'comm.connectchat.write',
+
   // ─── Automação (Fase 4 — Automation Platform) ───────
   AUTOMATION_WORKFLOWS_READ: 'automation.workflows.read',
   AUTOMATION_WORKFLOWS_WRITE: 'automation.workflows.write',
@@ -177,6 +181,14 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
+    key: 'connectchat',
+    label: 'ConnectChat',
+    permissions: [
+      PERMISSIONS.COMM_CONNECTCHAT_READ,
+      PERMISSIONS.COMM_CONNECTCHAT_WRITE,
+    ],
+  },
+  {
     key: 'automation',
     label: 'Automação',
     permissions: [
@@ -278,6 +290,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE]: 'Criar/sincronizar templates WhatsApp',
   [PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ]: 'Ver números WhatsApp conectados',
   [PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE]: 'Vincular assistente de IA ao número',
+  [PERMISSIONS.COMM_CONNECTCHAT_READ]: 'Ver conversas ConnectChat',
+  [PERMISSIONS.COMM_CONNECTCHAT_WRITE]: 'Responder e editar mensagens ConnectChat',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_READ]: 'Ver fluxos de automação',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_WRITE]: 'Criar/editar fluxos de automação',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_PUBLISH]: 'Publicar/reverter versões de fluxo',
@@ -352,6 +366,14 @@ export const SYSTEM_PROFILES: SystemProfileDef[] = [
       PERMISSIONS.COMM_WHATSAPP_TEAMS_READ,
       PERMISSIONS.COMM_WHATSAPP_QUEUES_READ,
       PERMISSIONS.COMM_WHATSAPP_TEMPLATES_READ,
+    ],
+  },
+  {
+    name: 'Atendente ConnectChat',
+    description: 'Atende conversas do ConnectChat',
+    permissions: [
+      PERMISSIONS.COMM_CONNECTCHAT_READ,
+      PERMISSIONS.COMM_CONNECTCHAT_WRITE,
     ],
   },
   {

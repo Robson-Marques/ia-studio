@@ -90,6 +90,12 @@ const NAV = [
     ],
   },
   {
+    label: 'ConnectChat', icon: 'messages',
+    children: [
+      { label: 'Conversas', icon: 'messages', path: '/connectchat/conversas', perm: 'comm.connectchat.read' },
+    ],
+  },
+  {
     label: 'Integrações', icon: 'grid',
     children: [
       { label: 'Conexões',          icon: 'plug',  path: '/integracoes/conexoes',    perm: 'integrations.connections.read' },
@@ -129,6 +135,7 @@ const BREADCRUMBS = {
   '/whatsapp/templates': 'WhatsApp / Templates',
   '/whatsapp/equipes':   'WhatsApp / Equipes e Filas',
   '/whatsapp/numeros':   'WhatsApp / Números',
+  '/connectchat/conversas': 'ConnectChat / Conversas',
   '/isp/abertura-chamado': 'ISP / Abertura de chamado',
   '/isp/incidentes':       'ISP / Incidentes',
   '/whatsapp/atendimento-ia': 'IA Studio / Atendimento por IA',
@@ -214,7 +221,7 @@ function resolveCrumb(pathname) {
 // casca, e a exceção precisa de motivo — rolagem interna própria em mais de uma
 // coluna. Hoje só a conversa do WhatsApp; o canvas de fluxo é candidato, mas ele
 // já resolve a altura por conta e entra em outra frente.
-const FULL_BLEED_PATHS = ['/whatsapp/conversas'];
+const FULL_BLEED_PATHS = ['/whatsapp/conversas', '/connectchat/conversas'];
 
 function buildBreadcrumb(pathname) {
   const labels = resolveCrumb(pathname).split(' / ');

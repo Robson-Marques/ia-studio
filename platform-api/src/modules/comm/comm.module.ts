@@ -22,6 +22,8 @@ import { WhatsappTemplatesController } from './whatsapp/whatsapp-templates.contr
 import { WhatsappNumbersController } from './whatsapp/whatsapp-numbers.controller';
 import { WhatsappAssistantRepository } from './whatsapp/whatsapp-assistant.repository';
 import { WhatsappAssistantService } from './whatsapp/whatsapp-assistant.service';
+import { ConnectchatInboxService } from './connectchat/connectchat-inbox.service';
+import { ConnectchatInboxController } from './connectchat/connectchat-inbox.controller';
 
 import { AttendanceRepository } from './attendance/attendance.repository';
 import { ChatEventsService } from './attendance/chat-events.service';
@@ -40,6 +42,7 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
     WhatsappInboxController,
     WhatsappTemplatesController,
     WhatsappNumbersController,
+    ConnectchatInboxController,
     AttendanceController,
     AttendanceAdminController,
   ],
@@ -57,6 +60,7 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
     WhatsappSyncService,
     WhatsappAssistantRepository,
     WhatsappAssistantService,
+    ConnectchatInboxService,
     // Atendimento
     AttendanceRepository,
     ChatEventsService,
