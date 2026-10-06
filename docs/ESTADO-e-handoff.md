@@ -21,6 +21,12 @@ e testar essa conexão, executar build no servidor e validar uma conversa real.
 O contrato atual expõe somente `businessContactId`;
 nome/telefone exigem futura extensão explícita da API ConnectChat.
 
+Atualização de 2026-10-06 — **Permissões ConnectChat:** instalações já
+provisionadas não recebiam permissões novas no perfil Administrador, porque o
+seed retornava antes da sincronização quando já havia usuários. O perfil agora é
+sincronizado em todo boot da API; após o deploy e novo login, o menu
+**ConnectChat → Conversas** fica disponível ao Administrador.
+
 ## Frente atual — vertentes próprias e reinício limpo do desenvolvimento
 
 Atualização de 2026-10-05 — **Base replicável:** a tag `v0.11.42` fixa uma

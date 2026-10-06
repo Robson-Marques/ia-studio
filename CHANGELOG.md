@@ -1,5 +1,11 @@
 # Changelog — IA Studio
 
+## v0.11.45 - 2026-10-06 (Permissões do Administrador)
+
+- Corrigido o provisionamento de instalações existentes: o perfil de sistema
+  **Administrador** agora sincroniza `ALL_PERMISSIONS` a cada inicialização da
+  API, incluindo as permissões ConnectChat adicionadas após a criação do banco.
+
 ## v0.11.44 - 2026-10-06 (Correção de configuração ConnectChat)
 
 - ConnectChat agora é provider do Integration Manager. A configuração é feita
