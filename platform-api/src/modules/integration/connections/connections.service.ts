@@ -256,6 +256,9 @@ export class ConnectionsService {
     const provider = this.registry.get(connection.provider_key);
     const ctx = this.buildContext(connection);
     const startedAt = Date.now();
+    // Conversas são conteúdo de atendimento. Mantemos operação e metadados
+    // rastreáveis, mas nunca o texto da mensagem ou a prova de vínculo no log.
+    const sensitiveParamKeys = connection.provider_key === 'connectchat' ? ['body', 'proof'] : [];
     try {
       const result = await provider.execute(ctx, operation, params);
       const durationMs = Date.now() - startedAt;
@@ -266,7 +269,7 @@ export class ConnectionsService {
         operation,
         status: IntegrationLogStatus.SUCCESS,
         durationMs,
-        requestMeta: redactSensitive({ operation, params }),
+        requestMeta: redactSensitive({ operation, params }, sensitiveParamKeys),
         responseMeta: { summary: this.summarize(result) },
         traceId: getRequestStore()?.traceId ?? null,
       });
@@ -290,7 +293,7 @@ export class ConnectionsService {
         operation,
         status: IntegrationLogStatus.FAILURE,
         durationMs,
-        requestMeta: redactSensitive({ operation, params }),
+        requestMeta: redactSensitive({ operation, params }, sensitiveParamKeys),
         error: (e as Error).message,
         traceId: getRequestStore()?.traceId ?? null,
       });

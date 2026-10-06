@@ -1,5 +1,14 @@
 # Changelog — IA Studio
 
+## v0.11.44 - 2026-10-06 (Correção de configuração ConnectChat)
+
+- ConnectChat agora é provider do Integration Manager. A configuração é feita
+  em **Integrações → Conexões**: URL, actor referência e timeout pertencem à
+  conexão; a chave técnica é guardada cifrada pelo Secrets Manager.
+- O canal de atendimento resolve exclusivamente uma conexão ConnectChat ativa
+  e executa as operações pelo Provider Registry, preservando health, logs e
+  estado da conexão sem depender de variáveis de ambiente.
+
 ## v0.11.43 - 2026-10-06 (Especialidade ConnectChat)
 
 - Adicionada `ia-studio.connectchat-channel@1.0.0`, criada após alinhamento

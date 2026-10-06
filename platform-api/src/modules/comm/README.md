@@ -25,7 +25,7 @@ nem dependência de solução não oficial.
 | `whatsapp/whatsapp-sync.service.ts` | **Cron a cada 10 min** (`@nestjs/schedule`): por conexão ACTIVE → display name, qualidade, limite de mensagens, templates → `comm_whatsapp_sync_state` + espelho no config; mudança de qualidade gera IntegrationLog. |
 | `whatsapp/whatsapp-numbers.controller.ts` | Painel **Números**: conexões whatsapp-meta com qualidade/limite/status/health + sync manual. |
 | `attendance/` | **Central de Atendimento**: `chat-assignment.service` (claim/release/transfer/close/reopen/takeover com **lock otimista** — 2º concorrente recebe 409 — e trilha `comm_whatsapp_chat_events`), `reply-gate.service` (claim implícito; conversa de outro → 409 `NEEDS_TAKEOVER_CONFIRMATION` → reenvio com `confirm_takeover`), `chat-scope.resolver` (cache 30s), state machine `OPEN ↔ IN_PROGRESS → CLOSED` (reopen → sempre OPEN), equipes/filas/membros com **soft-delete** + checagem de integridade. |
-| `connectchat/` | Canal interno ConnectChat: proxy autenticado somente pelo backend para conversas, mensagens, envio, edição e recibos. O painel faz polling incremental por `serverSequence`; o ConnectChat continua dono da conversa e do estado comercial do contato. |
+| `connectchat/` | Canal interno ConnectChat: usa uma `Connection` ativa do Integration Manager para conversas, mensagens, envio, edição e recibos. O painel faz polling incremental por `serverSequence`; o ConnectChat continua dono da conversa e do estado comercial do contato. |
 
 ## Tabelas (`comm_*`, locais à instância dedicada)
 
@@ -49,16 +49,18 @@ nem dependência de solução não oficial.
 
 ## ConnectChat
 
-O canal usa exclusivamente o adaptador HTTP do backend. Configure no ambiente
-da API, nunca no painel ou no navegador:
+O canal usa exclusivamente o adaptador HTTP do backend e uma **Connection**
+ativa do Integration Manager (`provider_key = 'connectchat'`). Configure em
+**Integrações → Conexões → Nova conexão → ConnectChat**:
 
-```dotenv
-CONNECTCHAT_API_URL=https://chat.exemplo.com.br
-CONNECTCHAT_API_KEY=cck_...
-CONNECTCHAT_ACTOR_REF=IA Studio:atendimento
-CONNECTCHAT_TIMEOUT_MS=10000
-```
+- `api_url`: URL base da API, sem `/v1` (ex.: `https://chat.exemplo.com.br`);
+- `actor_ref`: padrão `IA Studio:atendimento`;
+- `timeout_ms`: opcional, padrão `10000`;
+- `api_key`: chave técnica no campo de senha; é cifrada pelo Secrets Manager e,
+  após o envio, nunca volta ao navegador, vai para `Connection.config` ou para
+  variável de ambiente.
 
+O teste da conexão lista conversas para validar URL, chave e escopos de fato.
 O operador recebe `X-ConnectChat-Actor-Ref` derivado do seu usuário local. As
 chaves de idempotência e o `clientMessageId` são estáveis durante retries; não
 há acesso SQL, fallback de instalação ou WebSocket empresarial. A API atual do

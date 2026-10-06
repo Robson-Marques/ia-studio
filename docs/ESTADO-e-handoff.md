@@ -11,13 +11,14 @@
 > com IXC).
 
 Atualização de 2026-10-06 — **Canal ConnectChat:** foi adicionada a especialidade
-`ia-studio.connectchat-channel@1.0.0`, o adaptador HTTP somente de backend e a
+`ia-studio.connectchat-channel@1.0.1`, o adaptador HTTP somente de backend e a
 tela **ConnectChat → Conversas**. O canal usa polling incremental por
 `serverSequence`, retries idempotentes e actor por usuário local; não usa SQL,
-fallback entre instalações ou WebSocket empresarial. Falta provisionar no
-ambiente da API `CONNECTCHAT_API_URL`, `CONNECTCHAT_API_KEY`,
-`CONNECTCHAT_ACTOR_REF` e `CONNECTCHAT_TIMEOUT_MS`, executar build no servidor e
-validar uma conversa real. O contrato atual expõe somente `businessContactId`;
+fallback entre instalações ou WebSocket empresarial. A configuração agora é uma
+Connection `connectchat` em **Integrações → Conexões**: URL, actor e timeout
+ficam no config local; a chave técnica é cifrada no Secrets Manager. Falta criar
+e testar essa conexão, executar build no servidor e validar uma conversa real.
+O contrato atual expõe somente `businessContactId`;
 nome/telefone exigem futura extensão explícita da API ConnectChat.
 
 ## Frente atual — vertentes próprias e reinício limpo do desenvolvimento

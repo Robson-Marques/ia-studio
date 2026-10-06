@@ -13,6 +13,7 @@ import { S3Provider } from './providers/s3.provider';
 import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
 import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
+import { ConnectchatProvider } from './providers/connectchat.provider';
 
 @Module({
   providers: [
@@ -29,6 +30,7 @@ import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
     WhatsappMetaProvider,
     WhatsappYcloudProvider,
     GoogleWorkspaceProvider,
+    ConnectchatProvider,
   ],
   // GoogleWorkspaceProvider exportado: o OAuth controller monta a URL de
   // consentimento (buildConsentUrl) direto no provider.

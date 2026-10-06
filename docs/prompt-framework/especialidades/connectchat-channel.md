@@ -2,7 +2,7 @@
 schema: prompt-framework/v1
 id: ia-studio.connectchat-channel
 kind: task
-version: 1.0.0
+version: 1.0.1
 status: released
 title: Integrar o canal ConnectChat ao atendimento
 extends: workflow.system-change-base@1.1.0
@@ -21,7 +21,7 @@ owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-10-06"
 released_at: "2026-10-06"
-change_reason: Cria a especialidade aprovada para consumir a API externa ConnectChat como canal de atendimento no IA Studio.
+change_reason: PATCH. Corrige a fronteira de configuração: o ConnectChat é uma Connection do Integration Manager, com chave no Secrets Manager.
 ---
 
 # Integrar o canal ConnectChat ao atendimento
@@ -59,8 +59,9 @@ autenticado de sua API.
 
 - Mapear antes da mudança os consumidores reais do Inbox e do WhatsApp, sem
   duplicar suas regras de atendimento nem tratar o ConnectChat como WhatsApp.
-- Criar um adaptador HTTP isolado no backend, com URL, chave, actor e timeout
-  configurados somente no ambiente seguro da instalação.
+- Criar um adaptador HTTP isolado no backend, configurado por uma Connection
+  nomeada do Integration Manager: URL, actor e timeout no config local e chave
+  técnica exclusivamente no Secrets Manager.
 - Usar `X-ConnectChat-Key`, `X-ConnectChat-Actor-Ref`, escopos mínimos e
   `Idempotency-Key` estável em toda operação mutável; retries preservam chave e
   corpo originais.
@@ -84,7 +85,7 @@ autenticado de sua API.
 
 1. Ler o alinhamento aprovado e inventariar Inbox, WhatsApp, Integration
    Manager, Secrets Manager, ACL, logs e consumidores reais.
-2. Confirmar o contrato ConnectChat, variáveis de ambiente, escopos, mapeamento
+2. Confirmar o contrato ConnectChat, campos da Connection, escopos, mapeamento
    de atores e os limites da interface de atendimento.
 3. Desenhar o adaptador e a sincronização incremental, com cursor persistente,
    idempotência, backoff e tratamento explícito de conflitos e conversa fechada.

@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.11.0
+version: 1.11.1
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-10-05"
 released_at: "2026-10-05"
-change_reason: MINOR. Adiciona a especialidade de integração do canal externo ConnectChat ao atendimento do IA Studio.
+change_reason: PATCH. Corrige a especialidade ConnectChat para usar Connection e Secrets Manager do Integration Manager.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -66,3 +66,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.9.0 | released | Aprovado por Robson em 2026-10-05 | MINOR. Adiciona `ia-studio.assistant-ticket-analysis@1.0.0`, criada após o alinhamento da análise assistida de chamados IXC. |
 | 1.10.0 | released | Revisado em 2026-10-05 | MINOR. Atualiza `ia-studio.local-integrations-configuration@1.1.0` com a aposentadoria segura de provider sem remoção destrutiva de dados. |
 | 1.11.0 | released | Aprovado por Robson em 2026-10-06 | MINOR. Adiciona `ia-studio.connectchat-channel@1.0.0`, criada após alinhamento aprovado para integrar o canal externo ConnectChat ao atendimento. |
+| 1.11.1 | released | Revisado em 2026-10-06 | PATCH. Atualiza `ia-studio.connectchat-channel@1.0.1`: URL, actor e timeout ficam na Connection; chave técnica no Secrets Manager. |

@@ -42,7 +42,7 @@ export class ConnectchatApiError extends Error {
   }
 }
 
-/** Cliente de servidor para a instalação ConnectChat única desta vertente. */
+/** Cliente HTTP usado exclusivamente pelo provider ConnectChat. */
 export class ConnectchatClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -50,20 +50,20 @@ export class ConnectchatClient {
   private readonly timeoutMs: number;
 
   constructor(input: {
-    baseUrl?: string;
-    apiKey?: string;
-    actorRef?: string;
+    baseUrl: string;
+    apiKey: string;
+    actorRef: string;
     timeoutMs?: string | number;
-  } = {}) {
-    const rawUrl = input.baseUrl ?? process.env['CONNECTCHAT_API_URL'];
-    const apiKey = input.apiKey ?? process.env['CONNECTCHAT_API_KEY'];
-    const actorRef = input.actorRef ?? process.env['CONNECTCHAT_ACTOR_REF'] ?? 'IA Studio:atendimento';
-    const timeoutMs = Number(input.timeoutMs ?? process.env['CONNECTCHAT_TIMEOUT_MS'] ?? 10_000);
+  }) {
+    const rawUrl = input.baseUrl;
+    const apiKey = input.apiKey;
+    const actorRef = input.actorRef;
+    const timeoutMs = Number(input.timeoutMs ?? 10_000);
     if (!rawUrl || !apiKey) {
-      throw new Error('ConnectChat não configurado. Defina CONNECTCHAT_API_URL e CONNECTCHAT_API_KEY somente no backend.');
+      throw new Error('Conexão ConnectChat sem URL ou chave técnica configurada.');
     }
     if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 60_000) {
-      throw new Error('CONNECTCHAT_TIMEOUT_MS deve ser um inteiro entre 100 e 60000.');
+      throw new Error('O timeout do ConnectChat deve ser um inteiro entre 100 e 60000 ms.');
     }
     this.baseUrl = `${rawUrl.replace(/\/+$/, '')}/v1`;
     this.apiKey = apiKey;

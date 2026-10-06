@@ -19,6 +19,7 @@ import { S3Provider } from './providers/s3.provider';
 import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
 import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
+import { ConnectchatProvider } from './providers/connectchat.provider';
 
 // Providers cuja definicao deve ser atualizada no boot (ganhou implementacao).
 // smtp: virou envio real (email.send) na Fase 7 — wizard/capabilities mudaram.
@@ -42,11 +43,12 @@ export class ProviderSeedService implements OnApplicationBootstrap {
     private readonly whatsappMeta: WhatsappMetaProvider,
     private readonly whatsappYcloud: WhatsappYcloudProvider,
     private readonly googleWorkspace: GoogleWorkspaceProvider,
+    private readonly connectchat: ConnectchatProvider,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     // 1) Registro em memoria das implementacoes (diretriz 2).
-    for (const provider of [this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.googleWorkspace]) {
+    for (const provider of [this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.googleWorkspace, this.connectchat]) {
       this.registry.register(provider);
     }
 
