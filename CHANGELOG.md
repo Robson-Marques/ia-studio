@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release conjunta para corrigir a compilação do PWA do ConnectChat quando um
+  erro da API não possui código. A atualização coordenada volta a alcançar o
+  build e o health check da mesma tag nos dois repositórios.
+
 - O atualizador coordenado agora constrói API e PWA do ConnectChat em etapas
   separadas e registra a saída relevante no painel se houver falha, antes de
   restaurar a versão anterior. A execução usa o script presente na release
