@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release conjunta de correção para usar no PWA do ConnectChat o monograma N
+  branco, extraído da logo oficial da Newnet, sem o cartão claro ou azul sobre
+  a interface escura.
+
 - Release conjunta de correção para trocar o encapsulamento SVG que não
   renderizava pelo favicon PNG oficial da Newnet no PWA do ConnectChat.
 
