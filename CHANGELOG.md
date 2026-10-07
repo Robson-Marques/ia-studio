@@ -2,6 +2,9 @@
 
 ## Não publicado
 
+- Release conjunta de correção para trocar o encapsulamento SVG que não
+  renderizava pelo favicon PNG oficial da Newnet no PWA do ConnectChat.
+
 - Release conjunta de correção para propagar o favicon oficial da Newnet no
   PWA do ConnectChat, mantendo a mesma versão entre os dois repositórios.
 
