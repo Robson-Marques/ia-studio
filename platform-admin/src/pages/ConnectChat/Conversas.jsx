@@ -7,8 +7,7 @@ const POLL_MS = 5000;
 
 function labelForConversation(conversation) {
   if (conversation.customerDisplayName) return conversation.customerDisplayName;
-  const publicId = conversation.businessContact?.globalPublicId;
-  return publicId ? `Cliente ${publicId}` : 'Cliente em identificação';
+  return conversation.businessContact?.displayName ?? 'Cliente em identificação';
 }
 
 function messageId() {
@@ -179,7 +178,7 @@ export default function ConnectchatConversas() {
               <div>
                 <strong style={{ color: 'var(--su-text-primary)' }}>{labelForConversation(selected)}</strong>
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--su-text-muted)' }}>
-                  {selected.businessContact?.globalPublicId ? `Identificador: ${selected.businessContact.globalPublicId}` : 'Identificação em andamento'}
+                  {selected.businessContact?.displayName ? 'Nome informado pelo cliente' : 'Identificação em andamento'}
                 </span>
               </div>
               <div className="flex items-center gap-2">

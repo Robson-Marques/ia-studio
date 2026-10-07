@@ -11,7 +11,7 @@ export interface ConnectchatConversation {
   customerRef: string | null;
   globalIdentityId: string | null;
   businessContact?: {
-    globalPublicId: string | null;
+    displayName: string | null;
     status: 'LEAD' | 'CUSTOMER' | 'INACTIVE';
     linkStatus: 'PENDING' | 'ACTIVE' | 'DISCONNECTED';
   };

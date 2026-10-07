@@ -18,8 +18,8 @@ fallback entre instalações ou WebSocket empresarial. A configuração agora é
 Connection `connectchat` em **Integrações → Conexões**: URL, actor e timeout
 ficam no config local; a chave técnica é cifrada no Secrets Manager. Falta criar
 e testar essa conexão, executar build no servidor e validar uma conversa real.
-O contrato agora expõe `businessContact.globalPublicId` como fallback seguro;
-fragmentos de UUID não aparecem mais no atendimento. O nome comercial continua
+O contrato agora expõe `businessContact.displayName` informado no acesso como
+fallback seguro; fragmentos de UUID não aparecem mais no atendimento. O nome comercial continua
 fora do ConnectChat e será resolvido pelo IA Studio a partir de `customerRef`
 em um gateway interno posterior.
 

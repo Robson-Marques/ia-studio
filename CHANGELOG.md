@@ -2,6 +2,13 @@
 
 ## Não publicado
 
+- Release conjunta para substituir o `@ID` único do ConnectChat pelo nome não
+  único informado pela pessoa, validando nome e telefone antes do envio do OTP
+  e mantendo telefone como acesso e vínculo. Corrige também o menu de três
+  pontos do PWA, que deixa de encerrar a sessão ao abrir, orienta a solicitar
+  um novo código quando ele expirar ou for bloqueado e detecta o navegador ou
+  aparelho sem pedir um nome técnico ao cliente.
+
 - Release conjunta para configurar a assinatura `NEWNET` no envio de códigos
   Didit do ConnectChat, reposicionar a tela como área de atendimento e
   serviços e restaurar o favicon azul do PWA.
