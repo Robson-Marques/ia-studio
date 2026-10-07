@@ -2,6 +2,9 @@
 
 ## Não publicado
 
+- Release conjunta de correção para propagar o favicon oficial da Newnet no
+  PWA do ConnectChat, mantendo a mesma versão entre os dois repositórios.
+
 - A atualização pelo painel da instalação Newnet passa a coordenar a mesma tag
   do ConnectChat: valida a chave de deploy, obtém a release, mantém o backup e
   rollback próprios do Chat e exige healthcheck antes de concluir. Os dois
