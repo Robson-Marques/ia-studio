@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release conjunta para corrigir o novo pareamento do ConnectChat: a migração
+  preserva o histórico de aparelhos revogados e limita cada identidade a um
+  único aparelho ativo, sem retornar erro interno após a verificação Didit.
+
 - Release conjunta para corrigir a compilação do PWA do ConnectChat quando um
   erro da API não possui código. A atualização coordenada volta a alcançar o
   build e o health check da mesma tag nos dois repositórios.
