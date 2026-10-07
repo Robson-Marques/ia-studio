@@ -267,7 +267,10 @@ if [ "$CONNECTCHAT_AUTO_UPGRADE" = "1" ] && [ -f "$CONNECTCHAT_INSTALL_DIR/.conn
   fi
 
   log_db "CONNECTCHAT_UPGRADE" "backup, migração e rebuild do ConnectChat"
-  if ! bash "$CONNECTCHAT_INSTALL_DIR/ops/upgrade.sh" \
+  # O script pertence à release que acabou de ser baixada. Usar o script já
+  # instalado faria a primeira atualização após uma correção executar a versão
+  # antiga e esconder novamente o diagnóstico corrigido.
+  if ! bash "$CONNECTCHAT_SOURCE_DIR/ops/upgrade.sh" \
     --source-dir "$CONNECTCHAT_SOURCE_DIR" --install-dir "$CONNECTCHAT_INSTALL_DIR" >/tmp/connectchat_upgrade.out 2>/tmp/connectchat_upgrade.err; then
     CONNECTCHAT_FAILURE_SUMMARY="$(
       {
