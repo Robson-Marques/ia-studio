@@ -96,6 +96,14 @@ Administração da instalação**. O processo consulta as tags do repositório d
 vertente instalada, cria backup próprio, compila e reinicia somente seus
 processos. Em caso de falha, a aplicação permanece na revisão anterior.
 
+Na instalação Newnet que possui ConnectChat em `/opt/connectchat-newnet`, a
+mesma ação também aplica a mesma tag no serviço ConnectChat. A etapa usa a
+chave de deploy já existente em `/root/.ssh/connectchat_deploy`, cria o backup
+criptografado do Chat, executa suas migrações, reconstrói os containers e só
+conclui após `GET /v1/health` responder saudável. IA Studio e ConnectChat
+continuam com bancos, processos, volumes e segredos separados; a tag conjunta
+é uma coordenação de release, não uma fusão de runtime.
+
 Uso manual excepcional:
 
 ```bash

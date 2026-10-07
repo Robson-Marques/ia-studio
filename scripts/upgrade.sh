@@ -230,19 +230,75 @@ log_db "ADMIN_BUILD" "npm install + vite build (platform-admin)"
 build_front "$ADMIN_DIR" "$ADMIN_API" "$ADMIN_BASE" "ADMIN_BUILD"
 log_db "ADMIN_BUILD" "painel do cliente publicado"
 
-# ---------- 10) ROTATE_BACKUPS (mantem 7) ----------
+# ---------- 10) CONNECTCHAT (release conjunta Newnet) ----------
+# O ConnectChat continua um serviço Docker e banco próprios; "atualização
+# conjunta" significa uma única ação no painel para aplicar a MESMA tag nos dois
+# repositórios, nunca misturar seus processos, volumes ou segredos. Instalações
+# sem ConnectChat simplesmente registram a etapa como não aplicável.
+CONNECTCHAT_AUTO_UPGRADE="${CONNECTCHAT_AUTO_UPGRADE:-1}"
+CONNECTCHAT_INSTALL_DIR="${CONNECTCHAT_INSTALL_DIR:-/opt/connectchat-newnet}"
+CONNECTCHAT_REPOSITORY="${CONNECTCHAT_REPOSITORY:-git@git.nivoo.dev.br:root/connect.git}"
+CONNECTCHAT_DEPLOY_KEY="${CONNECTCHAT_DEPLOY_KEY:-/root/.ssh/connectchat_deploy}"
+CONNECTCHAT_SOURCE_DIR=""
+
+cleanup_connectchat_source() {
+  [ -n "$CONNECTCHAT_SOURCE_DIR" ] && [ -d "$CONNECTCHAT_SOURCE_DIR" ] && rm -rf -- "$CONNECTCHAT_SOURCE_DIR"
+}
+
+if [ "$CONNECTCHAT_AUTO_UPGRADE" = "1" ] && [ -f "$CONNECTCHAT_INSTALL_DIR/.connectchat-release" ]; then
+  [ -f "$CONNECTCHAT_INSTALL_DIR/.env" ] \
+    || mark_failed "CONNECTCHAT_PREFLIGHT" "instalação ConnectChat incompleta em $CONNECTCHAT_INSTALL_DIR (.env ausente)"
+  [ -r "$CONNECTCHAT_DEPLOY_KEY" ] \
+    || mark_failed "CONNECTCHAT_PREFLIGHT" "chave de deploy do ConnectChat não está disponível; esperada em $CONNECTCHAT_DEPLOY_KEY"
+
+  log_db "CONNECTCHAT_PREFLIGHT" "validando a tag $TO_VERSION e a instalação ConnectChat"
+  if ! GIT_SSH_COMMAND="ssh -i $CONNECTCHAT_DEPLOY_KEY -o IdentitiesOnly=yes" \
+    git ls-remote --exit-code --tags "$CONNECTCHAT_REPOSITORY" "refs/tags/$TO_VERSION" >/tmp/connectchat_git.err 2>&1; then
+    mark_failed "CONNECTCHAT_PREFLIGHT" "tag $TO_VERSION não está disponível no repositório ConnectChat: $(tail -c 400 /tmp/connectchat_git.err)"
+  fi
+
+  CONNECTCHAT_SOURCE_DIR="$(mktemp -d "/var/tmp/connectchat-${TO_VERSION#v}.XXXXXX")" \
+    || mark_failed "CONNECTCHAT_FETCH" "não foi possível criar a fonte temporária da release ConnectChat"
+  log_db "CONNECTCHAT_FETCH" "obtendo a release conjunta $TO_VERSION"
+  if ! GIT_SSH_COMMAND="ssh -i $CONNECTCHAT_DEPLOY_KEY -o IdentitiesOnly=yes" \
+    git clone --quiet --branch "$TO_VERSION" --depth 1 "$CONNECTCHAT_REPOSITORY" "$CONNECTCHAT_SOURCE_DIR" 2>/tmp/connectchat_git.err; then
+    cleanup_connectchat_source
+    mark_failed "CONNECTCHAT_FETCH" "clone da release ConnectChat falhou: $(tail -c 400 /tmp/connectchat_git.err)"
+  fi
+
+  log_db "CONNECTCHAT_UPGRADE" "backup, migração e rebuild do ConnectChat"
+  if ! bash "$CONNECTCHAT_INSTALL_DIR/ops/upgrade.sh" \
+    --source-dir "$CONNECTCHAT_SOURCE_DIR" --install-dir "$CONNECTCHAT_INSTALL_DIR" >/tmp/connectchat_upgrade.out 2>/tmp/connectchat_upgrade.err; then
+    cleanup_connectchat_source
+    mark_failed "CONNECTCHAT_UPGRADE" "upgrade do ConnectChat falhou: $(tail -c 600 /tmp/connectchat_upgrade.err)"
+  fi
+
+  CONNECTCHAT_PWA_PORT="$(sed -n 's/^PWA_PORT=//p' "$CONNECTCHAT_INSTALL_DIR/.env" | head -1)"
+  [[ "$CONNECTCHAT_PWA_PORT" =~ ^[0-9]{2,5}$ ]] || CONNECTCHAT_PWA_PORT=4174
+  if ! curl --fail --silent --show-error "http://127.0.0.1:${CONNECTCHAT_PWA_PORT}/v1/health" >/tmp/connectchat_health.out 2>/tmp/connectchat_health.err; then
+    cleanup_connectchat_source
+    mark_failed "CONNECTCHAT_HEALTH" "ConnectChat não respondeu saudável após o upgrade: $(tail -c 400 /tmp/connectchat_health.err)"
+  fi
+  cleanup_connectchat_source
+  CONNECTCHAT_SOURCE_DIR=""
+  log_db "CONNECTCHAT_DONE" "ConnectChat atualizado e saudável em $TO_VERSION"
+else
+  log_db "CONNECTCHAT_SKIPPED" "ConnectChat não está instalado nesta aplicação; etapa não aplicável"
+fi
+
+# ---------- 11) ROTATE_BACKUPS (mantem 7) ----------
 log_db "ROTATE_BACKUPS" "mantendo os 7 backups mais recentes"
 ls -1t "$BACKUP_DIR"/iastudio_db_*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
 log_db "ROTATE_BACKUPS" "rotacao concluida"
 
-# ---------- 11) MARK_SUCCESS (antes do restart) ----------
+# ---------- 12) MARK_SUCCESS (antes do restart) ----------
 log_db "DONE" "Upgrade aplicado ($FROM_VERSION -> $TO_VERSION)"
 psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL
 UPDATE system_upgrades SET status='SUCCESS', finished_at=now() WHERE id = '$UPGRADE_ID';
 SQL
 trap - ERR
 
-# ---------- 12) RESTART ----------
+# ---------- 13) RESTART ----------
 # WORKER PRIMEIRO, API POR ULTIMO — e cada um em seu proprio comando. O worker
 # roda o assistente/crons e registra as tools em memoria: se ele nao reiniciar,
 # codigo/tool novos NUNCA entram (bug real: o worker ficou 19h sem reiniciar

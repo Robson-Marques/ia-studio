@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- A atualização pelo painel da instalação Newnet passa a coordenar a mesma tag
+  do ConnectChat: valida a chave de deploy, obtém a release, mantém o backup e
+  rollback próprios do Chat e exige healthcheck antes de concluir. Os dois
+  serviços seguem isolados em runtime e dados.
+
 - A Central ConnectChat permite ao usuário autorizado informar o código IXC,
   solicitar a confirmação do cliente e concluir o vínculo depois da aprovação
   no PWA. A referência e a identidade técnica continuam restritas ao backend.
