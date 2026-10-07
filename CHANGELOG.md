@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- O atualizador coordenado agora constrói API e PWA do ConnectChat em etapas
+  separadas e registra a saída relevante no painel se houver falha, antes de
+  restaurar a versão anterior.
+
 - Release conjunta para substituir o `@ID` único do ConnectChat pelo nome não
   único informado pela pessoa, validando nome e telefone antes do envio do OTP
   e mantendo telefone como acesso e vínculo. Corrige também o menu de três

@@ -269,8 +269,17 @@ if [ "$CONNECTCHAT_AUTO_UPGRADE" = "1" ] && [ -f "$CONNECTCHAT_INSTALL_DIR/.conn
   log_db "CONNECTCHAT_UPGRADE" "backup, migração e rebuild do ConnectChat"
   if ! bash "$CONNECTCHAT_INSTALL_DIR/ops/upgrade.sh" \
     --source-dir "$CONNECTCHAT_SOURCE_DIR" --install-dir "$CONNECTCHAT_INSTALL_DIR" >/tmp/connectchat_upgrade.out 2>/tmp/connectchat_upgrade.err; then
+    CONNECTCHAT_FAILURE_SUMMARY="$(
+      {
+        echo '--- saída do upgrade ConnectChat ---'
+        tail -c 1400 /tmp/connectchat_upgrade.out
+        echo
+        echo '--- erros do upgrade ConnectChat ---'
+        tail -c 1400 /tmp/connectchat_upgrade.err
+      } | tr '\n' ' '
+    )"
     cleanup_connectchat_source
-    mark_failed "CONNECTCHAT_UPGRADE" "upgrade do ConnectChat falhou: $(tail -c 600 /tmp/connectchat_upgrade.err)"
+    mark_failed "CONNECTCHAT_UPGRADE" "upgrade do ConnectChat falhou: $CONNECTCHAT_FAILURE_SUMMARY"
   fi
 
   CONNECTCHAT_PWA_PORT="$(sed -n 's/^PWA_PORT=//p' "$CONNECTCHAT_INSTALL_DIR/.env" | head -1)"
