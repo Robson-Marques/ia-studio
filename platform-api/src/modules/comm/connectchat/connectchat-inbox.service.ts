@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { ConnectchatMention } from '../../../shared/integration/connectchat.client';
+import { ConnectchatConversation, ConnectchatMention } from '../../../shared/integration/connectchat.client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
 
@@ -23,6 +23,23 @@ export class ConnectchatInboxService {
     return this.connections.execute(await this.connectionId(), operation, params);
   }
 
+  private async conversation(conversationId: string): Promise<ConnectchatConversation> {
+    const conversations = await this.execute('listConversations') as ConnectchatConversation[];
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (!conversation?.globalIdentityId) {
+      throw new BadRequestException('A conversa não está disponível para vínculo de cliente.');
+    }
+    return conversation;
+  }
+
+  private async activeIxcConnection() {
+    const connections = await this.connectionsRepository.findAll({ providerKey: 'ixc', status: 'ACTIVE' });
+    if (connections.length !== 1) {
+      throw new ConflictException('É necessário haver exatamente uma conexão IXC ativa para vincular o cliente pelo atendimento.');
+    }
+    return connections[0];
+  }
+
   private actor(user: AuthenticatedUser): string {
     return `ystudio:user:${user.sub}`;
   }
@@ -31,8 +48,40 @@ export class ConnectchatInboxService {
     return this.connections.test(await this.connectionId());
   }
 
-  listConversations() {
-    return this.execute('listConversations');
+  async listConversations() {
+    const conversations = await this.execute('listConversations') as ConnectchatConversation[];
+    return Promise.all(conversations.map((conversation) => this.presentConversation(conversation)));
+  }
+
+  private async presentConversation(conversation: ConnectchatConversation) {
+    const { customerRef: _customerRef, globalIdentityId: _globalIdentityId, ...safeConversation } = conversation;
+    const customerDisplayName = await this.resolveCustomerDisplayName(conversation.customerRef);
+    return customerDisplayName ? { ...safeConversation, customerDisplayName } : safeConversation;
+  }
+
+  /**
+   * customerRef é opaco para o ConnectChat. Nesta vertente, o IA Studio emite
+   * `ixc:<connection-id>:<customer-id>` e só ele pode interpretá-lo.
+   */
+  private async resolveCustomerDisplayName(customerRef: string | null): Promise<string | null> {
+    if (!customerRef) return null;
+    const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(customerRef);
+    if (!match) return null;
+    const [, connectionId, customerId] = match;
+    const connection = await this.connections.findById(connectionId).catch(() => null);
+    if (!connection || connection.provider_key !== 'ixc' || connection.status !== 'ACTIVE') return null;
+
+    try {
+      const result = await this.connections.execute(connection.id, 'cliente.identificacao', { customerId }) as {
+        data?: Array<{ name?: unknown }>;
+      };
+      const name = result.data?.[0]?.name;
+      return typeof name === 'string' && name.trim() ? name.trim() : null;
+    } catch {
+      // A falha já é registrada pelo Integration Manager. A caixa segue legível
+      // com @ID, sem transformar a indisponibilidade do ERP em perda do chat.
+      return null;
+    }
   }
 
   getMessages(conversationId: string, afterSequence?: string, limit?: number) {
@@ -65,5 +114,43 @@ export class ConnectchatInboxService {
 
   markDelivered(user: AuthenticatedUser, conversationId: string, sequence: string) {
     return this.execute('acknowledgeDelivered', { conversationId, sequence, actorRef: this.actor(user) });
+  }
+
+  async requestCustomerLink(user: AuthenticatedUser, conversationId: string, customerId: string) {
+    const [conversation, ixc] = await Promise.all([
+      this.conversation(conversationId),
+      this.activeIxcConnection(),
+    ]);
+    const identification = await this.connections.execute(ixc.id, 'cliente.identificacao', { customerId }) as {
+      data?: Array<{ name?: unknown }>;
+    };
+    const customerName = identification.data?.[0]?.name;
+    if (typeof customerName !== 'string' || !customerName.trim()) {
+      throw new BadRequestException('Não foi encontrado um cliente IXC ativo para esse código.');
+    }
+    const request = await this.execute('createLinkRequest', {
+      globalIdentityId: conversation.globalIdentityId,
+      purpose: 'atendimento',
+      customerRef: `ixc:${ixc.id}:${customerId}`,
+      actorRef: this.actor(user),
+    }) as { id?: unknown; expiresAt?: unknown };
+    if (typeof request.id !== 'string') {
+      throw new BadRequestException('O ConnectChat não retornou o identificador do pedido de vínculo.');
+    }
+    return {
+      requestId: request.id,
+      expiresAt: typeof request.expiresAt === 'string' ? request.expiresAt : null,
+      customerName: customerName.trim(),
+    };
+  }
+
+  async completeCustomerLink(user: AuthenticatedUser, conversationId: string, requestId: string) {
+    const conversation = await this.conversation(conversationId);
+    await this.execute('completeLinkRequest', {
+      requestId,
+      globalIdentityId: conversation.globalIdentityId,
+      actorRef: this.actor(user),
+    });
+    return { completed: true };
   }
 }

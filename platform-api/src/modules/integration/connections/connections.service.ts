@@ -258,7 +258,9 @@ export class ConnectionsService {
     const startedAt = Date.now();
     // Conversas são conteúdo de atendimento. Mantemos operação e metadados
     // rastreáveis, mas nunca o texto da mensagem ou a prova de vínculo no log.
-    const sensitiveParamKeys = connection.provider_key === 'connectchat' ? ['body', 'proof'] : [];
+    const sensitiveParamKeys = connection.provider_key === 'connectchat'
+      ? ['body', 'proof', 'customerRef', 'globalIdentityId']
+      : connection.provider_key === 'ixc' ? ['cpf', 'customerId'] : [];
     try {
       const result = await provider.execute(ctx, operation, params);
       const durationMs = Date.now() - startedAt;

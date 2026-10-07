@@ -33,3 +33,17 @@ export async function markConnectchatRead(conversationId, sequence) {
     // Recibo não pode impedir a leitura da conversa; o próximo polling repete.
   }
 }
+
+export async function requestConnectchatCustomerLink(conversationId, customerId) {
+  try {
+    const { data } = await api.post(`/comm/connectchat/conversations/${conversationId}/customer-link-requests`, { customerId });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível solicitar o vínculo do cliente')); }
+}
+
+export async function completeConnectchatCustomerLink(conversationId, requestId) {
+  try {
+    const { data } = await api.post(`/comm/connectchat/conversations/${conversationId}/customer-link-requests/complete`, { requestId });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'O cliente ainda não confirmou o vínculo')); }
+}

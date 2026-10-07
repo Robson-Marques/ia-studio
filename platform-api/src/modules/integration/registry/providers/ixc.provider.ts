@@ -76,6 +76,8 @@ const T = {
 const OPERATIONS = [
   // Contrato canônico ISP.
   'cliente.dados',
+  // Projeção mínima para identificação de atendimento por referência externa.
+  'cliente.identificacao',
   // Extensão IXC: identificar por telefone.
   'cliente.por_telefone',
   'cliente.planos',
@@ -216,6 +218,9 @@ export class IxcProvider extends BaseProvider {
     switch (operation as Operation) {
       case 'cliente.dados':
         return { data: await this.findClientes(ctx, token, this.str(args, 'cpf', true)) };
+
+      case 'cliente.identificacao':
+        return { data: await this.customerIdentification(ctx, token, this.str(args, 'customerId', true)!) };
 
       case 'cliente.por_telefone':
         return { data: await this.findClientesPorTelefone(ctx, token, this.str(args, 'telefone', true)!) };
@@ -434,6 +439,16 @@ export class IxcProvider extends BaseProvider {
       if (rows.length > 0) return rows;
     }
     return [];
+  }
+
+  /** Projeção mínima por id do ERP, usada somente para identificar um atendimento já vinculado. */
+  private async customerIdentification(ctx: ProviderContext, token: string, customerId: string): Promise<Record<string, string>[]> {
+    const rows = await this.list(ctx, token, T.cliente, this.eq(`${T.cliente}.id`, customerId, `${T.cliente}.id`));
+    return rows.slice(0, 1).flatMap((row) => {
+      const id = this.str(row, 'id');
+      const name = this.firstLabel(row, ['razao', 'fantasia']);
+      return id && name ? [{ id, name }] : [];
+    });
   }
 
   /**

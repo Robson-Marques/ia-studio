@@ -8,6 +8,13 @@ export interface ConnectchatConversation {
   status: 'OPEN' | 'CLOSED';
   lastSequence: string;
   createdAt: string;
+  customerRef: string | null;
+  globalIdentityId: string | null;
+  businessContact?: {
+    globalPublicId: string | null;
+    status: 'LEAD' | 'CUSTOMER' | 'INACTIVE';
+    linkStatus: 'PENDING' | 'ACTIVE' | 'DISCONNECTED';
+  };
 }
 
 export interface ConnectchatMessage {
@@ -122,12 +129,16 @@ export class ConnectchatClient {
     return this.mutate(`/integration/conversations/${conversationId}/receipts/read`, { sequence }, actorRef, `ystudio:read:${conversationId}:${sequence}`) as Promise<{ sequence: string }>;
   }
 
-  async createLinkRequest(globalIdentityId: string, purpose: string, ttlSeconds?: number, actorRef?: string): Promise<unknown> {
-    return this.mutate('/integration/link-requests', { globalIdentityId, purpose, ...(ttlSeconds ? { ttlSeconds } : {}) }, actorRef);
+  async createLinkRequest(globalIdentityId: string, purpose: string, customerRef?: string, ttlSeconds?: number, actorRef?: string): Promise<unknown> {
+    return this.mutate('/integration/link-requests', { globalIdentityId, purpose, ...(customerRef ? { customerRef } : {}), ...(ttlSeconds ? { ttlSeconds } : {}) }, actorRef);
   }
 
-  async exchangeLinkProof(proof: string, actorRef?: string): Promise<unknown> {
-    return this.mutate('/integration/link-proofs/exchange', { proof }, actorRef);
+  async completeLinkRequest(requestId: string, globalIdentityId: string, actorRef?: string): Promise<unknown> {
+    return this.mutate('/integration/link-requests/complete', { requestId, globalIdentityId }, actorRef, `ystudio:link-complete:${requestId}`);
+  }
+
+  async exchangeLinkProof(proof: string, customerRef?: string, actorRef?: string): Promise<unknown> {
+    return this.mutate('/integration/link-proofs/exchange', { proof, ...(customerRef ? { customerRef } : {}) }, actorRef);
   }
 
   private async mutate(

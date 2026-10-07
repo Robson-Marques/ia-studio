@@ -18,8 +18,24 @@ fallback entre instalações ou WebSocket empresarial. A configuração agora é
 Connection `connectchat` em **Integrações → Conexões**: URL, actor e timeout
 ficam no config local; a chave técnica é cifrada no Secrets Manager. Falta criar
 e testar essa conexão, executar build no servidor e validar uma conversa real.
-O contrato atual expõe somente `businessContactId`;
-nome/telefone exigem futura extensão explícita da API ConnectChat.
+O contrato agora expõe `businessContact.globalPublicId` como fallback seguro;
+fragmentos de UUID não aparecem mais no atendimento. O nome comercial continua
+fora do ConnectChat e será resolvido pelo IA Studio a partir de `customerRef`
+em um gateway interno posterior.
+
+Atualização de 2026-10-07 — **Identificação comercial ConnectChat:** o
+`customerRef` é persistido pelo ConnectChat como referência opaca e a API de
+integração o devolve somente ao backend do IA Studio. Nesta vertente, a
+referência `ixc:<connection-id>:<customer-id>` permite ao backend consultar a
+projeção mínima de identificação no IXC ativo; o navegador recebe só o nome
+resolvido. Falha de ERP preserva a conversa e usa `@ID` como fallback.
+
+Atualização de 2026-10-07 — **Vínculo consentido ConnectChat:** o atendente
+autorizado informa o código IXC na conversa, o IA Studio cria um pedido com a
+referência opaca e o cliente o confirma na PWA. A PWA não recebe prova nem
+referência comercial; a conclusão do mesmo `requestId` acontece entre os dois
+backends pela Connection configurada. A permissão granular
+`comm.connectchat.link.customer` protege a ação e é auditada.
 
 Atualização de 2026-10-06 — **Permissões ConnectChat:** instalações já
 provisionadas não recebiam permissões novas no perfil Administrador, porque o

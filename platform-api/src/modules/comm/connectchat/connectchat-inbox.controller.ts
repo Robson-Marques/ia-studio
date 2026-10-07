@@ -3,11 +3,14 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
+import { Auditable } from '../../../shared/audit/auditable.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { ConnectchatInboxService } from './connectchat-inbox.service';
 import { AckConnectchatReceiptDto } from './dto/ack-connectchat-receipt.dto';
 import { EditConnectchatMessageDto } from './dto/edit-connectchat-message.dto';
 import { SendConnectchatMessageDto } from './dto/send-connectchat-message.dto';
+import { RequestConnectchatCustomerLinkDto } from './dto/request-connectchat-customer-link.dto';
+import { CompleteConnectchatCustomerLinkDto } from './dto/complete-connectchat-customer-link.dto';
 
 @ApiTags('Comm — ConnectChat')
 @ApiBearerAuth()
@@ -23,6 +26,28 @@ export class ConnectchatInboxController {
   @Get('conversations')
   @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_READ)
   listConversations() { return this.inbox.listConversations(); }
+
+  @Post('conversations/:conversationId/customer-link-requests')
+  @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER)
+  @Auditable({ action: 'comm.connectchat.customer_link.request', entityType: 'ConnectchatConversation', extractEntityId: (args) => args[1] as string })
+  requestCustomerLink(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('conversationId', new ParseUUIDPipe()) conversationId: string,
+    @Body() dto: RequestConnectchatCustomerLinkDto,
+  ) {
+    return this.inbox.requestCustomerLink(user, conversationId, dto.customerId);
+  }
+
+  @Post('conversations/:conversationId/customer-link-requests/complete')
+  @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER)
+  @Auditable({ action: 'comm.connectchat.customer_link.complete', entityType: 'ConnectchatConversation', extractEntityId: (args) => args[1] as string })
+  completeCustomerLink(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('conversationId', new ParseUUIDPipe()) conversationId: string,
+    @Body() dto: CompleteConnectchatCustomerLinkDto,
+  ) {
+    return this.inbox.completeCustomerLink(user, conversationId, dto.requestId);
+  }
 
   @Get('conversations/:conversationId/messages')
   @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_READ)

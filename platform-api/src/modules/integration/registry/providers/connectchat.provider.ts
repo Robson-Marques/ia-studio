@@ -31,6 +31,7 @@ export class ConnectchatProvider extends BaseProvider {
         'execute:acknowledgeDelivered',
         'execute:acknowledgeRead',
         'execute:createLinkRequest',
+        'execute:completeLinkRequest',
         'execute:exchangeLinkProof',
       ],
       wizardSchema: {
@@ -78,7 +79,7 @@ export class ConnectchatProvider extends BaseProvider {
                 type: 'password',
                 secret: true,
                 required: true,
-                help: 'Use uma chave com os escopos chat:read, chat:write, chat:edit e chat:receipt.',
+                help: 'Use uma chave com os escopos chat:read, chat:write, chat:edit, chat:receipt, link:request e link:exchange.',
               },
             ],
           },
@@ -140,9 +141,15 @@ export class ConnectchatProvider extends BaseProvider {
       case 'acknowledgeRead':
         return client.acknowledgeRead(this.required(p, 'conversationId'), this.required(p, 'sequence'), actorRef || undefined);
       case 'createLinkRequest':
-        return client.createLinkRequest(this.required(p, 'globalIdentityId'), this.required(p, 'purpose'), this.optionalNumber(p, 'ttlSeconds'), actorRef || undefined);
+        return client.createLinkRequest(this.required(p, 'globalIdentityId'), this.required(p, 'purpose'), this.string(p, 'customerRef') || undefined, this.optionalNumber(p, 'ttlSeconds'), actorRef || undefined);
+      case 'completeLinkRequest':
+        return client.completeLinkRequest(this.required(p, 'requestId'), this.required(p, 'globalIdentityId'), actorRef || undefined);
       case 'exchangeLinkProof':
-        return client.exchangeLinkProof(this.required(p, 'proof'), actorRef || undefined);
+        return client.exchangeLinkProof(
+          this.required(p, 'proof'),
+          this.string(p, 'customerRef') || undefined,
+          actorRef || undefined,
+        );
       default:
         return super.execute(ctx, operation, params);
     }

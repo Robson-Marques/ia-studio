@@ -1,5 +1,20 @@
 # Changelog — IA Studio
 
+## Não publicado
+
+- A Central ConnectChat permite ao usuário autorizado informar o código IXC,
+  solicitar a confirmação do cliente e concluir o vínculo depois da aprovação
+  no PWA. A referência e a identidade técnica continuam restritas ao backend.
+- Criada a permissão granular **Vincular cliente ConnectChat**; Administrador a
+  herda pelo catálogo total e o perfil Atendente ConnectChat continua limitado
+  a leitura e mensagens.
+- ConnectChat passa a receber a projeção comercial de nome exclusivamente pelo
+  backend do IA Studio. A referência opaca `ixc:<connection-id>:<customer-id>`
+  é validada contra uma conexão IXC ativa e resolvida em tempo real, sem
+  copiar cadastro para o ConnectChat ou enviar a referência ao navegador.
+- O atendimento mostra o nome comercial quando a resolução existe, usa `@ID`
+  como fallback e nunca volta a exibir fragmentos de UUID.
+
 ## v0.11.45 - 2026-10-06 (Permissões do Administrador)
 
 - Corrigido o provisionamento de instalações existentes: o perfil de sistema

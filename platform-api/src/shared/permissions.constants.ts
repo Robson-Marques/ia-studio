@@ -58,6 +58,7 @@ export const PERMISSIONS = {
   // ─── ConnectChat (canal interno de atendimento) ───────
   COMM_CONNECTCHAT_READ: 'comm.connectchat.read',
   COMM_CONNECTCHAT_WRITE: 'comm.connectchat.write',
+  COMM_CONNECTCHAT_LINK_CUSTOMER: 'comm.connectchat.link.customer',
 
   // ─── Automação (Fase 4 — Automation Platform) ───────
   AUTOMATION_WORKFLOWS_READ: 'automation.workflows.read',
@@ -186,6 +187,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: [
       PERMISSIONS.COMM_CONNECTCHAT_READ,
       PERMISSIONS.COMM_CONNECTCHAT_WRITE,
+      PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER,
     ],
   },
   {
@@ -292,6 +294,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE]: 'Vincular assistente de IA ao número',
   [PERMISSIONS.COMM_CONNECTCHAT_READ]: 'Ver conversas ConnectChat',
   [PERMISSIONS.COMM_CONNECTCHAT_WRITE]: 'Responder e editar mensagens ConnectChat',
+  [PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER]: 'Vincular cliente ConnectChat',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_READ]: 'Ver fluxos de automação',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_WRITE]: 'Criar/editar fluxos de automação',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_PUBLISH]: 'Publicar/reverter versões de fluxo',
