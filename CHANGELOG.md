@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release conjunta para configurar a assinatura `NEWNET` no envio de códigos
+  Didit do ConnectChat, reposicionar a tela como área de atendimento e
+  serviços e restaurar o favicon azul do PWA.
+
 - Release conjunta de correção para usar no PWA do ConnectChat o monograma N
   branco, extraído da logo oficial da Newnet, sem o cartão claro ou azul sobre
   a interface escura.
