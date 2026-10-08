@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.65: conclui o ajuste do compositor do ConnectChat.
+  Microfone e envio passam a alternar sem controle desabilitado residual; a
+  gravação usa painel próprio no rodapé, preservando a área de mensagens.
+
 - Release coordenada v0.11.64: porta para o ConnectChat a composição mobile
   consolidada no AquaPark — clipe, campo de múltiplas linhas expansível e
   microfone ou envio. Corrige a bandeja de anexos para respeitar seu estado
