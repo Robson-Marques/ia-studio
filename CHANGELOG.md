@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release conjunta para ajustar o botão de envio do ConnectChat ao padrão de
+  ação circular com avião de papel, usando a identidade azul da Newnet e estado
+  desabilitado sem texto.
+
 - Release conjunta para corrigir o novo pareamento do ConnectChat: a migração
   preserva o histórico de aparelhos revogados e limita cada identidade a um
   único aparelho ativo, sem retornar erro interno após a verificação Didit.
