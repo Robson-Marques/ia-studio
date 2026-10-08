@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.62: corrige a compilação do PWA do ConnectChat que
+  impedia a atualização da v0.11.61. A correção remove uma comparação de tipo
+  redundante após o tratamento específico de mensagens de voz; não altera
+  banco, migrações ou contratos de integração.
+
 - Release coordenada v0.11.61: atualiza o ConnectChat junto ao IA Studio com
   o compositor de mídia refinado para celular. Áudio passa a ter prévia e
   player próprio com reprodução, pausa, progresso e duração; o gravador exibe
