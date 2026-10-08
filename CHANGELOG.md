@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.63: corrige a apresentação do ConnectChat no tema
+  claro e a posição da bandeja de anexos. O clipe abre e fecha a bandeja acima
+  do compositor, que permanece utilizável; não há alteração de banco, mídia ou
+  contrato de integração.
+
 - Release coordenada v0.11.62: corrige a compilação do PWA do ConnectChat que
   impedia a atualização da v0.11.61. A correção remove uma comparação de tipo
   redundante após o tratamento específico de mensagens de voz; não altera
