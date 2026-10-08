@@ -2,6 +2,13 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.61: atualiza o ConnectChat junto ao IA Studio com
+  o compositor de mídia refinado para celular. Áudio passa a ter prévia e
+  player próprio com reprodução, pausa, progresso e duração; o gravador exibe
+  contador, waveform, descarte e confirmação. A seleção de mídia deixa os
+  cartões grandes e usa uma bandeja compacta de galeria, câmera, vídeo e
+  documento, mantendo o mesmo contrato privado de anexos.
+
 - Release coordenada v0.11.60: atualiza o ConnectChat junto ao IA Studio para
   o novo compositor de mídia do PWA. O cliente passa a alternar microfone e
   envio conforme há texto, selecionar foto, vídeo e documento por ações
