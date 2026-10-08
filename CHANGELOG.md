@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release conjunta para corrigir o layout da conversa do ConnectChat: o aviso
+  inicial deixa de ocupar a área das mensagens, a lista volta a preencher e
+  rolar a tela, e a comunicação passa a explicar o cadastro e os serviços da
+  Newnet sem linguagem técnica de vínculo.
+
 - Release conjunta para ajustar o botão de envio do ConnectChat ao padrão de
   ação circular com avião de papel, usando a identidade azul da Newnet e estado
   desabilitado sem texto.
