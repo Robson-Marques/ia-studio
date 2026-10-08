@@ -2,6 +2,12 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.59: incorpora no ConnectChat o envio de fotos,
+  documentos e áudios gravados no atendimento, além da escolha persistente
+  entre tema claro e escuro. Os anexos permanecem em volume protegido do
+  ConnectChat, com validação antes do armazenamento e backup/restauração
+  incluídos no ciclo da aplicação.
+
 - Release conjunta para corrigir o layout da conversa do ConnectChat: o aviso
   inicial deixa de ocupar a área das mensagens, a lista volta a preencher e
   rolar a tela, e a comunicação passa a explicar o cadastro e os serviços da
