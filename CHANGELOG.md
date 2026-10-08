@@ -2,6 +2,12 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.64: porta para o ConnectChat a composição mobile
+  consolidada no AquaPark — clipe, campo de múltiplas linhas expansível e
+  microfone ou envio. Corrige a bandeja de anexos para respeitar seu estado
+  fechado e simplifica o player de voz dentro da conversa; não altera banco,
+  mídia ou contratos de integração.
+
 - Release coordenada v0.11.63: corrige a apresentação do ConnectChat no tema
   claro e a posição da bandeja de anexos. O clipe abre e fecha a bandeja acima
   do compositor, que permanece utilizável; não há alteração de banco, mídia ou
