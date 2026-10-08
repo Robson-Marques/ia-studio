@@ -2,6 +2,14 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.60: atualiza o ConnectChat junto ao IA Studio para
+  o novo compositor de mídia do PWA. O cliente passa a alternar microfone e
+  envio conforme há texto, selecionar foto, vídeo e documento por ações
+  próprias, registrar foto pela câmera, gravar áudio com pausar/retomar,
+  descarte e confirmação antes do envio, e pré-visualizar a mídia. A mesma
+  release habilita vídeo privado validado (`mp4`, `webm`, `mov`) na API do
+  ConnectChat e ajusta o tema escuro para o azul da Newnet.
+
 - Release coordenada v0.11.59: incorpora no ConnectChat o envio de fotos,
   documentos e áudios gravados no atendimento, além da escolha persistente
   entre tema claro e escuro. Os anexos permanecem em volume protegido do
