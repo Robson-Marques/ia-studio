@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.73: corrige o envio de vídeo gravado no ConnectChat.
+  A categoria de mídia acompanha o arquivo e a API reconhece MIME genérico de
+  navegadores móveis sem abrir mão da extensão e da assinatura binária.
+
 - Release coordenada v0.11.72: registra a correção operacional do ConnectChat
   no proxy público Newnet, que passa a aceitar anexos de até 100 MB sem
   interromper uploads com HTTP 413 antes da API.
