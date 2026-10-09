@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.66: corrige o player de voz do ConnectChat para
+  manter o mesmo layout antes e durante a reprodução, restaura a forma de onda,
+  fixa o shell da conversa e clareia as mensagens enviadas.
+
 - Release coordenada v0.11.65: conclui o ajuste do compositor do ConnectChat.
   Microfone e envio passam a alternar sem controle desabilitado residual; a
   gravação usa painel próprio no rodapé, preservando a área de mensagens.
