@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.67: refina o PWA do ConnectChat com a cápsula de
+  composição arredondada da referência do AquaPark, ícones curados de clipe,
+  microfone, envio, play e pausa, e duração de áudio exibida somente em
+  minutos e segundos inteiros. Não altera banco, mídia ou contratos.
+
 - Release coordenada v0.11.66: corrige o player de voz do ConnectChat para
   manter o mesmo layout antes e durante a reprodução, restaura a forma de onda,
   fixa o shell da conversa e clareia as mensagens enviadas.
