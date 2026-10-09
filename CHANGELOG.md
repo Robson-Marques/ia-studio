@@ -2,6 +2,9 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.81: Central ConnectChat passa a apresentar a conta
+  ConnectChat e o cliente IXC separadamente e disponibiliza o desvínculo manual.
+
 - A Central ConnectChat passa a exibir separadamente o cliente IXC vinculado e
   a conta ConnectChat da pessoa, além de permitir o desvínculo manual, auditado
   e autorizado pelo mesmo controle de vínculo.
