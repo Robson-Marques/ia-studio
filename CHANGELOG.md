@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.71: eleva o limite de anexos do ConnectChat para
+  100 MB no cliente, proxy interno e API, e reancora automaticamente a
+  conversa na última mensagem após mídia ou mudança do compositor.
+
 - Corrige a presença do ConnectChat ponta a ponta: a Central do IA Studio
   publica início e fim da digitação do atendente, com validação de conversa e
   permissão de resposta já existente. A sinalização é transitória e não altera
