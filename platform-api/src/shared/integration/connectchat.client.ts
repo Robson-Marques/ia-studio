@@ -135,11 +135,15 @@ export class ConnectchatClient {
   }
 
   async linkContactDirectly(globalIdentityId: string, customerRef: string, customerDisplayName?: string, actorRef?: string): Promise<unknown> {
+    // O nome comercial faz parte do retrato que a PWA pode mostrar. Incluí-lo
+    // na chave permite completar vínculos anteriores que foram criados antes
+    // desse campo existir, sem conflitar com a requisição idempotente antiga.
+    const snapshotKey = `${customerRef}:${customerDisplayName ?? ''}`;
     return this.mutate(
       '/integration/contacts/link',
       { globalIdentityId, customerRef, ...(customerDisplayName ? { customerDisplayName } : {}) },
       actorRef,
-      `ystudio:link-direct:${globalIdentityId}:${this.shortHash(customerRef)}`,
+      `ystudio:link-direct:${globalIdentityId}:${this.shortHash(snapshotKey)}`,
     );
   }
 

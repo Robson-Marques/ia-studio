@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.82: completa automaticamente o nome comercial dos
+  vínculos ConnectChat já existentes, para que a PWA também mostre o cliente
+  vinculado sem exigir que a empresa refaça a identificação.
+
 - Release coordenada v0.11.81: Central ConnectChat passa a apresentar a conta
   ConnectChat e o cliente IXC separadamente e disponibiliza o desvínculo manual.
 

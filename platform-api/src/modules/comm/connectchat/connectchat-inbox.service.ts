@@ -54,8 +54,24 @@ export class ConnectchatInboxService {
   }
 
   private async presentConversation(conversation: ConnectchatConversation) {
-    const { customerRef: _customerRef, globalIdentityId: _globalIdentityId, ...safeConversation } = conversation;
     const customerDisplayName = await this.resolveCustomerDisplayName(conversation.customerRef);
+    // Vínculos anteriores ao retrato comercial não carregam o nome seguro que
+    // a PWA apresenta. Ao consultar a Central, completa-se esse único campo
+    // diretamente no ConnectChat; nas próximas leituras não há nova gravação.
+    if (
+      customerDisplayName
+      && conversation.customerRef
+      && conversation.globalIdentityId
+      && conversation.businessContact?.customerDisplayName !== customerDisplayName
+    ) {
+      await this.execute('linkContactDirectly', {
+        globalIdentityId: conversation.globalIdentityId,
+        customerRef: conversation.customerRef,
+        customerDisplayName,
+      });
+      if (conversation.businessContact) conversation.businessContact.customerDisplayName = customerDisplayName;
+    }
+    const { customerRef: _customerRef, globalIdentityId: _globalIdentityId, ...safeConversation } = conversation;
     return customerDisplayName ? { ...safeConversation, customerDisplayName } : safeConversation;
   }
 
