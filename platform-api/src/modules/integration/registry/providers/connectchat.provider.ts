@@ -32,6 +32,7 @@ export class ConnectchatProvider extends BaseProvider {
         'execute:acknowledgeDelivered',
         'execute:acknowledgeRead',
         'execute:linkContactDirectly',
+        'execute:disconnectContactDirectly',
         'execute:createLinkRequest',
         'execute:completeLinkRequest',
         'execute:exchangeLinkProof',
@@ -81,7 +82,7 @@ export class ConnectchatProvider extends BaseProvider {
                 type: 'password',
                 secret: true,
                 required: true,
-                help: 'Use uma chave com os escopos chat:read, chat:write, chat:edit, chat:receipt, link:request e link:exchange.',
+                help: 'Use uma chave com os escopos chat:read, chat:write, chat:edit, chat:receipt, link:direct e link:disconnect.',
               },
             ],
           },
@@ -148,7 +149,9 @@ export class ConnectchatProvider extends BaseProvider {
       case 'acknowledgeRead':
         return client.acknowledgeRead(this.required(p, 'conversationId'), this.required(p, 'sequence'), actorRef || undefined);
       case 'linkContactDirectly':
-        return client.linkContactDirectly(this.required(p, 'globalIdentityId'), this.required(p, 'customerRef'), actorRef || undefined);
+        return client.linkContactDirectly(this.required(p, 'globalIdentityId'), this.required(p, 'customerRef'), this.string(p, 'customerDisplayName') || undefined, actorRef || undefined);
+      case 'disconnectContactDirectly':
+        return client.disconnectContactDirectly(this.required(p, 'globalIdentityId'), actorRef || undefined);
       case 'createLinkRequest':
         return client.createLinkRequest(this.required(p, 'globalIdentityId'), this.required(p, 'purpose'), this.string(p, 'customerRef') || undefined, this.optionalNumber(p, 'ttlSeconds'), actorRef || undefined);
       case 'completeLinkRequest':

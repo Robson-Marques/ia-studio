@@ -135,11 +135,21 @@ export class ConnectchatInboxService {
     await this.execute('linkContactDirectly', {
       globalIdentityId: conversation.globalIdentityId,
       customerRef: `ixc:${ixc.id}:${customerId}`,
+      customerDisplayName: customerName.trim(),
       actorRef: this.actor(user),
     });
     return {
       customerName: customerName.trim(),
     };
+  }
+
+  async unlinkCustomer(user: AuthenticatedUser, conversationId: string) {
+    const conversation = await this.conversation(conversationId);
+    await this.execute('disconnectContactDirectly', {
+      globalIdentityId: conversation.globalIdentityId,
+      actorRef: this.actor(user),
+    });
+    return { unlinked: true };
   }
 
   async completeCustomerLink(user: AuthenticatedUser, conversationId: string, requestId: string) {

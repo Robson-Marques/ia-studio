@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- A Central ConnectChat passa a exibir separadamente o cliente IXC vinculado e
+  a conta ConnectChat da pessoa, além de permitir o desvínculo manual, auditado
+  e autorizado pelo mesmo controle de vínculo.
+
 - Release coordenada v0.11.80: corrige a compilação do PWA do ConnectChat após
   a remoção da confirmação residual de vínculo.
 

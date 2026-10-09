@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { listConnectchatConversations, listConnectchatMessages, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage, setConnectchatTyping } from '../../services/connectchat';
+import { listConnectchatConversations, listConnectchatMessages, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -31,6 +31,7 @@ export default function ConnectchatConversas() {
   const [sending, setSending] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [linking, setLinking] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
   const typingTimerRef = useRef(null);
@@ -155,6 +156,23 @@ export default function ConnectchatConversas() {
     }
   }
 
+  async function unlinkCustomer() {
+    if (!selected || !window.confirm(`Desvincular ${labelForConversation(selected)} deste atendimento? A conversa será encerrada até um novo vínculo.`)) return;
+    setUnlinking(true);
+    try {
+      await unlinkConnectchatCustomer(selected.id);
+      stopTyping(selected.id);
+      setSelected(null);
+      setMessages([]);
+      await loadConversations(true);
+      toast.success('Cliente desvinculado do atendimento.');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setUnlinking(false);
+    }
+  }
+
   return (
     <div className="flex overflow-hidden" style={{ flex: 1, minHeight: 0, background: 'var(--su-surface-overlay)' }}>
       <aside className={`${selected ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-96 shrink-0 min-h-0`} style={{ borderRight: '1px solid var(--su-border-default)' }}>
@@ -191,8 +209,11 @@ export default function ConnectchatConversas() {
               <div>
                 <strong style={{ color: 'var(--su-text-primary)' }}>{labelForConversation(selected)}</strong>
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--su-text-muted)' }}>
-                  {selected.businessContact?.status === 'CUSTOMER' ? 'Cliente vinculado' : 'Cliente em identificação'}
+                  {selected.businessContact?.status === 'CUSTOMER'
+                    ? `Conta ConnectChat: ${selected.businessContact?.displayName ?? 'não informada'}`
+                    : 'Cliente em identificação'}
                 </span>
+                {selected.businessContact?.status === 'CUSTOMER' ? <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: 'var(--su-text-muted)' }}>Cliente vinculado</span> : null}
               </div>
               <div className="flex items-center gap-2">
                 {selected.businessContact?.status !== 'CUSTOMER' && can('comm.connectchat.link.customer') ? (
@@ -200,6 +221,9 @@ export default function ConnectchatConversas() {
                     <input aria-label="Código do cliente no IXC" className="su-input" value={customerId} onChange={(event) => setCustomerId(event.target.value)} inputMode="numeric" placeholder="Código IXC" disabled={linking} style={{ width: 118 }} />
                     <Button variant="secondary" size="sm" loading={linking} onClick={requestCustomerLink}>Vincular cliente</Button>
                   </div>
+                ) : null}
+                {selected.businessContact?.status === 'CUSTOMER' && can('comm.connectchat.link.customer') ? (
+                  <Button variant="ghost" size="sm" loading={unlinking} onClick={unlinkCustomer}>Desvincular cliente</Button>
                 ) : null}
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>

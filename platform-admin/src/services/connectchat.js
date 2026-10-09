@@ -47,6 +47,13 @@ export async function requestConnectchatCustomerLink(conversationId, customerId)
   } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível vincular o cliente')); }
 }
 
+export async function unlinkConnectchatCustomer(conversationId) {
+  try {
+    const { data } = await api.post(`/comm/connectchat/conversations/${conversationId}/customer-unlink`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível desvincular o cliente')); }
+}
+
 export async function completeConnectchatCustomerLink(conversationId, requestId) {
   try {
     const { data } = await api.post(`/comm/connectchat/conversations/${conversationId}/customer-link-requests/complete`, { requestId });

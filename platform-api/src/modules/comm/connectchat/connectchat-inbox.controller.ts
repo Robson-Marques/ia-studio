@@ -39,6 +39,16 @@ export class ConnectchatInboxController {
     return this.inbox.requestCustomerLink(user, conversationId, dto.customerId);
   }
 
+  @Post('conversations/:conversationId/customer-unlink')
+  @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER)
+  @Auditable({ action: 'comm.connectchat.customer_link.disconnect', entityType: 'ConnectchatConversation', extractEntityId: (args) => args[1] as string })
+  unlinkCustomer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('conversationId', new ParseUUIDPipe()) conversationId: string,
+  ) {
+    return this.inbox.unlinkCustomer(user, conversationId);
+  }
+
   @Post('conversations/:conversationId/customer-link-requests/complete')
   @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER)
   @Auditable({ action: 'comm.connectchat.customer_link.complete', entityType: 'ConnectchatConversation', extractEntityId: (args) => args[1] as string })
