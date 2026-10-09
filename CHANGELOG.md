@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.69: corrige a captura de vídeo e a apresentação de
+  imagens do ConnectChat. A câmera fica visível durante a gravação, imagens
+  aparecem abertas na conversa e a lixeira usa o mesmo vetor do AquaPark
+  Mobile. Não altera banco, mídia ou contratos.
+
 - Release coordenada v0.11.68: porta o comportamento mobile completo do
   compositor do ConnectChat. A gravação vira uma cápsula com envio imediato,
   o compositor flutua sobre a conversa, as ações adotam azul Newnet e foto e
