@@ -28,6 +28,7 @@ export class ConnectchatProvider extends BaseProvider {
         'execute:openConversation',
         'execute:sendMessage',
         'execute:editMessage',
+        'execute:setTyping',
         'execute:acknowledgeDelivered',
         'execute:acknowledgeRead',
         'execute:createLinkRequest',
@@ -136,6 +137,11 @@ export class ConnectchatProvider extends BaseProvider {
         });
       case 'editMessage':
         return client.editMessage(this.required(p, 'messageId'), this.required(p, 'body'), actorRef || undefined);
+      case 'setTyping': {
+        const status = this.required(p, 'status');
+        if (status !== 'started' && status !== 'stopped') throw new BadRequestException('ConnectChat exige um estado de digitação válido.');
+        return client.setTyping(this.required(p, 'conversationId'), status, actorRef || undefined);
+      }
       case 'acknowledgeDelivered':
         return client.acknowledgeDelivered(this.required(p, 'conversationId'), this.required(p, 'sequence'), actorRef || undefined);
       case 'acknowledgeRead':

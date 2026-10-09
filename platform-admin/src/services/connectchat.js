@@ -26,6 +26,12 @@ export async function sendConnectchatMessage(conversationId, body, clientMessage
   } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível enviar a mensagem')); }
 }
 
+export async function setConnectchatTyping(conversationId, status) {
+  try {
+    await api.post(`/comm/connectchat/conversations/${conversationId}/typing`, { status });
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível atualizar o estado de digitação')); }
+}
+
 export async function markConnectchatRead(conversationId, sequence) {
   try {
     await api.post(`/comm/connectchat/conversations/${conversationId}/receipts/read`, { sequence });

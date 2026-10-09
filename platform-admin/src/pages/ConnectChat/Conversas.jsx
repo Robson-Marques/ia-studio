@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { completeConnectchatCustomerLink, listConnectchatConversations, listConnectchatMessages, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage } from '../../services/connectchat';
+import { completeConnectchatCustomerLink, listConnectchatConversations, listConnectchatMessages, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage, setConnectchatTyping } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -34,6 +34,8 @@ export default function ConnectchatConversas() {
   const [linking, setLinking] = useState(false);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
+  const typingTimerRef = useRef(null);
+  const typingConversationRef = useRef(null);
   selectedRef.current = selected;
   messagesRef.current = messages;
 
@@ -84,7 +86,34 @@ export default function ConnectchatConversas() {
     return () => clearInterval(timer);
   }, [loadConversations, loadMessages]);
 
+  function stopTyping(conversationId = typingConversationRef.current) {
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = null;
+    if (!conversationId) return;
+    typingConversationRef.current = null;
+    void setConnectchatTyping(conversationId, 'stopped').catch(() => undefined);
+  }
+
+  function scheduleTyping() {
+    const conversation = selectedRef.current;
+    if (!conversation) return;
+    if (typingConversationRef.current && typingConversationRef.current !== conversation.id) stopTyping(typingConversationRef.current);
+    if (!typingConversationRef.current) {
+      typingConversationRef.current = conversation.id;
+      void setConnectchatTyping(conversation.id, 'started').catch(() => undefined);
+    }
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => stopTyping(conversation.id), 900);
+  }
+
+  useEffect(() => () => {
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    const conversationId = typingConversationRef.current;
+    if (conversationId) void setConnectchatTyping(conversationId, 'stopped').catch(() => undefined);
+  }, []);
+
   async function selectConversation(conversation) {
+    stopTyping();
     setSelected(conversation);
     setMessages([]);
     setCustomerId('');
@@ -95,6 +124,7 @@ export default function ConnectchatConversas() {
   async function send() {
     const body = text.trim();
     if (!body || !selected) return;
+    stopTyping(selected.id);
     setSending(true);
     const stableClientMessageId = messageId();
     try {
@@ -210,7 +240,7 @@ export default function ConnectchatConversas() {
             </div>
             {selected.status === 'OPEN' && can('comm.connectchat.write') ? (
               <div className="flex gap-2" style={{ padding: 'var(--su-space-3)', borderTop: '1px solid var(--su-border-default)' }}>
-                <textarea className="su-textarea" value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Mensagem" disabled={sending} style={{ flex: 1, minHeight: 42, resize: 'none' }} />
+                <textarea className="su-textarea" value={text} onChange={(event) => { const value = event.target.value; setText(value); if (value.trim()) scheduleTyping(); else stopTyping(selected.id); }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Mensagem" disabled={sending} style={{ flex: 1, minHeight: 42, resize: 'none' }} />
                 <Button variant="primary" loading={sending} disabled={!text.trim()} onClick={send}>Enviar</Button>
               </div>
             ) : (

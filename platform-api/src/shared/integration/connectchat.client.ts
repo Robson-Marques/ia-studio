@@ -121,6 +121,10 @@ export class ConnectchatClient {
     return this.mutate(`/integration/messages/${messageId}`, { body }, actorRef, `ystudio:edit:${messageId}:${this.shortHash(body)}`, 'PATCH') as Promise<ConnectchatMessage>;
   }
 
+  async setTyping(conversationId: string, status: 'started' | 'stopped', actorRef?: string): Promise<{ status: 'started' | 'stopped' }> {
+    return this.mutate(`/integration/conversations/${conversationId}/typing`, { status }, actorRef) as Promise<{ status: 'started' | 'stopped' }>;
+  }
+
   async acknowledgeDelivered(conversationId: string, sequence: string, actorRef?: string): Promise<{ sequence: string }> {
     return this.mutate(`/integration/conversations/${conversationId}/receipts/delivered`, { sequence }, actorRef, `ystudio:delivered:${conversationId}:${sequence}`) as Promise<{ sequence: string }>;
   }

@@ -11,6 +11,7 @@ import { EditConnectchatMessageDto } from './dto/edit-connectchat-message.dto';
 import { SendConnectchatMessageDto } from './dto/send-connectchat-message.dto';
 import { RequestConnectchatCustomerLinkDto } from './dto/request-connectchat-customer-link.dto';
 import { CompleteConnectchatCustomerLinkDto } from './dto/complete-connectchat-customer-link.dto';
+import { SetConnectchatTypingDto } from './dto/set-connectchat-typing.dto';
 
 @ApiTags('Comm — ConnectChat')
 @ApiBearerAuth()
@@ -73,6 +74,16 @@ export class ConnectchatInboxController {
   @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_WRITE)
   edit(@CurrentUser() user: AuthenticatedUser, @Param('messageId', new ParseUUIDPipe()) messageId: string, @Body() dto: EditConnectchatMessageDto) {
     return this.inbox.edit(user, messageId, dto.body);
+  }
+
+  @Post('conversations/:conversationId/typing')
+  @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_WRITE)
+  setTyping(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('conversationId', new ParseUUIDPipe()) conversationId: string,
+    @Body() dto: SetConnectchatTypingDto,
+  ) {
+    return this.inbox.setTyping(user, conversationId, dto.status);
   }
 
   @Post('conversations/:conversationId/receipts/read')

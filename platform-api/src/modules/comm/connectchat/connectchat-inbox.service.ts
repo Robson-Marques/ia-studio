@@ -108,6 +108,10 @@ export class ConnectchatInboxService {
     return this.execute('editMessage', { messageId, body: body.trim(), actorRef: this.actor(user) });
   }
 
+  setTyping(user: AuthenticatedUser, conversationId: string, status: 'started' | 'stopped') {
+    return this.execute('setTyping', { conversationId, status, actorRef: this.actor(user) });
+  }
+
   markRead(user: AuthenticatedUser, conversationId: string, sequence: string) {
     return this.execute('acknowledgeRead', { conversationId, sequence, actorRef: this.actor(user) });
   }

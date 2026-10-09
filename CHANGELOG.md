@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Corrige a presença do ConnectChat ponta a ponta: a Central do IA Studio
+  publica início e fim da digitação do atendente, com validação de conversa e
+  permissão de resposta já existente. A sinalização é transitória e não altera
+  banco nem mídia.
+
 - Release coordenada v0.11.69: corrige a captura de vídeo e a apresentação de
   imagens do ConnectChat. A câmera fica visível durante a gravação, imagens
   aparecem abertas na conversa e a lixeira usa o mesmo vetor do AquaPark
