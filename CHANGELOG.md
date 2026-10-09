@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.76: o cabeçalho do ConnectChat ganha controles
+  vetoriais de tema e conta, com menu de sessão mais claro. O convite de push
+  passa a ocorrer dentro da conversa e só pede permissão do navegador após a
+  confirmação explícita da pessoa usuária.
+
 - Release coordenada v0.11.75: vídeo enviado pelo ConnectChat é carregado
   diretamente no player da mensagem, sem cartão intermediário para abrir. A
   prévia da câmera permanece contínua durante a gravação de vídeo.
