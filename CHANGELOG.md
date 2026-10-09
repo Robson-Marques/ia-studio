@@ -2,6 +2,9 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.80: corrige a compilação do PWA do ConnectChat após
+  a remoção da confirmação residual de vínculo.
+
 - Release coordenada v0.11.79: remove da PWA do ConnectChat qualquer confirmação
   residual de vínculo. A Central é a única responsável por localizar e vincular
   o cadastro; o cliente apenas aguarda a liberação automática do atendimento.
