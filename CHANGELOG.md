@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.72: registra a correção operacional do ConnectChat
+  no proxy público Newnet, que passa a aceitar anexos de até 100 MB sem
+  interromper uploads com HTTP 413 antes da API.
+
 - Release coordenada v0.11.71: eleva o limite de anexos do ConnectChat para
   100 MB no cliente, proxy interno e API, e reancora automaticamente a
   conversa na última mensagem após mídia ou mudança do compositor.
