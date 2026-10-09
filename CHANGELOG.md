@@ -2,6 +2,9 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.83: restaura o compositor flutuante do ConnectChat,
+  mantendo a digitação acessível e a lista de mensagens rolando por baixo dele.
+
 - Release coordenada v0.11.82: completa automaticamente o nome comercial dos
   vínculos ConnectChat já existentes, para que a PWA também mostre o cliente
   vinculado sem exigir que a empresa refaça a identificação.
