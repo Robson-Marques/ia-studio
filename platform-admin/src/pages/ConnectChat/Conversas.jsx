@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { completeConnectchatCustomerLink, listConnectchatConversations, listConnectchatMessages, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage, setConnectchatTyping } from '../../services/connectchat';
+import { listConnectchatConversations, listConnectchatMessages, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage, setConnectchatTyping } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -30,7 +30,6 @@ export default function ConnectchatConversas() {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [customerId, setCustomerId] = useState('');
-  const [linkRequest, setLinkRequest] = useState(null);
   const [linking, setLinking] = useState(false);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
@@ -117,7 +116,6 @@ export default function ConnectchatConversas() {
     setSelected(conversation);
     setMessages([]);
     setCustomerId('');
-    setLinkRequest(null);
     await loadMessages(conversation, true);
   }
 
@@ -147,24 +145,9 @@ export default function ConnectchatConversas() {
     setLinking(true);
     try {
       const request = await requestConnectchatCustomerLink(selected.id, customerId.trim());
-      setLinkRequest(request);
-      toast.success(`Pedido enviado para ${request.customerName}. Aguarde a confirmação no ConnectChat.`);
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLinking(false);
-    }
-  }
-
-  async function completeCustomerLink() {
-    if (!selected || !linkRequest?.requestId) return;
-    setLinking(true);
-    try {
-      await completeConnectchatCustomerLink(selected.id, linkRequest.requestId);
-      setLinkRequest(null);
       setCustomerId('');
       await loadConversations(true);
-      toast.success('Cliente vinculado ao atendimento.');
+      toast.success(`${request.customerName} foi vinculado ao atendimento.`);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -208,19 +191,15 @@ export default function ConnectchatConversas() {
               <div>
                 <strong style={{ color: 'var(--su-text-primary)' }}>{labelForConversation(selected)}</strong>
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--su-text-muted)' }}>
-                  {selected.businessContact?.displayName ? 'Nome informado pelo cliente' : 'Identificação em andamento'}
+                  {selected.businessContact?.status === 'CUSTOMER' ? 'Cliente vinculado' : 'Cliente em identificação'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 {selected.businessContact?.status !== 'CUSTOMER' && can('comm.connectchat.link.customer') ? (
-                  linkRequest ? (
-                    <Button variant="secondary" size="sm" loading={linking} onClick={completeCustomerLink}>Concluir vínculo</Button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <input aria-label="Código do cliente no IXC" className="su-input" value={customerId} onChange={(event) => setCustomerId(event.target.value)} inputMode="numeric" placeholder="Código IXC" disabled={linking} style={{ width: 118 }} />
-                      <Button variant="secondary" size="sm" loading={linking} onClick={requestCustomerLink}>Vincular cliente</Button>
-                    </div>
-                  )
+                  <div className="flex items-center gap-2">
+                    <input aria-label="Código do cliente no IXC" className="su-input" value={customerId} onChange={(event) => setCustomerId(event.target.value)} inputMode="numeric" placeholder="Código IXC" disabled={linking} style={{ width: 118 }} />
+                    <Button variant="secondary" size="sm" loading={linking} onClick={requestCustomerLink}>Vincular cliente</Button>
+                  </div>
                 ) : null}
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>

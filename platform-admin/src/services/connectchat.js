@@ -44,7 +44,7 @@ export async function requestConnectchatCustomerLink(conversationId, customerId)
   try {
     const { data } = await api.post(`/comm/connectchat/conversations/${conversationId}/customer-link-requests`, { customerId });
     return data;
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível solicitar o vínculo do cliente')); }
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível vincular o cliente')); }
 }
 
 export async function completeConnectchatCustomerLink(conversationId, requestId) {

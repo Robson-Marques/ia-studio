@@ -132,18 +132,12 @@ export class ConnectchatInboxService {
     if (typeof customerName !== 'string' || !customerName.trim()) {
       throw new BadRequestException('Não foi encontrado um cliente IXC ativo para esse código.');
     }
-    const request = await this.execute('createLinkRequest', {
+    await this.execute('linkContactDirectly', {
       globalIdentityId: conversation.globalIdentityId,
-      purpose: 'atendimento',
       customerRef: `ixc:${ixc.id}:${customerId}`,
       actorRef: this.actor(user),
-    }) as { id?: unknown; expiresAt?: unknown };
-    if (typeof request.id !== 'string') {
-      throw new BadRequestException('O ConnectChat não retornou o identificador do pedido de vínculo.');
-    }
+    });
     return {
-      requestId: request.id,
-      expiresAt: typeof request.expiresAt === 'string' ? request.expiresAt : null,
       customerName: customerName.trim(),
     };
   }

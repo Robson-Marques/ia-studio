@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- A Central ConnectChat vincula diretamente o cliente localizado pelo código
+  IXC, sem depender de confirmação adicional na PWA. Após o vínculo, lista e
+  cabeçalho mostram o nome comercial e o estado **Cliente vinculado**.
+
 - Release coordenada v0.11.77: ConnectChat passa a oferecer e registrar push
   somente após o vínculo ativo, repetindo o registro automaticamente quando a
   pessoa já havia autorizado notificações no navegador.

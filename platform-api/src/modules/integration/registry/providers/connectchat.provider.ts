@@ -31,6 +31,7 @@ export class ConnectchatProvider extends BaseProvider {
         'execute:setTyping',
         'execute:acknowledgeDelivered',
         'execute:acknowledgeRead',
+        'execute:linkContactDirectly',
         'execute:createLinkRequest',
         'execute:completeLinkRequest',
         'execute:exchangeLinkProof',
@@ -146,6 +147,8 @@ export class ConnectchatProvider extends BaseProvider {
         return client.acknowledgeDelivered(this.required(p, 'conversationId'), this.required(p, 'sequence'), actorRef || undefined);
       case 'acknowledgeRead':
         return client.acknowledgeRead(this.required(p, 'conversationId'), this.required(p, 'sequence'), actorRef || undefined);
+      case 'linkContactDirectly':
+        return client.linkContactDirectly(this.required(p, 'globalIdentityId'), this.required(p, 'customerRef'), actorRef || undefined);
       case 'createLinkRequest':
         return client.createLinkRequest(this.required(p, 'globalIdentityId'), this.required(p, 'purpose'), this.string(p, 'customerRef') || undefined, this.optionalNumber(p, 'ttlSeconds'), actorRef || undefined);
       case 'completeLinkRequest':

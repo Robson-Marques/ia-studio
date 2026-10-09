@@ -133,6 +133,15 @@ export class ConnectchatClient {
     return this.mutate(`/integration/conversations/${conversationId}/receipts/read`, { sequence }, actorRef, `ystudio:read:${conversationId}:${sequence}`) as Promise<{ sequence: string }>;
   }
 
+  async linkContactDirectly(globalIdentityId: string, customerRef: string, actorRef?: string): Promise<unknown> {
+    return this.mutate(
+      '/integration/contacts/link',
+      { globalIdentityId, customerRef },
+      actorRef,
+      `ystudio:link-direct:${globalIdentityId}:${this.shortHash(customerRef)}`,
+    );
+  }
+
   async createLinkRequest(globalIdentityId: string, purpose: string, customerRef?: string, ttlSeconds?: number, actorRef?: string): Promise<unknown> {
     return this.mutate('/integration/link-requests', { globalIdentityId, purpose, ...(customerRef ? { customerRef } : {}), ...(ttlSeconds ? { ttlSeconds } : {}) }, actorRef);
   }

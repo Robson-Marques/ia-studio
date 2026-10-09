@@ -5,6 +5,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -33,6 +35,7 @@ import {
 } from '../../../shared/integration/provider.interface';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
+import { ConnectchatApiError } from '../../../shared/integration/connectchat.client';
 import { ConnectionStateAction } from './dto/update-connection-state.dto';
 
 const STATE_ACTION_TARGET: Record<ConnectionStateAction, ConnectionStatus> = {
@@ -299,6 +302,19 @@ export class ConnectionsService {
         error: (e as Error).message,
         traceId: getRequestStore()?.traceId ?? null,
       });
+      // O ConnectChat já devolve erros públicos e seguros (por exemplo,
+      // credencial sem escopo). Preservar essa informação evita que a Central
+      // transforme uma falha configurável em um opaco "Internal server error".
+      if (e instanceof ConnectchatApiError) {
+        const status = e.status >= HttpStatus.BAD_REQUEST && e.status < HttpStatus.INTERNAL_SERVER_ERROR
+          ? e.status
+          : HttpStatus.BAD_GATEWAY;
+        throw new HttpException({
+          statusCode: status,
+          message: e.message,
+          code: e.code ?? 'CONNECTCHAT_REQUEST_FAILED',
+        }, status);
+      }
       throw e;
     }
   }
