@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.79: remove da PWA do ConnectChat qualquer confirmação
+  residual de vínculo. A Central é a única responsável por localizar e vincular
+  o cadastro; o cliente apenas aguarda a liberação automática do atendimento.
+
 - A Central ConnectChat vincula diretamente o cliente localizado pelo código
   IXC, sem depender de confirmação adicional na PWA. Após o vínculo, lista e
   cabeçalho mostram o nome comercial e o estado **Cliente vinculado**.
