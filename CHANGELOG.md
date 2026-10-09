@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.68: porta o comportamento mobile completo do
+  compositor do ConnectChat. A gravação vira uma cápsula com envio imediato,
+  o compositor flutua sobre a conversa, as ações adotam azul Newnet e foto e
+  vídeo usam captura pela câmera. Não altera banco, mídia ou contratos.
+
 - Release coordenada v0.11.67: refina o PWA do ConnectChat com a cápsula de
   composição arredondada da referência do AquaPark, ícones curados de clipe,
   microfone, envio, play e pausa, e duração de áudio exibida somente em
