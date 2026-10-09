@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.77: ConnectChat passa a oferecer e registrar push
+  somente após o vínculo ativo, repetindo o registro automaticamente quando a
+  pessoa já havia autorizado notificações no navegador.
+
 - Release coordenada v0.11.76: o cabeçalho do ConnectChat ganha controles
   vetoriais de tema e conta, com menu de sessão mais claro. O convite de push
   passa a ocorrer dentro da conversa e só pede permissão do navegador após a
