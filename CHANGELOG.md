@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.74: finaliza a compatibilidade do ConnectChat com
+  MIME não canônico de vídeo gravado pelo navegador, preservando a validação
+  binária obrigatória do arquivo.
+
 - Release coordenada v0.11.73: corrige o envio de vídeo gravado no ConnectChat.
   A categoria de mídia acompanha o arquivo e a API reconhece MIME genérico de
   navegadores móveis sem abrir mão da extensão e da assinatura binária.
