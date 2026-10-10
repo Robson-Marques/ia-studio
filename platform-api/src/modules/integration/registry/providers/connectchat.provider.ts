@@ -28,6 +28,8 @@ export class ConnectchatProvider extends BaseProvider {
         'execute:getTyping',
         'execute:openConversation',
         'execute:sendMessage',
+        'execute:sendAttachment',
+        'execute:downloadAttachment',
         'execute:editMessage',
         'execute:setTyping',
         'execute:acknowledgeDelivered',
@@ -140,6 +142,24 @@ export class ConnectchatProvider extends BaseProvider {
           replyToMessageId: this.string(p, 'replyToMessageId') || undefined,
           mentions: Array.isArray(p['mentions']) ? p['mentions'] as ConnectchatMention[] : undefined,
         });
+      case 'sendAttachment': {
+        const data = p['data'];
+        const attachmentKind = this.required(p, 'attachmentKind');
+        if (!Buffer.isBuffer(data) || !['IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO'].includes(attachmentKind)) {
+          throw new BadRequestException('ConnectChat exige um arquivo e uma categoria de anexo válidos.');
+        }
+        return client.sendAttachment({
+          conversationId: this.required(p, 'conversationId'),
+          clientMessageId: this.required(p, 'clientMessageId'),
+          attachmentKind: attachmentKind as 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO',
+          data,
+          filename: this.required(p, 'filename'),
+          mimeType: this.required(p, 'mimeType'),
+          actorRef: actorRef || undefined,
+        });
+      }
+      case 'downloadAttachment':
+        return client.downloadAttachment(this.required(p, 'attachmentId'));
       case 'editMessage':
         return client.editMessage(this.required(p, 'messageId'), this.required(p, 'body'), actorRef || undefined);
       case 'setTyping': {

@@ -33,6 +33,13 @@ export interface ConnectchatMessage {
     deliveredAt: string | null;
     readAt: string | null;
   }>;
+  attachments?: Array<{
+    id: string;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    kind: 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO';
+  }>;
 }
 
 export interface ConnectchatMention {
@@ -127,8 +134,88 @@ export class ConnectchatClient {
     ) as Promise<ConnectchatMessage>;
   }
 
+  async sendAttachment(input: {
+    conversationId: string;
+    clientMessageId: string;
+    attachmentKind: 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO';
+    data: Buffer;
+    filename: string;
+    mimeType: string;
+    actorRef?: string;
+  }): Promise<ConnectchatMessage> {
+    const body = new FormData();
+    body.set('file', new Blob([input.data], { type: input.mimeType || 'application/octet-stream' }), input.filename || 'arquivo');
+    body.set('clientMessageId', input.clientMessageId);
+    body.set('attachmentKind', input.attachmentKind);
+    return this.multipart(
+      `/integration/conversations/${input.conversationId}/attachments`,
+      body,
+      input.actorRef,
+      `ystudio:attachment:${input.clientMessageId}`,
+    ) as Promise<ConnectchatMessage>;
+  }
+
+  async downloadAttachment(attachmentId: string): Promise<{ data: Buffer; mimeType: string; filename: string }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await fetch(`${this.baseUrl}/integration/attachments/${encodeURIComponent(attachmentId)}/content`, {
+        headers: {
+          'X-ConnectChat-Key': this.apiKey,
+          'X-ConnectChat-Actor-Ref': this.defaultActorRef,
+        },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as ConnectchatErrorBody;
+        throw new ConnectchatApiError(response.status, typeof payload.code === 'string' ? payload.code : null, typeof payload.message === 'string' ? payload.message : `ConnectChat respondeu HTTP ${response.status}.`);
+      }
+      const disposition = response.headers.get('content-disposition') ?? '';
+      const filename = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+      return {
+        data: Buffer.from(await response.arrayBuffer()),
+        mimeType: response.headers.get('content-type')?.split(';', 1)[0] || 'application/octet-stream',
+        filename: filename ? decodeURIComponent(filename) : 'arquivo',
+      };
+    } catch (error) {
+      if (error instanceof ConnectchatApiError) throw error;
+      const detail = error instanceof Error && error.name === 'AbortError' ? `Timeout ao chamar ${this.baseUrl}` : (error as Error).message;
+      throw new Error(`Falha ao obter o anexo do ConnectChat: ${detail}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async editMessage(messageId: string, body: string, actorRef?: string): Promise<ConnectchatMessage> {
     return this.mutate(`/integration/messages/${messageId}`, { body }, actorRef, `ystudio:edit:${messageId}:${this.shortHash(body)}`, 'PATCH') as Promise<ConnectchatMessage>;
+  }
+
+  private async multipart(path: string, body: FormData, actorRef: string | undefined, idempotencyKey: string): Promise<unknown> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: {
+          'X-ConnectChat-Key': this.apiKey,
+          'X-ConnectChat-Actor-Ref': actorRef ?? this.defaultActorRef,
+          'Idempotency-Key': idempotencyKey,
+        },
+        body,
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({})) as ConnectchatErrorBody;
+      if (!response.ok) {
+        throw new ConnectchatApiError(response.status, typeof payload.code === 'string' ? payload.code : null, typeof payload.message === 'string' ? payload.message : `ConnectChat respondeu HTTP ${response.status}.`);
+      }
+      return payload;
+    } catch (error) {
+      if (error instanceof ConnectchatApiError) throw error;
+      const detail = error instanceof Error && error.name === 'AbortError' ? `Timeout ao chamar ${this.baseUrl}` : (error as Error).message;
+      throw new Error(`Falha de rede ao chamar ${this.baseUrl}${path}: ${detail}`);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async setTyping(conversationId: string, status: 'started' | 'stopped', actorRef?: string): Promise<{ status: 'started' | 'stopped' }> {

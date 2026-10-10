@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -35,6 +35,45 @@ function receiptMark(message) {
   return { label: 'Enviada ao ConnectChat', color: '#d3d8e2', glyph: '✓' };
 }
 
+function attachmentKind(file) {
+  if (file.type.startsWith('image/')) return 'IMAGE';
+  if (file.type.startsWith('audio/')) return 'AUDIO';
+  if (file.type.startsWith('video/')) return 'VIDEO';
+  return 'DOCUMENT';
+}
+
+function attachmentLabel(attachment) {
+  return attachment.kind === 'AUDIO' ? 'Áudio' : attachment.kind === 'VIDEO' ? 'Vídeo' : attachment.kind === 'IMAGE' ? 'Imagem' : 'Documento';
+}
+
+function MessageAttachment({ attachment }) {
+  const [asset, setAsset] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    let url = '';
+    getConnectchatAttachment(attachment.id)
+      .then((content) => {
+        url = content.url;
+        if (alive) setAsset(content);
+        else URL.revokeObjectURL(content.url);
+      })
+      .catch((err) => { if (alive) setError(err.message); });
+    return () => {
+      alive = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [attachment.id]);
+
+  if (error) return <p style={{ margin: 'var(--su-space-2) 0 0', fontSize: 12, color: 'var(--su-text-muted)' }}>Não foi possível abrir {attachmentLabel(attachment).toLowerCase()}.</p>;
+  if (!asset) return <p style={{ margin: 'var(--su-space-2) 0 0', fontSize: 12, color: 'var(--su-text-muted)' }}>Carregando {attachmentLabel(attachment).toLowerCase()}…</p>;
+  if (attachment.kind === 'IMAGE') return <img src={asset.url} alt={attachment.originalName} style={{ display: 'block', maxWidth: '100%', maxHeight: 320, marginTop: 'var(--su-space-2)', borderRadius: 'var(--su-radius-sm)' }} />;
+  if (attachment.kind === 'VIDEO') return <video src={asset.url} controls playsInline preload="metadata" style={{ display: 'block', width: '100%', maxHeight: 360, marginTop: 'var(--su-space-2)', borderRadius: 'var(--su-radius-sm)', background: 'var(--su-surface-overlay)' }} />;
+  if (attachment.kind === 'AUDIO') return <audio src={asset.url} controls preload="metadata" style={{ display: 'block', width: '100%', marginTop: 'var(--su-space-2)' }} />;
+  return <a href={asset.url} download={attachment.originalName} style={{ display: 'block', marginTop: 'var(--su-space-2)', color: 'inherit', fontSize: 13, fontWeight: 700 }}>📎 {attachment.originalName}</a>;
+}
+
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
@@ -44,6 +83,7 @@ export default function ConnectchatConversas() {
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendingAttachment, setSendingAttachment] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
@@ -53,6 +93,7 @@ export default function ConnectchatConversas() {
   const typingTimerRef = useRef(null);
   const typingHeartbeatRef = useRef(null);
   const typingConversationRef = useRef(null);
+  const attachmentInputRef = useRef(null);
   selectedRef.current = selected;
   messagesRef.current = messages;
 
@@ -181,6 +222,27 @@ export default function ConnectchatConversas() {
     }
   }
 
+  async function sendAttachment(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !selected) return;
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error('O arquivo pode ter no máximo 100 MB.');
+      return;
+    }
+    stopTyping(selected.id);
+    setSendingAttachment(true);
+    try {
+      const sent = await sendConnectchatAttachment(selected.id, file, attachmentKind(file), messageId());
+      setMessages((current) => mergeMessages(current, [sent]));
+      await loadConversations(true);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSendingAttachment(false);
+    }
+  }
+
   async function requestCustomerLink() {
     if (!selected || !/^[1-9]\d*$/.test(customerId.trim())) {
       toast.error('Informe o código numérico do cliente no IXC.');
@@ -277,7 +339,8 @@ export default function ConnectchatConversas() {
                 return (
                   <div key={message.id} className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`}>
                     <div style={{ maxWidth: '80%', padding: 'var(--su-space-3)', borderRadius: 'var(--su-radius-md)', background: outgoing ? 'var(--su-action)' : 'var(--su-surface-raised)', color: outgoing ? 'var(--su-action-contrast)' : 'var(--su-text-primary)', boxShadow: 'var(--su-shadow-sm)' }}>
-                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{message.body}</p>
+                      {message.body ? <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{message.body}</p> : null}
+                      {message.attachments?.map((attachment) => <MessageAttachment key={attachment.id} attachment={attachment} />)}
                       <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 10, opacity: 0.82 }}>
                         <time>{new Date(message.createdAt).toLocaleString('pt-BR')}</time>
                         {receipt ? <span aria-label={receipt.label} title={receipt.label} style={{ color: receipt.color, fontSize: 12, fontWeight: 800, letterSpacing: -2, textShadow: receipt.label === 'Lida pelo cliente' ? '0 0 8px rgba(66, 255, 122, .45)' : undefined }}>{receipt.glyph}</span> : null}
@@ -291,8 +354,10 @@ export default function ConnectchatConversas() {
               <>
               {customerActivity ? <p style={{ margin: 0, padding: 'var(--su-space-2) var(--su-space-3) 0', color: 'var(--su-text-muted)', fontSize: 12 }}>{presenceCopy(customerActivity)}</p> : null}
               <div className="flex gap-2" style={{ padding: 'var(--su-space-3)', borderTop: '1px solid var(--su-border-default)' }}>
-                <textarea className="su-textarea" value={text} onChange={(event) => { const value = event.target.value; setText(value); if (value.trim()) scheduleTyping(); else stopTyping(selected.id); }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Mensagem" disabled={sending} style={{ flex: 1, minHeight: 42, resize: 'none' }} />
-                <Button variant="primary" loading={sending} disabled={!text.trim()} onClick={send}>Enviar</Button>
+                <input ref={attachmentInputRef} type="file" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden onChange={sendAttachment} />
+                <Button variant="secondary" size="sm" loading={sendingAttachment} disabled={sending || sendingAttachment} onClick={() => attachmentInputRef.current?.click()}>Anexar</Button>
+                <textarea className="su-textarea" value={text} onChange={(event) => { const value = event.target.value; setText(value); if (value.trim()) scheduleTyping(); else stopTyping(selected.id); }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Mensagem" disabled={sending || sendingAttachment} style={{ flex: 1, minHeight: 42, resize: 'none' }} />
+                <Button variant="primary" loading={sending} disabled={!text.trim() || sendingAttachment} onClick={send}>Enviar</Button>
               </div>
               </>
             ) : (

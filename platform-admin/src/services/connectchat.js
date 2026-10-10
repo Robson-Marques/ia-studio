@@ -41,6 +41,24 @@ export async function sendConnectchatMessage(conversationId, body, clientMessage
   } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível enviar a mensagem')); }
 }
 
+export async function sendConnectchatAttachment(conversationId, file, attachmentKind, clientMessageId) {
+  try {
+    const form = new FormData();
+    form.set('file', file, file.name || 'arquivo');
+    form.set('attachmentKind', attachmentKind);
+    form.set('clientMessageId', clientMessageId);
+    const { data } = await api.post(`/comm/connectchat/conversations/${conversationId}/attachments`, form);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível enviar o anexo')); }
+}
+
+export async function getConnectchatAttachment(attachmentId) {
+  try {
+    const { data, headers } = await api.get(`/comm/connectchat/attachments/${attachmentId}/content`, { responseType: 'blob' });
+    return { url: URL.createObjectURL(data), mimeType: headers['content-type'] || 'application/octet-stream' };
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível abrir o anexo')); }
+}
+
 export async function setConnectchatTyping(conversationId, status) {
   try {
     await api.post(`/comm/connectchat/conversations/${conversationId}/typing`, { status });

@@ -123,6 +123,23 @@ export class ConnectchatInboxService {
     return this.execute('sendMessage', { ...input, body: input.body.trim(), actorRef: this.actor(user) });
   }
 
+  async sendAttachment(user: AuthenticatedUser, input: {
+    conversationId: string;
+    clientMessageId: string;
+    attachmentKind: 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO';
+    data: Buffer;
+    filename: string;
+    mimeType: string;
+  }) {
+    if (!input.data.length) throw new BadRequestException('Selecione um arquivo para enviar.');
+    if (input.data.length > 100 * 1024 * 1024) throw new BadRequestException('O arquivo pode ter no máximo 100 MB.');
+    return this.execute('sendAttachment', { ...input, actorRef: this.actor(user) });
+  }
+
+  getAttachment(attachmentId: string) {
+    return this.execute('downloadAttachment', { attachmentId });
+  }
+
   edit(user: AuthenticatedUser, messageId: string, body: string) {
     if (!body.trim()) throw new BadRequestException('A mensagem não pode ficar vazia.');
     return this.execute('editMessage', { messageId, body: body.trim(), actorRef: this.actor(user) });
