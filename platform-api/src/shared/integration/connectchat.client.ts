@@ -144,7 +144,10 @@ export class ConnectchatClient {
     actorRef?: string;
   }): Promise<ConnectchatMessage> {
     const body = new FormData();
-    body.set('file', new Blob([input.data], { type: input.mimeType || 'application/octet-stream' }), input.filename || 'arquivo');
+    // Buffer pode carregar SharedArrayBuffer na tipagem do Node 20; copiar os
+    // bytes produz um ArrayBuffer próprio aceito pelo Blob do fetch nativo.
+    const bytes = new Uint8Array(input.data);
+    body.set('file', new Blob([bytes], { type: input.mimeType || 'application/octet-stream' }), input.filename || 'arquivo');
     body.set('clientMessageId', input.clientMessageId);
     body.set('attachmentKind', input.attachmentKind);
     return this.multipart(

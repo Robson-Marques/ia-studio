@@ -6,6 +6,9 @@
   segurança imagens, áudios, vídeos e documentos recebidos e permite enviar
   anexos para o cliente pelo mesmo histórico contínuo.
 
+- Release coordenada v0.11.93: corrige a compatibilidade da transferência
+  multipart no runtime Node do servidor ao encaminhar o arquivo da Central.
+
 - Release coordenada v0.11.91: a Central renova a presença enquanto o atendente
   escreve e mostra a atividade específica do cliente — digitando, gravando
   áudio ou gravando vídeo — sem o indicador desaparecer durante a interação.
