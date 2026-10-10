@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.86: elimina a faixa de rodapé visual que aparecia
+  sob o compositor flutuante do ConnectChat; o fundo do atendimento permanece
+  contínuo enquanto a barra sobrepõe a conversa.
+
 - Release coordenada v0.11.85: um cliente desvinculado pode ser vinculado de
   novo pela Central. Cada tentativa consciente recebe uma chave própria, sem
   reutilizar o sucesso histórico de um vínculo já encerrado.
