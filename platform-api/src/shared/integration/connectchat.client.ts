@@ -135,15 +135,16 @@ export class ConnectchatClient {
   }
 
   async linkContactDirectly(globalIdentityId: string, customerRef: string, customerDisplayName?: string, actorRef?: string): Promise<unknown> {
-    // O nome comercial faz parte do retrato que a PWA pode mostrar. Incluí-lo
-    // na chave permite completar vínculos anteriores que foram criados antes
-    // desse campo existir, sem conflitar com a requisição idempotente antiga.
-    const snapshotKey = `${customerRef}:${customerDisplayName ?? ''}`;
+    // Um vínculo pode ser removido e criado novamente para o mesmo cliente.
+    // Portanto, a chave precisa ser estável só durante esta tentativa (os
+    // retries HTTP reaproveitam-na), e não para sempre por identidade+cliente.
+    // Caso contrário a API devolveria o sucesso armazenado de um vínculo já
+    // desfeito sem executar a nova operação.
     return this.mutate(
       '/integration/contacts/link',
       { globalIdentityId, customerRef, ...(customerDisplayName ? { customerDisplayName } : {}) },
       actorRef,
-      `ystudio:link-direct:${globalIdentityId}:${this.shortHash(snapshotKey)}`,
+      `ystudio:link-direct:${globalIdentityId}:${randomUUID()}`,
     );
   }
 
