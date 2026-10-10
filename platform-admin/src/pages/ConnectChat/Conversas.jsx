@@ -6,6 +6,12 @@ import { usePermissions } from '../../hooks/usePermissions';
 const POLL_MS = 5000;
 const TYPING_POLL_MS = 1500;
 
+function presenceCopy(activity) {
+  if (activity === 'recording_audio') return 'Cliente está gravando um áudio…';
+  if (activity === 'recording_video') return 'Cliente está gravando um vídeo…';
+  return 'Cliente está digitando…';
+}
+
 function labelForConversation(conversation) {
   if (conversation.customerDisplayName) return conversation.customerDisplayName;
   return conversation.businessContact?.displayName ?? 'Cliente em identificação';
@@ -41,10 +47,11 @@ export default function ConnectchatConversas() {
   const [customerId, setCustomerId] = useState('');
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
-  const [customerTyping, setCustomerTyping] = useState(false);
+  const [customerActivity, setCustomerActivity] = useState(null);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
   const typingTimerRef = useRef(null);
+  const typingHeartbeatRef = useRef(null);
   const typingConversationRef = useRef(null);
   selectedRef.current = selected;
   messagesRef.current = messages;
@@ -97,17 +104,17 @@ export default function ConnectchatConversas() {
 
   useEffect(() => {
     if (!selected?.id) {
-      setCustomerTyping(false);
+      setCustomerActivity(null);
       return undefined;
     }
     let active = true;
     const refresh = async () => {
       try {
         const presence = await getConnectchatTyping(selected.id);
-        if (active) setCustomerTyping(Boolean(presence.customerTyping));
+        if (active) setCustomerActivity(presence.customerTyping ? (presence.customerActivity || 'typing') : null);
       } catch (error) {
         console.warn('Não foi possível consultar a digitação do cliente no ConnectChat.', error);
-        if (active) setCustomerTyping(false);
+        if (active) setCustomerActivity(null);
       }
     };
     void refresh();
@@ -118,6 +125,8 @@ export default function ConnectchatConversas() {
   function stopTyping(conversationId = typingConversationRef.current) {
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     typingTimerRef.current = null;
+    if (typingHeartbeatRef.current) clearInterval(typingHeartbeatRef.current);
+    typingHeartbeatRef.current = null;
     if (!conversationId) return;
     typingConversationRef.current = null;
     void setConnectchatTyping(conversationId, 'stopped').catch(() => undefined);
@@ -130,13 +139,17 @@ export default function ConnectchatConversas() {
     if (!typingConversationRef.current) {
       typingConversationRef.current = conversation.id;
       void setConnectchatTyping(conversation.id, 'started').catch(() => undefined);
+      typingHeartbeatRef.current = setInterval(() => {
+        if (typingConversationRef.current === conversation.id) void setConnectchatTyping(conversation.id, 'started').catch(() => undefined);
+      }, 1_000);
     }
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = setTimeout(() => stopTyping(conversation.id), 900);
+    typingTimerRef.current = setTimeout(() => stopTyping(conversation.id), 2_500);
   }
 
   useEffect(() => () => {
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    if (typingHeartbeatRef.current) clearInterval(typingHeartbeatRef.current);
     const conversationId = typingConversationRef.current;
     if (conversationId) void setConnectchatTyping(conversationId, 'stopped').catch(() => undefined);
   }, []);
@@ -145,7 +158,7 @@ export default function ConnectchatConversas() {
     stopTyping();
     setSelected(conversation);
     setMessages([]);
-    setCustomerTyping(false);
+    setCustomerActivity(null);
     setCustomerId('');
     await loadMessages(conversation, true);
   }
@@ -276,7 +289,7 @@ export default function ConnectchatConversas() {
             </div>
             {selected.status === 'OPEN' && can('comm.connectchat.write') ? (
               <>
-              {customerTyping ? <p style={{ margin: 0, padding: 'var(--su-space-2) var(--su-space-3) 0', color: 'var(--su-text-muted)', fontSize: 12 }}>Cliente está digitando…</p> : null}
+              {customerActivity ? <p style={{ margin: 0, padding: 'var(--su-space-2) var(--su-space-3) 0', color: 'var(--su-text-muted)', fontSize: 12 }}>{presenceCopy(customerActivity)}</p> : null}
               <div className="flex gap-2" style={{ padding: 'var(--su-space-3)', borderTop: '1px solid var(--su-border-default)' }}>
                 <textarea className="su-textarea" value={text} onChange={(event) => { const value = event.target.value; setText(value); if (value.trim()) scheduleTyping(); else stopTyping(selected.id); }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Mensagem" disabled={sending} style={{ flex: 1, minHeight: 42, resize: 'none' }} />
                 <Button variant="primary" loading={sending} disabled={!text.trim()} onClick={send}>Enviar</Button>

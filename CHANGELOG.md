@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.91: a Central renova a presença enquanto o atendente
+  escreve e mostra a atividade específica do cliente — digitando, gravando
+  áudio ou gravando vídeo — sem o indicador desaparecer durante a interação.
+
 - Release coordenada v0.11.90: o rodapé do painel passa a mostrar a tag real
   instalada, em vez de reaproveitar o primeiro título histórico do changelog.
   A recuperação do ConnectChat também reabre os atendimentos legados que ainda
