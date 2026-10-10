@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.87: a última mensagem do ConnectChat passa a parar
+  acima do compositor flutuante. A rolagem preserva a bolha inteira visível no
+  fim, mantendo a sobreposição apenas para o histórico anterior.
+
 - Release coordenada v0.11.86: elimina a faixa de rodapé visual que aparecia
   sob o compositor flutuante do ConnectChat; o fundo do atendimento permanece
   contínuo enquanto a barra sobrepõe a conversa.
