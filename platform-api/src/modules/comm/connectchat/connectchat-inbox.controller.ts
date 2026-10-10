@@ -108,9 +108,10 @@ export class ConnectchatInboxController {
     const uploaded = await multipartRequest.file();
     if (!uploaded) throw new BadRequestException('Selecione um arquivo para enviar.');
     const field = (name: string) => {
-      const value = uploaded.fields?.[name];
+      const value = (uploaded.fields as Record<string, unknown> | undefined)?.[name];
       const current = Array.isArray(value) ? value[0] : value;
-      return typeof current?.value === 'string' ? current.value.trim() : '';
+      const raw = (current as { value?: unknown } | undefined)?.value;
+      return typeof raw === 'string' ? raw.trim() : '';
     };
     const attachmentKind = field('attachmentKind');
     if (!['IMAGE', 'DOCUMENT', 'AUDIO', 'VIDEO'].includes(attachmentKind)) {

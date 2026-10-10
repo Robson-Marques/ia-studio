@@ -2,6 +2,9 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.94: usa o contrato multipart já validado no Fastify
+  para ler os campos do anexo enviado pela Central.
+
 - Release coordenada v0.11.92: a Central do ConnectChat passa a renderizar com
   segurança imagens, áudios, vídeos e documentos recebidos e permite enviar
   anexos para o cliente pelo mesmo histórico contínuo.
