@@ -230,6 +230,32 @@ log_db "ADMIN_BUILD" "npm install + vite build (platform-admin)"
 build_front "$ADMIN_DIR" "$ADMIN_API" "$ADMIN_BASE" "ADMIN_BUILD"
 log_db "ADMIN_BUILD" "painel do cliente publicado"
 
+# O index.html é a única peça estável da SPA: ele referencia bundles com hash
+# produzidos pelo Vite. Revalidá-lo sempre impede que uma aba aberta continue
+# no painel anterior depois de uma atualização. Aplicamos a política também em
+# instalações existentes, cujo vhost foi criado antes desta regra.
+refresh_admin_index_cache_policy() {
+  local site="/etc/nginx/sites-available/${IASTUDIO_NGINX_SITE}"
+  local backup="${site}.before-index-cache-${UPGRADE_ID}"
+  [ -f "$site" ] || { log_db "ADMIN_CACHE" "vhost não encontrado; política de cache será aplicada na próxima instalação"; return 0; }
+  grep -Fq 'location = /index.html' "$site" && return 0
+  cp -- "$site" "$backup"
+  sed -i '\|^[[:space:]]*location /[[:space:]]*{|i\  location = /index.html { add_header Cache-Control "no-cache, no-store, must-revalidate" always; }' "$site"
+  if ! grep -Fq 'location = /index.html' "$site" || ! nginx -t; then
+    mv -- "$backup" "$site"
+    nginx -t || true
+    mark_failed "ADMIN_CACHE" "não foi possível configurar a revalidação do painel"
+  fi
+  systemctl reload nginx || {
+    mv -- "$backup" "$site"
+    nginx -t && systemctl reload nginx || true
+    mark_failed "ADMIN_CACHE" "não foi possível recarregar o nginx com a política de cache do painel"
+  }
+  rm -f -- "$backup"
+  log_db "ADMIN_CACHE" "index.html do painel configurado para revalidar a cada atualização"
+}
+refresh_admin_index_cache_policy
+
 # ---------- 10) CONNECTCHAT (release conjunta Newnet) ----------
 # O ConnectChat continua um serviço Docker e banco próprios; "atualização
 # conjunta" significa uma única ação no painel para aplicar a MESMA tag nos dois

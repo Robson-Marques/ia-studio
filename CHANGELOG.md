@@ -2,6 +2,10 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.84: a Central ConnectChat passa a revalidar o HTML
+  do painel após cada release, garantindo que ações novas — como desvincular o
+  cliente — não fiquem escondidas por uma interface antiga em cache.
+
 - Release coordenada v0.11.83: restaura o compositor flutuante do ConnectChat,
   mantendo a digitação acessível e a lista de mensagens rolando por baixo dele.
 

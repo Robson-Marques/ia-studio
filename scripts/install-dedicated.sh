@@ -199,6 +199,9 @@ server {
   server_name $DOMAIN;
   root $IASTUDIO_APP_DIR/platform-admin/dist;
   location /api/ { proxy_pass http://127.0.0.1:$PORT; proxy_set_header Host \$host; proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto \$scheme; }
+  # O HTML aponta para bundles Vite com hash. Ele nunca pode ficar em cache,
+  # ou o navegador continua carregando uma interface anterior após um upgrade.
+  location = /index.html { add_header Cache-Control "no-cache, no-store, must-revalidate" always; }
   location / { try_files \$uri \$uri/ /index.html; }
 }
 EOF
