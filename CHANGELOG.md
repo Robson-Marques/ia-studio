@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.89: desvincular cliente no ConnectChat não encerra
+  mais o atendimento. A Central preserva o mesmo histórico e conversa ativa,
+  remove a confirmação redundante e permite identificar outro cadastro no mesmo
+  ID.
+
 - Release coordenada v0.11.88: a Central ConnectChat passa a mostrar os
   recibos de enviada, entregue e lida em cada mensagem da empresa. A leitura
   usa dois tiques verde-neon para se destacar com contraste sobre a bolha azul;

@@ -187,15 +187,14 @@ export default function ConnectchatConversas() {
   }
 
   async function unlinkCustomer() {
-    if (!selected || !window.confirm(`Desvincular ${labelForConversation(selected)} deste atendimento? A conversa será encerrada até um novo vínculo.`)) return;
+    if (!selected) return;
     setUnlinking(true);
     try {
       await unlinkConnectchatCustomer(selected.id);
       stopTyping(selected.id);
-      setSelected(null);
-      setMessages([]);
       await loadConversations(true);
-      toast.success('Cliente desvinculado do atendimento.');
+      await loadMessages(selected, true, true);
+      toast.success('Cliente desvinculado. A conversa permanece ativa e registrada.');
     } catch (error) {
       toast.error(error.message);
     } finally {
