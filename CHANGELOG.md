@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.90: o rodapé do painel passa a mostrar a tag real
+  instalada, em vez de reaproveitar o primeiro título histórico do changelog.
+  A recuperação do ConnectChat também reabre os atendimentos legados que ainda
+  apareciam encerrados após o desvínculo.
+
 - Release coordenada v0.11.89: desvincular cliente no ConnectChat não encerra
   mais o atendimento. A Central preserva o mesmo histórico e conversa ativa,
   remove a confirmação redundante e permite identificar outro cadastro no mesmo

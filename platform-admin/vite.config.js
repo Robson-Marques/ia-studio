@@ -1,17 +1,22 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 
-// Versao exibida (barra lateral) = a versao REAL do release. Caminhos resolvidos
-// a partir DESTE arquivo (import.meta.url) — nao dependem do diretorio onde o
-// build roda. O CHANGELOG.md da raiz e a fonte da verdade (primeiro "## vX.Y.Z");
-// no build o repo ja esta na tag certa. O package.json ficava preso em 0.1.0.
+// Versao exibida (barra lateral) = a tag REAL do release. O changelog usa uma
+// secao "Não publicado", portanto seu primeiro titulo versionado pode ser
+// antigo; no build de release, a tag atual do Git e a fonte confiavel.
 const here = fileURLToPath(new URL('.', import.meta.url));
 function resolveAppVersion() {
   try {
+    return execFileSync('git', ['describe', '--tags', '--exact-match'], {
+      cwd: here + '..', encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim().replace(/^v/, '');
+  } catch { /* build local sem tag: usa o changelog abaixo */ }
+  try {
     const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf-8');
-    const m = changelog.match(/^##\s+v(\d+\.\d+\.\d+)/m);
+    const m = changelog.match(/(?:^##\s+v|Release coordenada v)(\d+\.\d+\.\d+)/m);
     if (m) return m[1];
   } catch { /* segue pro fallback */ }
   try {
