@@ -96,6 +96,12 @@ export class ConnectchatInboxController {
     return this.inbox.setTyping(user, conversationId, dto.status);
   }
 
+  @Get('conversations/:conversationId/typing')
+  @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_READ)
+  getTyping(@Param('conversationId', new ParseUUIDPipe()) conversationId: string) {
+    return this.inbox.getTyping(conversationId);
+  }
+
   @Post('conversations/:conversationId/receipts/read')
   @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_WRITE)
   markRead(@CurrentUser() user: AuthenticatedUser, @Param('conversationId', new ParseUUIDPipe()) conversationId: string, @Body() dto: AckConnectchatReceiptDto) {

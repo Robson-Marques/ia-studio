@@ -28,6 +28,11 @@ export interface ConnectchatMessage {
   clientMessageId: string | null;
   createdAt: string;
   editedAt: string | null;
+  receipts?: Array<{
+    participantKind: 'CUSTOMER' | 'BUSINESS';
+    deliveredAt: string | null;
+    readAt: string | null;
+  }>;
 }
 
 export interface ConnectchatMention {
@@ -90,6 +95,10 @@ export class ConnectchatClient {
   async getMessages(conversationId: string, afterSequence = '0', limit = 50): Promise<ConnectchatMessage[]> {
     const query = new URLSearchParams({ afterSequence, limit: String(Math.min(100, Math.max(1, limit))) });
     return this.request(`/integration/conversations/${conversationId}/messages?${query.toString()}`) as Promise<ConnectchatMessage[]>;
+  }
+
+  async getTyping(conversationId: string): Promise<{ customerTyping: boolean; businessTyping: boolean }> {
+    return this.request(`/integration/conversations/${conversationId}/typing`) as Promise<{ customerTyping: boolean; businessTyping: boolean }>;
   }
 
   async openConversation(businessContactId: string, actorRef?: string): Promise<ConnectchatConversation> {

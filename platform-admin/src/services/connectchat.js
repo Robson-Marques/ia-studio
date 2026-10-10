@@ -16,6 +16,21 @@ export async function listConnectchatMessages(conversationId, afterSequence = '0
   } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível carregar as mensagens')); }
 }
 
+export async function getConnectchatTyping(conversationId) {
+  try {
+    const { data } = await api.get(`/comm/connectchat/conversations/${conversationId}/typing`);
+    return data ?? { customerTyping: false, businessTyping: false };
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível consultar a digitação do cliente')); }
+}
+
+export async function markConnectchatDelivered(conversationId, sequence) {
+  try {
+    await api.post(`/comm/connectchat/conversations/${conversationId}/receipts/delivered`, { sequence });
+  } catch (err) {
+    console.warn('Não foi possível confirmar a entrega no ConnectChat.', err);
+  }
+}
+
 export async function sendConnectchatMessage(conversationId, body, clientMessageId) {
   try {
     const { data } = await api.post(`/comm/connectchat/conversations/${conversationId}/messages`, {

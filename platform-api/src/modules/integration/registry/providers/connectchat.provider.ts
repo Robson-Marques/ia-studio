@@ -25,6 +25,7 @@ export class ConnectchatProvider extends BaseProvider {
         'health',
         'execute:listConversations',
         'execute:getMessages',
+        'execute:getTyping',
         'execute:openConversation',
         'execute:sendMessage',
         'execute:editMessage',
@@ -126,6 +127,8 @@ export class ConnectchatProvider extends BaseProvider {
         return client.listConversations();
       case 'getMessages':
         return client.getMessages(this.required(p, 'conversationId'), this.string(p, 'afterSequence') || '0', this.number(p, 'limit', 50));
+      case 'getTyping':
+        return client.getTyping(this.required(p, 'conversationId'));
       case 'openConversation':
         return client.openConversation(this.required(p, 'businessContactId'), actorRef || undefined);
       case 'sendMessage':

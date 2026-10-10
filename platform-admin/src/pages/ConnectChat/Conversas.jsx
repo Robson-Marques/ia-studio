@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { listConnectchatConversations, listConnectchatMessages, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
+import { getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
+const TYPING_POLL_MS = 1500;
 
 function labelForConversation(conversation) {
   if (conversation.customerDisplayName) return conversation.customerDisplayName;
@@ -20,6 +21,14 @@ function mergeMessages(current, incoming) {
   return [...byId.values()].sort((a, b) => Number(a.serverSequence) - Number(b.serverSequence));
 }
 
+function receiptMark(message) {
+  if (message.senderKind !== 'BUSINESS') return null;
+  const receipt = message.receipts?.find((item) => item.participantKind === 'CUSTOMER');
+  if (receipt?.readAt) return { label: 'Lida pelo cliente', color: '#42ff7a', glyph: '✓✓' };
+  if (receipt?.deliveredAt) return { label: 'Entregue ao cliente', color: '#d3d8e2', glyph: '✓✓' };
+  return { label: 'Enviada ao ConnectChat', color: '#d3d8e2', glyph: '✓' };
+}
+
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
@@ -32,6 +41,7 @@ export default function ConnectchatConversas() {
   const [customerId, setCustomerId] = useState('');
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
+  const [customerTyping, setCustomerTyping] = useState(false);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
   const typingTimerRef = useRef(null);
@@ -60,15 +70,14 @@ export default function ConnectchatConversas() {
 
   const loadMessages = useCallback(async (conversation, initial = false, silent = false) => {
     try {
-      const afterSequence = initial
-        ? '0'
-        : (messagesRef.current.at(-1)?.serverSequence ?? '0');
+      const lastKnown = messagesRef.current.at(-1)?.serverSequence ?? '0';
+      const afterSequence = initial ? '0' : (BigInt(lastKnown) > 100n ? (BigInt(lastKnown) - 100n).toString() : '0');
       const incoming = await listConnectchatMessages(conversation.id, afterSequence);
       if (selectedRef.current?.id !== conversation.id) return;
       setMessages((current) => mergeMessages(initial ? [] : current, incoming));
       const lastSequence = incoming.at(-1)?.serverSequence ?? (initial ? undefined : afterSequence);
       if (lastSequence && lastSequence !== '0' && can('comm.connectchat.write')) {
-        markConnectchatRead(conversation.id, lastSequence);
+        void markConnectchatDelivered(conversation.id, lastSequence).then(() => markConnectchatRead(conversation.id, lastSequence));
       }
     } catch (error) {
       if (!silent) toast.error(error.message);
@@ -85,6 +94,26 @@ export default function ConnectchatConversas() {
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [loadConversations, loadMessages]);
+
+  useEffect(() => {
+    if (!selected?.id) {
+      setCustomerTyping(false);
+      return undefined;
+    }
+    let active = true;
+    const refresh = async () => {
+      try {
+        const presence = await getConnectchatTyping(selected.id);
+        if (active) setCustomerTyping(Boolean(presence.customerTyping));
+      } catch (error) {
+        console.warn('Não foi possível consultar a digitação do cliente no ConnectChat.', error);
+        if (active) setCustomerTyping(false);
+      }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), TYPING_POLL_MS);
+    return () => { active = false; clearInterval(timer); };
+  }, [selected?.id]);
 
   function stopTyping(conversationId = typingConversationRef.current) {
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
@@ -116,6 +145,7 @@ export default function ConnectchatConversas() {
     stopTyping();
     setSelected(conversation);
     setMessages([]);
+    setCustomerTyping(false);
     setCustomerId('');
     await loadMessages(conversation, true);
   }
@@ -231,21 +261,28 @@ export default function ConnectchatConversas() {
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2" style={{ padding: 'var(--su-space-4)', background: 'var(--su-surface-subtle)' }}>
               {messages.length === 0 ? <EmptyState icon="message" title="Sem mensagens" description="Ainda não há mensagens para mostrar nesta conversa." /> : messages.map((message) => {
                 const outgoing = message.senderKind === 'BUSINESS';
+                const receipt = receiptMark(message);
                 return (
                   <div key={message.id} className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`}>
                     <div style={{ maxWidth: '80%', padding: 'var(--su-space-3)', borderRadius: 'var(--su-radius-md)', background: outgoing ? 'var(--su-action)' : 'var(--su-surface-raised)', color: outgoing ? 'var(--su-action-contrast)' : 'var(--su-text-primary)', boxShadow: 'var(--su-shadow-sm)' }}>
                       <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{message.body}</p>
-                      <span style={{ display: 'block', marginTop: 4, fontSize: 10, opacity: 0.72 }}>{new Date(message.createdAt).toLocaleString('pt-BR')}</span>
+                      <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 10, opacity: 0.82 }}>
+                        <time>{new Date(message.createdAt).toLocaleString('pt-BR')}</time>
+                        {receipt ? <span aria-label={receipt.label} title={receipt.label} style={{ color: receipt.color, fontSize: 12, fontWeight: 800, letterSpacing: -2, textShadow: receipt.label === 'Lida pelo cliente' ? '0 0 8px rgba(66, 255, 122, .45)' : undefined }}>{receipt.glyph}</span> : null}
+                      </span>
                     </div>
                   </div>
                 );
               })}
             </div>
             {selected.status === 'OPEN' && can('comm.connectchat.write') ? (
+              <>
+              {customerTyping ? <p style={{ margin: 0, padding: 'var(--su-space-2) var(--su-space-3) 0', color: 'var(--su-text-muted)', fontSize: 12 }}>Cliente está digitando…</p> : null}
               <div className="flex gap-2" style={{ padding: 'var(--su-space-3)', borderTop: '1px solid var(--su-border-default)' }}>
                 <textarea className="su-textarea" value={text} onChange={(event) => { const value = event.target.value; setText(value); if (value.trim()) scheduleTyping(); else stopTyping(selected.id); }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Mensagem" disabled={sending} style={{ flex: 1, minHeight: 42, resize: 'none' }} />
                 <Button variant="primary" loading={sending} disabled={!text.trim()} onClick={send}>Enviar</Button>
               </div>
+              </>
             ) : (
               <p style={{ margin: 0, padding: 'var(--su-space-3)', textAlign: 'center', color: 'var(--su-text-muted)', borderTop: '1px solid var(--su-border-default)' }}>{selected.status === 'CLOSED' ? 'Esta conversa foi encerrada no ConnectChat.' : 'Você não tem permissão para responder.'}</p>
             )}

@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+- Release coordenada v0.11.88: a Central ConnectChat passa a mostrar os
+  recibos de enviada, entregue e lida em cada mensagem da empresa. A leitura
+  usa dois tiques verde-neon para se destacar com contraste sobre a bolha azul;
+  a digitação do cliente também aparece durante o atendimento.
+
 - Release coordenada v0.11.87: a última mensagem do ConnectChat passa a parar
   acima do compositor flutuante. A rolagem preserva a bolha inteira visível no
   fim, mantendo a sobreposição apenas para o histórico anterior.

@@ -108,6 +108,10 @@ export class ConnectchatInboxService {
     return this.execute('getMessages', { conversationId, afterSequence: afterSequence ?? '0', limit: safeLimit });
   }
 
+  getTyping(conversationId: string) {
+    return this.execute('getTyping', { conversationId });
+  }
+
   send(user: AuthenticatedUser, input: {
     conversationId: string;
     body: string;
