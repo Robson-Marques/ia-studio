@@ -2,6 +2,8 @@
 
 ## Não publicado
 
+- v0.11.97: corrige o corpo binário do cliente Central Nivoo para `Uint8Array` compatível com `fetch` no build Nest; o atualizador passa a mostrar até 6 KiB da saída conjunta dos builds API e painel quando falham.
+
 - v0.11.96: o hook anterior ao `prisma db push` prepara de forma idempotente cinco colunas novas de identificadores/jobs e seus índices únicos, evitando o aviso genérico de risco em tabelas existentes. O atualizador agora registra a saída completa do Prisma quando a etapa falha; `--accept-data-loss` continua proibido.
 
 - WhatsApp integrado exclusivamente pela Central Nivoo: onboarding oficial, posse dos números, conversas e mensagens paginadas, mídia autenticada, templates, envio assíncrono por job e desconexão confirmada.

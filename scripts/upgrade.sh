@@ -207,7 +207,7 @@ npx prisma generate 2>>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISM
 
 # ---------- 7) API_BUILD ----------
 log_db "API_BUILD" "nest build"
-npm run build 2>/tmp/iastudio_build.err >/dev/null || mark_failed "API_BUILD" "nest build falhou: $(tail -c 800 /tmp/iastudio_build.err)"
+npm run build >/tmp/iastudio_build.err 2>&1 || mark_failed "API_BUILD" "nest build falhou: $(tail -c 6000 /tmp/iastudio_build.err)"
 
 # Helper de build do painel local.
 build_front() {
@@ -219,7 +219,7 @@ build_front() {
   # do DS e o install quebra com ETARGET (derrubou os deploys v0.10.40/41 ate limpar
   # o cache a mao). Os fronts sao os unicos que puxam @studio-ux-ds.
   npm install --no-audit --no-fund --prefer-online 2>/tmp/iastudio_npm.err >/dev/null || mark_failed "$step" "npm install falhou: $(tail -c 600 /tmp/iastudio_npm.err)"
-  VITE_API_URL="$api_url" npm run build -- --base="$base" 2>/tmp/iastudio_build.err >/dev/null || mark_failed "$step" "vite build falhou: $(tail -c 800 /tmp/iastudio_build.err)"
+  VITE_API_URL="$api_url" npm run build -- --base="$base" >/tmp/iastudio_build.err 2>&1 || mark_failed "$step" "vite build falhou: $(tail -c 6000 /tmp/iastudio_build.err)"
 }
 
 # Painel e API vivem no domínio exclusivo da aplicação dedicada.

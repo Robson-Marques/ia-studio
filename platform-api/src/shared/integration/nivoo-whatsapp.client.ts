@@ -109,14 +109,16 @@ export class NivooWhatsappClient {
     timeoutMs?: number;
   } = {}): Promise<T> {
     const headers: Record<string, string> = { 'X-Nivoo-Internal-Key': this.key };
-    let body: string | Buffer | undefined;
+    let body: string | Uint8Array | undefined;
     if (options.body) {
       headers['Content-Type'] = 'application/json';
       body = JSON.stringify({ ...options.body, installation_id: this.installationId });
     } else if (options.bytes) {
       headers['Content-Type'] = options.mime || 'application/octet-stream';
       if (options.filename) headers[options.templateFile ? 'X-Template-File-Name' : 'X-File-Name'] = options.filename;
-      body = options.bytes;
+      // Buffer não é BodyInit nos tipos DOM usados pelo build; Uint8Array é.
+      // A cópia preserva exatamente os bytes recebidos no upload bruto.
+      body = new Uint8Array(options.bytes);
     }
     let response: Response;
     try {

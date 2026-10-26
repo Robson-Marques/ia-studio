@@ -19,6 +19,8 @@ A auditoria posterior ao rebase fechou o acesso por ID às conversas/mídias/aç
 
 **Upgrade v0.11.95:** o painel fez backup e checkout, mas o `db push` recusou um aviso de perda de dados antes do build; o atualizador voltou o checkout para `v0.11.94` e manteve o dist em uso. O diff Prisma da release só acrescenta colunas e índices. A correção seguinte prepara as cinco colunas `UNIQUE` novas no hook SQL (todas anuláveis) e captura stdout/stderr completo do Prisma caso outro drift do banco ainda gere aviso. Não usar `--accept-data-loss`.
 
+**Upgrade v0.11.96:** o `db push` passou. O build Nest falhou na tipagem do corpo binário do `fetch` (`Buffer` não aceito como `BodyInit`); rollback manteve o servidor em `v0.11.94`. O cliente foi ajustado para copiar os bytes em `Uint8Array`, padrão já usado em `s3.driver.ts`, e o log dos builds agora captura stdout e stderr com trecho maior. Ainda não há validação de build bem-sucedido nem ativação do consumidor.
+
 Atualização de 2026-10-06 — **Canal ConnectChat:** foi adicionada a especialidade
 `ia-studio.connectchat-channel@1.0.1`, o adaptador HTTP somente de backend e a
 tela **ConnectChat → Conversas**. O canal usa polling incremental por
