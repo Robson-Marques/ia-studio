@@ -2,6 +2,8 @@
 
 ## Não publicado
 
+- v0.11.96: o hook anterior ao `prisma db push` prepara de forma idempotente cinco colunas novas de identificadores/jobs e seus índices únicos, evitando o aviso genérico de risco em tabelas existentes. O atualizador agora registra a saída completa do Prisma quando a etapa falha; `--accept-data-loss` continua proibido.
+
 - WhatsApp integrado exclusivamente pela Central Nivoo: onboarding oficial, posse dos números, conversas e mensagens paginadas, mídia autenticada, templates, envio assíncrono por job e desconexão confirmada.
 - Painel de números configura e abre a Central; caixa de entrada apresenta metadados, respostas, reações e mídia por proxy. Gravação OGG/Opus sai como nota de voz; MP4 sai como áudio comum.
 - Providers e webhooks Meta/YCloud antigos saíram do runtime. Vínculos são desativados e segredos exclusivos apagados; histórico de conexões, logs e conversas permanece para auditoria.

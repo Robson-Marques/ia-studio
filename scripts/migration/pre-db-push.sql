@@ -26,3 +26,36 @@ BEGIN
     RAISE NOTICE 'enum AiProviderKind recriado sem GEMINI/OLLAMA';
   END IF;
 END $$;
+
+-- v0.11.96: os identificadores remotos/jobs sao colunas novas e anulaveis.
+-- O Prisma 5 emite aviso de perda de dados ao adicionar UNIQUE em tabelas
+-- existentes, mesmo quando todas as linhas antigas recebem NULL. Preparar as
+-- colunas e os indices aqui evita --accept-data-loss. Se houver valores
+-- duplicados por drift previo, CREATE UNIQUE INDEX falha sem apagar dados.
+ALTER TABLE IF EXISTS "comm_whatsapp_chats" ADD COLUMN IF NOT EXISTS "remote_chat_id" TEXT;
+ALTER TABLE IF EXISTS "comm_whatsapp_messages" ADD COLUMN IF NOT EXISTS "remote_message_id" TEXT;
+ALTER TABLE IF EXISTS "comm_whatsapp_messages" ADD COLUMN IF NOT EXISTS "remote_job_id" TEXT;
+ALTER TABLE IF EXISTS "isp_incident_dispatches" ADD COLUMN IF NOT EXISTS "job_id" TEXT;
+ALTER TABLE IF EXISTS "isp_incident_team_alerts" ADD COLUMN IF NOT EXISTS "job_id" TEXT;
+
+DO $$
+BEGIN
+  IF to_regclass('comm_whatsapp_chats') IS NOT NULL THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS "comm_whatsapp_chats_remote_chat_id_key"
+      ON "comm_whatsapp_chats" ("remote_chat_id");
+  END IF;
+  IF to_regclass('comm_whatsapp_messages') IS NOT NULL THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS "comm_whatsapp_messages_remote_message_id_key"
+      ON "comm_whatsapp_messages" ("remote_message_id");
+    CREATE UNIQUE INDEX IF NOT EXISTS "comm_whatsapp_messages_remote_job_id_key"
+      ON "comm_whatsapp_messages" ("remote_job_id");
+  END IF;
+  IF to_regclass('isp_incident_dispatches') IS NOT NULL THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS "isp_incident_dispatches_job_id_key"
+      ON "isp_incident_dispatches" ("job_id");
+  END IF;
+  IF to_regclass('isp_incident_team_alerts') IS NOT NULL THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS "isp_incident_team_alerts_job_id_key"
+      ON "isp_incident_team_alerts" ("job_id");
+  END IF;
+END $$;

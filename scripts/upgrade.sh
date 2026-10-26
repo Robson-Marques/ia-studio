@@ -202,7 +202,7 @@ fi
 
 # ---------- 6) PRISMA_PUSH ----------
 log_db "PRISMA_PUSH" "prisma db push sem aceitação automática de perda"
-npx prisma db push 2>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISMA_PUSH" "db push falhou ou exigiu intervenção para mudança destrutiva: $(tail -c 600 /tmp/iastudio_prisma.err)"
+npx prisma db push >/tmp/iastudio_prisma.err 2>&1 || mark_failed "PRISMA_PUSH" "db push falhou ou exigiu intervenção para mudança destrutiva: $(tail -c 3000 /tmp/iastudio_prisma.err)"
 npx prisma generate 2>>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISMA_PUSH" "prisma generate falhou: $(tail -c 600 /tmp/iastudio_prisma.err)"
 
 # ---------- 7) API_BUILD ----------

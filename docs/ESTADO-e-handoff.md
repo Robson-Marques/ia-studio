@@ -6,8 +6,8 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-10-26 (integração WhatsApp pela Central Nivoo
-> baseada na linha remota `v0.11.94`; ativação operacional ainda pendente).
+> Última atualização: 2026-10-26 (a aplicação de `v0.11.95` falhou no
+> `prisma db push`; rollback manteve o servidor em `v0.11.94`).
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
 
@@ -16,6 +16,8 @@ O IA Studio Newnet está sendo migrado para o contrato remoto da Central WhatsAp
 A auditoria posterior ao rebase fechou o acesso por ID às conversas/mídias/ações de atendimento, ocultou dados de mensagem dos logs e incluiu três rascunhos HSM nativos para alertas e avisos ISP. A publicação do modelo do sistema é explícita; disparos ficam pendentes até a Central concluir o job. A atualização ainda precisa de build/migração e smoke test no servidor.
 
 **Ainda não ativado:** o consumidor Newnet, `installation_id` e origem HTTPS exata não foram cadastrados na Central. Não inventar identificadores. A chave interna deve ser cadastrada no cofre pelo painel/backend, nunca enviada em chat nem ao navegador. O Windows local não tem Node; build, migração Prisma, smoke test e eventual publicação ocorrem no servidor/CI, após o cadastro real. A documentação anterior abaixo registra o estado histórico da vertente e não comprova ativação desta frente.
+
+**Upgrade v0.11.95:** o painel fez backup e checkout, mas o `db push` recusou um aviso de perda de dados antes do build; o atualizador voltou o checkout para `v0.11.94` e manteve o dist em uso. O diff Prisma da release só acrescenta colunas e índices. A correção seguinte prepara as cinco colunas `UNIQUE` novas no hook SQL (todas anuláveis) e captura stdout/stderr completo do Prisma caso outro drift do banco ainda gere aviso. Não usar `--accept-data-loss`.
 
 Atualização de 2026-10-06 — **Canal ConnectChat:** foi adicionada a especialidade
 `ia-studio.connectchat-channel@1.0.1`, o adaptador HTTP somente de backend e a
