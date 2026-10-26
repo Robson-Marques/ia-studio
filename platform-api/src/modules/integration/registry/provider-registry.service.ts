@@ -19,7 +19,7 @@ export class ProviderRegistryService {
     this.logger.log(`Provider registrado: ${key}`);
   }
 
-  /** Implementacao existe pra key? (whatsapp-meta so na Fase 3, por ex.) */
+  /** Implementação embarcada existe para esta key? */
   has(key: string): boolean {
     return this.providers.has(key);
   }

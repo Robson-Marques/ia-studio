@@ -310,7 +310,7 @@ export class BuiltinTools implements OnModuleInit {
           },
           { kind: 'text', body: message },
         );
-        return { wamid: result.wamid, chat_id: result.chatId };
+        return { job_id: result.jobId, state: 'QUEUED', chat_id: result.chatId };
       },
     });
 

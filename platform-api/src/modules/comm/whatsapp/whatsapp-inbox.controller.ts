@@ -1,6 +1,6 @@
 // Conversas WhatsApp — listagem/mensagens/envio/janela/midia + envio pelo
-// Meta Orchestrator (criterios; sem numero). ACL granular por endpoint.
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+// orquestrador da Central (critérios; sem número fixo). ACL granular por endpoint.
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { CommChatStatus } from '@prisma/client';
@@ -155,7 +155,7 @@ export class WhatsappInboxController {
   /**
    * Upload real de arquivo/audio gravado no aparelho (multipart/form-data):
    * campos `file` + `kind` (image|audio|video|document) + `caption?` +
-   * `confirm_takeover?`. O binario sobe pra Meta (media_id) e a mensagem sai
+   * `confirm_takeover?`. O binário sobe para a Central (media_id) e a mensagem sai
    * pela MESMA porta do /send (reply gate + janela de 24h + takeover 409).
    */
   @Post('chats/:id/media/upload')
@@ -209,22 +209,24 @@ export class WhatsappInboxController {
       mimeType: data.mimetype || 'application/octet-stream',
       filename: data.filename || 'arquivo',
       caption: readField('caption'),
+      voice: readField('voice') === 'true',
       confirmTakeover: readField('confirm_takeover') === 'true',
     });
   }
 
   @Get('chats/:id/media/:mediaId')
   @RequirePermissions(...ANY_VIEW)
-  media(
+  async media(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
   ) {
-    return this.inbox.downloadMedia(id, mediaId);
+    const { bytes, mime } = await this.inbox.downloadMedia(id, mediaId);
+    return new StreamableFile(bytes, { type: mime, length: bytes.length });
   }
 
   /**
-   * Envio pelo Meta Orchestrator (sem conversa aberta): criterios de
+   * Envio pelo orquestrador da Central (sem conversa aberta): critérios de
    * tag/departamento resolvem a conexao — o chamador nunca indica numero.
    */
   @Post('send')

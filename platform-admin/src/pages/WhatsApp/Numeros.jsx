@@ -1,37 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListScreen, Badge, Button, Modal, Field, Select, Checkbox, useToast } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Modal, Field, Select, Checkbox, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import {
   listNumbers, syncNumber,
   getNumberAssistant, setNumberAssistant, removeNumberAssistant,
+  getCentralSetup, startCentralOnboarding, getCentralOnboardingSession, disconnectCentralNumber,
 } from '../../services/whatsapp';
 import { listAgents } from '../../services/ai';
-import { MESSAGING_LIMIT_LABEL, QUALITY, formatPhone } from './whatsapp.constants';
+import { formatPhone } from './whatsapp.constants';
 import { statusToTone } from '../../lib/tone';
 
-// WhatsApp/Números — as conexões com a Meta: situação, qualidade, limite de
-// conversas e sincronização. Migrada pro DS na v0.10.9.
-//
-// Decisões de composição:
-//
-//  · **Grade de cards → tabela.** Eram 9 campos empilhados num card por número;
-//    numa tabela os mesmos números ficam comparáveis lado a lado, que é o que se
-//    quer num painel de conexões ("qual está com qualidade baixa?").
-//  · **Sincronizar saiu do card e foi pra barra de lote** — e aceita vários de
-//    uma vez, o que antes exigia um clique por número. Só aparece quando toda a
-//    seleção está ativa: sincronizar conexão desativada devolve erro da Meta.
-//  · **A linha abre a conexão DAQUELE número** em Integrações — que é onde ela se
-//    gerencia; esta tela é o painel de saúde, não o cadastro. O `id` do número é o
-//    id da própria conexão (o backend deriva a lista das conexões `whatsapp-meta`),
-//    então o link é direto. Na v0.10.9 a linha caía na LISTA de conexões,
-//    obrigando a procurar de novo o que já tinha sido escolhido; na v0.10.10 virou
-//    `?open=<id>`, e na v0.10.11 — quando a conexão ganhou rota própria — virou o
-//    endereço dela. O `?open=` continua funcionando para links antigos: a tela de
-//    Conexões o encaminha.
-//  · O erro de sincronização fica **na célula da situação**, visível: informação
-//    essencial não vive em tooltip (regra do DS).
+// WhatsApp/Números — onboarding, situação, histórico, assistente e desconexão
+// dos números pertencentes à instalação Newnet na Central Nivoo.
 
 const STATUS_LABEL = {
   ACTIVE: { label: 'Ativa', variant: 'green' },
@@ -59,6 +41,11 @@ export default function Numeros() {
   const [mAgentId, setMAgentId] = useState('');
   const [mEnabled, setMEnabled] = useState(true);
   const [savingBind, setSavingBind] = useState(false);
+  const [setupConfigured, setSetupConfigured] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [disconnectTarget, setDisconnectTarget] = useState(null);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const canManageAssistant = can('comm.whatsapp.assistant.manage');
 
@@ -74,7 +61,8 @@ export default function Numeros() {
   async function load() {
     setLoading(true);
     try {
-      const numbers = await listNumbers();
+      const [setup, numbers] = await Promise.all([getCentralSetup(), listNumbers()]);
+      setSetupConfigured(setup.configured === true);
       setItems(numbers);
       loadBindings(numbers);
     } catch (err) {
@@ -84,20 +72,83 @@ export default function Numeros() {
     }
   }
 
-  // Vínculo de cada número (para a coluna "Assistente"). Best-effort — um número
-  // sem vínculo simplesmente não aparece no mapa.
+  // Vínculo de cada número (para a coluna "Assistente"). Uma falha de leitura
+  // é informada sem esconder os demais números da lista.
   async function loadBindings(numbers) {
     const results = await Promise.all(
       (numbers || []).map((n) =>
-        getNumberAssistant(n.id).then((v) => [n.id, v]).catch(() => [n.id, null]),
+        getNumberAssistant(n.id).then((v) => [n.id, v, null]).catch((error) => [n.id, null, error]),
       ),
     );
     const map = {};
     for (const [id, view] of results) if (view) map[id] = view;
+    const failure = results.find(([, , error]) => error)?.[2];
+    if (failure) toast.error(`Não foi possível carregar alguns vínculos de assistentes: ${failure.message}`);
     setBindings(map);
   }
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    let polling = false;
+    const timer = window.setInterval(async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const session = await getCentralOnboardingSession(sessionId);
+        if (session.status === 'CONNECTED') {
+          window.clearInterval(timer);
+          setSessionId(null);
+          toast.success('Número conectado pela Central WhatsApp.');
+          await load();
+        } else if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(session.status)) {
+          window.clearInterval(timer);
+          setSessionId(null);
+          toast.error(session.failure_message || 'A conexão não foi concluída. Inicie uma nova tentativa.');
+        }
+      } catch (err) {
+        window.clearInterval(timer);
+        setSessionId(null);
+        toast.error(err.message);
+      } finally { polling = false; }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function connectNumber() {
+    if (!setupConfigured) {
+      navigate('/integracoes/conexoes/nova?provider=whatsapp-nivoo');
+      return;
+    }
+    const popup = window.open('about:blank', '_blank');
+    if (!popup) { toast.error('Permita abrir uma nova aba para conectar o número.'); return; }
+    popup.opener = null;
+    setConnecting(true);
+    try {
+      const session = await startCentralOnboarding();
+      if (new URL(session.launch_url).origin !== 'https://integracoes.nivoo.dev.br') {
+        throw new Error('A Central retornou um endereço de conexão inesperado.');
+      }
+      popup.location.href = session.launch_url;
+      setSessionId(session.session_id);
+    } catch (err) {
+      popup.close();
+      toast.error(err.message);
+    } finally { setConnecting(false); }
+  }
+
+  async function confirmDisconnect() {
+    if (!disconnectTarget) return;
+    setDisconnecting(true);
+    try {
+      await disconnectCentralNumber(disconnectTarget.id);
+      toast.success('Número desconectado na Central. O histórico foi preservado.');
+      setDisconnectTarget(null);
+      await load();
+    } catch (err) { toast.error(err.message); }
+    finally { setDisconnecting(false); }
+  }
 
   // ─── Vínculo assistente↔número ──────────────────────
   async function openAssistantModal(number) {
@@ -154,7 +205,7 @@ export default function Numeros() {
     }
     setSyncing(false);
     clear();
-    if (ok) toast.success(ok === 1 ? 'Número sincronizado com a Meta.' : `${ok} números sincronizados com a Meta.`);
+    if (ok) toast.success(ok === 1 ? 'Número sincronizado com a Central.' : `${ok} números sincronizados com a Central.`);
     if (falhas.length) toast.error(`Não deu pra sincronizar ${falhas.length}: ${falhas[0]}`);
     load();
   }
@@ -163,8 +214,9 @@ export default function Numeros() {
     <Button
       variant="primary"
       icon="plus"
-      title="O cadastro de um número novo é feito pela conexão, em Integrações"
-      onClick={() => navigate('/integracoes/conexoes')}
+      title={setupConfigured ? 'Abrir a conexão oficial da Central em nova aba' : 'Configurar consumidor da Central primeiro'}
+      loading={connecting}
+      onClick={connectNumber}
     >
       Conectar número
     </Button>
@@ -175,7 +227,7 @@ export default function Numeros() {
       <div className="min-w-0">
         <p style={{ fontWeight: 500, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">{n.name}</p>
         <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }} className="truncate">
-          {n.phone ? formatPhone(n.phone) : 'número ainda não sincronizado'}
+          {n.phone ? formatPhone(n.phone) : n.phone_number_id ? `ID ${n.phone_number_id}` : 'telefone não informado pela Central'}
           {n.display_name ? ` · ${n.display_name}` : ''}
         </p>
       </div>
@@ -197,11 +249,7 @@ export default function Numeros() {
         </div>
       );
     } },
-    { key: 'quality', header: 'Qualidade', render: (n) => {
-      const q = QUALITY[n.quality_rating] || QUALITY.UNKNOWN;
-      return <Badge tone={statusToTone(q.variant)}>{q.label}</Badge>;
-    } },
-    { key: 'limit', header: 'Pode enviar', render: (n) => MESSAGING_LIMIT_LABEL[n.messaging_limit] || 'não informado pela Meta' },
+    { key: 'history', header: 'Histórico desde', render: (n) => n.history?.available_from ? formatDateTime(n.history.available_from) : 'não informado' },
     { key: 'templates', header: 'Templates', align: 'right', render: (n) => n.templates_count ?? 0 },
     { key: 'assistant', header: 'Assistente', render: (n) => {
       const b = bindings[n.id];
@@ -229,6 +277,11 @@ export default function Numeros() {
         : <Badge tone="danger">não respondeu</Badge>;
     } },
     { key: 'sync', header: 'Sincronizado', render: (n) => (n.last_sync_at ? formatDateTime(n.last_sync_at) : 'nunca') },
+    { key: 'disconnect', header: 'Conexão', render: (n) => n.remote_status === 'ACTIVE' && can('integrations.connections.write') ? (
+      <Button variant="danger" size="sm" title="Desregistrar este número na Central e parar os envios" onClick={(e) => { e.stopPropagation(); setDisconnectTarget(n); }}>
+        Desconectar
+      </Button>
+    ) : '—' },
   ];
 
   // Só oferece sincronizar quando TODA a seleção está ativa — a Meta recusa
@@ -241,7 +294,7 @@ export default function Numeros() {
         variant="ghost"
         icon="refresh"
         loading={syncing}
-        title="Pergunta à Meta agora: situação, qualidade, limite e templates"
+        title="Atualiza conversas e modelos pela Central"
         onClick={() => handleSync(ids, clear)}
       >
         Sincronizar agora
@@ -253,7 +306,7 @@ export default function Numeros() {
     <>
     <ListScreen
       title="Números"
-      subtitle="Os números de WhatsApp conectados à Meta. A sincronização automática roda a cada 10 minutos."
+      subtitle="Números oficiais administrados pela Central Nivoo. A sincronização automática roda a cada 30 segundos."
       primaryAction={conectar}
       search={q}
       onSearch={setQ}
@@ -269,10 +322,23 @@ export default function Numeros() {
       emptyNew={{
         icon: 'phone',
         title: 'Nenhum número conectado',
-        description: 'Conecte um número pela conexão “WhatsApp (Meta Cloud API)”, em Integrações → Conexões. Enquanto a Meta não aprovar o cadastro rápido, a conexão é feita informando as credenciais.',
+        description: setupConfigured
+          ? 'Abra a conexão oficial pela Central Nivoo. O histórico disponível começa na data informada pela Central.'
+          : 'Configure o consumidor “WhatsApp (Central Nivoo)” em Integrações → Conexões. Depois conecte o número por aqui.',
         action: conectar,
       }}
       emptyFiltered={{ title: 'Nenhum número encontrado', description: 'Nenhum número com esse nome ou telefone.', onClear: () => setQ('') }}
+    />
+
+    <ConfirmDialog
+      open={Boolean(disconnectTarget)}
+      danger
+      loading={disconnecting}
+      title="Desconectar número"
+      message={`Desregistrar ${disconnectTarget?.name || 'este número'} na Central? Envios e recebimento param. As conversas e os arquivos já armazenados permanecem disponíveis para leitura.`}
+      confirmLabel="Desconectar"
+      onClose={() => !disconnecting && setDisconnectTarget(null)}
+      onConfirm={confirmDisconnect}
     />
 
     <Modal

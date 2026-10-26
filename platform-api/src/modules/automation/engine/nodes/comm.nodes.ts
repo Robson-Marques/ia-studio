@@ -44,7 +44,7 @@ export class CommNodes implements OnModuleInit {
 
         if (ctx.dryRun) {
           await ctx.log('info', `[simulado] WhatsApp para ${phone}: ${templateName ? `template ${templateName}` : text.slice(0, 80)}`);
-          return { handle: 'success', output: { simulated: true, wamid: 'dry-run' } };
+          return { handle: 'success', output: { simulated: true, state: 'QUEUED' } };
         }
         try {
           const message: RichMessage = templateName
@@ -61,7 +61,7 @@ export class CommNodes implements OnModuleInit {
             },
             message,
           );
-          await ctx.log('info', `WhatsApp enviado (wamid=${result.wamid ?? 'n/d'}).`);
+          await ctx.log('info', `WhatsApp aceito pela Central (job_id=${result.jobId ?? 'n/d'}); confirmação pendente.`);
           return { handle: 'success', output: result };
         } catch (e) {
           await ctx.log('error', `WhatsApp falhou: ${(e as Error).message}`);

@@ -31,33 +31,29 @@ function StatusTicks({ status }) {
   return <DSIcon name="clock" size="sm" style={{ color: '#8696a0' }} />;
 }
 
-// Mídia (recebida ou enviada): baixa da Meta sob demanda via proxy do backend.
+// Mídia da Central: baixa sob demanda pelo proxy autenticado do backend.
 function ChatMedia({ chatId, message }) {
   const toast = useToast();
   const media = message.media || {};
-  const outgoing = message.direction === 'OUTGOING';
-  const [data, setData] = useState(media.url ? { src: media.url, mime: media.mime_type } : null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => () => {
+    if (data?.src) URL.revokeObjectURL(data.src);
+  }, [data?.src]);
 
   async function load() {
     if (!media.media_id) return;
     setLoading(true);
     try {
-      const r = await downloadChatMedia(chatId, media.media_id);
-      setData({ src: `data:${r.mime};base64,${r.base64}`, mime: r.mime });
+      const blob = await downloadChatMedia(chatId, media.media_id);
+      setData({ src: URL.createObjectURL(blob), mime: blob.type });
     } catch (err) {
       toast.error(err.message);
     } finally {
       setLoading(false);
     }
   }
-
-  // O que o próprio atendente enviou carrega sozinho; o que chegou fica sob
-  // demanda, para não baixar tudo ao abrir a conversa.
-  useEffect(() => {
-    if (outgoing && !data && media.media_id) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [media.media_id]);
 
   const NOME_TIPO = { image: 'imagem', audio: 'áudio', video: 'vídeo' };
 
@@ -71,7 +67,7 @@ function ChatMedia({ chatId, message }) {
         style={{ fontSize: 12, color: '#027eb5', minHeight: 32, background: 'none', border: 0, padding: 0, font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
       >
         {loading ? <Spinner size="sm" /> : <DSIcon name="download" size="sm" />}
-        Carregar {NOME_TIPO[message.type] || 'arquivo'}
+        {message.media_state === 'UNAVAILABLE' ? 'Tentar carregar mídia indisponível' : `Carregar ${NOME_TIPO[message.type] || 'arquivo'}`}
       </button>
     );
   }
@@ -100,7 +96,7 @@ function ChatMedia({ chatId, message }) {
   );
 }
 
-function Bubble({ chatId, message }) {
+function Bubble({ chatId, message, reactions }) {
   const outgoing = message.direction === 'OUTGOING';
   return (
     <div className={outgoing ? 'flex justify-end' : 'flex justify-start'}>
@@ -127,10 +123,23 @@ function Bubble({ chatId, message }) {
               </a>
             ))
         )}
+        {message.reply_to_message_id && <p className="text-xs opacity-70">↳ Resposta a {message.reply_to_from || 'outra mensagem'}</p>}
         {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+        {message.type === 'reaction' && message.reaction_emoji && <p>{message.reaction_emoji} · reação a uma mensagem anterior</p>}
+        {message.interactive_reply && <p className="text-xs">Opção: {message.interactive_reply.title || message.interactive_reply.id || 'resposta interativa'}{message.interactive_reply.description ? ` · ${message.interactive_reply.description}` : ''}</p>}
+        {message.referral && <p className="text-xs">Origem: {message.referral.headline || message.referral.source_url || 'anúncio'}{!message.referral.source_id && ' · identificação de origem indisponível'}</p>}
+        {message.template?.name && <p className="text-xs">Modelo: {message.template.name}</p>}
+        {message.media_metadata && <p className="text-xs opacity-70">
+          {[
+            message.media_metadata.size_bytes != null ? `${Math.round(message.media_metadata.size_bytes / 1024)} KB` : null,
+            message.media_metadata.width_px && message.media_metadata.height_px ? `${message.media_metadata.width_px}×${message.media_metadata.height_px}` : null,
+            message.media_metadata.duration_ms != null ? `${Math.round(message.media_metadata.duration_ms / 1000)} s` : null,
+          ].filter(Boolean).join(' · ')}
+        </p>}
+        {reactions?.length > 0 && <p className="text-xs" aria-label="Reações">{reactions.join(' ')}</p>}
         <div className="flex items-center gap-1 justify-end" style={{ fontSize: 10, color: '#667781' }}>
           {message.type === 'template' && <span>(modelo)</span>}
-          <span>{new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>{new Date(message.occurred_at || message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           {outgoing && <StatusTicks status={message.status} />}
         </div>
         {message.status === 'failed' && message.error_detail && (
@@ -161,6 +170,13 @@ export default function ChatWindow({
   const isMine = chat.current_handler_type === 'USER' && chat.current_handler_id === meId;
   const closed = chat.attendance_status === 'CLOSED';
   const nome = chat.contact_name || formatPhone(chat.phone);
+  const reactions = new Map();
+  const knownMessageIds = new Set(messages.flatMap((m) => [m.remote_message_id, m.external_id].filter(Boolean)));
+  for (const message of messages) {
+    if (!message.reaction_emoji || !message.reaction_to_message_id) continue;
+    const target = message.reaction_to_message_id;
+    reactions.set(target, [...(reactions.get(target) || []), message.reaction_emoji]);
+  }
 
   async function run(fn, okMsg) {
     setActing(true);
@@ -280,7 +296,9 @@ export default function ChatWindow({
           backgroundSize: '22px 22px',
         }}
       >
-        {messages.map((m) => <Bubble key={m.id} chatId={chat.id} message={m} />)}
+        {messages.filter((m) => m.type !== 'reaction' || !knownMessageIds.has(m.reaction_to_message_id)).map((m) => (
+          <Bubble key={m.id} chatId={chat.id} message={m} reactions={reactions.get(m.remote_message_id) || reactions.get(m.external_id) || []} />
+        ))}
         {messages.length === 0 && (
           <p className="text-center py-8" style={{ fontSize: 12, color: '#667781' }}>
             Nenhuma mensagem nesta conversa ainda.

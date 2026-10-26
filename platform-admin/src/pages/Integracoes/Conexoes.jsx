@@ -66,7 +66,7 @@ export default function Conexoes() {
   useEffect(() => {
     load();
     // O nome amigável do conector vem do catálogo local; sem isto a coluna mostra a
-    // chave crua ("whatsapp-meta") — linguagem de código na tela.
+    // chave crua do provider — linguagem de código na tela.
     listConnectionProviders()
       .then(({ items: list }) => setProviderNames(Object.fromEntries((list || []).map((p) => [p.key, p.name]))))
       .catch((err) => toast.error(err.message));

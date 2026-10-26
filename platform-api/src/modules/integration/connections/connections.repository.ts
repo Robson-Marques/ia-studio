@@ -37,21 +37,6 @@ export class ConnectionsRepository {
     });
   }
 
-  /** Conexao whatsapp-meta cujo config.phone_number_id casa com o webhook. */
-  findByProviderConfigValue(providerKey: string, configPath: string, value: string) {
-    return this.prisma.connection.findFirst({
-      where: {
-        provider_key: providerKey,
-        config: { path: [configPath], equals: value },
-      },
-    });
-  }
-
-  /** Todas as conexoes de um provider (todas as orgs) — verify token do webhook. */
-  findAllByProvider(providerKey: string) {
-    return this.prisma.connection.findMany({ where: { provider_key: providerKey } });
-  }
-
   create(data: Prisma.ConnectionUncheckedCreateInput) {
     return this.prisma.connection.create({ data });
   }

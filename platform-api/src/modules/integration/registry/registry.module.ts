@@ -10,8 +10,7 @@ import { PostgresqlProvider } from './providers/postgresql.provider';
 import { SqlServerProvider } from './providers/sqlserver.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { S3Provider } from './providers/s3.provider';
-import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
-import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
+import { WhatsappNivooProvider } from './providers/whatsapp-nivoo.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 import { ConnectchatProvider } from './providers/connectchat.provider';
 
@@ -27,8 +26,7 @@ import { ConnectchatProvider } from './providers/connectchat.provider';
     SqlServerProvider,
     SmtpProvider,
     S3Provider,
-    WhatsappMetaProvider,
-    WhatsappYcloudProvider,
+    WhatsappNivooProvider,
     GoogleWorkspaceProvider,
     ConnectchatProvider,
   ],

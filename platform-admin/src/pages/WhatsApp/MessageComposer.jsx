@@ -80,16 +80,18 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
   async function enviar(fn, onOk) {
     setSending(true);
     try {
-      await fn(false);
+      const result = await fn(false);
       onOk?.();
       await onSent?.();
+      if (result?.job_id) toast.success('Mensagem aceita pela Central. Aguardando confirmação do envio.');
     } catch (err) {
       if (isTakeover(err)) setTakeover({ retry: async () => {
         setSending(true);
         try {
-          await fn(true);
+          const result = await fn(true);
           onOk?.();
           await onSent?.();
+          if (result?.job_id) toast.success('Mensagem aceita pela Central. Aguardando confirmação do envio.');
         } catch (e2) {
           toast.error(e2.message || 'Não deu para enviar.');
         } finally {
@@ -133,6 +135,7 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
     if (!audioFile) return;
     enviar(
       (confirmTakeover) => uploadChatMedia(chat.id, audioFile, 'audio', {
+        voice: audioFile.type.toLowerCase().includes('ogg') && audioFile.type.toLowerCase().includes('opus'),
         confirm_takeover: confirmTakeover || undefined,
       }),
       () => rec.cancel(),

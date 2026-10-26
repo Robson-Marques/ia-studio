@@ -348,7 +348,7 @@ model IntegrationLog {
 
 // ─────────────────────────────────────────────────────────────────────
 // COMM — Communication Platform / WhatsApp Meta Cloud API (Fase 3)
-// A CONEXAO WhatsApp e uma Connection (provider_key 'whatsapp-meta') do
+// A CONEXAO WhatsApp e uma Connection (provider_key 'whatsapp-nivoo') do
 // Integration Manager — NAO existe tabela propria de conexao (diretriz 52).
 // Toda tabela operacional pertence à própria instalação dedicada.
 // ─────────────────────────────────────────────────────────────────────
@@ -359,6 +359,8 @@ model IntegrationLog {
 model WhatsappChat {
   id                   String           @id @default(uuid())
   connection_id        String
+  remote_chat_id       String?          @unique
+  remote_history       Json?
   phone                String
   contact_name         String?
   last_message         String?
@@ -420,6 +422,10 @@ model WhatsappMessage {
   id              String               @id @default(uuid())
   chat_id         String
   connection_id   String
+  remote_message_id String?            @unique
+  remote_job_id    String?             @unique
+  occurred_at      DateTime?
+  inbound_event_published Boolean      @default(true)
   // wamid da Meta (mensagens inbound/outbound aceitas pela Cloud API)
   external_id     String?
   direction       CommMessageDirection
@@ -430,6 +436,15 @@ model WhatsappMessage {
   content         String               @default("")
   // Midia: { media_id, mime_type, filename?, caption?, url? }
   media           Json?
+  media_state     String?
+  media_metadata  Json?
+  reply_to_message_id String?
+  reply_to_from   String?
+  reaction_emoji  String?
+  reaction_to_message_id String?
+  interactive_reply Json?
+  template        Json?
+  referral        Json?
   // sent | delivered | read | failed | received
   status          String               @default("sent")
   error_detail    String?
@@ -438,6 +453,7 @@ model WhatsappMessage {
   chat WhatsappChat @relation(fields: [chat_id], references: [id])
 
   @@index([chat_id, created_at])
+  @@index([inbound_event_published, created_at])
   @@index([external_id])
   @@map("comm_whatsapp_messages")
 }
@@ -524,7 +540,7 @@ model WhatsappTemplate {
   @@map("comm_whatsapp_templates")
 }
 
-// Estado de sincronizacao continua (~10 min) por conexao whatsapp-meta:
+// Estado histórico de sincronizacao do conector Meta direto (sem novas escritas):
 // display name, qualidade do numero, limite de mensagens, contagem de templates.
 model WhatsappSyncState {
   id              String    @id @default(uuid())
@@ -544,6 +560,29 @@ model WhatsappSyncState {
   updated_at      DateTime  @updatedAt
 
   @@map("comm_whatsapp_sync_state")
+}
+
+model NivooWhatsappSyncCheckpoint {
+  id                String   @id @default("primary")
+  last_completed_at DateTime?
+  last_error        String?
+  updated_at        DateTime @updatedAt
+
+  @@map("comm_nivoo_whatsapp_sync_checkpoint")
+}
+
+model NivooWhatsappOutboundJob {
+  id              String   @id
+  connection_id   String
+  chat_id         String?
+  status          String   @default("PENDING")
+  meta_message_id String?
+  last_error      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([status, created_at])
+  @@map("comm_nivoo_whatsapp_outbound_jobs")
 }
 
 // Equipes de atendimento (soft-delete via is_active — nunca DELETE fisico).

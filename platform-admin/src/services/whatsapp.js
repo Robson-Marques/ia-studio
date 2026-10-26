@@ -91,6 +91,7 @@ export async function uploadChatMedia(chatId, file, kind, opts = {}) {
     // os campos que vieram antes da parte de arquivo no stream multipart.
     form.append('kind', kind);
     if (opts.caption) form.append('caption', opts.caption);
+    if (opts.voice) form.append('voice', 'true');
     if (opts.confirm_takeover) form.append('confirm_takeover', 'true');
     form.append('file', file, file.name || `${kind}-${Date.now()}`);
     const { data } = await api.post(`/comm/whatsapp/chats/${chatId}/media/upload`, form, {
@@ -109,8 +110,8 @@ export async function uploadChatMedia(chatId, file, kind, opts = {}) {
 
 export async function downloadChatMedia(chatId, mediaId) {
   try {
-    const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media/${mediaId}`);
-    return data; // { base64, mime }
+    const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media/${mediaId}`, { responseType: 'blob', timeout: 120000 });
+    return data;
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao baixar mídia')); }
 }
 
@@ -228,7 +229,27 @@ export async function uploadTemplateHeaderMedia(connectionId, file) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao subir a mídia do cabeçalho')); }
 }
 
-// ─── Números (conexões whatsapp-meta) ────────────────────────
+// ─── Números (Central WhatsApp Nivoo) ────────────────────────
+
+export async function getCentralSetup() {
+  const { data } = await api.get('/comm/whatsapp/numbers/setup');
+  return data;
+}
+
+export async function startCentralOnboarding() {
+  const { data } = await api.post('/comm/whatsapp/numbers/onboarding/sessions');
+  return data;
+}
+
+export async function getCentralOnboardingSession(sessionId) {
+  const { data } = await api.get(`/comm/whatsapp/numbers/onboarding/sessions/${encodeURIComponent(sessionId)}`);
+  return data.session;
+}
+
+export async function disconnectCentralNumber(id) {
+  const { data } = await api.post(`/comm/whatsapp/numbers/${encodeURIComponent(id)}/disconnect`);
+  return data;
+}
 
 export async function listNumbers(params = {}) {
   try {

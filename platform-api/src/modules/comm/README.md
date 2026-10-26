@@ -1,51 +1,35 @@
-# Módulo `comm` — Communication Platform / WhatsApp Meta Cloud API (Fase 3)
+# Comunicação WhatsApp — Central Nivoo (Newnet)
 
-Canal WhatsApp **oficial-only (Meta Cloud API)**, portado do Aquapark para a
-instalação dedicada. Não há organização, workspace, ambiente, limite comercial
-nem dependência de solução não oficial.
+Este módulo usa exclusivamente a API integradora da Central WhatsApp. O contrato externo é `CONTRATO-CONSUMO-REMOTO-WHATSAPP.md` v2.6.0, mantido no projeto `PARA-SERVIDOR-INTEGRADOR/whatsapp-central/docs`. O IA Studio não recebe webhook Meta nem guarda token Meta. A chave `X-Nivoo-Internal-Key` fica no Secrets Manager e só o backend a usa.
 
-## Arquitetura
+## Preparação e ativação
 
-- **Conexão = `Connection` do Integration Manager** (`provider_key = 'whatsapp-meta'`). NÃO existe tabela própria de conexão (diretriz 52).
-  - **Secret da conexão** (Secrets Manager, AES-256-GCM): `access_token`, `app_secret`, `verify_token`.
-  - **`Connection.config`** (não sensível): `phone_number_id`, `waba_id` (roteiam o webhook), `department`, `is_default` + espelho do sync (`display_name`, `phone`, `quality_rating`, `messaging_limit`).
-- **Provider `WhatsappMetaProvider`** (`integration/registry/providers/whatsapp-meta.provider.ts`): `connect` valida o token (GET phone number), `health` (token/número/templates), `execute` (`sendText`/`sendTemplate`/`sendMedia`/`sendRich`/`listTemplates`/`createTemplate`/`syncStatus`/`downloadMedia`) e `discover` (números da WABA + templates). A conexão pertence somente à instalação local.
-- **Cliente Graph API**: `shared/integration/meta-graph.client.ts` (fetch nativo + `MetaApiError` com o código Meta — ex.: **131047** = fora da janela de 24h). Tipos `RichMessage`/`NormalizedMessage`/janela em `shared/integration/whatsapp.types.ts`.
+1. Na Central, cadastrar a instalação Newnet em **Plataforma → Consumidores integradores**, com `installation_id`, origem HTTPS exata do painel e chave interna. Sem esses dados o canal permanece desconfigurado e não há envio.
+2. Em **Integrações → Conexões**, criar uma única conexão `whatsapp-nivoo`, informando `installation_id`, origem HTTPS e chave no campo secreto. O backend usa somente `https://integracoes.nivoo.dev.br`. A conexão serve de configuração do consumidor.
+3. Em **WhatsApp → Números**, abrir o onboarding em nova aba. O `launch_url` contém segredo no fragmento e não é persistido/logado. Após `CONNECTED`, listar as conexões da Central e sincronizar os números locais.
+4. Publicar a versão e executar migração Prisma no servidor; testar onboarding, leitura, mídia, texto, template, nota de voz, job de envio e desconexão com uma instalação real antes de declarar o canal operacional.
 
-## Sub-áreas
+## Donos do fluxo
 
-| Pasta | Responsabilidade |
-|---|---|
-| `whatsapp/whatsapp-orchestrator.service.ts` | **Meta Orchestrator** — o chamador NUNCA conhece o número: resolve a Connection por `criteria` (connectionId explícito → tag/departamento → `is_default` → maior `priority` entre ACTIVE); envia via `ConnectionsService.execute` (IntegrationLog + `last_used_at`), grava o outbound na inbox (a Meta não ecoa) e calcula `windowState(connection, phone)`. |
-| `whatsapp/whatsapp-webhook.controller.ts` | Rota pública **`GET/POST /api/webhooks/whatsapp`** (VERSION_NEUTRAL, sem `/v1`). GET valida `hub.verify_token` contra o secret das conexões locais whatsapp-meta. POST valida **HMAC `x-hub-signature-256`** (rawBody) com o `app_secret` da conexão dona do `phone_number_id` e despacha por `field`. |
-| `whatsapp/whatsapp-inbound.service.ts` | Persiste chat/mensagem (dedup por `wamid`; `unread_count`, `last_inbound_at` = base da janela de 24h), reabre conversa CLOSED (SYSTEM), atualiza ACKs (sent/delivered/read/failed → IntegrationLog em falha), sincroniza status de template e **emite `whatsapp.inbound.message`** com `trace_id` e `source_event_id`. |
-| `whatsapp/whatsapp-smart-send.service.ts` | **Smart-send**: dentro da janela de 24h → texto livre; fora (`expired`/`none`) → template HSM (`coldTemplate` no 1º contato); recusa Meta **131047** → backstop no template. `skipIfWithinWindow` p/ emissores que não interrompem conversa ativa. Porta de envio das Fases 4-5. |
-| `whatsapp/whatsapp-inbox.*` | Conversas: listagem com **escopo de visibilidade** (abas mine/unassigned/team/all ∩ perms `comm.whatsapp.view.*`), mensagens, janela, envio manual (reply gate + janela; fora de 24h exige template — 409 amigável), proxy de mídia inbound (`downloadMedia` base64). |
-| `whatsapp/whatsapp-templates.*` | Catálogo `comm_whatsapp_templates` **bidirecional**: criar no painel → publica na Meta (DRAFT→PENDING); sync puxa a WABA (status/razão de rejeição) e publica rascunhos. |
-| `whatsapp/whatsapp-sync.service.ts` | **Cron a cada 10 min** (`@nestjs/schedule`): por conexão ACTIVE → display name, qualidade, limite de mensagens, templates → `comm_whatsapp_sync_state` + espelho no config; mudança de qualidade gera IntegrationLog. |
-| `whatsapp/whatsapp-numbers.controller.ts` | Painel **Números**: conexões whatsapp-meta com qualidade/limite/status/health + sync manual. |
-| `attendance/` | **Central de Atendimento**: `chat-assignment.service` (claim/release/transfer/close/reopen/takeover com **lock otimista** — 2º concorrente recebe 409 — e trilha `comm_whatsapp_chat_events`), `reply-gate.service` (claim implícito; conversa de outro → 409 `NEEDS_TAKEOVER_CONFIRMATION` → reenvio com `confirm_takeover`), `chat-scope.resolver` (cache 30s), state machine `OPEN ↔ IN_PROGRESS → CLOSED` (reopen → sempre OPEN), equipes/filas/membros com **soft-delete** + checagem de integridade. |
-| `connectchat/` | Canal interno ConnectChat: usa uma `Connection` ativa do Integration Manager para conversas, mensagens, envio, edição e recibos. O painel faz polling incremental por `serverSequence`; o ConnectChat continua dono da conversa e do estado comercial do contato. |
+| Arquivo | Responsabilidade |
+| --- | --- |
+| `shared/integration/nivoo-whatsapp.client.ts` | HTTP autenticado da Central, paginação, onboarding, mensagens, mídia, templates e jobs. |
+| `integration/registry/providers/whatsapp-nivoo.provider.ts` | Único provider WhatsApp registrado; secret do consumidor e operações de envio. |
+| `whatsapp/nivoo-connections.service.ts` | Mapeia cada número remoto à `Connection` local, confirma posse e desconexão. |
+| `whatsapp/nivoo-sync.service.ts` | Sincroniza conversas e mensagens; eco de saída não dispara atendimento/IA. Faz importação inicial sem reexecutar automação histórica e reconcilia jobs. |
+| `whatsapp/whatsapp-orchestrator.service.ts` | Resolve conexão ativa por ID, tag, padrão ou prioridade; recebe `job_id` do envio assíncrono. |
+| `whatsapp/whatsapp-inbox.*` | Escopo de atendimento, janela de 24h, envio manual e proxy binário autenticado de mídia. |
+| `whatsapp/whatsapp-templates.*` | Catálogo local e sincronização/criação/edição/exclusão por meio da Central. |
+| `attendance/` | Atribuição, transferência, encerramento, reabertura, equipes e filas locais. |
+| `connectchat/` | Canal interno ConnectChat via `Connection` ativa do Integration Manager, com polling incremental por `serverSequence`. |
 
-## Tabelas (`comm_*`, locais à instância dedicada)
+O painel consulta `GET /comm/whatsapp/numbers/setup`, cria/consulta sessões de onboarding, sincroniza e desconecta em `/comm/whatsapp/numbers`. O download de mídia passa por `GET /comm/whatsapp/chats/:id/media/:mediaId`, exige sessão e permissão locais e responde bytes. A leitura após desconexão permanece disponível para histórico pertencente à instalação; novos envios exigem conexão ativa.
 
-`comm_whatsapp_chats`, `comm_whatsapp_messages`, `comm_whatsapp_chat_events`, `comm_whatsapp_templates`, `comm_whatsapp_sync_state`, `comm_attendance_teams`, `comm_attendance_queues`, `comm_attendance_members`.
+`comm_whatsapp_chats` e `comm_whatsapp_messages` guardam IDs da Central, ID Meta quando existir, campos ricos e metadados de mídia. Mensagens de entrada novas mantêm `inbound_event_published=false` até o evento de atendimento ser persistido; a sincronização reprocessa as pendentes após falha. `comm_nivoo_whatsapp_sync_checkpoint` guarda o marco da importação e `comm_nivoo_whatsapp_outbound_jobs` guarda o estado dos POSTs aceitos. A Central é a fonte das mensagens; a base local sustenta atendimento e busca. POST de envio não tem retry automático para evitar duplicação.
 
-## ACL (grupo "WhatsApp")
+Os providers antigos `whatsapp-meta` e `whatsapp-ycloud` são desativados e retirados do runtime. As rotas locais de webhook foram removidas. As linhas antigas de conexão, log e conversa ficam preservadas para auditoria, mas são excluídas das superfícies operacionais. Os segredos são desvinculados; os que não servem a nenhuma outra conexão ou servidor MCP são apagados. Não existe migração retroativa de histórico que a Central não recebeu.
 
-`comm.whatsapp.view.{assigned,unassigned,team,all}`, `reply.{assigned,team,all}`, `claim`, `transfer`, `close`, `teams.{read,manage}`, `queues.{read,manage}`, `templates.{read,manage}`, `numbers.read`. Perfil de sistema **Atendente WhatsApp** criado no provisionamento; Administrador herda tudo; Operador herda os `*.read`.
-
-## Endpoints principais
-
-- `GET/POST /api/webhooks/whatsapp` (@Public + throttle) — webhook Meta.
-- `GET /comm/whatsapp/scope|chats|chats/:id|chats/:id/messages|chats/:id/window|chats/:id/media/:mediaId`
-- `POST /comm/whatsapp/chats/:id/{send,read,claim,release,transfer,close,reopen}` + `GET :id/timeline`
-- `POST /comm/whatsapp/send` — envio pelo orchestrator (criteria tag/departamento; sem número).
-- `GET/POST /comm/whatsapp/templates` + `POST /comm/whatsapp/templates/sync`
-- `GET /comm/whatsapp/numbers` + `POST /comm/whatsapp/numbers/:id/sync`
-- `GET/POST/PATCH /comm/attendance/{teams,queues}` + membros + `GET /comm/attendance/users`
-- `GET /comm/connectchat/{health,conversations}` + `GET /comm/connectchat/conversations/:id/messages?after_sequence=`
-- `POST /comm/connectchat/conversations/:id/messages|receipts/{read,delivered}` + `PATCH /comm/connectchat/messages/:id`
+Quando um Phone Number ID corresponde a exatamente uma conexão antiga, o espelho novo herda tags, prioridade, departamento, conexão padrão e vínculo do assistente. Correspondências ambíguas exigem conferência manual no painel.
 
 ## ConnectChat
 
@@ -53,29 +37,23 @@ O canal usa exclusivamente o adaptador HTTP do backend e uma **Connection**
 ativa do Integration Manager (`provider_key = 'connectchat'`). Configure em
 **Integrações → Conexões → Nova conexão → ConnectChat**:
 
-- `api_url`: URL base da API, sem `/v1` (ex.: `https://chat.exemplo.com.br`);
+- `api_url`: URL base da API, sem `/v1`;
 - `actor_ref`: padrão `IA Studio:atendimento`;
 - `timeout_ms`: opcional, padrão `10000`;
-- `api_key`: chave técnica no campo de senha; é cifrada pelo Secrets Manager e,
-  após o envio, nunca volta ao navegador, vai para `Connection.config` ou para
-  variável de ambiente.
+- `api_key`: chave técnica no campo de senha, cifrada pelo Secrets Manager.
 
-O teste da conexão lista conversas para validar URL, chave e escopos de fato.
-O operador recebe `X-ConnectChat-Actor-Ref` derivado do seu usuário local. As
-chaves de idempotência e o `clientMessageId` são estáveis durante retries; não
-há acesso SQL, fallback de instalação ou WebSocket empresarial. A API atual do
-ConnectChat fornece `businessContactId`, não nome ou telefone do cliente; o
-painel o identifica de forma honesta até existir contrato de perfil de contato.
+O teste da conexão lista conversas para validar URL, chave e escopos. O
+operador recebe `X-ConnectChat-Actor-Ref` derivado do usuário local. Chaves de
+idempotência e `clientMessageId` são estáveis durante retries. A API atual
+fornece `businessContactId` sem nome ou telefone do cliente.
 
-## Wizard Meta (Connection Wizard)
+## Endpoints principais
 
-Passo informativo **"Fluxo oficial (Embedded Signup)" — EM BREVE** (exige App Meta aprovado / Tech Provider) + modo **manual** (Phone Number ID, WABA ID, Access Token, App Secret, Verify Token) + passo de roteamento (departamento, conexão padrão) + teste final. A definição no catálogo local é atualizada no boot (`REFRESH_KEYS`) porque o wizard da Fase 2 não capturava app_secret/verify_token.
-
-## Decisões e limitações desta fase (documentadas)
-
-1. **`phone_number_id`/`waba_id` ficam no `config`** (não no Secret): são identificadores não sensíveis e o webhook precisa deles para rotear sem decifrar os secrets locais.
-2. **Realtime = polling 5s** no front (lista + conversa aberta). WebSocket fica pra fase posterior (Notification Center/Event Bus — Fase 4).
-3. **Mídia outbound por URL pública** (a Meta baixa por link); upload via Storage Manager entra quando o fluxo de anexos for necessário. **Mídia inbound** é baixada da Meta sob demanda (proxy autenticado, base64) — sem armazenamento local nesta fase.
-4. **Embedded Signup/OAuth**: arquitetura pronta no wizard (passo informativo); ativação depende da aprovação do App Meta.
-5. Cron de sync roda no processo da API (worker BullMQ separado chega na Fase 4 com o Message Broker — diretriz 33; o sync é idempotente e guarda estado no banco).
-6. Webhook responde 200 pra payloads de números desconhecidos (não vaza existência; a Meta não fica re-tentando).
+- `GET /comm/whatsapp/scope|chats|chats/:id|chats/:id/messages|chats/:id/window|chats/:id/media/:mediaId`
+- `POST /comm/whatsapp/chats/:id/{send,read,claim,release,transfer,close,reopen}` e `GET :id/timeline`
+- `POST /comm/whatsapp/send` — envio pelo orchestrator.
+- `GET/POST /comm/whatsapp/templates` e `POST /comm/whatsapp/templates/sync`
+- `GET /comm/whatsapp/numbers` e `POST /comm/whatsapp/numbers/:id/sync`
+- `GET/POST/PATCH /comm/attendance/{teams,queues}` e membros.
+- `GET /comm/connectchat/{health,conversations}` e `GET /comm/connectchat/conversations/:id/messages?after_sequence=`
+- `POST /comm/connectchat/conversations/:id/messages|receipts/{read,delivered}` e `PATCH /comm/connectchat/messages/:id`.

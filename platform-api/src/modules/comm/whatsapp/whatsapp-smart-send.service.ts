@@ -1,13 +1,12 @@
-// Envio "inteligente" respeitando a janela de 24h da Meta (portado do
+// Envio pela Central respeitando a janela de 24h (portado do
 // Aquapark). Regra unica reutilizavel pelos emissores automaticos (IA e
 // automacao nas Fases 4-5):
 //   - dentro de 24h            → texto livre (a fala dinamica);
 //   - expirou / contato frio   → template HSM aprovado;
-//   - texto livre recusado com 131047 → backstop no template (a janela local
-//     estava desatualizada; o codigo da Meta e autoritativo).
+//   - Central indica requiresTemplate → backstop no template.
 import { Injectable, Logger } from '@nestjs/common';
 import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
-import { MetaApiError, META_REENGAGEMENT_CODE } from '../../../shared/integration/meta-graph.client';
+import { NivooCentralError } from '../../../shared/integration/nivoo-whatsapp.client';
 import { SendCriteria, TemplateVariables } from '../../../shared/integration/whatsapp.types';
 import { normalizePhone } from './whatsapp.helpers';
 
@@ -59,9 +58,9 @@ export class WhatsappSmartSendService {
       );
       return { via: 'text' };
     } catch (err) {
-      // Backstop autoritativo: 131047 → janela local desatualizada → template.
-      if (err instanceof MetaApiError && err.metaCode === META_REENGAGEMENT_CODE) {
-        this.logger.warn(`Texto livre recusado (131047) para ${phone} — caindo no template ${args.template}.`);
+      // Backstop da Central: janela local desatualizada → template.
+      if (err instanceof NivooCentralError && err.requiresTemplate) {
+        this.logger.warn(`Janela encerrada para ${phone} — usando o modelo ${args.template}.`);
         return { via: await this.sendTemplate(args, phone, args.template, language) };
       }
       throw err;

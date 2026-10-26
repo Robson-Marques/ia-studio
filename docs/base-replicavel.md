@@ -52,7 +52,7 @@ manter, adaptar ou retirar módulos de negócio.
 |---|---|
 | Plataforma | Instalação dedicada, identidade por `app-id`, isolamento de banco, Redis, storage, PM2, domínio e backup. |
 | Integrações | Provider Registry, conexões, segredos, health checks e logs. Provider é uma extensão; não se remove o Integration Manager porque uma integração específica sai. |
-| Comunicação | WhatsApp oficial da Meta, atendimento, templates HSM, catálogo de templates e regras de telefone. |
+| Comunicação | WhatsApp oficial consumido via Central Nivoo, atendimento, templates HSM, catálogo de templates e regras de telefone. |
 | Automação e IA | Assistentes, aprovações, fluxos, tools autorizadas, auditoria e análise de atendimento genérica. Uma tool específica pode sair sem retirar a plataforma de IA. |
 | Gestão e segurança | Usuários, ACL, auditoria, configurações, administração da instalação, backup, atualização e observabilidade. |
 | Painel | Shell, dashboard, componentes de interface e rotas das áreas que permanecerem no contrato do novo cliente. |

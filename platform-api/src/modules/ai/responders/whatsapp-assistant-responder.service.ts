@@ -19,7 +19,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AiAgent } from '@prisma/client';
 import { EventEnvelope } from '../../../shared/events/event-envelope';
-import { WHATSAPP_INBOUND_EVENT } from '../../comm/whatsapp/whatsapp-inbound.service';
+import { WHATSAPP_INBOUND_EVENT } from '../../comm/whatsapp/whatsapp.events';
 import { WhatsappAssistantService } from '../../comm/whatsapp/whatsapp-assistant.service';
 import { WhatsappInboxService } from '../../comm/whatsapp/whatsapp-inbox.service';
 import { WhatsappOrchestratorService } from '../../comm/whatsapp/whatsapp-orchestrator.service';

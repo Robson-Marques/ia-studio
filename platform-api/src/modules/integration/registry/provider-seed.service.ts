@@ -2,7 +2,7 @@
 // Fonte: metadata() das implementacoes registradas + catalogo-only.
 // Nunca sobrescreve definição existente — catálogo local preserva adaptações
 // (diretriz 43). EXCECAO pontual (REFRESH_KEYS): quando um provider que era
-// catalogo-only ganha implementacao real (whatsapp-meta na Fase 3), o wizard
+// catalogo-only ganha implementacao real, o wizard
 // mudou de forma — a definicao e atualizada UMA vez a partir do metadata().
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -16,15 +16,14 @@ import { PostgresqlProvider } from './providers/postgresql.provider';
 import { SqlServerProvider } from './providers/sqlserver.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { S3Provider } from './providers/s3.provider';
-import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
-import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
+import { WhatsappNivooProvider } from './providers/whatsapp-nivoo.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 import { ConnectchatProvider } from './providers/connectchat.provider';
 
 // Providers cuja definicao deve ser atualizada no boot (ganhou implementacao).
 // smtp: virou envio real (email.send) na Fase 7 — wizard/capabilities mudaram.
 // postgresql: ganhou Schema Discovery + SQL read-only na Fase 7 (wizard/caps).
-const REFRESH_KEYS = new Set<string>(['whatsapp-meta', 'smtp', 'postgresql']);
+const REFRESH_KEYS = new Set<string>(['smtp', 'postgresql']);
 
 @Injectable()
 export class ProviderSeedService implements OnApplicationBootstrap {
@@ -40,17 +39,22 @@ export class ProviderSeedService implements OnApplicationBootstrap {
     private readonly sqlserver: SqlServerProvider,
     private readonly smtp: SmtpProvider,
     private readonly s3: S3Provider,
-    private readonly whatsappMeta: WhatsappMetaProvider,
-    private readonly whatsappYcloud: WhatsappYcloudProvider,
+    private readonly whatsappNivoo: WhatsappNivooProvider,
     private readonly googleWorkspace: GoogleWorkspaceProvider,
     private readonly connectchat: ConnectchatProvider,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     // 1) Registro em memoria das implementacoes (diretriz 2).
-    for (const provider of [this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappMeta, this.whatsappYcloud, this.googleWorkspace, this.connectchat]) {
+    for (const provider of [this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappNivoo, this.googleWorkspace, this.connectchat]) {
       this.registry.register(provider);
     }
+
+    await Promise.all([
+      this.repository.deactivate('whatsapp-meta'),
+      this.repository.deactivate('whatsapp-ycloud'),
+      this.repository.retireLegacyWhatsappConnections(),
+    ]);
 
     // 2) Seed create-if-missing das definições do catálogo local.
     try {
@@ -59,8 +63,7 @@ export class ProviderSeedService implements OnApplicationBootstrap {
         const existing = await this.repository.findByKey(meta.key);
         if (existing && REFRESH_KEYS.has(meta.key)) {
           // Definicao pre-existente de um provider que ganhou implementacao:
-          // atualiza wizard/capabilities (o wizard antigo nao capturava
-          // app_secret/verify_token — necessarios pro webhook da Fase 3).
+          // atualiza wizard/capabilities, preservando as conexões existentes.
           await this.repository.update(meta.key, {
             name: meta.name,
             description: meta.description,

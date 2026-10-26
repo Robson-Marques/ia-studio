@@ -72,7 +72,7 @@ export class ConnectionsService {
 
   async findById(id: string): Promise<Connection> {
     const connection = await this.repository.findById(id);
-    if (!connection) throw new NotFoundException('Conexão não encontrada.');
+    if (!connection || !this.registry.has(connection.provider_key)) throw new NotFoundException('Conexão não encontrada.');
     return connection;
   }
 
@@ -84,6 +84,10 @@ export class ConnectionsService {
   // ─── Criacao via wizard ─────────────────────────────
   async create(dto: CreateConnectionDto, createdBy: string | null) {
     const definition = await this.providerCatalog.definitionForConnection(dto.provider_key);
+    if (dto.provider_key === 'whatsapp-nivoo' &&
+        (await this.repository.countByProvider('whatsapp-nivoo')) > 0) {
+      throw new ConflictException('O consumidor da Central WhatsApp já está configurado. Conecte outros números em WhatsApp → Números.');
+    }
 
     // Higiene: campo marcado como secret no wizard NUNCA entra no config.
     const config = this.stripSecretFields(dto.config ?? {}, definition);
@@ -206,6 +210,9 @@ export class ConnectionsService {
   // ─── Estado (enable/disable/maintenance) ────────────
   async changeState(id: string, action: ConnectionStateAction) {
     const connection = await this.findById(id);
+    if (connection.provider_key === 'whatsapp-nivoo') {
+      throw new ConflictException('Gerencie este número em WhatsApp → Números. A desconexão precisa ser confirmada pela Central.');
+    }
     const target = STATE_ACTION_TARGET[action];
     assertConnectionTransition(connection.status, target);
 
@@ -267,17 +274,25 @@ export class ConnectionsService {
     try {
       const result = await provider.execute(ctx, operation, params);
       const durationMs = Date.now() - startedAt;
-      await this.repository.update(id, { last_used_at: new Date() });
-      await this.integrationLogs.record({
-        connectionId: id,
-        direction: IntegrationDirection.OUTBOUND,
-        operation,
-        status: IntegrationLogStatus.SUCCESS,
-        durationMs,
-        requestMeta: redactSensitive({ operation, params }, sensitiveParamKeys),
-        responseMeta: { summary: this.summarize(result) },
-        traceId: getRequestStore()?.traceId ?? null,
-      });
+      try {
+        await this.repository.update(id, { last_used_at: new Date() });
+        await this.integrationLogs.record({
+          connectionId: id,
+          direction: IntegrationDirection.OUTBOUND,
+          operation,
+          status: IntegrationLogStatus.SUCCESS,
+          durationMs,
+          requestMeta: redactSensitive({ operation, params: this.withoutBinary(params) }, sensitiveParamKeys),
+          responseMeta: { summary: this.summarize(result) },
+          traceId: getRequestStore()?.traceId ?? null,
+        });
+      } catch (logError) {
+        const acceptedNivooJob = connection.provider_key === 'whatsapp-nivoo' &&
+          ['sendText', 'sendMedia', 'sendTemplate'].includes(operation) &&
+          !!(result as { job_id?: string } | null)?.job_id;
+        if (!acceptedNivooJob) throw logError;
+        this.logger.error(`A Central aceitou o envio, mas o registro de uso/log local falhou: ${(logError as Error).message}`);
+      }
       return result;
     } catch (e) {
       const durationMs = Date.now() - startedAt;
@@ -298,7 +313,7 @@ export class ConnectionsService {
         operation,
         status: IntegrationLogStatus.FAILURE,
         durationMs,
-        requestMeta: redactSensitive({ operation, params }, sensitiveParamKeys),
+        requestMeta: redactSensitive({ operation, params: this.withoutBinary(params) }, sensitiveParamKeys),
         error: (e as Error).message,
         traceId: getRequestStore()?.traceId ?? null,
       });
@@ -369,14 +384,14 @@ export class ConnectionsService {
   }
 
   /**
-   * Upload de midia binaria pra Meta (retorna media_id). Caminho SEPARADO do
+   * Upload de midia binaria para a Central (retorna media_id). Caminho separado do
    * execute() porque o binario NAO pode ir pro log de integracao (redactSensitive
    * serializaria o Buffer inteiro) — aqui logamos so metadados (mime/filename/tamanho).
-   * O provider whatsapp-meta expoe a operacao 'uploadMedia'.
+   * O provider whatsapp-nivoo expoe a operacao 'uploadMedia'.
    */
   async uploadMedia(
     id: string,
-    file: { data: Buffer; mimeType: string; filename: string },
+    file: { data: Buffer; mimeType: string; filename: string; kind: 'image' | 'audio' | 'video' | 'document' },
   ): Promise<{ media_id: string }> {
     const connection = await this.findById(id);
     if (connection.status !== 'ACTIVE') {
@@ -395,7 +410,7 @@ export class ConnectionsService {
         status: IntegrationLogStatus.SUCCESS,
         durationMs: Date.now() - startedAt,
         // So metadados — nunca o binario.
-        requestMeta: { mime_type: file.mimeType, filename: file.filename, size: file.data.length },
+        requestMeta: { kind: file.kind, mime_type: file.mimeType, filename: file.filename, size: file.data.length },
         responseMeta: { media_id: result?.media_id ?? null },
         traceId: getRequestStore()?.traceId ?? null,
       });
@@ -408,7 +423,7 @@ export class ConnectionsService {
         operation: 'uploadMedia',
         status: IntegrationLogStatus.FAILURE,
         durationMs: Date.now() - startedAt,
-        requestMeta: { mime_type: file.mimeType, filename: file.filename, size: file.data.length },
+        requestMeta: { kind: file.kind, mime_type: file.mimeType, filename: file.filename, size: file.data.length },
         error: (e as Error).message,
         traceId: getRequestStore()?.traceId ?? null,
       });
@@ -581,5 +596,14 @@ export class ConnectionsService {
     if (Array.isArray(result)) return `array[${result.length}]`;
     if (typeof result === 'object') return `object{${Object.keys(result as object).length} chaves}`;
     return typeof result;
+  }
+
+  private withoutBinary(value: unknown): unknown {
+    if (Buffer.isBuffer(value)) return `[arquivo: ${value.length} bytes]`;
+    if (Array.isArray(value)) return value.map((item) => this.withoutBinary(item));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, this.withoutBinary(item)]));
+    }
+    return value;
   }
 }

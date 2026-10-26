@@ -35,4 +35,29 @@ export class RegistryRepository {
       data: { is_active: false },
     });
   }
+
+  /** Aposenta os vínculos antigos e remove credenciais exclusivas deles.
+   * Conversas, linhas de conexão e logs permanecem para auditoria. */
+  retireLegacyWhatsappConnections() {
+    return this.prisma.$transaction(async (tx) => {
+      const where = { provider_key: { in: ['whatsapp-meta', 'whatsapp-ycloud'] } };
+      const legacy = await tx.connection.findMany({ where, select: { secret_id: true } });
+      await tx.connection.updateMany({
+        where,
+        data: {
+          status: 'DISABLED', is_active: false, secret_id: null,
+          status_detail: 'Conector substituído pela Central WhatsApp Nivoo.',
+        },
+      });
+      for (const secretId of new Set(legacy.map((item) => item.secret_id).filter((id): id is string => !!id))) {
+        const [connections, mcpServers] = await Promise.all([
+          tx.connection.count({ where: { secret_id: secretId } }),
+          tx.aiMcpServer.count({ where: { secret_id: secretId } }),
+        ]);
+        if (connections === 0 && mcpServers === 0) {
+          await tx.secret.deleteMany({ where: { id: secretId } });
+        }
+      }
+    });
+  }
 }

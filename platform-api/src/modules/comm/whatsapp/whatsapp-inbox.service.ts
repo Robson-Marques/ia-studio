@@ -1,11 +1,12 @@
 // Inbox de conversas: listagem com escopo de visibilidade (abas Minhas /
 // Não atribuídas / Minha Equipe / Todas), mensagens, envio (reply gate +
-// janela de 24h + orchestrator) e proxy de midia inbound (download da Meta).
+// janela de 24h + orchestrator) e proxy de mídia da Central.
 import {
   BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { CommChatStatus, CommMessageDirection, Connection, Prisma, WhatsappChat, WhatsappMessage } from '@prisma/client';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
@@ -16,15 +17,19 @@ import { AttendanceRepository } from '../attendance/attendance.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import {
-  MetaApiError,
-  META_MEDIA_LIMITS,
-  META_REENGAGEMENT_CODE,
-} from '../../../shared/integration/meta-graph.client';
+import { NivooCentralError } from '../../../shared/integration/nivoo-whatsapp.client';
 import { RichMessage, WindowState, computeWindowState } from '../../../shared/integration/whatsapp.types';
 import { SendChatMessageDto } from '../dto/send-chat-message.dto';
+import { NivooConnectionsService } from './nivoo-connections.service';
 
 export type MediaKind = 'image' | 'audio' | 'video' | 'document';
+
+const MEDIA_LIMITS: Record<MediaKind, number> = {
+  image: 5 * 1024 * 1024,
+  audio: 16 * 1024 * 1024,
+  video: 16 * 1024 * 1024,
+  document: 100 * 1024 * 1024,
+};
 
 export interface UploadMediaArgs {
   kind: MediaKind;
@@ -32,6 +37,7 @@ export interface UploadMediaArgs {
   mimeType: string;
   filename: string;
   caption?: string;
+  voice?: boolean;
   confirmTakeover?: boolean;
 }
 
@@ -61,6 +67,7 @@ export class WhatsappInboxService {
     private readonly attendance: AttendanceRepository,
     private readonly connections: ConnectionsService,
     private readonly connectionsRepository: ConnectionsRepository,
+    private readonly nivoo: NivooConnectionsService,
   ) {}
 
   // ─── Escopo (a UI monta as abas a partir daqui) ─────
@@ -153,7 +160,8 @@ export class WhatsappInboxService {
 
   async getChat(chatId: string): Promise<ChatView> {
     const chat = await this.chats.findChatById(chatId);
-    if (!chat) throw new NotFoundException('Conversa não encontrada.');
+    if (!chat || !chat.remote_chat_id) throw new NotFoundException('Conversa não encontrada.');
+    await this.nivoo.assertCurrentOwner(chat.connection_id);
     let handlerName: string | null = null;
     if (chat.current_handler_type === 'BOT') {
       handlerName = 'IA';
@@ -240,17 +248,17 @@ export class WhatsappInboxService {
     user: AuthenticatedUser,
     chatId: string,
     dto: SendChatMessageDto,
-  ): Promise<{ wamid: string | null; via: 'text' | 'media' | 'template' }> {
+  ): Promise<{ wamid: string | null; job_id?: string; via: 'text' | 'media' | 'template' }> {
     const chat = await this.getChat(chatId);
     const message = this.buildRichMessage(dto);
     const via: 'text' | 'media' | 'template' =
       message.kind === 'template' ? 'template' : message.kind === 'text' ? 'text' : 'media';
     const result = await this.deliver(user, chat, message, dto.confirm_takeover === true, via === 'template');
-    return { wamid: result.wamid, via };
+    return { wamid: result.wamid, job_id: result.jobId, via };
   }
 
   /**
-   * Upload de arquivo/audio gravado no aparelho: sobe o binario pra Meta
+   * Upload de arquivo/áudio gravado no aparelho: sobe o binário para a Central
    * (media_id) e envia pela MESMA porta do texto/midia (reply gate + janela de
    * 24h + takeover 409). Nao duplica a logica de envio — reusa deliver().
    */
@@ -258,10 +266,10 @@ export class WhatsappInboxService {
     user: AuthenticatedUser,
     chatId: string,
     args: UploadMediaArgs,
-  ): Promise<{ wamid: string | null; via: 'media' }> {
+  ): Promise<{ wamid: string | null; job_id?: string; via: 'media' }> {
     const chat = await this.getChat(chatId);
     // Validacao de tamanho por tipo (limites da Cloud API) — erro amigavel.
-    const limit = META_MEDIA_LIMITS[args.kind];
+    const limit = MEDIA_LIMITS[args.kind];
     if (args.data.length > limit) {
       const mb = Math.round(limit / (1024 * 1024));
       throw new BadRequestException(
@@ -281,30 +289,25 @@ export class WhatsappInboxService {
     }
     const connection = await this.loadChatConnection(chat);
 
-    // Sobe o binario e recebe o media_id (caminho separado do execute()).
-    let mediaId: string;
-    try {
-      const uploaded = await this.connections.uploadMedia(connection.id, {
-        data: args.data,
-        mimeType: args.mimeType,
-        filename: args.filename,
-      });
-      mediaId = uploaded.media_id;
-    } catch (err) {
-      if (err instanceof MetaApiError) throw new BadRequestException(err.message);
-      throw err;
-    }
+    // Sobe o binário e recebe o media_id (caminho separado do execute()).
+    const uploaded = await this.connections.uploadMedia(connection.id, {
+      data: args.data,
+      kind: args.kind,
+      mimeType: args.mimeType,
+      filename: args.filename,
+    });
 
     const message: RichMessage = {
       kind: args.kind,
-      mediaId,
+      mediaId: uploaded.media_id,
       caption: args.caption,
       filename: args.kind === 'document' ? args.filename : undefined,
+      voice: args.kind === 'audio' && args.voice === true,
     };
     // Reaproveita o mesmo envio (ja passou pelo reply gate/janela acima, mas
     // deliver revalida — barato e mantem uma porta unica de envio).
     const result = await this.deliver(user, chat, message, args.confirmTakeover === true, false);
-    return { wamid: result.wamid, via: 'media' };
+    return { wamid: result.wamid, job_id: result.jobId, via: 'media' };
   }
 
   /**
@@ -318,7 +321,7 @@ export class WhatsappInboxService {
     message: RichMessage,
     confirmTakeover: boolean,
     isTemplate: boolean,
-  ): Promise<{ wamid: string | null }> {
+  ): Promise<{ wamid: string | null; jobId?: string }> {
     const scope = await this.scopeResolver.resolve(user);
 
     // Reply gate: claim implicito / takeover confirmado / 403 / 409.
@@ -338,37 +341,33 @@ export class WhatsappInboxService {
     const connection = await this.loadChatConnection(chat);
     try {
       const result = await this.orchestrator.sendViaConnection(connection, chat.phone, message, `user:${user.sub}`);
-      // SLA: primeira resposta humana (idempotente — so grava se null).
-      if (!chat.first_response_at) {
-        await this.chats
-          .updateChatConditional(chat.id, { first_response_at: null }, { first_response_at: new Date() })
-          .catch(() => 0);
-      }
-      return { wamid: result.wamid };
+      return { wamid: result.wamid, jobId: result.jobId };
     } catch (err) {
-      if (err instanceof MetaApiError && err.metaCode === META_REENGAGEMENT_CODE) {
+      if (err instanceof NivooCentralError && err.requiresTemplate) {
         // Backstop 131047: nossa janela estava desatualizada.
         throw new ConflictException(
           'A Meta recusou o texto livre (janela de 24h expirada). Use um template aprovado.',
         );
       }
-      if (err instanceof MetaApiError) throw new BadRequestException(err.message);
       throw err;
     }
   }
 
-  // ─── Midia inbound (proxy de download da Meta) ──────
+  // ─── Mídia inbound (proxy de download da Central) ──────
 
   async downloadMedia(
     chatId: string,
     mediaId: string,
-  ): Promise<{ base64: string; mime: string }> {
+  ): Promise<{ bytes: Buffer; mime: string }> {
     const chat = await this.getChat(chatId);
-    const result = (await this.connections.execute(chat.connection_id, 'downloadMedia', {
-      media_id: mediaId,
-    })) as { base64: string; mime: string } | null;
-    if (!result) throw new NotFoundException('Mídia não encontrada na Meta (pode ter expirado).');
-    return result;
+    const message = await this.chats.findCentralMessageInChat(chatId, mediaId);
+    if (!message?.remote_message_id || !chat.remote_chat_id) throw new NotFoundException('Mídia não encontrada nesta conversa.');
+    if (message.media_state === 'UNAVAILABLE') {
+      throw new ServiceUnavailableException('A Central ainda não disponibilizou este arquivo.');
+    }
+    // Leitura continua possível após a desconexão oficial. O proxy entrega
+    // bytes ao navegador sem serializar arquivos grandes como JSON/base64.
+    return (await this.nivoo.client()).downloadMedia(chat.remote_chat_id, message.remote_message_id);
   }
 
   // ─── Helpers privados ───────────────────────────────

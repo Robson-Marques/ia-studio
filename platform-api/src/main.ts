@@ -12,9 +12,6 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({ ignoreTrailingSlash: true, bodyLimit: 10 * 1024 * 1024 }),
-    // rawBody: necessario pra validar HMAC (x-hub-signature-256) do webhook
-    // WhatsApp Meta (Fase 3) sobre o corpo bruto, byte a byte.
-    { rawBody: true },
   );
 
   // Upload de pacotes de backup (multipart/form-data) na administração local.

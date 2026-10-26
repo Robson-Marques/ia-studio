@@ -59,10 +59,11 @@ IXC. Extensões de segmento ficam atrás de portas, módulos e permissões próp
 
 ## 5. Comunicação WhatsApp
 
-WhatsApp usa exclusivamente capacidades oficiais da Meta Cloud API. O fluxo
-prioritário é Embedded Signup/OAuth oficial; credenciais manuais são uma
-alternativa operacional quando a aprovação Meta ainda não permitir o fluxo
-oficial. Cada conexão, webhook, template e secret pertence à aplicação local.
+WhatsApp é consumido exclusivamente pela Central WhatsApp Nivoo, que opera as
+capacidades oficiais da Meta Cloud API. O IA Studio guarda somente a chave do
+consumidor no backend, abre o onboarding da Central e sincroniza suas conversas,
+mensagens e templates. Webhooks e credenciais Meta pertencem à Central. Cada
+número remoto é espelhado em uma Connection da instalação Newnet.
 
 Envios automáticos fora da janela de 24 horas exigem template HSM aprovado.
 Templates de sistema são semeados de modo idempotente e ações de botões são

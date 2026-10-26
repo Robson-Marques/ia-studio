@@ -1,13 +1,12 @@
-// Meta Orchestrator (spec "Connection Wizard Meta"): o chamador NUNCA conhece
-// o número. Pede critérios locais (tag/departamento/
-// conexao/prioridade) e o orchestrator resolve a Connection whatsapp-meta:
+// Orquestrador da Central WhatsApp: resolve a Connection whatsapp-nivoo por
+// critérios locais (ID, tag, departamento, padrão e prioridade).
 //   1) criteria.connectionId explicito;
 //   2) tag/departamento (Connection.tags / config.department);
 //   3) conexao padrao (config.is_default);
 //   4) maior priority entre as ACTIVE.
 // Todo envio passa pelo ConnectionsService.execute (Provider Registry →
 // IntegrationLog + last_used_at).
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CommMessageDirection, Connection, ConnectionStatus } from '@prisma/client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
@@ -20,7 +19,7 @@ import {
   computeWindowState,
 } from '../../../shared/integration/whatsapp.types';
 
-export const WHATSAPP_PROVIDER_KEY = 'whatsapp-meta';
+export const WHATSAPP_PROVIDER_KEY = 'whatsapp-nivoo';
 
 export interface OrchestratorSendArgs {
   phone: string;
@@ -32,7 +31,8 @@ export interface OrchestratorSendArgs {
 export interface OrchestratorSendResult {
   wamid: string | null;
   connectionId: string;
-  chatId: string;
+  chatId: string | null;
+  jobId?: string;
 }
 
 @Injectable()
@@ -51,7 +51,10 @@ export class WhatsappOrchestratorService {
     const all = await this.connectionsRepository.findAll({
       providerKey: WHATSAPP_PROVIDER_KEY,
     });
-    const active = all.filter((c) => c.status === ConnectionStatus.ACTIVE);
+    const active = all.filter((c) => {
+      const config = c.config as Record<string, unknown>;
+      return c.status === ConnectionStatus.ACTIVE && config['remote_connection_id'] && config['remote_owned'] === true;
+    });
     if (active.length === 0) {
       throw new BadRequestException('Nenhuma conexão WhatsApp ativa nesta instância. Conecte um número primeiro.');
     }
@@ -89,7 +92,7 @@ export class WhatsappOrchestratorService {
     return active[0];
   }
 
-  // ─── Envio (RichMessage → Cloud API via Provider Registry) ──────────
+  // ─── Envio (RichMessage → Central via Provider Registry) ──────────
 
   async send(args: OrchestratorSendArgs, message: RichMessage): Promise<OrchestratorSendResult> {
     const connection = await this.resolveConnection(args.criteria);
@@ -107,44 +110,36 @@ export class WhatsappOrchestratorService {
     if (!phone) throw new BadRequestException('Telefone de destino inválido.');
 
     const { operation, params } = this.toOperation(phone, message);
-    const result = (await this.connections.execute(connection.id, operation, params)) as { wamid?: string | null };
+    const result = (await this.connections.execute(connection.id, operation, params)) as { wamid?: string | null; job_id?: string };
+    if (!result?.job_id) throw new BadRequestException('A Central não confirmou o enfileiramento da mensagem.');
 
-    // A Meta NAO ecoa o outbound — grava na inbox pra conversa refletir o envio.
-    const chat = await this.chats.upsertChat({
-      connectionId: connection.id,
-      phone,
-      lastMessage: this.preview(message),
-      direction: CommMessageDirection.OUTGOING,
-    });
-    await this.chats.createMessage({
-      chat_id: chat.id,
-      connection_id: connection.id,
-      external_id: result?.wamid ?? null,
-      direction: CommMessageDirection.OUTGOING,
-      sender,
-      type: message.kind === 'template' ? 'template' : message.kind === 'text' ? 'text' : message.kind,
-      content: this.preview(message),
-      media: ['image', 'audio', 'video', 'document'].includes(message.kind)
-        ? {
-            // media_id (upload direto) permite a UI baixar o outbound por base64;
-            // url fica pro caso legado de link publico.
-            media_id: (message as { mediaId?: string }).mediaId,
-            url: (message as { url?: string }).url,
-            caption: (message as { caption?: string }).caption,
-            filename: (message as { filename?: string }).filename,
-          }
-        : undefined,
-      status: 'sent',
-    });
-
-    return { wamid: result?.wamid ?? null, connectionId: connection.id, chatId: chat.id };
+    let chat: Awaited<ReturnType<WhatsappChatsRepository['findChatByConnectionPhone']>> = null;
+    // O POST já foi aceito. Falha local de persistência não pode induzir o
+    // operador/automação a repetir o envio e duplicar a mensagem na Central.
+    try {
+      chat = await this.chats.findChatByConnectionPhone(connection.id, phone);
+      await this.chats.recordCentralJob(result.job_id, connection.id, chat?.remote_chat_id ? chat.id : null);
+      if (chat?.remote_chat_id) {
+        await this.chats.createMessage({
+          chat_id: chat.id,
+          connection_id: connection.id,
+          remote_job_id: result.job_id,
+          direction: CommMessageDirection.OUTGOING,
+          sender,
+          type: message.kind === 'template' ? 'template' : message.kind === 'text' ? 'text' : message.kind,
+          content: this.preview(message),
+          status: 'queued',
+        });
+      }
+    } catch (error) {
+      this.logger.error(`A Central aceitou o job ${result.job_id}, mas o registro local falhou: ${(error as Error).message}`);
+    }
+    return { wamid: null, connectionId: connection.id, chatId: chat?.remote_chat_id ? chat.id : null, jobId: result.job_id };
   }
 
   // ─── Lida (tick azul) + digitando ──────────────────────────────────
-  // Porte do padrao Aquapark: um POST /messages marca a mensagem incoming como
-  // lida e, com typing=true, mostra "digitando…" no WhatsApp do cliente (some
-  // sozinho em ~25s ou quando enviamos a resposta). Best-effort — UX nunca pode
-  // quebrar o atendimento; engolimos o erro (mas logamos em debug).
+  // A Central marca a conversa como lida e, com typing=true, solicita o
+  // indicador de digitação. Falhas são registradas sem interromper a leitura.
 
   async markRead(
     connectionId: string,
@@ -152,21 +147,31 @@ export class WhatsappOrchestratorService {
     opts?: { typing?: boolean },
   ): Promise<void> {
     if (!messageId) return;
+    const message = await this.chats.findMessageByExternalId(messageId);
+    const chat = message ? await this.chats.findChatById(message.chat_id) : null;
+    if (!chat?.remote_chat_id || chat.connection_id !== connectionId) return;
     try {
       await this.connections.execute(connectionId, 'markRead', {
-        message_id: messageId,
+        remote_chat_id: chat.remote_chat_id,
         typing: opts?.typing === true,
       });
     } catch (e) {
-      this.logger.debug(`markRead falhou (ignorado): ${(e as Error).message}`);
+      this.logger.warn(`Não foi possível marcar a conversa como lida na Central: ${(e as Error).message}`);
     }
   }
 
   /** Como markRead, resolvendo a última mensagem incoming (wamid) do chat. */
   async markReadByChat(chatId: string, opts?: { typing?: boolean }): Promise<void> {
-    const anchor = await this.chats.findLastIncomingAnchor(chatId).catch(() => null);
-    if (!anchor) return;
-    await this.markRead(anchor.connection_id, anchor.external_id, opts);
+    const chat = await this.chats.findChatById(chatId);
+    if (!chat?.remote_chat_id) return;
+    try {
+      await this.connections.execute(chat.connection_id, 'markRead', {
+        remote_chat_id: chat.remote_chat_id,
+        typing: opts?.typing === true,
+      });
+    } catch (e) {
+      this.logger.warn(`Não foi possível marcar a conversa como lida na Central: ${(e as Error).message}`);
+    }
   }
 
   // ─── Janela de 24h ──────────────────────────────────
@@ -200,10 +205,11 @@ export class WhatsappOrchestratorService {
             media_id: message.mediaId,
             caption: message.caption,
             filename: message.filename,
+            voice: message.voice === true,
           },
         };
       default:
-        return { operation: 'sendRich', params: { to: phone, message } };
+        throw new BadRequestException('Este formato de mensagem não é aceito pela Central WhatsApp.');
     }
   }
 

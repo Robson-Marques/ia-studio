@@ -6,9 +6,14 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-10-05 (base de referência `v0.11.42` marcada;
-> análise assistida de chamados IXC em construção; vertente ISP opera somente
-> com IXC).
+> Última atualização: 2026-10-26 (migração WhatsApp pela Central Nivoo em
+> desenvolvimento; base de referência `v0.11.42` permanece como marco anterior).
+
+## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
+
+O IA Studio Newnet está sendo migrado para o contrato remoto da Central WhatsApp v2.6.0. O código local já contém cliente autenticado, provider `whatsapp-nivoo`, onboarding, sincronização paginada de conversas/mensagens, reconciliação de jobs, mídia autenticada, templates e tela de números. O runtime Meta/YCloud e seus webhooks foram retirados; conexões antigas são desativadas no boot e seus registros relacionados são preservados para auditoria. Fonte técnica local: `platform-api/src/modules/comm/README.md`.
+
+**Ainda não ativado:** o consumidor Newnet, `installation_id` e origem HTTPS exata não foram cadastrados na Central. Não inventar identificadores. A chave interna deve ser cadastrada no cofre pelo painel/backend, nunca enviada em chat nem ao navegador. O Windows local não tem Node; build, migração Prisma, smoke test e eventual publicação ocorrem no servidor/CI, após o cadastro real. A documentação anterior abaixo registra o estado histórico da vertente e não comprova ativação desta frente.
 
 Atualização de 2026-10-06 — **Canal ConnectChat:** foi adicionada a especialidade
 `ia-studio.connectchat-channel@1.0.1`, o adaptador HTTP somente de backend e a

@@ -27,7 +27,7 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
   - **openai / anthropic** (AI): health = GET `/v1/models` com a API Key; `discover` lista modelos.
   - **postgresql** (DATABASE): health via socket TCP (`require('net')`) — sem driver `pg` nesta fase.
   - **smtp / s3**: health stub OK (validação de configuração; handshake real nas Fases 7 / Storage).
-  - **whatsapp-meta**: só definição de catálogo — implementação (Embedded Signup oficial) na Fase 3.
+  - **whatsapp-nivoo**: consumidor da Central WhatsApp; a chave interna fica no Secrets Manager, e o onboarding dos números é feito pela Central. `whatsapp-meta` e `whatsapp-ycloud` foram aposentados do catálogo e do runtime; conexões/logs históricos ficam, segredos exclusivos são removidos.
 
 ## catalog/ (diretrizes 1/43/48)
 

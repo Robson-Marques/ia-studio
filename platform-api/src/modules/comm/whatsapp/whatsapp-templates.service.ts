@@ -8,9 +8,9 @@ import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
 import { ConnectionsService } from '../../integration/connections/connections.service';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { MetaTemplate } from '../../../shared/integration/meta-graph.client';
 import { CreateTemplateDto } from '../dto/create-template.dto';
 import { UpdateTemplateDto } from '../dto/update-template.dto';
+import { NivooConnectionsService } from './nivoo-connections.service';
 
 const META_STATUS_MAP: Record<string, CommTemplateStatus> = {
   APPROVED: 'APPROVED',
@@ -22,6 +22,16 @@ const META_STATUS_MAP: Record<string, CommTemplateStatus> = {
   PENDING_DELETION: 'DISABLED',
 };
 
+interface CentralTemplate {
+  id?: string;
+  name: string;
+  language: string;
+  category?: string;
+  status?: string;
+  components?: unknown[];
+  rejected_reason?: string;
+}
+
 @Injectable()
 export class WhatsappTemplatesService {
   private readonly logger = new Logger(WhatsappTemplatesService.name);
@@ -31,10 +41,18 @@ export class WhatsappTemplatesService {
     private readonly connections: ConnectionsService,
     private readonly connectionsRepository: ConnectionsRepository,
     private readonly audit: AuditLogService,
+    private readonly nivoo: NivooConnectionsService,
   ) {}
 
-  list(connectionId?: string): Promise<WhatsappTemplate[]> {
-    return this.repository.list(connectionId);
+  async list(connectionId?: string): Promise<WhatsappTemplate[]> {
+    if (connectionId) {
+      await this.loadConnection(connectionId);
+      return this.repository.list(connectionId);
+    }
+    const connections = await this.connectionsRepository.findAll({ providerKey: WHATSAPP_PROVIDER_KEY });
+    const ownIds = new Set(connections.filter((item) => (item.config as Record<string, unknown>)['remote_owned'] === true).map((item) => item.id));
+    const all = await this.repository.list();
+    return all.filter((item) => ownIds.has(item.connection_id));
   }
 
   // ─── CRUD local + vínculo a evento (Checkpoint 1) ───
@@ -45,6 +63,7 @@ export class WhatsappTemplatesService {
     if (!template) {
       throw new NotFoundException('Template não encontrado.');
     }
+    await this.loadConnection(template.connection_id);
     return template;
   }
 
@@ -313,7 +332,30 @@ export class WhatsappTemplatesService {
 
   /** Usado tambem pelo cron de sync (~10 min). */
   async syncConnection(connection: Connection): Promise<{ pulled: number; pushed: number }> {
-    // 1) PUSH: rascunhos locais que ainda nao chegaram na Meta.
+    // Consulta primeiro: se um POST anterior teve resposta perdida, o modelo
+    // remoto já existente é conciliado antes de qualquer nova publicação.
+    const metaTemplates = (await this.connections.execute(
+      connection.id,
+      'listTemplates',
+      {},
+    )) as CentralTemplate[];
+    let pulled = 0;
+    for (const t of metaTemplates) {
+      if (!t?.name || !t?.language) continue;
+      await this.repository.upsertFromMeta({
+        connectionId: connection.id,
+        name: t.name,
+        language: t.language,
+        category: t.category ?? 'UTILITY',
+        status: META_STATUS_MAP[(t.status ?? 'PENDING').toUpperCase()] ?? 'PENDING',
+        components: Array.isArray(t.components) ? t.components : [],
+        metaTemplateId: t.id ?? null,
+        rejectionReason: t.rejected_reason ?? null,
+      });
+      pulled++;
+    }
+
+    // Publica somente os rascunhos que ainda não apareceram na Central.
     let pushed = 0;
     const drafts = await this.repository.listDrafts(connection.id);
     for (const draft of drafts) {
@@ -335,27 +377,6 @@ export class WhatsappTemplatesService {
       }
     }
 
-    // 2) PULL: catalogo da WABA → upsert local.
-    const metaTemplates = (await this.connections.execute(
-      connection.id,
-      'listTemplates',
-      {},
-    )) as MetaTemplate[];
-    let pulled = 0;
-    for (const t of metaTemplates) {
-      if (!t?.name || !t?.language) continue;
-      await this.repository.upsertFromMeta({
-        connectionId: connection.id,
-        name: t.name,
-        language: t.language,
-        category: t.category ?? 'UTILITY',
-        status: META_STATUS_MAP[(t.status ?? 'PENDING').toUpperCase()] ?? 'PENDING',
-        components: Array.isArray(t.components) ? t.components : [],
-        metaTemplateId: t.id ?? null,
-        rejectionReason: t.rejected_reason ?? null,
-      });
-      pulled++;
-    }
     return { pulled, pushed };
   }
 
@@ -430,6 +451,7 @@ export class WhatsappTemplatesService {
     if (!connection || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
       throw new NotFoundException('Conexão WhatsApp não encontrada.');
     }
+    await this.nivoo.assertCurrentOwner(connection.id);
     return connection;
   }
 }

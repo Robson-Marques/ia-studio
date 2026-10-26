@@ -1,6 +1,4 @@
-// Números WhatsApp — visão das conexões whatsapp-meta da instalação com
-// qualidade/limite/status/health (painel da conexao, spec Wizard Meta) +
-// sync manual. A criacao de conexao continua no Connection Wizard (Fase 2).
+// Números WhatsApp da Central Nivoo, com onboarding e desconexão oficiais.
 import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Connection } from '@prisma/client';
@@ -9,11 +7,12 @@ import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
-import { WhatsappSyncService } from './whatsapp-sync.service';
+import { NivooSyncService } from './nivoo-sync.service';
 import { WhatsappAssistantService } from './whatsapp-assistant.service';
 import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { SetChannelAssistantDto } from '../dto/set-channel-assistant.dto';
+import { NivooConnectionsService } from './nivoo-connections.service';
+import { WhatsappTemplatesRepository } from './whatsapp-templates.repository';
 
 @ApiTags('Comm — WhatsApp Números')
 @ApiBearerAuth()
@@ -21,21 +20,45 @@ import { SetChannelAssistantDto } from '../dto/set-channel-assistant.dto';
 export class WhatsappNumbersController {
   constructor(
     private readonly connections: ConnectionsRepository,
-    private readonly sync: WhatsappSyncService,
-    private readonly prisma: PrismaService,
+    private readonly sync: NivooSyncService,
     private readonly assistant: WhatsappAssistantService,
+    private readonly nivoo: NivooConnectionsService,
+    private readonly templates: WhatsappTemplatesRepository,
   ) {}
 
   @Get()
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ)
-  async list(
-  ) {
-    const items = await this.connections.findAll({
-      providerKey: WHATSAPP_PROVIDER_KEY,
-    });
-    const states = await this.prisma.whatsappSyncState.findMany();
-    const stateByConnection = new Map(states.map((s) => [s.connection_id, s]));
-    return items.map((c) => this.toView(c, stateByConnection.get(c.id)));
+  async list() {
+    const current = await this.connections.findAll({ providerKey: WHATSAPP_PROVIDER_KEY });
+    const owned = current.filter((c) => (c.config as Record<string, unknown>)['remote_owned'] === true);
+    return Promise.all(owned.map(async (connection) => ({
+      ...this.toView(connection),
+      templates_count: await this.templates.countByConnection(connection.id),
+    })));
+  }
+
+  @Post('onboarding/sessions')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  createSession() {
+    return this.nivoo.createSession();
+  }
+
+  @Get('setup')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ)
+  async setup() {
+    return { configured: await this.nivoo.isConfigured() };
+  }
+
+  @Get('onboarding/sessions/:sessionId')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  getSession(@Param('sessionId') sessionId: string) {
+    return this.nivoo.getSession(sessionId);
+  }
+
+  @Post(':id/disconnect')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  disconnect(@Param('id') id: string) {
+    return this.nivoo.disconnect(id);
   }
 
   @Post(':id/sync')
@@ -47,7 +70,7 @@ export class WhatsappNumbersController {
     if (!connection || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
       throw new NotFoundException('Conexão WhatsApp não encontrada.');
     }
-    return this.sync.syncConnection(connection);
+    return this.sync.sync();
   }
 
   // ─── Vínculo assistente↔número ──────────────────────
@@ -80,7 +103,7 @@ export class WhatsappNumbersController {
     return this.assistant.remove(id);
   }
 
-  private toView(connection: Connection, state?: { [k: string]: unknown } | null) {
+  private toView(connection: Connection) {
     const config = (connection.config ?? {}) as Record<string, unknown>;
     return {
       id: connection.id,
@@ -93,13 +116,12 @@ export class WhatsappNumbersController {
       waba_id: config['waba_id'] ?? null,
       department: config['department'] ?? null,
       is_default: config['is_default'] === 'sim' || config['is_default'] === true,
-      phone: (state?.['phone_number'] as string | undefined) ?? (config['phone'] as string | undefined) ?? null,
-      display_name: (state?.['display_name'] as string | undefined) ?? (config['display_name'] as string | undefined) ?? null,
-      quality_rating: (state?.['quality_rating'] as string | undefined) ?? null,
-      messaging_limit: (state?.['messaging_limit'] as string | undefined) ?? null,
-      templates_count: (state?.['templates_count'] as number | undefined) ?? 0,
-      last_sync_at: (state?.['last_sync_at'] as Date | undefined) ?? connection.last_sync_at,
-      last_sync_error: (state?.['last_error'] as string | undefined) ?? null,
+      phone: (config['phone'] as string | undefined) ?? null,
+      display_name: (config['display_name'] as string | undefined) ?? null,
+      remote_status: config['remote_status'] ?? null,
+      billing_currency: config['billing_currency'] ?? null,
+      history: config['history'] ?? null,
+      last_sync_at: connection.last_sync_at,
       last_health_at: connection.last_health_at,
       last_health_ok: connection.last_health_ok,
       connected_at: connection.connected_at,

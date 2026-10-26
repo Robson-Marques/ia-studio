@@ -2,6 +2,12 @@
 
 ## Não publicado
 
+- WhatsApp integrado exclusivamente pela Central Nivoo: onboarding oficial, posse dos números, conversas e mensagens paginadas, mídia autenticada, templates, envio assíncrono por job e desconexão confirmada.
+- Painel de números configura e abre a Central; caixa de entrada apresenta metadados, respostas, reações e mídia por proxy. Gravação OGG/Opus sai como nota de voz; MP4 sai como áudio comum.
+- Providers e webhooks Meta/YCloud antigos saíram do runtime. Vínculos são desativados e segredos exclusivos apagados; histórico de conexões, logs e conversas permanece para auditoria.
+- Mensagens de entrada novas guardam pendência de publicação do evento e são reprocessadas após falha, sem reativar automações do histórico inicial.
+- Ativação operacional pendente de cadastro do consumidor Newnet, origem HTTPS e chave no backend, migração/build no servidor e validação com instalação real.
+
 - Release coordenada v0.11.94: usa o contrato multipart já validado no Fastify
   para ler os campos do anexo enviado pela Central.
 
