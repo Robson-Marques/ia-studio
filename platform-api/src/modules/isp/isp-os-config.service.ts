@@ -3,6 +3,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConnectionsService } from '../integration/connections/connections.service';
 import { SettingsService } from '../core/settings/settings.service';
+import { SEED_CATALOG } from '../comm/whatsapp/template-catalog/catalog.seed';
 import { IspConnectionResolver } from './isp-connection.resolver';
 import { IspOsConfigRepository, OsConfigPair } from './isp-os-config.repository';
 import {
@@ -122,7 +123,7 @@ export class IspOsConfigService {
     return {
       team_id: typeof team === 'string' && team ? team : null,
       limiar_pct: Number.isFinite(limiarN) && limiarN >= 1 && limiarN <= 100 ? limiarN : ISP_PLANTAO_LIMIAR_DEFAULT,
-      template: typeof template === 'string' && template ? template : null,
+      template: typeof template === 'string' && template ? template : SEED_CATALOG[0].name,
       cooldown_min: Number.isFinite(cooldownN) && cooldownN >= 0 ? cooldownN : ISP_PLANTAO_COOLDOWN_DEFAULT,
     };
   }

@@ -30,6 +30,7 @@ export interface TeamAlertResult {
   channel: 'whatsapp' | 'in-app';
   recipients: number;
   sent: number;
+  queued: number;
   failed: number;
   skipped: number;
   reason?: string;
@@ -69,12 +70,12 @@ export class IspTeamAlertService {
       return this.fallbackInApp(incident, body, 'Template de alerta não configurado.');
     }
 
-    const result: TeamAlertResult = { channel: 'whatsapp', recipients: recipients.length, sent: 0, failed: 0, skipped: 0 };
+    const result: TeamAlertResult = { channel: 'whatsapp', recipients: recipients.length, sent: 0, queued: 0, failed: 0, skipped: 0 };
     const summaryLine = this.summaryLine(incident, opts.stats);
 
     for (const r of recipients) {
       try {
-        const { via } = await this.smartSend.send({
+        const { via, jobId } = await this.smartSend.send({
           phone: r.phone,
           text: body,
           template: cfg.template,
@@ -82,16 +83,18 @@ export class IspTeamAlertService {
           variables: { '1': summaryLine },
           sender: 'system',
         });
-        if (via === 'skipped') result.skipped += 1;
-        else result.sent += 1;
+        if (via === 'skipped' || !jobId) result.skipped += 1;
+        else result.queued += 1;
         await this.repository.createTeamAlert({
           incident_id: incident.id,
           user_id: r.user_id,
           phone: r.phone,
           via,
-          status: via === 'skipped' ? 'FAILED' : 'SENT',
-          error: via === 'skipped' ? 'Envio não concluído (janela/template).' : null,
-          sent_at: via === 'skipped' ? null : new Date(),
+          status: via === 'skipped' || !jobId ? 'FAILED' : 'PENDING',
+          job_id: jobId ?? null,
+          error: via === 'skipped' || !jobId ? 'Envio não aceito pela Central (janela/template).' : null,
+        }).catch((error) => {
+          this.logger.error(`Registro do alerta ${jobId ?? 'sem job'} falhou: ${(error as Error).message}`);
         });
       } catch (e) {
         result.failed += 1;
@@ -107,13 +110,13 @@ export class IspTeamAlertService {
     }
 
     // Se NINGUEM recebeu de fato, degrada pro in-app para o plantao nao ficar no escuro.
-    if (result.sent === 0) {
+    if (result.queued === 0) {
       const fb = await this.fallbackInApp(incident, body, 'Disparo ao plantão não concluído (janela/template).');
       return { ...fb, recipients: recipients.length };
     }
 
     this.logger.log(
-      `Alerta de incidente ${incident.id} ao plantão: ${result.sent} enviados, ${result.failed} falhas, ${result.skipped} pulados.`,
+      `Alerta de incidente ${incident.id} ao plantão: ${result.queued} aceitos pela Central, ${result.failed} falhas, ${result.skipped} pulados.`,
     );
     return result;
   }
@@ -128,7 +131,7 @@ export class IspTeamAlertService {
     } catch (e) {
       this.logger.warn(`Fallback in-app do alerta de incidente ${incident.id} falhou: ${(e as Error).message}`);
     }
-    return { channel: 'in-app', recipients: 0, sent: 0, failed: 0, skipped: 0, reason };
+    return { channel: 'in-app', recipients: 0, sent: 0, queued: 0, failed: 0, skipped: 0, reason };
   }
 
   private buildBody(incident: IspIncident, stats?: TeamAlertStats): string {

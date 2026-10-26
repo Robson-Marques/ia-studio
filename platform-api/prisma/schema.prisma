@@ -1423,6 +1423,7 @@ model IspIncidentDispatch {
   target_id       String
   channel         String                    @default("WHATSAPP")
   template_id     String?
+  job_id          String?                   @unique
   status          IspIncidentDispatchStatus @default(PENDING)
   sent_at         DateTime?
   error           String?
@@ -1445,6 +1446,7 @@ model IspIncidentTeamAlert {
   user_id         String
   phone           String
   via             String?
+  job_id          String?                   @unique
   status          IspIncidentDispatchStatus @default(PENDING)
   error           String?
   sent_at         DateTime?

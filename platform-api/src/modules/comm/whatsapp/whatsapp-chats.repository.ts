@@ -36,6 +36,12 @@ export class WhatsappChatsRepository {
     return this.prisma.whatsappChat.findUnique({ where: { id } });
   }
 
+  canViewChat(id: string, visibilityWhere?: Prisma.WhatsappChatWhereInput): Promise<boolean> {
+    return this.prisma.whatsappChat.count({
+      where: visibilityWhere ? { AND: [{ id }, visibilityWhere] } : { id },
+    }).then((count) => count > 0);
+  }
+
   findChatByRemoteId(id: string): Promise<WhatsappChat | null> {
     return this.prisma.whatsappChat.findUnique({ where: { remote_chat_id: id } });
   }
@@ -193,6 +199,17 @@ export class WhatsappChatsRepository {
         error_detail: error,
       },
     });
+    if (status === 'DONE' || status === 'FAILED') {
+      const outcome = {
+        status: status === 'DONE' ? 'SENT' as const : 'FAILED' as const,
+        sent_at: status === 'DONE' ? new Date() : null,
+        error,
+      };
+      await Promise.all([
+        this.prisma.ispIncidentDispatch.updateMany({ where: { job_id: id }, data: outcome }),
+        this.prisma.ispIncidentTeamAlert.updateMany({ where: { job_id: id }, data: outcome }),
+      ]);
+    }
     if (status === 'DONE') {
       const humanMessage = await this.prisma.whatsappMessage.findFirst({
         where: { remote_job_id: id, sender: { startsWith: 'user:' } },

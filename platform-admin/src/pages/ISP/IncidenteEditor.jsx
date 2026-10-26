@@ -154,8 +154,8 @@ export default function IncidenteEditor() {
     try {
       if (confirm.kind === 'activate') {
         const res = await activateIncident(id, { confirm: true });
-        const sent = res?.dispatch?.sent;
-        toast.success(sent != null ? `Incidente ativado — ${sent} avisos enviados.` : 'Incidente ativado.');
+        const sent = res?.dispatch?.queued ?? res?.dispatch?.sent;
+        toast.success(sent != null ? `Incidente ativado — ${sent} avisos aceitos pela Central para processamento.` : 'Incidente ativado.');
       } else {
         await resolveIncident(id, { confirm: true });
         toast.success('Incidente encerrado.');
@@ -472,7 +472,7 @@ function AfetadosTab({ incidentId, incident, canWrite, canDispatch, onChanged })
     setBusy(true);
     try {
       const res = await dispatchIncident(incidentId, { confirm: true, rate_per_sec: rate });
-      toast.success(`Disparo concluído — ${res?.sent ?? 0} enviados, ${res?.failed ?? 0} falha(s).`);
+      toast.success(`Disparo aceito pela Central — ${res?.queued ?? 0} na fila, ${res?.failed ?? 0} falha(s). Consulte o estado final das mensagens após o processamento.`);
       setDispatchConfirm(false);
       setDispatchOpen(false);
       onChanged();

@@ -328,6 +328,7 @@ export class IspIncidentsService {
         channel: alertResult.channel,
         recipients: alertResult.recipients,
         sent: alertResult.sent,
+        queued: alertResult.queued,
         failed: alertResult.failed,
       },
     });
@@ -344,7 +345,7 @@ export class IspIncidentsService {
       action: 'isp.incident.dispatch',
       entityType: 'IspIncident',
       entityId: incident.id,
-      newValue: { sent: result.sent, failed: result.failed, skipped: result.skipped, total: result.total },
+      newValue: { sent: result.sent, queued: result.queued, failed: result.failed, skipped: result.skipped, total: result.total },
     });
     return result;
   }

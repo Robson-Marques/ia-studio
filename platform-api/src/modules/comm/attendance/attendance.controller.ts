@@ -11,6 +11,7 @@ import { Auditable } from '../../../shared/audit/auditable.decorator';
 import { ChatAssignmentService, TransferTarget } from './chat-assignment.service';
 import { ChatScopeResolver } from './chat-scope.resolver';
 import { ChatEventsService } from './chat-events.service';
+import { WhatsappInboxService } from '../whatsapp/whatsapp-inbox.service';
 import { CloseChatDto, TransferChatDto } from '../dto/transfer-chat.dto';
 
 const ANY_VIEW = [
@@ -28,6 +29,7 @@ export class AttendanceController {
     private readonly assignment: ChatAssignmentService,
     private readonly scopeResolver: ChatScopeResolver,
     private readonly events: ChatEventsService,
+    private readonly inbox: WhatsappInboxService,
   ) {}
 
   @Post(':id/claim')
@@ -37,6 +39,7 @@ export class AttendanceController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     const scope = await this.scopeResolver.resolve(user);
     return this.assignment.claim(id, scope);
   }
@@ -48,6 +51,7 @@ export class AttendanceController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     const scope = await this.scopeResolver.resolve(user);
     return this.assignment.release(id, scope);
   }
@@ -60,6 +64,7 @@ export class AttendanceController {
     @Param('id') id: string,
     @Body() dto: TransferChatDto,
   ) {
+    await this.inbox.assertCanView(user, id);
     const scope = await this.scopeResolver.resolve(user);
     const target: TransferTarget = { type: dto.type, id: dto.id } as TransferTarget;
     return this.assignment.transfer(id, scope, target, dto.reason);
@@ -73,6 +78,7 @@ export class AttendanceController {
     @Param('id') id: string,
     @Body() dto: CloseChatDto,
   ) {
+    await this.inbox.assertCanView(user, id);
     const scope = await this.scopeResolver.resolve(user);
     return this.assignment.close(id, scope, dto.reason);
   }
@@ -84,6 +90,7 @@ export class AttendanceController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     const scope = await this.scopeResolver.resolve(user);
     return this.assignment.reopen(id, scope);
   }
@@ -91,10 +98,11 @@ export class AttendanceController {
   /** Trilha de atendimento (TimelineModal). */
   @Get(':id/timeline')
   @RequirePermissions(...ANY_VIEW)
-  timeline(
+  async timeline(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.events.timeline(id);
   }
 }

@@ -172,6 +172,13 @@ export class WhatsappInboxService {
     return { ...chat, current_handler_name: handlerName };
   }
 
+  async assertCanView(user: AuthenticatedUser, chatId: string): Promise<void> {
+    const scope = await this.scopeResolver.resolve(user);
+    const visible = await this.chats.canViewChat(chatId, this.scopeResolver.buildVisibilityWhere(scope));
+    if (!visible) throw new NotFoundException('Conversa não encontrada.');
+    await this.getChat(chatId);
+  }
+
   /** Vincula o cliente (titular do cadastro) a este WhatsApp — grava o CPF/ref/
    *  nome no chat. Trocável: outro CPF re-vincula. Usado pela tool da IA. */
   async linkCustomer(

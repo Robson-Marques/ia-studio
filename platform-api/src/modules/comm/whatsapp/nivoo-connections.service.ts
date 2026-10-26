@@ -6,6 +6,7 @@ import { ConnectionsRepository } from '../../integration/connections/connections
 import { SecretsService } from '../../integration/secrets/secrets.service';
 import { NIVOO_PROVIDER_KEY } from '../../integration/registry/providers/whatsapp-nivoo.provider';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { WhatsappTemplatesRepository } from './whatsapp-templates.repository';
 
 @Injectable()
 export class NivooConnectionsService {
@@ -14,6 +15,7 @@ export class NivooConnectionsService {
     private readonly secrets: SecretsService,
     private readonly audit: AuditLogService,
     private readonly prisma: PrismaService,
+    private readonly templates: WhatsappTemplatesRepository,
   ) {}
 
   async isConfigured(): Promise<boolean> {
@@ -138,6 +140,7 @@ export class NivooConnectionsService {
         });
       }
       if (!local) throw new Error('Falha ao espelhar a conexão WhatsApp da Central.');
+      await this.templates.seedCatalog(local.id);
       if (legacy && legacy.id !== local.id) {
         const binding = await this.prisma.commChannelAgent.findUnique({ where: { connection_id: legacy.id } });
         if (binding) {

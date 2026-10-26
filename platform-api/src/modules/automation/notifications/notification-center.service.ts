@@ -70,7 +70,7 @@ export class NotificationCenterService {
     let lastDetail = '';
     for (const ch of chain) {
       const result = await this.deliverVia(ch, args, content);
-      if (result.status === 'SENT') return result;
+      if (result.status === 'SENT' || result.status === 'QUEUED') return result;
       lastDetail = result.detail ?? '';
       if (result.status === 'SKIPPED') continue;
     }
@@ -116,15 +116,15 @@ export class NotificationCenterService {
     try {
       if (channel === 'whatsapp') {
         if (!args.recipient.phone) return { channel, status: 'SKIPPED', detail: 'sem telefone' };
-        await this.whatsapp.send(
+        const result = await this.whatsapp.send(
           {
             phone: args.recipient.phone,
             sender: 'system',
           },
           { kind: 'text', body: content.body || content.title },
         );
-        await this.log(args, channel, 'SENT');
-        return { channel, status: 'SENT' };
+        await this.log(args, channel, 'QUEUED', `job_id=${result.jobId ?? 'indisponível'}; confirmação pendente na Central`);
+        return { channel, status: 'QUEUED' };
       }
 
       if (channel === 'email') {

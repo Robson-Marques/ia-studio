@@ -155,6 +155,12 @@ export class WhatsappTemplatesController {
     return this.templates.pushEdit(id, dto);
   }
 
+  @Post(':id/publish')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE)
+  publish(@Param('id') id: string) {
+    return this.templates.publishDraft(id);
+  }
+
   @Post(':id/delete-official')
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE)
   deleteOfficial(

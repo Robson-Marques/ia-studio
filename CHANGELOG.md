@@ -6,6 +6,9 @@
 - Painel de números configura e abre a Central; caixa de entrada apresenta metadados, respostas, reações e mídia por proxy. Gravação OGG/Opus sai como nota de voz; MP4 sai como áudio comum.
 - Providers e webhooks Meta/YCloud antigos saíram do runtime. Vínculos são desativados e segredos exclusivos apagados; histórico de conexões, logs e conversas permanece para auditoria.
 - Mensagens de entrada novas guardam pendência de publicação do evento e são reprocessadas após falha, sem reativar automações do histórico inicial.
+- Leitura, mídia e ações de atendimento exigem visibilidade da conversa específica; metadados de envio WhatsApp sensíveis são ocultados dos logs.
+- Catálogo nativo de três templates HSM para alertas e avisos ISP é semeado por número como rascunho. A publicação dos modelos do sistema é explícita no painel.
+- Disparos ISP respeitam a janela de 24 horas e guardam o job da Central como pendente; a reconciliação marca sucesso ou falha final. O Notification Center também registra aceite WhatsApp como `QUEUED`.
 - Ativação operacional pendente de cadastro do consumidor Newnet, origem HTTPS e chave no backend, migração/build no servidor e validação com instalação real.
 
 - Release coordenada v0.11.94: usa o contrato multipart já validado no Fastify

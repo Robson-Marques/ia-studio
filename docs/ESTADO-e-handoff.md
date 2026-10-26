@@ -6,12 +6,14 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-10-26 (migração WhatsApp pela Central Nivoo em
-> desenvolvimento; base de referência `v0.11.42` permanece como marco anterior).
+> Última atualização: 2026-10-26 (integração WhatsApp pela Central Nivoo
+> baseada na linha remota `v0.11.94`; ativação operacional ainda pendente).
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
 
 O IA Studio Newnet está sendo migrado para o contrato remoto da Central WhatsApp v2.6.0. O código local já contém cliente autenticado, provider `whatsapp-nivoo`, onboarding, sincronização paginada de conversas/mensagens, reconciliação de jobs, mídia autenticada, templates e tela de números. O runtime Meta/YCloud e seus webhooks foram retirados; conexões antigas são desativadas no boot e seus registros relacionados são preservados para auditoria. Fonte técnica local: `platform-api/src/modules/comm/README.md`.
+
+A auditoria posterior ao rebase fechou o acesso por ID às conversas/mídias/ações de atendimento, ocultou dados de mensagem dos logs e incluiu três rascunhos HSM nativos para alertas e avisos ISP. A publicação do modelo do sistema é explícita; disparos ficam pendentes até a Central concluir o job. A atualização ainda precisa de build/migração e smoke test no servidor.
 
 **Ainda não ativado:** o consumidor Newnet, `installation_id` e origem HTTPS exata não foram cadastrados na Central. Não inventar identificadores. A chave interna deve ser cadastrada no cofre pelo painel/backend, nunca enviada em chat nem ao navegador. O Windows local não tem Node; build, migração Prisma, smoke test e eventual publicação ocorrem no servidor/CI, após o cadastro real. A documentação anterior abaixo registra o estado histórico da vertente e não comprova ativação desta frente.
 
@@ -732,13 +734,10 @@ login white-label. **Nada muda em produção até cadastrar endereço** (registr
 
 ## 🧹 Pendências técnicas conhecidas (não urgentes)
 
-- **Catálogo de templates HSM (padrão do Aquapark) — IA Studio NÃO tem.** A regra nova no `CLAUDE.md`
-  exige um catálogo nativo de templates prontos-pra-publicar (seed no boot + `resolveButtonUrl` das ações
-  de botão/links de acesso). O IA Studio hoje só tem CRUD manual de template (`WhatsappTemplate`). **Frente
-  própria:** portar o subsistema `whatsapp-template-catalog/` do Aquapark (`catalog.seed.ts` +
-  `template-actions.ts` + mapper/service/controller + aba "Templates do Sistema"), semeando os templates do
-  ISP como padrões (inclusive o **alerta de incidente** da frente 6). Enquanto não vier, o template do alerta
-  é criado manual na Meta e apontado no card "Equipe de plantão".
+- **Catálogo HSM:** a integração Central Nivoo adicionou três modelos ISP como rascunhos nativos
+  semeados por número no boot e na sincronização, com revisão/publicação explícita na tela de Templates.
+  Esses modelos não têm botões; o resolvedor de URLs simbólicas continua reservado para futuros modelos
+  que precisarem de botões. Publicação e aprovação pela Meta ainda dependem da instalação real.
 
 - **PIX inline** na página de pagamento: falta o endpoint IXC do "Copiar código PIX" (o `get_boleto
   dados` não traz o EMV). Op `financeiro.boleto_pix` + `findPixEmv` prontas — só trocar a chamada.

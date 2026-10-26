@@ -2,10 +2,31 @@
 import { Injectable } from '@nestjs/common';
 import { CommTemplateStatus, Prisma, WhatsappTemplate } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { SEED_CATALOG } from './template-catalog/catalog.seed';
 
 @Injectable()
 export class WhatsappTemplatesRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async seedCatalog(connectionId: string): Promise<void> {
+    for (const item of SEED_CATALOG) {
+      await this.prisma.whatsappTemplate.upsert({
+        where: { connection_id_name_language: { connection_id: connectionId, name: item.name, language: item.language } },
+        create: {
+          connection_id: connectionId,
+          name: item.name,
+          language: item.language,
+          category: item.category,
+          status: 'DRAFT',
+          components: item.components as unknown as Prisma.InputJsonValue,
+          event: item.event,
+          is_system_template: true,
+          variable_map_json: item.variableMap as unknown as Prisma.InputJsonValue,
+        },
+        update: {},
+      });
+    }
+  }
 
   list(connectionId?: string): Promise<WhatsappTemplate[]> {
     return this.prisma.whatsappTemplate.findMany({

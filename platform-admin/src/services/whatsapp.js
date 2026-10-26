@@ -166,6 +166,11 @@ export async function syncTemplates(connectionId) {
   catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao sincronizar templates')); }
 }
 
+export async function publishTemplate(id) {
+  try { const { data } = await api.post(`/comm/whatsapp/templates/${id}/publish`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao publicar o template')); }
+}
+
 export async function getTemplate(id) {
   try { const { data } = await api.get(`/comm/whatsapp/templates/${id}`); return data; }
   catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar o template')); }

@@ -34,7 +34,7 @@ export class WhatsappSmartSendService {
 
   constructor(private readonly orchestrator: WhatsappOrchestratorService) {}
 
-  async send(args: SmartSendArgs): Promise<{ via: SmartSendVia }> {
+  async send(args: SmartSendArgs): Promise<{ via: SmartSendVia; jobId?: string }> {
     const phone = normalizePhone(args.phone);
     if (!phone) return { via: 'skipped' };
     const language = args.language ?? 'pt_BR';
@@ -44,7 +44,7 @@ export class WhatsappSmartSendService {
     // Fora da janela (sabido): direto ao template, sem tentar texto livre.
     if (state !== 'within') {
       const template = state === 'none' ? (args.coldTemplate ?? args.template) : args.template;
-      return { via: await this.sendTemplate(args, phone, template, language) };
+      return this.sendTemplate(args, phone, template, language);
     }
 
     // Dentro da janela: emissor "nao-interromper" desiste.
@@ -52,16 +52,16 @@ export class WhatsappSmartSendService {
 
     // Dentro da janela: texto livre.
     try {
-      await this.orchestrator.send(
+      const result = await this.orchestrator.send(
         { phone, criteria: { connectionId: connection.id }, sender: args.sender ?? 'system' },
         { kind: 'text', body: args.text },
       );
-      return { via: 'text' };
+      return { via: 'text', jobId: result.jobId };
     } catch (err) {
       // Backstop da Central: janela local desatualizada → template.
       if (err instanceof NivooCentralError && err.requiresTemplate) {
         this.logger.warn(`Janela encerrada para ${phone} — usando o modelo ${args.template}.`);
-        return { via: await this.sendTemplate(args, phone, args.template, language) };
+        return this.sendTemplate(args, phone, args.template, language);
       }
       throw err;
     }
@@ -72,9 +72,9 @@ export class WhatsappSmartSendService {
     phone: string,
     templateName: string,
     language: string,
-  ): Promise<SmartSendVia> {
+  ): Promise<{ via: SmartSendVia; jobId?: string }> {
     try {
-      await this.orchestrator.send(
+      const result = await this.orchestrator.send(
         {
           phone,
           criteria: args.criteria,
@@ -82,11 +82,11 @@ export class WhatsappSmartSendService {
         },
         { kind: 'template', name: templateName, language, variables: args.variables },
       );
-      return 'template';
+      return { via: 'template', jobId: result.jobId };
     } catch (err) {
       // Template nao publicado/aprovado → nao quebra o fluxo do emissor.
       this.logger.warn(`Template "${templateName}" não enviado a ${phone}: ${(err as Error).message}`);
-      return 'skipped';
+      return { via: 'skipped' };
     }
   }
 }

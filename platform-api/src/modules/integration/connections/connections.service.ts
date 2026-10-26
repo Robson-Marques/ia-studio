@@ -270,6 +270,8 @@ export class ConnectionsService {
     // rastreáveis, mas nunca o texto da mensagem ou a prova de vínculo no log.
     const sensitiveParamKeys = connection.provider_key === 'connectchat'
       ? ['body', 'proof', 'customerRef', 'globalIdentityId']
+      : connection.provider_key === 'whatsapp-nivoo'
+        ? ['to', 'body', 'variables', 'caption', 'url', 'media_id', 'remote_chat_id', 'filename']
       : connection.provider_key === 'ixc' ? ['cpf', 'customerId'] : [];
     try {
       const result = await provider.execute(ctx, operation, params);

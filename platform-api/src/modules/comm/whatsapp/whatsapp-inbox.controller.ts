@@ -1,6 +1,6 @@
 // Conversas WhatsApp — listagem/mensagens/envio/janela/midia + envio pelo
 // orquestrador da Central (critérios; sem número fixo). ACL granular por endpoint.
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, StreamableFile } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { CommChatStatus } from '@prisma/client';
@@ -83,31 +83,34 @@ export class WhatsappInboxController {
 
   @Get('chats/:id')
   @RequirePermissions(...ANY_VIEW)
-  getChat(
+  async getChat(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.inbox.getChat(id);
   }
 
   /** Desvincula o cliente deste WhatsApp (ação do atendente). */
   @Post('chats/:id/unlink-customer')
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_CLAIM)
-  unlinkCustomer(
+  async unlinkCustomer(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.inbox.unlinkCustomer(id);
   }
 
   @Get('chats/:id/messages')
   @RequirePermissions(...ANY_VIEW)
-  listMessages(
+  async listMessages(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Query('take') take?: string,
     @Query('before') before?: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.inbox.listMessages(
       id,
       take ? Number(take) : undefined,
@@ -117,38 +120,42 @@ export class WhatsappInboxController {
 
   @Get('chats/:id/window')
   @RequirePermissions(...ANY_VIEW)
-  windowState(
+  async windowState(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.inbox.windowState(id);
   }
 
   @Post('chats/:id/read')
   @RequirePermissions(...ANY_VIEW)
-  markRead(
+  async markRead(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.inbox.markRead(id);
   }
 
   @Post('chats/:id/typing')
   @RequirePermissions(...ANY_REPLY)
-  typing(
+  async typing(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.inbox.sendTyping(id);
   }
 
   @Post('chats/:id/send')
   @RequirePermissions(...ANY_REPLY)
-  send(
+  async send(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: SendChatMessageDto,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.inbox.send(user, id, dto);
   }
 
@@ -166,6 +173,7 @@ export class WhatsappInboxController {
     @Param('id') id: string,
     @Req() req: FastifyRequest,
   ) {
+    await this.inbox.assertCanView(user, id);
     // @fastify/multipart registrado no bootstrap. Le o arquivo + campos anexos.
     const reqAny = req as FastifyRequest & {
       isMultipart?: () => boolean;
@@ -221,6 +229,7 @@ export class WhatsappInboxController {
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     const { bytes, mime } = await this.inbox.downloadMedia(id, mediaId);
     return new StreamableFile(bytes, { type: mime, length: bytes.length });
   }
@@ -235,6 +244,12 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: OrchestratorSendDto,
   ) {
+    const permissions = user.permissions ?? [];
+    if (!permissions.includes('*') &&
+      (!permissions.includes(PERMISSIONS.COMM_WHATSAPP_REPLY_ALL) ||
+       !permissions.includes(PERMISSIONS.INTEGRATIONS_CONNECTIONS_EXECUTE))) {
+      throw new ForbiddenException('Sem permissão para envio WhatsApp pelo orquestrador.');
+    }
     return this.orchestrator.send(
       {
         phone: dto.phone,

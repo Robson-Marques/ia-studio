@@ -27,6 +27,8 @@ O painel consulta `GET /comm/whatsapp/numbers/setup`, cria/consulta sessões de 
 
 `comm_whatsapp_chats` e `comm_whatsapp_messages` guardam IDs da Central, ID Meta quando existir, campos ricos e metadados de mídia. Mensagens de entrada novas mantêm `inbound_event_published=false` até o evento de atendimento ser persistido; a sincronização reprocessa as pendentes após falha. `comm_nivoo_whatsapp_sync_checkpoint` guarda o marco da importação e `comm_nivoo_whatsapp_outbound_jobs` guarda o estado dos POSTs aceitos. A Central é a fonte das mensagens; a base local sustenta atendimento e busca. POST de envio não tem retry automático para evitar duplicação.
 
+Cada número recebe rascunhos nativos dos templates de alerta de plantão, aviso de incidente e normalização ISP. O usuário revisa e publica explicitamente esses modelos; o sync não publica rascunhos do sistema. Avisos ISP usam texto dentro da janela e template aprovado fora dela. O POST aceito gera um job `PENDING` nos logs de disparo/alerta; o cron consulta a Central e marca `SENT` ou `FAILED` somente após a resposta final.
+
 Os providers antigos `whatsapp-meta` e `whatsapp-ycloud` são desativados e retirados do runtime. As rotas locais de webhook foram removidas. As linhas antigas de conexão, log e conversa ficam preservadas para auditoria, mas são excluídas das superfícies operacionais. Os segredos são desvinculados; os que não servem a nenhuma outra conexão ou servidor MCP são apagados. Não existe migração retroativa de histórico que a Central não recebeu.
 
 Quando um Phone Number ID corresponde a exatamente uma conexão antiga, o espelho novo herda tags, prioridade, departamento, conexão padrão e vínculo do assistente. Correspondências ambíguas exigem conferência manual no painel.

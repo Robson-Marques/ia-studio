@@ -1,7 +1,7 @@
 // Catalogo de templates HSM por conexao — BIDIRECIONAL (diretriz 11 +
 // spec Wizard Meta): criado no painel → publica na Meta (DRAFT → PENDING);
 // criado/alterado na Meta → aparece aqui no sync (status/razao de rejeicao).
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { CommTemplateStatus, Connection, Prisma, WhatsappTemplate } from '@prisma/client';
 import { WhatsappTemplatesRepository } from './whatsapp-templates.repository';
 import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
@@ -33,7 +33,7 @@ interface CentralTemplate {
 }
 
 @Injectable()
-export class WhatsappTemplatesService {
+export class WhatsappTemplatesService implements OnApplicationBootstrap {
   private readonly logger = new Logger(WhatsappTemplatesService.name);
 
   constructor(
@@ -43,6 +43,15 @@ export class WhatsappTemplatesService {
     private readonly audit: AuditLogService,
     private readonly nivoo: NivooConnectionsService,
   ) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    const connections = await this.connectionsRepository.findAll({ providerKey: WHATSAPP_PROVIDER_KEY });
+    for (const connection of connections) {
+      if ((connection.config as Record<string, unknown>)['remote_owned'] === true) {
+        await this.repository.seedCatalog(connection.id);
+      }
+    }
+  }
 
   async list(connectionId?: string): Promise<WhatsappTemplate[]> {
     if (connectionId) {
@@ -323,6 +332,42 @@ export class WhatsappTemplatesService {
     return template;
   }
 
+  /** Publicação deliberada de um rascunho nativo após revisão na tela. */
+  async publishDraft(id: string): Promise<WhatsappTemplate> {
+    const template = await this.getById(id);
+    if (template.status !== 'DRAFT') throw new BadRequestException('Só rascunhos podem ser publicados.');
+    const remote = (await this.connections.execute(template.connection_id, 'listTemplates', {})) as CentralTemplate[];
+    const alreadyPublished = remote.find((item) => item.name === template.name && item.language === template.language);
+    if (alreadyPublished) {
+      return this.repository.upsertFromMeta({
+        connectionId: template.connection_id,
+        name: template.name,
+        language: template.language,
+        category: alreadyPublished.category ?? template.category,
+        status: META_STATUS_MAP[(alreadyPublished.status ?? 'PENDING').toUpperCase()] ?? 'PENDING',
+        components: alreadyPublished.components ?? template.components as unknown[],
+        metaTemplateId: alreadyPublished.id ?? null,
+        rejectionReason: alreadyPublished.rejected_reason ?? null,
+      });
+    }
+    const result = (await this.connections.execute(template.connection_id, 'createTemplate', {
+      name: template.name,
+      language: template.language,
+      category: template.category,
+      components: template.components,
+    })) as { id?: string; status?: string };
+    const updated = await this.repository.update(id, {
+      status: META_STATUS_MAP[(result.status ?? 'PENDING').toUpperCase()] ?? 'PENDING',
+      meta_template_id: result.id ?? null,
+      synced_at: new Date(),
+    });
+    await this.audit.record({
+      action: 'comm.whatsapp.template.publish', entityType: 'WhatsappTemplate', entityId: id,
+      newValue: { name: template.name, status: updated.status },
+    });
+    return updated;
+  }
+
   // ─── Sync bidirecional (pull Meta → local; push DRAFTs locais) ──────
 
   async sync(connectionId: string): Promise<{ pulled: number; pushed: number }> {
@@ -359,6 +404,7 @@ export class WhatsappTemplatesService {
     let pushed = 0;
     const drafts = await this.repository.listDrafts(connection.id);
     for (const draft of drafts) {
+      if (draft.is_system_template) continue; // requer revisão e publicação explícita
       try {
         const result = (await this.connections.execute(connection.id, 'createTemplate', {
           name: draft.name,

@@ -4,7 +4,7 @@ import { ListScreen, Badge, Button, Select, Field, Checkbox, Modal, ConfirmDialo
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import {
-  listNumbers, listTemplates, syncTemplates,
+  listNumbers, listTemplates, syncTemplates, publishTemplate,
   duplicateTemplate, replicateTemplate, bindTemplateEvent, deleteTemplate, deleteTemplateOfficial,
 } from '../../services/whatsapp';
 import { TEMPLATE_STATUS } from './whatsapp.constants';
@@ -22,6 +22,7 @@ const QUALITY = {
 // MARCADOR local ("este template serve para tal acontecimento") — documentação,
 // não um gatilho automático.
 const EVENTOS = [
+  { value: 'ISP_INCIDENT_TEAM_ALERT', label: 'Alerta de incidente à equipe de plantão' },
   { value: 'whatsapp.inbound.message', label: 'Chegou uma mensagem de WhatsApp' },
   { value: 'ai.agent.run.completed', label: 'Um assistente terminou um atendimento' },
 ];
@@ -108,6 +109,20 @@ export default function Templates() {
     try {
       await duplicateTemplate(t.id);
       toast.success('Template duplicado como rascunho.');
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function handlePublish(t) {
+    if (acting) return;
+    setActing(true);
+    try {
+      await publishTemplate(t.id);
+      toast.success('Template enviado à análise da Meta. Aguarde a aprovação para usá-lo.');
       await load();
     } catch (err) {
       toast.error(err.message);
@@ -213,6 +228,11 @@ export default function Templates() {
     { key: 'synced_at', header: 'Sincronizado', render: (t) => (t.synced_at ? formatDateTime(t.synced_at) : '—') },
     ...(canManage ? [{ key: 'acoes', header: 'Ações', render: (t) => (
       <div className="flex items-center gap-1 justify-end">
+        {t.is_system_template && t.status === 'DRAFT' && (
+          <Button variant="secondary" size="sm" disabled={acting} onClick={() => handlePublish(t)}>
+            Publicar
+          </Button>
+        )}
         <Button
           variant="ghost" size="sm" icon="edit" disabled={acting}
           title={isOnMeta(t) ? 'Editar e reenviar à Meta' : 'Editar rascunho'}
