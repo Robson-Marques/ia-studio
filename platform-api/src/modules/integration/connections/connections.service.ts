@@ -63,11 +63,16 @@ export class ConnectionsService {
     // Providers retirados da instalação podem ter registros históricos no banco.
     // Eles continuam preservados (sem apagar segredo/log), mas não reaparecem na
     // superfície operacional nem podem ser selecionados por fluxos atuais.
-    return connections.filter((connection) => this.registry.has(connection.provider_key));
+    return connections.filter((connection) =>
+      this.registry.has(connection.provider_key) && connection.provider_key !== 'whatsapp-nivoo');
   }
 
   listAvailableProviders() {
-    return this.providerCatalog.listAvailable();
+    // A Central WhatsApp tem duas etapas próprias (identificar a instalação e
+    // conectar números) e é gerida inteira em WhatsApp → Números. Exibi-la no
+    // wizard genérico fazia "Conectar número" saltar para outro produto.
+    return this.providerCatalog.listAvailable().then((providers) =>
+      providers.filter((provider) => provider.key !== 'whatsapp-nivoo'));
   }
 
   async findById(id: string): Promise<Connection> {
@@ -82,8 +87,15 @@ export class ConnectionsService {
   }
 
   // ─── Criacao via wizard ─────────────────────────────
-  async create(dto: CreateConnectionDto, createdBy: string | null) {
+  async create(
+    dto: CreateConnectionDto,
+    createdBy: string | null,
+    options: { allowWhatsappConsumer?: boolean } = {},
+  ) {
     const definition = await this.providerCatalog.definitionForConnection(dto.provider_key);
+    if (dto.provider_key === 'whatsapp-nivoo' && !options.allowWhatsappConsumer) {
+      throw new BadRequestException('Configure a Central Nivoo em WhatsApp → Números.');
+    }
     if (dto.provider_key === 'whatsapp-nivoo' &&
         (await this.repository.countByProvider('whatsapp-nivoo')) > 0) {
       throw new ConflictException('O consumidor da Central WhatsApp já está configurado. Conecte outros números em WhatsApp → Números.');

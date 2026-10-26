@@ -6,8 +6,8 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-10-26 (a aplicação de `v0.11.95` falhou no
-> `prisma db push`; rollback manteve o servidor em `v0.11.94`).
+> Última atualização: 2026-10-26 (o servidor permanece em `v0.11.94`; as
+> tentativas até `v0.11.98` fizeram rollback antes de concluir a release).
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
 
@@ -22,6 +22,10 @@ A auditoria posterior ao rebase fechou o acesso por ID às conversas/mídias/aç
 **Upgrade v0.11.96:** o `db push` passou. O build Nest falhou na tipagem do corpo binário do `fetch` (`Buffer` não aceito como `BodyInit`); rollback manteve o servidor em `v0.11.94`. O cliente foi ajustado para copiar os bytes em `Uint8Array`, padrão já usado em `s3.driver.ts`, e o log dos builds agora captura stdout e stderr com trecho maior. Ainda não há validação de build bem-sucedido nem ativação do consumidor.
 
 **Upgrade v0.11.97:** o `db push` passou novamente, mas a combinação de tipos DOM/Node do servidor também representou o `Uint8Array` como `Uint8Array<ArrayBufferLike>` e recusou o corpo no `fetch`. O rollback manteve `v0.11.94`. A correção seguinte cria um `ArrayBuffer` nominal com o tamanho exato e copia os bytes para ele, removendo a ambiguidade com `SharedArrayBuffer`. A atualização continua sendo feita pelo painel.
+
+**Upgrade v0.11.98:** Prisma, build da API e build do painel passaram. A etapa coordenada do ConnectChat falhou porque a mesma tag ainda não existia no repositório do Chat; o rollback manteve `v0.11.94`. A tag `v0.11.98` do ConnectChat foi publicada depois, apontando para seu commit estável correspondente, mas esta versão não chegou a ser aplicada novamente antes da revisão de fluxo abaixo.
+
+**Revisão v0.11.99:** a preparação do consumidor e a autenticação de um número deixaram de ser apresentadas como duas conexões concorrentes. `WhatsApp → Números` agora contém a configuração técnica única (`installation_id`, origem HTTPS e chave cifrada) e, quando pronta, abre diretamente o onboarding oficial da Central. O provider `whatsapp-nivoo` não aparece mais na lista/wizard genéricos de Integrações; seus registros continuam preservados e disponíveis ao runtime. A linha técnica ganhou marca própria e não é mais convertida no primeiro espelho de número. Build e smoke test desta revisão continuam a cargo do atualizador no servidor.
 
 Atualização de 2026-10-06 — **Canal ConnectChat:** foi adicionada a especialidade
 `ia-studio.connectchat-channel@1.0.1`, o adaptador HTTP somente de backend e a

@@ -241,6 +241,13 @@ export async function getCentralSetup() {
   return data;
 }
 
+export async function configureCentralSetup(body) {
+  try {
+    const { data } = await api.put('/comm/whatsapp/numbers/setup', body);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao configurar a Central Nivoo')); }
+}
+
 export async function startCentralOnboarding() {
   const { data } = await api.post('/comm/whatsapp/numbers/onboarding/sessions');
   return data;

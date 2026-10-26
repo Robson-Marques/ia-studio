@@ -13,6 +13,7 @@ import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
 import { SetChannelAssistantDto } from '../dto/set-channel-assistant.dto';
 import { NivooConnectionsService } from './nivoo-connections.service';
 import { WhatsappTemplatesRepository } from './whatsapp-templates.repository';
+import { ConfigureNivooConsumerDto } from '../dto/configure-nivoo-consumer.dto';
 
 @ApiTags('Comm — WhatsApp Números')
 @ApiBearerAuth()
@@ -46,7 +47,16 @@ export class WhatsappNumbersController {
   @Get('setup')
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ)
   async setup() {
-    return { configured: await this.nivoo.isConfigured() };
+    return this.nivoo.configuration();
+  }
+
+  @Put('setup')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  configureSetup(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ConfigureNivooConsumerDto,
+  ) {
+    return this.nivoo.configureConsumer(dto, user.sub ?? null);
   }
 
   @Get('onboarding/sessions/:sessionId')

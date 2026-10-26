@@ -7,6 +7,8 @@ import { SecretsService } from '../../integration/secrets/secrets.service';
 import { NIVOO_PROVIDER_KEY } from '../../integration/registry/providers/whatsapp-nivoo.provider';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { WhatsappTemplatesRepository } from './whatsapp-templates.repository';
+import { ConnectionsService } from '../../integration/connections/connections.service';
+import { ConfigureNivooConsumerDto } from '../dto/configure-nivoo-consumer.dto';
 
 @Injectable()
 export class NivooConnectionsService {
@@ -16,18 +18,104 @@ export class NivooConnectionsService {
     private readonly audit: AuditLogService,
     private readonly prisma: PrismaService,
     private readonly templates: WhatsappTemplatesRepository,
+    private readonly integrationConnections: ConnectionsService,
   ) {}
 
   async isConfigured(): Promise<boolean> {
+    return (await this.configuration()).configured;
+  }
+
+  async configuration() {
+    const row = await this.findConsumerSetup();
+    const config = (row?.config ?? {}) as Record<string, unknown>;
+    return {
+      configured: !!row?.secret_id && !!config['installation_id'] && !!config['consumer_origin'],
+      connection_id: row?.id ?? null,
+      installation_id: config['installation_id'] ?? null,
+      consumer_origin: config['consumer_origin'] ?? null,
+      status: row?.status ?? null,
+      status_detail: row?.status_detail ?? null,
+      last_health_at: row?.last_health_at ?? null,
+      last_health_ok: row?.last_health_ok ?? null,
+    };
+  }
+
+  async configureConsumer(dto: ConfigureNivooConsumerDto, createdBy: string | null) {
+    const installationId = dto.installation_id.trim();
+    const consumerOrigin = this.normalizeConsumerOrigin(dto.consumer_origin);
+    const internalKey = dto.internal_key?.trim() ?? '';
+    const current = await this.findConsumerSetup();
+
+    if (!installationId) {
+      throw new BadRequestException('Informe o identificador da instalação na Central Nivoo.');
+    }
+    if (!current?.secret_id && !internalKey) {
+      throw new BadRequestException('Informe a chave interna do consumidor da Central Nivoo.');
+    }
+
+    const config = {
+      installation_id: installationId,
+      consumer_origin: consumerOrigin,
+      base_url: 'https://integracoes.nivoo.dev.br',
+      consumer_setup: true,
+    };
+    const secrets = internalKey ? { internal_key: internalKey } : undefined;
+
+    let saved: Connection;
+    if (current) {
+      const currentConfig = (current.config ?? {}) as Record<string, unknown>;
+      saved = await this.integrationConnections.update(current.id, {
+        // Em instalações antigas o primeiro número também era a configuração.
+        // Preserve seu nome operacional até a sincronização separá-lo.
+        name: currentConfig['remote_connection_id']
+          ? current.name
+          : 'Central Nivoo — consumidor WhatsApp',
+        config,
+        ...(secrets ? { secrets } : {}),
+      });
+      saved = (await this.integrationConnections.test(saved.id)).connection;
+    } else {
+      saved = await this.integrationConnections.create({
+        provider_key: NIVOO_PROVIDER_KEY,
+        name: 'Central Nivoo — consumidor WhatsApp',
+        config,
+        secrets,
+      }, createdBy, { allowWhatsappConsumer: true });
+    }
+
+    // Todos os espelhos usam a mesma identificacao e o mesmo segredo do
+    // consumidor. Assim uma rotacao aqui nao deixa numeros antigos apontando
+    // para credenciais obsoletas.
+    const canonical = await this.connections.findById(saved.id);
+    if (!canonical) throw new NotFoundException('Configuração da Central não encontrada após salvar.');
     const rows = await this.connections.findAll({ providerKey: NIVOO_PROVIDER_KEY });
-    return rows.some((row) => !!row.secret_id && !!(row.config as Record<string, unknown>)['installation_id']);
+    for (const row of rows) {
+      if (row.id === canonical.id) continue;
+      const rowConfig = (row.config ?? {}) as Record<string, unknown>;
+      await this.connections.update(row.id, {
+        secret_id: canonical.secret_id,
+        config: {
+          ...rowConfig,
+          installation_id: installationId,
+          consumer_origin: consumerOrigin,
+          base_url: 'https://integracoes.nivoo.dev.br',
+        } as Prisma.InputJsonValue,
+      });
+    }
+
+    await this.audit.record({
+      action: 'comm.whatsapp.nivoo.consumer.configure',
+      entityType: 'Connection', entityId: canonical.id,
+      newValue: { installation_id: installationId, consumer_origin: consumerOrigin },
+    });
+    return this.configuration();
   }
 
   async setup(): Promise<Connection> {
-    const all = await this.connections.findAll({ providerKey: NIVOO_PROVIDER_KEY });
-    const configured = all.find((row) => row.secret_id && (row.config as Record<string, unknown>)['installation_id']);
-    if (!configured) {
-      throw new BadRequestException('Configure primeiro o consumidor WhatsApp (Central Nivoo) em Integrações → Conexões.');
+    const configured = await this.findConsumerSetup();
+    const config = (configured?.config ?? {}) as Record<string, unknown>;
+    if (!configured?.secret_id || !config['installation_id'] || !config['consumer_origin']) {
+      throw new BadRequestException('Configure primeiro a Central Nivoo em WhatsApp → Números.');
     }
     return configured;
   }
@@ -68,7 +156,13 @@ export class NivooConnectionsService {
     const existing = await this.connections.findAll({ providerKey: NIVOO_PROVIDER_KEY });
     const linked: Array<{ local: Connection; remote: NivooConnection }> = [];
     const owned = new Set(remote.map((item) => item.id));
-    let bootstrap = existing.find((row) => !(row.config as Record<string, unknown>)['remote_connection_id']);
+    // Configuracoes novas permanecem tecnicas e nunca viram um numero. O
+    // fallback sem `consumer_setup` preserva instalações criadas antes desta
+    // separacao, nas quais a primeira linha era reaproveitada como espelho.
+    let bootstrap = existing.find((row) => {
+      const config = row.config as Record<string, unknown>;
+      return !config['remote_connection_id'] && config['consumer_setup'] !== true;
+    });
 
     for (const item of remote) {
       if (item.installation_id !== client.installationId) {
@@ -85,8 +179,9 @@ export class NivooConnectionsService {
       }) : [];
       const legacy = legacyMatches.length === 1 ? legacyMatches[0] : null;
       const legacyConfig = (legacy?.config ?? {}) as Record<string, unknown>;
+      const sourceConfig = ((local?.config ?? bootstrap?.config ?? {}) as Record<string, unknown>);
       const config = {
-        ...((local?.config ?? bootstrap?.config ?? {}) as Record<string, unknown>),
+        ...sourceConfig,
         ...(!local && legacy ? {
           department: legacyConfig['department'] ?? null,
           is_default: legacyConfig['is_default'] ?? false,
@@ -94,6 +189,13 @@ export class NivooConnectionsService {
         installation_id: client.installationId,
         consumer_origin: (setup.config as Record<string, unknown>)['consumer_origin'],
         base_url: (setup.config as Record<string, unknown>)['base_url'] || 'https://integracoes.nivoo.dev.br',
+        // Um bootstrap legado continua sendo também a configuração; os
+        // espelhos novos são exclusivamente números operacionais.
+        consumer_setup: local
+          ? local.id === setup.id || sourceConfig['consumer_setup'] === true
+          : bootstrap
+            ? sourceConfig['consumer_setup'] !== false
+            : false,
         remote_connection_id: item.id,
         remote_owned: true,
         phone_number_id: item.phone_number_id,
@@ -201,5 +303,29 @@ export class NivooConnectionsService {
     if (!remoteId || !connections.some((item) => item.id === remoteId)) {
       throw new NotFoundException('Conversa não encontrada nesta instalação.');
     }
+  }
+
+  private async findConsumerSetup(): Promise<Connection | null> {
+    const rows = await this.connections.findAll({ providerKey: NIVOO_PROVIDER_KEY });
+    const isConfigured = (row: Connection) => {
+      const config = row.config as Record<string, unknown>;
+      return !!row.secret_id && !!config['installation_id'] && !!config['consumer_origin'];
+    };
+    return rows.find((row) => (row.config as Record<string, unknown>)['consumer_setup'] === true && isConfigured(row))
+      ?? rows.find((row) => !(row.config as Record<string, unknown>)['remote_connection_id'] && isConfigured(row))
+      ?? rows.find(isConfigured)
+      ?? rows[0]
+      ?? null;
+  }
+
+  private normalizeConsumerOrigin(value: string): string {
+    let parsed: URL;
+    try { parsed = new URL(value.trim()); }
+    catch { throw new BadRequestException('Informe uma origem HTTPS válida para o painel.'); }
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
+        (parsed.pathname !== '/' && parsed.pathname !== '') || parsed.search || parsed.hash) {
+      throw new BadRequestException('A origem do painel deve usar HTTPS e não pode ter caminho, parâmetros ou fragmento.');
+    }
+    return parsed.origin;
   }
 }

@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ListScreen, Badge, Button, Modal, Field, Select, Checkbox, ConfirmDialog, useToast } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Modal, Field, Input, Select, Checkbox, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import {
   listNumbers, syncNumber,
   getNumberAssistant, setNumberAssistant, removeNumberAssistant,
-  getCentralSetup, startCentralOnboarding, getCentralOnboardingSession, disconnectCentralNumber,
+  getCentralSetup, configureCentralSetup, startCentralOnboarding, getCentralOnboardingSession, disconnectCentralNumber,
 } from '../../services/whatsapp';
 import { listAgents } from '../../services/ai';
 import { formatPhone } from './whatsapp.constants';
@@ -28,7 +27,6 @@ const STATUS_LABEL = {
 
 export default function Numeros() {
   const toast = useToast();
-  const navigate = useNavigate();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +39,12 @@ export default function Numeros() {
   const [mAgentId, setMAgentId] = useState('');
   const [mEnabled, setMEnabled] = useState(true);
   const [savingBind, setSavingBind] = useState(false);
-  const [setupConfigured, setSetupConfigured] = useState(false);
+  const [setup, setSetup] = useState({ configured: false });
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupInstallationId, setSetupInstallationId] = useState('');
+  const [setupOrigin, setSetupOrigin] = useState('');
+  const [setupKey, setSetupKey] = useState('');
+  const [savingSetup, setSavingSetup] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [disconnectTarget, setDisconnectTarget] = useState(null);
@@ -62,7 +65,7 @@ export default function Numeros() {
     setLoading(true);
     try {
       const [setup, numbers] = await Promise.all([getCentralSetup(), listNumbers()]);
-      setSetupConfigured(setup.configured === true);
+      setSetup(setup);
       setItems(numbers);
       loadBindings(numbers);
     } catch (err) {
@@ -117,8 +120,8 @@ export default function Numeros() {
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function connectNumber() {
-    if (!setupConfigured) {
-      navigate('/integracoes/conexoes/nova?provider=whatsapp-nivoo');
+    if (!setup.configured) {
+      openSetup();
       return;
     }
     const popup = window.open('about:blank', '_blank');
@@ -136,6 +139,36 @@ export default function Numeros() {
       popup.close();
       toast.error(err.message);
     } finally { setConnecting(false); }
+  }
+
+  function openSetup() {
+    setSetupInstallationId(String(setup.installation_id ?? ''));
+    setSetupOrigin(String(setup.consumer_origin ?? window.location.origin));
+    setSetupKey('');
+    setSetupOpen(true);
+  }
+
+  async function saveSetup() {
+    if (!setupInstallationId.trim()) { toast.error('Informe o identificador da instalação.'); return; }
+    if (!setupOrigin.trim()) { toast.error('Informe a origem HTTPS do painel.'); return; }
+    if (!setup.configured && !setupKey.trim()) { toast.error('Informe a chave interna do consumidor.'); return; }
+    setSavingSetup(true);
+    try {
+      const updated = await configureCentralSetup({
+        installation_id: setupInstallationId.trim(),
+        consumer_origin: setupOrigin.trim(),
+        ...(setupKey.trim() ? { internal_key: setupKey.trim() } : {}),
+      });
+      setSetup(updated);
+      setSetupOpen(false);
+      setSetupKey('');
+      if (updated.last_health_ok === true) {
+        toast.success('Central Nivoo configurada e validada. Agora conecte o número.');
+      } else {
+        toast.warn(updated.status_detail || 'Configuração salva, mas a Central ainda não confirmou o acesso. Confira o cadastro do consumidor.');
+      }
+    } catch (err) { toast.error(err.message); }
+    finally { setSavingSetup(false); }
   }
 
   async function confirmDisconnect() {
@@ -210,17 +243,34 @@ export default function Numeros() {
     load();
   }
 
-  const conectar = can('integrations.connections.write') && (
+  const canManageConnections = can('integrations.connections.write');
+  const configurar = canManageConnections && (
+    <Button
+      variant={setup.configured ? 'secondary' : 'primary'}
+      icon="settings"
+      title="Identificação técnica desta instalação na Central Nivoo"
+      onClick={openSetup}
+    >
+      {setup.configured ? 'Configuração da Central' : 'Configurar Central'}
+    </Button>
+  );
+  const conectar = canManageConnections && setup.configured && (
     <Button
       variant="primary"
       icon="plus"
-      title={setupConfigured ? 'Abrir a conexão oficial da Central em nova aba' : 'Configurar consumidor da Central primeiro'}
+      title="Abrir a autenticação oficial da Meta pela Central Nivoo em nova aba"
       loading={connecting}
       onClick={connectNumber}
     >
       Conectar número
     </Button>
   );
+  const headerActions = items.length ? (
+    <div className="flex items-center gap-2 flex-wrap">
+      {configurar}
+      {conectar}
+    </div>
+  ) : setup.configured ? configurar : null;
 
   const columns = [
     { key: 'name', header: 'Número', render: (n) => (
@@ -306,8 +356,8 @@ export default function Numeros() {
     <>
     <ListScreen
       title="Números"
-      subtitle="Números oficiais administrados pela Central Nivoo. A sincronização automática roda a cada 30 segundos."
-      primaryAction={conectar}
+      subtitle="Configure esta instalação uma vez e conecte cada número diretamente pela autenticação oficial da Central Nivoo."
+      primaryAction={headerActions}
       search={q}
       onSearch={setQ}
       searchPlaceholder="Buscar número…"
@@ -315,17 +365,15 @@ export default function Numeros() {
       columns={columns}
       rows={rows}
       getRowId={(n) => n.id}
-      onRowClick={(n) => navigate(`/integracoes/conexoes/${n.id}`)}
-      getRowLabel={(n) => `Abrir a conexão de ${n.name}`}
       bulkActions={bulkActions}
       filterActive={!!q.trim()}
       emptyNew={{
         icon: 'phone',
         title: 'Nenhum número conectado',
-        description: setupConfigured
-          ? 'Abra a conexão oficial pela Central Nivoo. O histórico disponível começa na data informada pela Central.'
-          : 'Configure o consumidor “WhatsApp (Central Nivoo)” em Integrações → Conexões. Depois conecte o número por aqui.',
-        action: conectar,
+        description: setup.configured
+          ? 'A instalação já está identificada. Abra agora a autenticação oficial da Meta pela Central Nivoo.'
+          : 'Antes do primeiro número, identifique esta instalação na Central Nivoo. Essa preparação técnica é feita uma única vez.',
+        action: setup.configured ? conectar : configurar,
       }}
       emptyFiltered={{ title: 'Nenhum número encontrado', description: 'Nenhum número com esse nome ou telefone.', onClear: () => setQ('') }}
     />
@@ -340,6 +388,59 @@ export default function Numeros() {
       onClose={() => !disconnecting && setDisconnectTarget(null)}
       onConfirm={confirmDisconnect}
     />
+
+    <Modal
+      open={setupOpen}
+      onClose={() => (savingSetup ? null : setSetupOpen(false))}
+      title="Configuração da Central Nivoo"
+      maxWidth={560}
+      footer={
+        <div className="flex items-center gap-2" style={{ justifyContent: 'flex-end', width: '100%' }}>
+          <Button variant="secondary" disabled={savingSetup} onClick={() => setSetupOpen(false)}>Cancelar</Button>
+          <Button variant="primary" loading={savingSetup} onClick={saveSetup}>Salvar e validar</Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <p style={{ fontSize: 13, color: 'var(--su-text-secondary)', margin: 0 }}>
+          Esta etapa apenas identifica o IA Studio perante a Central. Depois de validada, o botão
+          “Conectar número” abre diretamente a autenticação da Meta na Central Nivoo.
+        </p>
+        <Field label="Identificador da instalação" required hint="O mesmo installation_id cadastrado em Plataforma → Consumidores integradores na Central.">
+          <Input
+            value={setupInstallationId}
+            onChange={(e) => setSetupInstallationId(e.target.value)}
+            name="nivoo-installation-id"
+            autoComplete="off"
+          />
+        </Field>
+        <Field label="Origem HTTPS do painel" required hint="Somente a origem exata, sem caminho. Ex.: https://painel.exemplo.com.br">
+          <Input
+            type="url"
+            value={setupOrigin}
+            onChange={(e) => setSetupOrigin(e.target.value)}
+            name="nivoo-consumer-origin"
+            autoComplete="url"
+          />
+        </Field>
+        <Field
+          label="Chave interna do consumidor"
+          required={!setup.configured}
+          hint={setup.configured ? 'Deixe em branco para manter a chave já cifrada no cofre.' : 'A chave fica cifrada no cofre e não volta para o navegador.'}
+        >
+          <Input
+            type="password"
+            value={setupKey}
+            onChange={(e) => setSetupKey(e.target.value)}
+            name="nivoo-internal-key"
+            autoComplete="new-password"
+          />
+        </Field>
+        {setup.configured && setup.last_health_ok === false && setup.status_detail && (
+          <p style={{ fontSize: 12, color: 'var(--su-danger-fg)', margin: 0 }}>{setup.status_detail}</p>
+        )}
+      </div>
+    </Modal>
 
     <Modal
       open={!!modalNumber}
