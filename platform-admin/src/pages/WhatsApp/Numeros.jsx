@@ -124,9 +124,18 @@ export default function Numeros() {
       openSetup();
       return;
     }
-    const popup = window.open('about:blank', '_blank');
-    if (!popup) { toast.error('Permita abrir uma nova aba para conectar o número.'); return; }
+    // A jornada hospedada pela Nivoo é curta e autocontida. Abrimos como
+    // janela auxiliar, igual ao fluxo operacional do AquaPark, para o
+    // administrador continuar vendo o IA Studio ao fundo em vez de perder o
+    // contexto em outra aba.
+    const popup = window.open(
+      'about:blank',
+      'nivoo-whatsapp-connect',
+      'popup,width=560,height=720,resizable=yes,scrollbars=yes',
+    );
+    if (!popup) { toast.error('Permita abrir a janela de conexão do WhatsApp.'); return; }
     popup.opener = null;
+    popup.focus();
     setConnecting(true);
     try {
       const session = await startCentralOnboarding();

@@ -2,6 +2,8 @@
 
 ## Não publicado
 
+- v0.12.01: a autenticação WhatsApp hospedada pela Central Nivoo passa a abrir em uma janela popup compacta, preservando o IA Studio visível ao fundo, em vez de ocupar uma nova aba do navegador.
+
 - v0.11.99: separa a preparação técnica da Central Nivoo da conexão de números. A identificação da instalação passa a ser configurada em um modal próprio de **WhatsApp → Números**; depois disso, **Conectar número** abre diretamente a autenticação oficial da Meta na Central, sem redirecionar para Integrações. O consumidor e os espelhos WhatsApp deixam de aparecer no gerenciador genérico de conexões, e o registro técnico deixa de ser reaproveitado como primeiro número.
 
 - v0.11.98: o upload bruto para a Central copia o `Buffer` recebido para um `ArrayBuffer` nominal antes do `fetch`, compatível com a combinação de tipos DOM/Node usada pelo build no servidor.

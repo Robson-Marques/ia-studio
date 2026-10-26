@@ -27,6 +27,8 @@ A auditoria posterior ao rebase fechou o acesso por ID às conversas/mídias/aç
 
 **Revisão v0.11.99:** a preparação do consumidor e a autenticação de um número deixaram de ser apresentadas como duas conexões concorrentes. `WhatsApp → Números` agora contém a configuração técnica única (`installation_id`, origem HTTPS e chave cifrada) e, quando pronta, abre diretamente o onboarding oficial da Central. O provider `whatsapp-nivoo` não aparece mais na lista/wizard genéricos de Integrações; seus registros continuam preservados e disponíveis ao runtime. A linha técnica ganhou marca própria e não é mais convertida no primeiro espelho de número. Build e smoke test desta revisão continuam a cargo do atualizador no servidor.
 
+**Revisão v0.12.01:** o `launch_url` do onboarding deixa de abrir como uma aba comum e passa a usar a janela auxiliar nomeada `nivoo-whatsapp-connect`, com 560×720 px, redimensionável e rolável. O comportamento porta o fluxo já operacional do AquaPark e mantém a tela de números visível durante a autenticação Meta/Nivoo.
+
 Atualização de 2026-10-06 — **Canal ConnectChat:** foi adicionada a especialidade
 `ia-studio.connectchat-channel@1.0.1`, o adaptador HTTP somente de backend e a
 tela **ConnectChat → Conversas**. O canal usa polling incremental por
