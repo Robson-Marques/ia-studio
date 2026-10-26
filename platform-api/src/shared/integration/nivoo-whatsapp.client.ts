@@ -109,16 +109,19 @@ export class NivooWhatsappClient {
     timeoutMs?: number;
   } = {}): Promise<T> {
     const headers: Record<string, string> = { 'X-Nivoo-Internal-Key': this.key };
-    let body: string | Uint8Array | undefined;
+    let body: string | ArrayBuffer | undefined;
     if (options.body) {
       headers['Content-Type'] = 'application/json';
       body = JSON.stringify({ ...options.body, installation_id: this.installationId });
     } else if (options.bytes) {
       headers['Content-Type'] = options.mime || 'application/octet-stream';
       if (options.filename) headers[options.templateFile ? 'X-Template-File-Name' : 'X-File-Name'] = options.filename;
-      // Buffer não é BodyInit nos tipos DOM usados pelo build; Uint8Array é.
-      // A cópia preserva exatamente os bytes recebidos no upload bruto.
-      body = new Uint8Array(options.bytes);
+      // O build combina os tipos DOM e Node, onde Buffer/Uint8Array podem
+      // carregar ArrayBufferLike (inclusive SharedArrayBuffer) e deixam de ser
+      // aceitos como BodyInit. Copiamos para um ArrayBuffer nominal e exclusivo.
+      const arrayBuffer = new ArrayBuffer(options.bytes.byteLength);
+      new Uint8Array(arrayBuffer).set(options.bytes);
+      body = arrayBuffer;
     }
     let response: Response;
     try {
