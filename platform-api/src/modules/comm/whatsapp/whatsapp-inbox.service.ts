@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { CommChatStatus, CommMessageDirection, Connection, Prisma, WhatsappChat, WhatsappMessage } from '@prisma/client';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
+import { WhatsappMediaStoreService } from './whatsapp-media-store.service';
 import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
 import {
   WHATSAPP_OFFICIAL_PROVIDER_KEY,
@@ -78,6 +79,7 @@ export class WhatsappInboxService {
     private readonly connections: ConnectionsService,
     private readonly connectionsRepository: ConnectionsRepository,
     private readonly nivoo: NivooConnectionsService,
+    private readonly mediaStore: WhatsappMediaStoreService,
   ) {}
 
   // ─── Escopo (a UI monta as abas a partir daqui) ─────
@@ -390,6 +392,8 @@ export class WhatsappInboxService {
     if (connection?.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) {
       const message = await this.chats.findMessageByChatAndMediaRef(chatId, mediaId);
       if (!message) throw new NotFoundException('Mídia não encontrada nesta conversa.');
+      const cached = await this.mediaStore.stored(message);
+      if (cached) return cached;
       const history = chat.remote_history && typeof chat.remote_history === 'object' && !Array.isArray(chat.remote_history)
         ? chat.remote_history as Record<string, unknown>
         : {};
@@ -419,19 +423,27 @@ export class WhatsappInboxService {
         })) as { base64?: string; mime?: string };
       }
       if (!result?.base64) throw new NotFoundException('Mídia não encontrada nesta conversa.');
-      return {
-        bytes: Buffer.from(result.base64, 'base64'),
-        mime: result.mime || 'application/octet-stream',
-      };
+      const bytes = Buffer.from(result.base64, 'base64');
+      const mime = result.mime || 'application/octet-stream';
+      await this.mediaStore.save(message, bytes, mime).catch((error) => {
+        this.logger.warn(`Não foi possível persistir mídia WAHA ${message.id}: ${(error as Error).message}`);
+      });
+      return { bytes, mime };
     }
     const message = await this.chats.findCentralMessageInChat(chatId, mediaId);
     if (!message?.remote_message_id || !chat.remote_chat_id) throw new NotFoundException('Mídia não encontrada nesta conversa.');
+    const cached = await this.mediaStore.stored(message);
+    if (cached) return cached;
     if (message.media_state === 'UNAVAILABLE') {
       throw new ServiceUnavailableException('A Central ainda não disponibilizou este arquivo.');
     }
     // Leitura continua possível após a desconexão oficial. O proxy entrega
     // bytes ao navegador sem serializar arquivos grandes como JSON/base64.
-    return (await this.nivoo.client()).downloadMedia(chat.remote_chat_id, message.remote_message_id);
+    const downloaded = await (await this.nivoo.client()).downloadMedia(chat.remote_chat_id, message.remote_message_id);
+    await this.mediaStore.save(message, downloaded.bytes, downloaded.mime).catch((error) => {
+      this.logger.warn(`Não foi possível persistir mídia Central ${message.id}: ${(error as Error).message}`);
+    });
+    return downloaded;
   }
 
   // ─── Helpers privados ───────────────────────────────
