@@ -38,6 +38,7 @@ function ChatMedia({ chatId, message }) {
   const media = message.media || {};
   const [data, setData] = useState(!media.media_id && media.url ? { src: media.url, mime: media.mime_type } : null);
   const [loading, setLoading] = useState(false);
+  const loadTriggerRef = useRef(null);
 
   async function load() {
     if (!media.media_id) return;
@@ -52,10 +53,19 @@ function ChatMedia({ chatId, message }) {
     }
   }
 
-  // Imagens carregam automaticamente; áudio, vídeo e documentos ficam sob demanda.
-  // A primeira busca grava a cópia no servidor e as seguintes usam o StorageService.
+  // Imagens apenas quando entram perto da tela; outros arquivos sob demanda.
   useEffect(() => {
-    if (message.type === 'image' && !data && media.media_id) load();
+    if (message.type !== 'image' || !media.media_id || data) return;
+    const el = loadTriggerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        observer.disconnect();
+        load();
+      }
+    }, { rootMargin: '160px' });
+    observer.observe(el);
+    return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, media.media_id]);
 
@@ -64,6 +74,7 @@ function ChatMedia({ chatId, message }) {
   if (!data) {
     return (
       <button
+        ref={loadTriggerRef}
         type="button"
         onClick={load}
         disabled={loading}
