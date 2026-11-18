@@ -31,7 +31,7 @@ if [ "${UPGRADE_SELF_COPIED:-}" != "1" ]; then
 fi
 
 # ---------- ARGS (posicionais OU flags) ----------
-TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="/opt/iastudio"; DO_RESTART=1
+TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="${IASTUDIO_APP_DIR:-/opt/iastudio}"; DO_RESTART=1
 POS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -134,12 +134,40 @@ SQL
 }
 trap 'mark_failed "UNEXPECTED" "Erro inesperado na linha $LINENO"' ERR
 
+# PM2 names vary by installation. Find processes belonging to THIS API directory,
+# rather than restarting hardcoded global names (may target another instance).
+find_pm2_name() {
+  local role="$1"
+  pm2 jlist | node -e '
+    let json = "";
+    process.stdin.on("data", chunk => json += chunk);
+    process.stdin.on("end", () => {
+      try {
+        const dir = process.argv[1].replace(/\\/$/, "");
+        const role = process.argv[2];
+        const matches = JSON.parse(json).filter(p => {
+          const cwd = (p.pm2_env?.pm_cwd || "").replace(/\\/$/, "");
+          return cwd === dir && (role === "worker" ? /worker/i.test(p.name) : /api/i.test(p.name) && !/worker/i.test(p.name));
+        });
+        if (matches.length !== 1) process.exit(1);
+        process.stdout.write(matches[0].name);
+      } catch { process.exit(1); }
+    });
+  ' "$API_DIR" "$role"
+}
+
 # ---------- 1) PREFLIGHT ----------
 log_db "PREFLIGHT" "Validando upgrade-id e ambiente"
 STATUS_NOW=$(psql "$DATABASE_URL" -X -tA -c "SELECT status FROM system_upgrades WHERE id = '$UPGRADE_ID'" 2>/dev/null || echo "")
 [ -z "$STATUS_NOW" ]           && mark_failed "PREFLIGHT" "upgrade-id $UPGRADE_ID nao existe"
 [ "$STATUS_NOW" != "RUNNING" ] && mark_failed "PREFLIGHT" "upgrade-id nao esta RUNNING (atual=$STATUS_NOW)"
 FROM_VERSION=$(cd "$REPO_PATH" && git describe --tags --abbrev=0 2>/dev/null || echo "unknown")
+if [ "$DO_RESTART" -eq 1 ]; then
+  PM2_API_NAME="${IASTUDIO_PM2_API_NAME:-$(find_pm2_name api || true)}"
+  PM2_WORKER_NAME="${IASTUDIO_PM2_WORKER_NAME:-$(find_pm2_name worker || true)}"
+  [ -n "$PM2_API_NAME" ] && [ -n "$PM2_WORKER_NAME" ] || mark_failed "PREFLIGHT" "Nao foi possivel identificar API e worker PM2 deste diretorio. Defina IASTUDIO_PM2_API_NAME e IASTUDIO_PM2_WORKER_NAME no .env"
+  log_db "PREFLIGHT" "PM2 api=$PM2_API_NAME worker=$PM2_WORKER_NAME"
+fi
 log_db "PREFLIGHT" "from=$FROM_VERSION to=$TO_VERSION repo=$REPO_PATH"
 
 # ---------- 2) BACKUP ----------
@@ -246,14 +274,10 @@ trap - ERR
 # (mesmo detached) — por isso ele fica por ULTIMO, quando o worker ja pegou o
 # codigo novo. Um comando combinado deixava o worker de fora num restart parcial.
 if [ "$DO_RESTART" -eq 1 ]; then
-  echo "[RESTART] pm2 restart iastudio-worker"
-  pm2 restart iastudio-worker --update-env 2>/dev/null \
-    || pm2 start "$API_DIR/ecosystem.config.js" --only iastudio-worker 2>/dev/null \
-    || echo "AVISO: restart do iastudio-worker retornou nao-zero (verifique pm2 list)"
-  echo "[RESTART] pm2 restart iastudio-api"
-  pm2 restart iastudio-api --update-env 2>/dev/null \
-    || pm2 start "$API_DIR/ecosystem.config.js" --only iastudio-api 2>/dev/null \
-    || echo "AVISO: restart do iastudio-api retornou nao-zero (verifique pm2 list)"
+  log_db "RESTART" "pm2 restart $PM2_WORKER_NAME"
+  pm2 restart "$PM2_WORKER_NAME" --update-env || log_db "RESTART" "AVISO: worker nao reiniciou ($PM2_WORKER_NAME)"
+  log_db "RESTART" "pm2 restart $PM2_API_NAME"
+  pm2 restart "$PM2_API_NAME" --update-env || log_db "RESTART" "AVISO: API nao reiniciou ($PM2_API_NAME)"
 else
   echo "[RESTART] pulado (--no-restart)"
 fi
