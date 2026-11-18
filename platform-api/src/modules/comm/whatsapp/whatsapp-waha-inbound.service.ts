@@ -133,6 +133,9 @@ export class WhatsappWahaInboundService {
           occurredAt: timestamp,
           media: {
             media_id: encodeWahaMediaRef(chatAddress, externalId),
+            ...((existing.media && typeof existing.media === 'object' && !Array.isArray(existing.media) && typeof (existing.media as Record<string, unknown>)['storage_file_id'] === 'string')
+              ? { storage_file_id: (existing.media as Record<string, unknown>)['storage_file_id'] as string }
+              : {}),
             mime_type: mime,
             ...((mediaNode?.['filename'] ?? rawNode?.['filename'])
               ? { filename: String(mediaNode?.['filename'] ?? rawNode?.['filename']) }
@@ -142,6 +145,7 @@ export class WhatsappWahaInboundService {
         });
         await this.mediaStore.persistWahaBestEffort(updated);
       }
+      if (hasMedia && !fromMe) await this.mediaStore.persistWahaBestEffort(existing);
       if (!fromMe && !existing.inbound_event_published) {
         await this.publishInbound(connection, existing.chat_id, phone, externalId, timestamp, type, content, notifyName);
       }
