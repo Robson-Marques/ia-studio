@@ -74,6 +74,8 @@ export interface ConnectResult {
 
 export interface HealthResult {
   ok: boolean;
+  /** Autenticação ainda depende do usuário (ex.: leitura de QR Code). */
+  pendingAuth?: boolean;
   detail?: string;
   /** Checks individuais (ex.: { token: true, endpoint: true }). */
   checks?: Record<string, boolean>;

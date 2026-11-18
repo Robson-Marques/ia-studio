@@ -12,6 +12,9 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({ ignoreTrailingSlash: true, bodyLimit: 10 * 1024 * 1024 }),
+    // Necessário para validar o HMAC SHA-512 do webhook WAHA sobre os bytes
+    // exatos recebidos, sem depender de uma nova serialização do JSON.
+    { rawBody: true },
   );
 
   // Upload de pacotes de backup (multipart/form-data) na administração local.

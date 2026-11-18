@@ -11,6 +11,8 @@
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
 
+**Atualização de 2026-11-18 — WAHA por QR Code:** `WhatsApp → Números` mantém a Meta oficial pela Central Nivoo e passa a oferecer WAHA como segunda opção não oficial. Cada Connection WAHA cria sua própria sessão, mostra/renova o QR e compartilha inbox, atendimento e vínculo com assistente. API key e HMAC ficam no Cofre; automações exigem opt-in. Imagem, áudio, vídeo e documento são enviados e recuperados sob demanda, com referência opaca no histórico e sem base64 persistido. YCloud continua fora do runtime. Ainda faltam build/deploy e pareamento contra um servidor WAHA real; o Windows local não tem Node.
+
 O IA Studio Newnet está sendo migrado para o contrato remoto da Central WhatsApp v2.6.0. O código local já contém cliente autenticado, provider `whatsapp-nivoo`, onboarding, sincronização paginada de conversas/mensagens, reconciliação de jobs, mídia autenticada, templates e tela de números. O runtime Meta/YCloud e seus webhooks foram retirados; conexões antigas são desativadas no boot e seus registros relacionados são preservados para auditoria. Fonte técnica local: `platform-api/src/modules/comm/README.md`.
 
 A auditoria posterior ao rebase fechou o acesso por ID às conversas/mídias/ações de atendimento, ocultou dados de mensagem dos logs e incluiu três rascunhos HSM nativos para alertas e avisos ISP. A publicação do modelo do sistema é explícita; disparos ficam pendentes até a Central concluir o job. A atualização ainda precisa de build/migração e smoke test no servidor.
@@ -330,7 +332,7 @@ para o repo passar a representar só o que está em uso. Inventário read-only e
   no-op em instalação nova, recuperável (backup roda antes). `nest build` verde com
   o client já sem os campos.
 
-WhatsApp oficial (Meta/YCloud), OpenAI e
+WhatsApp oficial (Meta), OpenAI e
 Anthropic seguem intactos. Verificação: `nest build` real da API verde no estado
 pós-remoção; admin conferido por parser JSX (esbuild) + grep; os quatro gates
 verdes em todas as etapas. A prova de build final do admin é a atualização pelo

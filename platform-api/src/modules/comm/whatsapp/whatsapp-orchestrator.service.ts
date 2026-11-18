@@ -1,5 +1,5 @@
-// Orquestrador da Central WhatsApp: resolve a Connection whatsapp-nivoo por
-// critérios locais (ID, tag, departamento, padrão e prioridade).
+// Orquestrador WhatsApp: resolve Meta oficial (Nivoo) ou WAHA por critérios
+// locais (ID, tag, departamento, padrão e prioridade).
 //   1) criteria.connectionId explicito;
 //   2) tag/departamento (Connection.tags / config.department);
 //   3) conexao padrao (config.is_default);
@@ -18,6 +18,14 @@ import {
   WindowState,
   computeWindowState,
 } from '../../../shared/integration/whatsapp.types';
+import {
+  WHATSAPP_OFFICIAL_PROVIDER_KEY,
+  WHATSAPP_WAHA_PROVIDER_KEY,
+  WHATSAPP_PROVIDER_KEYS,
+  allowsAutomaticWhatsappSend,
+  usesOfficialWhatsappWindow,
+} from '../../../shared/integration/whatsapp-provider.constants';
+import { encodeWahaMediaRef } from '../../../shared/integration/waha.client';
 
 export const WHATSAPP_PROVIDER_KEY = 'whatsapp-nivoo';
 
@@ -49,11 +57,14 @@ export class WhatsappOrchestratorService {
 
   async resolveConnection(criteria?: SendCriteria): Promise<Connection> {
     const all = await this.connectionsRepository.findAll({
-      providerKey: WHATSAPP_PROVIDER_KEY,
+      providerKeys: [...WHATSAPP_PROVIDER_KEYS],
     });
     const active = all.filter((c) => {
       const config = c.config as Record<string, unknown>;
-      return c.status === ConnectionStatus.ACTIVE && config['remote_connection_id'] && config['remote_owned'] === true;
+      if (c.status !== ConnectionStatus.ACTIVE) return false;
+      if (c.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) return true;
+      return c.provider_key === WHATSAPP_OFFICIAL_PROVIDER_KEY &&
+        !!config['remote_connection_id'] && config['remote_owned'] === true;
     });
     if (active.length === 0) {
       throw new BadRequestException('Nenhuma conexão WhatsApp ativa nesta instância. Conecte um número primeiro.');
@@ -63,13 +74,23 @@ export class WhatsappOrchestratorService {
     if (criteria?.connectionId) {
       const found = active.find((c) => c.id === criteria.connectionId);
       if (!found) throw new BadRequestException('Conexão WhatsApp informada não está ativa nesta instância.');
+      if (!allowsAutomaticWhatsappSend(found)) {
+        throw new BadRequestException('Esta conexão WAHA não está habilitada para envios automáticos.');
+      }
       return found;
+    }
+
+    // Conexão WAHA só participa de disparos sem conexão explícita quando o
+    // usuário habilitou automações assumindo o risco do canal não oficial.
+    const routable = active.filter(allowsAutomaticWhatsappSend);
+    if (routable.length === 0) {
+      throw new BadRequestException('Nenhuma conexão WhatsApp está habilitada para envios automáticos.');
     }
 
     // 2) Tag / departamento.
     const wanted = (criteria?.tag ?? criteria?.department ?? '').trim().toLowerCase();
     if (wanted) {
-      const byTag = active.find((c) => {
+      const byTag = routable.find((c) => {
         const config = (c.config ?? {}) as Record<string, unknown>;
         const department = typeof config['department'] === 'string' ? (config['department'] as string) : '';
         return (
@@ -82,14 +103,14 @@ export class WhatsappOrchestratorService {
     }
 
     // 3) Conexao padrao do ambiente.
-    const byDefault = active.find((c) => {
+    const byDefault = routable.find((c) => {
       const config = (c.config ?? {}) as Record<string, unknown>;
       return config['is_default'] === 'sim' || config['is_default'] === true;
     });
     if (byDefault) return byDefault;
 
     // 4) Maior prioridade (findAllByOrg ja ordena priority desc).
-    return active[0];
+    return routable[0];
   }
 
   // ─── Envio (RichMessage → Central via Provider Registry) ──────────
@@ -111,6 +132,37 @@ export class WhatsappOrchestratorService {
 
     const { operation, params } = this.toOperation(phone, message);
     const result = (await this.connections.execute(connection.id, operation, params)) as { wamid?: string | null; job_id?: string };
+
+    if (connection.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) {
+      const responseChatId = result.wamid?.match(/(?:true|false)_([^_]+@(?:c\.us|lid))_/i)?.[1]
+        ?? `${phone}@c.us`;
+      const chat = await this.chats.upsertChat({
+        connectionId: connection.id,
+        phone,
+        lastMessage: this.preview(message),
+        direction: CommMessageDirection.OUTGOING,
+      });
+      await this.chats.createMessage({
+        chat_id: chat.id,
+        connection_id: connection.id,
+        external_id: result.wamid ?? null,
+        direction: CommMessageDirection.OUTGOING,
+        sender,
+        type: message.kind === 'template' ? 'template' : message.kind === 'text' ? 'text' : message.kind,
+        content: this.preview(message),
+        media: ['image', 'audio', 'video', 'document'].includes(message.kind)
+          ? {
+              ...(result.wamid ? { media_id: encodeWahaMediaRef(responseChatId, result.wamid) } : {}),
+              ...((message as { url?: string }).url ? { url: (message as { url: string }).url } : {}),
+              ...((message as { caption?: string }).caption ? { caption: (message as { caption: string }).caption } : {}),
+              ...((message as { filename?: string }).filename ? { filename: (message as { filename: string }).filename } : {}),
+            }
+          : undefined,
+        status: 'sent',
+      });
+      return { wamid: result.wamid ?? null, connectionId: connection.id, chatId: chat.id };
+    }
+
     if (!result?.job_id) throw new BadRequestException('A Central não confirmou o enfileiramento da mensagem.');
 
     let chat: Awaited<ReturnType<WhatsappChatsRepository['findChatByConnectionPhone']>> = null;
@@ -147,6 +199,18 @@ export class WhatsappOrchestratorService {
     opts?: { typing?: boolean },
   ): Promise<void> {
     if (!messageId) return;
+    const connection = await this.connectionsRepository.findById(connectionId);
+    if (connection?.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) {
+      try {
+        await this.connections.execute(connectionId, 'markRead', {
+          message_id: messageId,
+          typing: opts?.typing === true,
+        });
+      } catch (e) {
+        this.logger.warn(`Não foi possível marcar a conversa como lida na WAHA: ${(e as Error).message}`);
+      }
+      return;
+    }
     const message = await this.chats.findMessageByExternalId(messageId);
     const chat = message ? await this.chats.findChatById(message.chat_id) : null;
     if (!chat?.remote_chat_id || chat.connection_id !== connectionId) return;
@@ -163,6 +227,13 @@ export class WhatsappOrchestratorService {
   /** Como markRead, resolvendo a última mensagem incoming (wamid) do chat. */
   async markReadByChat(chatId: string, opts?: { typing?: boolean }): Promise<void> {
     const chat = await this.chats.findChatById(chatId);
+    if (!chat) return;
+    const connection = await this.connectionsRepository.findById(chat.connection_id);
+    if (connection?.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) {
+      const anchor = await this.chats.findLastIncomingAnchor(chatId).catch(() => null);
+      if (anchor) await this.markRead(anchor.connection_id, anchor.external_id, opts);
+      return;
+    }
     if (!chat?.remote_chat_id) return;
     try {
       await this.connections.execute(chat.connection_id, 'markRead', {
@@ -177,6 +248,8 @@ export class WhatsappOrchestratorService {
   // ─── Janela de 24h ──────────────────────────────────
 
   async windowState(connectionId: string, rawPhone: string): Promise<WindowState> {
+    const connection = await this.connectionsRepository.findById(connectionId);
+    if (connection && !usesOfficialWhatsappWindow(connection.provider_key)) return 'within';
     const chat = await this.chats.findChatByConnectionPhone(connectionId, normalizePhone(rawPhone));
     return computeWindowState(chat?.last_inbound_at ?? null);
   }
@@ -203,13 +276,15 @@ export class WhatsappOrchestratorService {
             kind: message.kind,
             url: message.url,
             media_id: message.mediaId,
+            data: message.data,
+            mime_type: message.mimeType,
             caption: message.caption,
             filename: message.filename,
             voice: message.voice === true,
           },
         };
       default:
-        throw new BadRequestException('Este formato de mensagem não é aceito pela Central WhatsApp.');
+        throw new BadRequestException('Este formato de mensagem não é aceito pela conexão WhatsApp.');
     }
   }
 

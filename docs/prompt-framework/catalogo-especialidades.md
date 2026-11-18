@@ -46,7 +46,7 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 
 - **Backend / API dedicada** (`platform-api`): modelagem de domínio local, ACL e eventos. Operação por aplicação/vertente é coberta por `ia-studio.dedicated-instance-operations@2.0.0`.
 - **Runtime de assistentes**: prompts operacionais, tools, knowledge base, memória, workflows — regras próprias, **não confundir** com este framework (que governa pedidos humanos de desenvolvimento).
-- **Novos conectores e contratos externos** (Meta, Google, gateways, etc.) — se surgirem. Conectores WhatsApp oficiais exigem Capability/contrato dedicado; Baileys, QR e coexistência manual são proibidos no produto alvo.
+- **Novos conectores e contratos externos** (Meta, Google, gateways, etc.) — se surgirem. A decisão vigente de 2026-11-18 permite Meta oficial + WAHA por QR Code com aceite de risco; Baileys e coexistência manual continuam fora do produto.
 - **Segurança / privacidade** (LGPD, retenção, backup, ACL local).
 - **Documentação / continuidade** (handoff, changelog, dívida técnica).
 

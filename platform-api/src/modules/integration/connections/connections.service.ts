@@ -68,11 +68,10 @@ export class ConnectionsService {
   }
 
   listAvailableProviders() {
-    // A Central WhatsApp tem duas etapas próprias (identificar a instalação e
-    // conectar números) e é gerida inteira em WhatsApp → Números. Exibi-la no
-    // wizard genérico fazia "Conectar número" saltar para outro produto.
+    // Os dois métodos de WhatsApp têm jornadas próprias em WhatsApp → Números.
+    // A WAHA também exige aceite explícito do risco antes de criar a sessão.
     return this.providerCatalog.listAvailable().then((providers) =>
-      providers.filter((provider) => provider.key !== 'whatsapp-nivoo'));
+      providers.filter((provider) => !['whatsapp-nivoo', 'whatsapp-waha'].includes(provider.key)));
   }
 
   async findById(id: string): Promise<Connection> {
@@ -90,7 +89,7 @@ export class ConnectionsService {
   async create(
     dto: CreateConnectionDto,
     createdBy: string | null,
-    options: { allowWhatsappConsumer?: boolean } = {},
+    options: { allowWhatsappConsumer?: boolean; allowWhatsappWaha?: boolean } = {},
   ) {
     const definition = await this.providerCatalog.definitionForConnection(dto.provider_key);
     if (dto.provider_key === 'whatsapp-nivoo' && !options.allowWhatsappConsumer) {
@@ -99,6 +98,9 @@ export class ConnectionsService {
     if (dto.provider_key === 'whatsapp-nivoo' &&
         (await this.repository.countByProvider('whatsapp-nivoo')) > 0) {
       throw new ConflictException('O consumidor da Central WhatsApp já está configurado. Conecte outros números em WhatsApp → Números.');
+    }
+    if (dto.provider_key === 'whatsapp-waha' && !options.allowWhatsappWaha) {
+      throw new BadRequestException('Conecte a WAHA em WhatsApp → Números e confirme o aviso de risco.');
     }
 
     // Higiene: campo marcado como secret no wizard NUNCA entra no config.
@@ -259,10 +261,10 @@ export class ConnectionsService {
       connectionId: id,
       direction: IntegrationDirection.OUTBOUND,
       operation: 'health',
-      status: result.ok ? IntegrationLogStatus.SUCCESS : IntegrationLogStatus.FAILURE,
+      status: result.ok || result.pendingAuth ? IntegrationLogStatus.SUCCESS : IntegrationLogStatus.FAILURE,
       durationMs,
       responseMeta: { detail: result.detail, checks: result.checks },
-      error: result.ok ? undefined : result.detail,
+      error: result.ok || result.pendingAuth ? undefined : result.detail,
       traceId: getRequestStore()?.traceId ?? null,
     });
     return { connection: updated, health: result };
@@ -284,7 +286,9 @@ export class ConnectionsService {
       ? ['body', 'proof', 'customerRef', 'globalIdentityId']
       : connection.provider_key === 'whatsapp-nivoo'
         ? ['to', 'body', 'variables', 'caption', 'url', 'media_id', 'remote_chat_id', 'filename']
-      : connection.provider_key === 'ixc' ? ['cpf', 'customerId'] : [];
+        : connection.provider_key === 'whatsapp-waha'
+          ? ['to', 'body', 'data', 'variables', 'caption', 'url', 'media_id', 'filename']
+          : connection.provider_key === 'ixc' ? ['cpf', 'customerId'] : [];
     try {
       const result = await provider.execute(ctx, operation, params);
       const durationMs = Date.now() - startedAt;
@@ -398,10 +402,10 @@ export class ConnectionsService {
   }
 
   /**
-   * Upload de midia binaria para a Central (retorna media_id). Caminho separado do
+   * Upload de mídia binária pelo provider WhatsApp (retorna media_id/referência). Caminho separado do
    * execute() porque o binario NAO pode ir pro log de integracao (redactSensitive
    * serializaria o Buffer inteiro) — aqui logamos so metadados (mime/filename/tamanho).
-   * O provider whatsapp-nivoo expoe a operacao 'uploadMedia'.
+   * Os providers whatsapp-nivoo e whatsapp-waha expõem `uploadMedia`.
    */
   async uploadMedia(
     id: string,
@@ -425,7 +429,11 @@ export class ConnectionsService {
         durationMs: Date.now() - startedAt,
         // So metadados — nunca o binario.
         requestMeta: { kind: file.kind, mime_type: file.mimeType, filename: file.filename, size: file.data.length },
-        responseMeta: { media_id: result?.media_id ?? null },
+        responseMeta: {
+          media_id: connection.provider_key === 'whatsapp-waha'
+            ? (result?.media_id ? '[base64 protegido]' : null)
+            : result?.media_id ?? null,
+        },
         traceId: getRequestStore()?.traceId ?? null,
       });
       if (!result?.media_id) throw new BadRequestException('Falha ao subir a mídia (sem media_id).');
@@ -532,10 +540,10 @@ export class ConnectionsService {
       connectionId: connection.id,
       direction: IntegrationDirection.OUTBOUND,
       operation: 'connect',
-      status: result.ok ? IntegrationLogStatus.SUCCESS : IntegrationLogStatus.FAILURE,
+      status: result.ok || result.pendingAuth ? IntegrationLogStatus.SUCCESS : IntegrationLogStatus.FAILURE,
       durationMs: Date.now() - startedAt,
       responseMeta: { detail: result.detail, checks: result.checks },
-      error: result.ok ? undefined : result.detail,
+      error: result.ok || result.pendingAuth ? undefined : result.detail,
       traceId: getRequestStore()?.traceId ?? null,
     });
     return this.applyHealthResult(connection, result, true);
@@ -549,7 +557,7 @@ export class ConnectionsService {
   ): Promise<Connection> {
     const data: Prisma.ConnectionUpdateInput = {
       last_health_at: new Date(),
-      last_health_ok: result.ok,
+      last_health_ok: result.pendingAuth ? null : result.ok,
       status_detail: result.detail ?? null,
     };
 
@@ -557,10 +565,14 @@ export class ConnectionsService {
     // os sobrepoe; so registra o resultado.
     const userPinned: ConnectionStatus[] = ['DISABLED', 'MAINTENANCE'];
     if (!userPinned.includes(connection.status)) {
-      const target: ConnectionStatus = result.ok ? 'ACTIVE' : 'ERROR';
+      const target: ConnectionStatus = result.pendingAuth
+        ? 'PENDING_AUTH'
+        : result.ok
+          ? 'ACTIVE'
+          : 'ERROR';
       assertConnectionTransition(connection.status, target);
       data.status = target;
-      data.is_active = result.ok;
+      data.is_active = result.ok && !result.pendingAuth;
       if (result.ok && (isFirstConnect || !connection.connected_at)) {
         data.connected_at = new Date();
       }

@@ -11,6 +11,7 @@ import { SqlServerProvider } from './providers/sqlserver.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { S3Provider } from './providers/s3.provider';
 import { WhatsappNivooProvider } from './providers/whatsapp-nivoo.provider';
+import { WhatsappWahaProvider } from './providers/whatsapp-waha.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 import { ConnectchatProvider } from './providers/connectchat.provider';
 
@@ -27,6 +28,7 @@ import { ConnectchatProvider } from './providers/connectchat.provider';
     SmtpProvider,
     S3Provider,
     WhatsappNivooProvider,
+    WhatsappWahaProvider,
     GoogleWorkspaceProvider,
     ConnectchatProvider,
   ],

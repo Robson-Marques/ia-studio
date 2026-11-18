@@ -1,6 +1,6 @@
 // Inbox de conversas: listagem com escopo de visibilidade (abas Minhas /
 // Não atribuídas / Minha Equipe / Todas), mensagens, envio (reply gate +
-// janela de 24h + orchestrator) e proxy de mídia da Central.
+// janela de 24h + orchestrator) e proxy de mídia do provider.
 import {
   BadRequestException,
   ConflictException,
@@ -10,7 +10,13 @@ import {
 } from '@nestjs/common';
 import { CommChatStatus, CommMessageDirection, Connection, Prisma, WhatsappChat, WhatsappMessage } from '@prisma/client';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
-import { WhatsappOrchestratorService, WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
+import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
+import {
+  WHATSAPP_OFFICIAL_PROVIDER_KEY,
+  WHATSAPP_WAHA_PROVIDER_KEY,
+  isWhatsappProvider,
+  usesOfficialWhatsappWindow,
+} from '../../../shared/integration/whatsapp-provider.constants';
 import { ChatScopeResolver, AttendanceScope } from '../attendance/chat-scope.resolver';
 import { ReplyGateService } from '../attendance/reply-gate.service';
 import { AttendanceRepository } from '../attendance/attendance.repository';
@@ -160,8 +166,15 @@ export class WhatsappInboxService {
 
   async getChat(chatId: string): Promise<ChatView> {
     const chat = await this.chats.findChatById(chatId);
-    if (!chat || !chat.remote_chat_id) throw new NotFoundException('Conversa não encontrada.');
-    await this.nivoo.assertCurrentOwner(chat.connection_id);
+    if (!chat) throw new NotFoundException('Conversa não encontrada.');
+    const connection = await this.connectionsRepository.findById(chat.connection_id);
+    if (!connection || !isWhatsappProvider(connection.provider_key)) {
+      throw new NotFoundException('Conversa não encontrada.');
+    }
+    if (connection.provider_key === WHATSAPP_OFFICIAL_PROVIDER_KEY) {
+      if (!chat.remote_chat_id) throw new NotFoundException('Conversa não encontrada.');
+      await this.nivoo.assertCurrentOwner(chat.connection_id);
+    }
     let handlerName: string | null = null;
     if (chat.current_handler_type === 'BOT') {
       handlerName = 'IA';
@@ -242,6 +255,10 @@ export class WhatsappInboxService {
 
   async windowState(chatId: string): Promise<{ state: WindowState; expires_at: string | null }> {
     const chat = await this.getChat(chatId);
+    const connection = await this.connectionsRepository.findById(chat.connection_id);
+    if (connection && !usesOfficialWhatsappWindow(connection.provider_key)) {
+      return { state: 'within', expires_at: null };
+    }
     const state = computeWindowState(chat.last_inbound_at);
     const expiresAt = chat.last_inbound_at
       ? new Date(chat.last_inbound_at.getTime() + 24 * 60 * 60 * 1000).toISOString()
@@ -265,8 +282,8 @@ export class WhatsappInboxService {
   }
 
   /**
-   * Upload de arquivo/áudio gravado no aparelho: sobe o binário para a Central
-   * (media_id) e envia pela MESMA porta do texto/midia (reply gate + janela de
+   * Upload de arquivo/áudio gravado no aparelho: sobe o binário pelo provider
+   * e envia pela MESMA porta do texto/mídia (reply gate + janela de
    * 24h + takeover 409). Nao duplica a logica de envio — reusa deliver().
    */
   async uploadAndSendMedia(
@@ -280,21 +297,20 @@ export class WhatsappInboxService {
     if (args.data.length > limit) {
       const mb = Math.round(limit / (1024 * 1024));
       throw new BadRequestException(
-        `Arquivo muito grande para ${args.kind} — o limite da Meta é ${mb} MB.`,
+        `Arquivo muito grande para ${args.kind} — o limite deste canal é ${mb} MB.`,
       );
     }
     if (args.data.length === 0) throw new BadRequestException('Arquivo vazio.');
 
-    // Reply gate + janela ANTES do upload (evita subir binario que a Meta
-    // recusaria depois). loadChatConnection valida a conexao ativa.
+    // Reply gate + janela ANTES do upload. A janela de 24h é exclusiva da Meta.
     const scope = await this.scopeResolver.resolve(user);
     await this.replyGate.assertCanReply(chat, scope, args.confirmTakeover === true);
-    if (computeWindowState(chat.last_inbound_at) !== 'within') {
+    const connection = await this.loadChatConnection(chat);
+    if (usesOfficialWhatsappWindow(connection.provider_key) && computeWindowState(chat.last_inbound_at) !== 'within') {
       throw new ConflictException(
         'Janela de 24h expirada — a Meta só aceita template aprovado. Selecione um template para reabrir a conversa.',
       );
     }
-    const connection = await this.loadChatConnection(chat);
 
     // Sobe o binário e recebe o media_id (caminho separado do execute()).
     const uploaded = await this.connections.uploadMedia(connection.id, {
@@ -334,9 +350,9 @@ export class WhatsappInboxService {
     // Reply gate: claim implicito / takeover confirmado / 403 / 409.
     await this.replyGate.assertCanReply(chat, scope, confirmTakeover);
 
-    // Janela de 24h: texto livre/midia manual so DENTRO da janela (template
-    // aprovado e o caminho fora dela — a UI ja avisa e sugere).
-    if (!isTemplate) {
+    const connection = await this.loadChatConnection(chat);
+    // Janela de 24h: regra da Cloud API oficial. WAHA não oferece templates.
+    if (!isTemplate && usesOfficialWhatsappWindow(connection.provider_key)) {
       const state = computeWindowState(chat.last_inbound_at);
       if (state !== 'within') {
         throw new ConflictException(
@@ -345,7 +361,6 @@ export class WhatsappInboxService {
       }
     }
 
-    const connection = await this.loadChatConnection(chat);
     try {
       const result = await this.orchestrator.sendViaConnection(connection, chat.phone, message, `user:${user.sub}`);
       return { wamid: result.wamid, jobId: result.jobId };
@@ -360,13 +375,26 @@ export class WhatsappInboxService {
     }
   }
 
-  // ─── Mídia inbound (proxy de download da Central) ──────
+  // ─── Mídia inbound/outbound (proxy do provider) ──────
 
   async downloadMedia(
     chatId: string,
     mediaId: string,
   ): Promise<{ bytes: Buffer; mime: string }> {
     const chat = await this.getChat(chatId);
+    const connection = await this.connectionsRepository.findById(chat.connection_id);
+    if (connection?.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) {
+      const message = await this.chats.findMessageByChatAndMediaRef(chatId, mediaId);
+      if (!message) throw new NotFoundException('Mídia não encontrada nesta conversa.');
+      const result = (await this.connections.execute(connection.id, 'downloadMedia', {
+        media_id: mediaId,
+      })) as { base64?: string; mime?: string };
+      if (!result?.base64) throw new NotFoundException('Mídia não encontrada nesta conversa.');
+      return {
+        bytes: Buffer.from(result.base64, 'base64'),
+        mime: result.mime || 'application/octet-stream',
+      };
+    }
     const message = await this.chats.findCentralMessageInChat(chatId, mediaId);
     if (!message?.remote_message_id || !chat.remote_chat_id) throw new NotFoundException('Mídia não encontrada nesta conversa.');
     if (message.media_state === 'UNAVAILABLE') {
@@ -403,7 +431,7 @@ export class WhatsappInboxService {
 
   private async loadChatConnection(chat: WhatsappChat): Promise<Connection> {
     const connection = await this.connectionsRepository.findById(chat.connection_id);
-    if (!connection || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
+    if (!connection || !isWhatsappProvider(connection.provider_key)) {
       throw new NotFoundException('Conexão da conversa não encontrada.');
     }
     if (connection.status !== 'ACTIVE') {

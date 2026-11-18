@@ -1,5 +1,5 @@
-// Números WhatsApp da Central Nivoo, com onboarding e desconexão oficiais.
-import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
+// Números WhatsApp: Meta oficial via Central Nivoo + WAHA por QR Code.
+import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Connection } from '@prisma/client';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
@@ -9,11 +9,17 @@ import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { NivooSyncService } from './nivoo-sync.service';
 import { WhatsappAssistantService } from './whatsapp-assistant.service';
-import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
 import { SetChannelAssistantDto } from '../dto/set-channel-assistant.dto';
 import { NivooConnectionsService } from './nivoo-connections.service';
 import { WhatsappTemplatesRepository } from './whatsapp-templates.repository';
 import { ConfigureNivooConsumerDto } from '../dto/configure-nivoo-consumer.dto';
+import { CreateWahaNumberDto } from '../dto/create-waha-number.dto';
+import { WhatsappWahaPairingService } from './whatsapp-waha-pairing.service';
+import {
+  WHATSAPP_OFFICIAL_PROVIDER_KEY,
+  WHATSAPP_PROVIDER_KEYS,
+  WHATSAPP_WAHA_PROVIDER_KEY,
+} from '../../../shared/integration/whatsapp-provider.constants';
 
 @ApiTags('Comm — WhatsApp Números')
 @ApiBearerAuth()
@@ -25,16 +31,22 @@ export class WhatsappNumbersController {
     private readonly assistant: WhatsappAssistantService,
     private readonly nivoo: NivooConnectionsService,
     private readonly templates: WhatsappTemplatesRepository,
+    private readonly waha: WhatsappWahaPairingService,
   ) {}
 
   @Get()
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ)
   async list() {
-    const current = await this.connections.findAll({ providerKey: WHATSAPP_PROVIDER_KEY });
-    const owned = current.filter((c) => (c.config as Record<string, unknown>)['remote_owned'] === true);
-    return Promise.all(owned.map(async (connection) => ({
+    const current = await this.connections.findAll({ providerKeys: [...WHATSAPP_PROVIDER_KEYS] });
+    const visible = current.filter((connection) =>
+      connection.provider_key === WHATSAPP_WAHA_PROVIDER_KEY ||
+      (connection.config as Record<string, unknown>)['remote_owned'] === true,
+    );
+    return Promise.all(visible.map(async (connection) => ({
       ...this.toView(connection),
-      templates_count: await this.templates.countByConnection(connection.id),
+      templates_count: connection.provider_key === WHATSAPP_OFFICIAL_PROVIDER_KEY
+        ? await this.templates.countByConnection(connection.id)
+        : 0,
     })));
   }
 
@@ -67,8 +79,30 @@ export class WhatsappNumbersController {
 
   @Post(':id/disconnect')
   @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
-  disconnect(@Param('id') id: string) {
+  async disconnect(@Param('id') id: string) {
+    const connection = await this.connections.findById(id);
+    if (connection?.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) {
+      return this.waha.disconnect(id);
+    }
     return this.nivoo.disconnect(id);
+  }
+
+  @Post('waha')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ, PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  createWaha(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateWahaNumberDto) {
+    return this.waha.create(dto, user.sub ?? null);
+  }
+
+  @Get(':id/waha/pairing')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ, PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  pairing(@Param('id') id: string) {
+    return this.waha.status(id);
+  }
+
+  @Post(':id/waha/restart')
+  @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ, PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  restartPairing(@Param('id') id: string) {
+    return this.waha.restart(id);
   }
 
   @Post(':id/sync')
@@ -77,7 +111,7 @@ export class WhatsappNumbersController {
     @Param('id') id: string,
   ) {
     const connection = await this.connections.findById(id);
-    if (!connection || connection.provider_key !== WHATSAPP_PROVIDER_KEY) {
+    if (!connection || connection.provider_key !== WHATSAPP_OFFICIAL_PROVIDER_KEY) {
       throw new NotFoundException('Conexão WhatsApp não encontrada.');
     }
     return this.sync.sync();
@@ -118,6 +152,9 @@ export class WhatsappNumbersController {
     return {
       id: connection.id,
       name: connection.name,
+      provider_key: connection.provider_key,
+      provider_label: connection.provider_key === WHATSAPP_OFFICIAL_PROVIDER_KEY ? 'Meta oficial' : 'QR Code (WAHA)',
+      supports_templates: connection.provider_key === WHATSAPP_OFFICIAL_PROVIDER_KEY,
       status: connection.status,
       status_detail: connection.status_detail,
       tags: connection.tags,
@@ -126,6 +163,7 @@ export class WhatsappNumbersController {
       waba_id: config['waba_id'] ?? null,
       department: config['department'] ?? null,
       is_default: config['is_default'] === 'sim' || config['is_default'] === true,
+      allow_automations: config['allow_automations'] === 'sim' || config['allow_automations'] === true,
       phone: (config['phone'] as string | undefined) ?? null,
       display_name: (config['display_name'] as string | undefined) ?? null,
       remote_status: config['remote_status'] ?? null,

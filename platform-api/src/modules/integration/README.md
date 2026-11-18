@@ -27,7 +27,8 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
   - **openai / anthropic** (AI): health = GET `/v1/models` com a API Key; `discover` lista modelos.
   - **postgresql** (DATABASE): health via socket TCP (`require('net')`) — sem driver `pg` nesta fase.
   - **smtp / s3**: health stub OK (validação de configuração; handshake real nas Fases 7 / Storage).
-  - **whatsapp-nivoo**: consumidor da Central WhatsApp; a chave interna fica no Secrets Manager, e o onboarding dos números é feito pela Central. `whatsapp-meta` e `whatsapp-ycloud` foram aposentados do catálogo e do runtime; conexões/logs históricos ficam, segredos exclusivos são removidos.
+  - **whatsapp-nivoo**: método oficial; consome a Central Nivoo/Meta, com chave interna no Secrets Manager e onboarding hospedado pela Central.
+  - **whatsapp-waha**: método não oficial por QR Code; uma sessão por Connection, API key e segredo HMAC no Cofre, várias conexões e automações somente por opt-in. `whatsapp-meta` direto e `whatsapp-ycloud` permanecem aposentados; conexões/logs históricos ficam, segredos exclusivos são removidos.
 
 ## catalog/ (diretrizes 1/43/48)
 

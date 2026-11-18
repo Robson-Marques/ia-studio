@@ -26,6 +26,10 @@ released_at: "2026-09-08"
 change_reason: Aposentada em 2026-09-30 pela auditoria da conversão dedicada. A versão 1.0.0 previa Baileys, QR, coexistência manual, metering e escopo SaaS; nenhum deles pode voltar ao produto alvo.
 ---
 
+> **Registro aposentado.** A decisão vigente de 2026-11-18 não reativa esta
+> especialidade: mantém Meta oficial, adiciona WAHA por QR Code e retira YCloud.
+> Baileys/coexistência manual continuam fora do produto.
+
 # Aposentada — conectores WhatsApp e coexistência legados
 
 ## Status

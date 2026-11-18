@@ -298,7 +298,7 @@ export default function MessageComposer({ chat, windowInfo, templates, scope, on
           <Field
             label="Endereço da mídia"
             required
-            hint="A Meta busca o arquivo nesse endereço. Para mandar do próprio aparelho, use o + da barra."
+            hint="A conexão busca o arquivo nesse endereço. Para mandar do próprio aparelho, use o + da barra."
           >
             <Input value={media.url} onChange={(e) => setMedia((m) => ({ ...m, url: e.target.value }))} placeholder="https://…" />
           </Field>

@@ -231,13 +231,28 @@ export class WhatsappChatsRepository {
   }
 
   async listChats(filters: ChatListFilters): Promise<{ items: WhatsappChat[]; total: number }> {
-    const owned = await this.prisma.connection.findMany({
-      where: { provider_key: 'whatsapp-nivoo', config: { path: ['remote_owned'], equals: true } },
-      select: { id: true },
+    const available = await this.prisma.connection.findMany({
+      where: {
+        OR: [
+          { provider_key: 'whatsapp-nivoo', config: { path: ['remote_owned'], equals: true } },
+          { provider_key: 'whatsapp-waha' },
+        ],
+      },
+      select: { id: true, provider_key: true },
     });
-    const where: Prisma.WhatsappChatWhereInput = { connection_id: { in: owned.map((item) => item.id) }, remote_chat_id: { not: null } };
+    const nivooIds = available.filter((item) => item.provider_key === 'whatsapp-nivoo').map((item) => item.id);
+    const wahaIds = available.filter((item) => item.provider_key === 'whatsapp-waha').map((item) => item.id);
+    const where: Prisma.WhatsappChatWhereInput = {
+      connection_id: { in: available.map((item) => item.id) },
+      AND: [{
+        OR: [
+          { connection_id: { in: nivooIds }, remote_chat_id: { not: null } },
+          { connection_id: { in: wahaIds } },
+        ],
+      }],
+    };
     if (filters.status) where.attendance_status = filters.status;
-    if (filters.connectionId) where.connection_id = owned.some((item) => item.id === filters.connectionId)
+    if (filters.connectionId) where.connection_id = available.some((item) => item.id === filters.connectionId)
       ? filters.connectionId : { in: [] };
     if (filters.search) {
       where.OR = [
@@ -267,13 +282,28 @@ export class WhatsappChatsRepository {
    * composicao de WHERE do listChats — sem inventar regra nova.
    */
   async countChats(filters: ChatListFilters): Promise<number> {
-    const owned = await this.prisma.connection.findMany({
-      where: { provider_key: 'whatsapp-nivoo', config: { path: ['remote_owned'], equals: true } },
-      select: { id: true },
+    const available = await this.prisma.connection.findMany({
+      where: {
+        OR: [
+          { provider_key: 'whatsapp-nivoo', config: { path: ['remote_owned'], equals: true } },
+          { provider_key: 'whatsapp-waha' },
+        ],
+      },
+      select: { id: true, provider_key: true },
     });
-    const where: Prisma.WhatsappChatWhereInput = { connection_id: { in: owned.map((item) => item.id) }, remote_chat_id: { not: null } };
+    const nivooIds = available.filter((item) => item.provider_key === 'whatsapp-nivoo').map((item) => item.id);
+    const wahaIds = available.filter((item) => item.provider_key === 'whatsapp-waha').map((item) => item.id);
+    const where: Prisma.WhatsappChatWhereInput = {
+      connection_id: { in: available.map((item) => item.id) },
+      AND: [{
+        OR: [
+          { connection_id: { in: nivooIds }, remote_chat_id: { not: null } },
+          { connection_id: { in: wahaIds } },
+        ],
+      }],
+    };
     if (filters.status) where.attendance_status = filters.status;
-    if (filters.connectionId) where.connection_id = owned.some((item) => item.id === filters.connectionId)
+    if (filters.connectionId) where.connection_id = available.some((item) => item.id === filters.connectionId)
       ? filters.connectionId : { in: [] };
     if (filters.search) {
       where.OR = [
@@ -360,9 +390,32 @@ export class WhatsappChatsRepository {
     return this.prisma.whatsappMessage.findFirst({ where: { external_id: externalId } });
   }
 
+  findMessageByConnectionExternalId(connectionId: string, externalId: string): Promise<WhatsappMessage | null> {
+    return this.prisma.whatsappMessage.findFirst({
+      where: { connection_id: connectionId, external_id: externalId },
+    });
+  }
+
+  async markInboundEventPublished(connectionId: string, externalId: string): Promise<void> {
+    await this.prisma.whatsappMessage.updateMany({
+      where: { connection_id: connectionId, external_id: externalId },
+      data: { inbound_event_published: true },
+    });
+  }
+
   findCentralMessageInChat(chatId: string, remoteMessageId: string): Promise<WhatsappMessage | null> {
     return this.prisma.whatsappMessage.findFirst({
       where: { chat_id: chatId, remote_message_id: remoteMessageId },
+    });
+  }
+
+  /** Confirma que uma referência opaca de mídia pertence a este chat WAHA. */
+  findMessageByChatAndMediaRef(chatId: string, mediaId: string): Promise<WhatsappMessage | null> {
+    return this.prisma.whatsappMessage.findFirst({
+      where: {
+        chat_id: chatId,
+        media: { path: ['media_id'], equals: mediaId },
+      },
     });
   }
 
@@ -378,13 +431,16 @@ export class WhatsappChatsRepository {
     return { external_id: msg.external_id, connection_id: msg.connection_id };
   }
 
-  async updateMessageStatusByExternalId(
+  async updateMessageStatusByConnectionExternalId(
+    connectionId: string,
     externalId: string,
     status: string,
     errorDetail?: string | null,
   ): Promise<number> {
     const result = await this.prisma.whatsappMessage.updateMany({
-      where: { external_id: externalId },
+      // O mesmo IA Studio pode manter várias sessões WAHA. O ACK só pode
+      // alterar a mensagem pertencente à conexão que recebeu o webhook.
+      where: { connection_id: connectionId, external_id: externalId },
       data: { status, ...(errorDetail !== undefined ? { error_detail: errorDetail } : {}) },
     });
     return result.count;

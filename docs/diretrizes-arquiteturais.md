@@ -59,13 +59,14 @@ IXC. Extensões de segmento ficam atrás de portas, módulos e permissões próp
 
 ## 5. Comunicação WhatsApp
 
-WhatsApp é consumido exclusivamente pela Central WhatsApp Nivoo, que opera as
-capacidades oficiais da Meta Cloud API. O IA Studio guarda somente a chave do
-consumidor no backend, abre o onboarding da Central e sincroniza suas conversas,
-mensagens e templates. Webhooks e credenciais Meta pertencem à Central. Cada
-número remoto é espelhado em uma Connection da instalação Newnet.
+O método oficial de WhatsApp é consumido pela Central Nivoo, que opera a Meta
+Cloud API: credenciais Meta e webhooks oficiais pertencem à Central e cada número
+remoto é espelhado em uma Connection local. Como segunda opção, o produto oferece
+WAHA não oficial por QR Code, com sessão independente por Connection, API key e
+HMAC no Cofre, aceite explícito de risco e automações desativadas por padrão.
+YCloud não é provider operacional.
 
-Envios automáticos fora da janela de 24 horas exigem template HSM aprovado.
+Envios automáticos pela Meta fora da janela de 24 horas exigem template HSM aprovado.
 Templates de sistema são semeados de modo idempotente e ações de botões são
 resolvidas para URLs da própria aplicação, sem URLs hardcoded.
 

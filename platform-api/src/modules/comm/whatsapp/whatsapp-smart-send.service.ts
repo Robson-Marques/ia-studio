@@ -9,6 +9,7 @@ import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
 import { NivooCentralError } from '../../../shared/integration/nivoo-whatsapp.client';
 import { SendCriteria, TemplateVariables } from '../../../shared/integration/whatsapp.types';
 import { normalizePhone } from './whatsapp.helpers';
+import { usesOfficialWhatsappWindow } from '../../../shared/integration/whatsapp-provider.constants';
 
 export interface SmartSendArgs {
   phone: string;
@@ -39,6 +40,10 @@ export class WhatsappSmartSendService {
     if (!phone) return { via: 'skipped' };
     const language = args.language ?? 'pt_BR';
     const connection = await this.orchestrator.resolveConnection(args.criteria);
+    // Este serviço existe para a regra Meta janela→template e para o job
+    // assíncrono reconciliado pela Central. WAHA não tem HSM nem job Nivoo;
+    // portanto emissores ISP/Notification Center não podem cair nela.
+    if (!usesOfficialWhatsappWindow(connection.provider_key)) return { via: 'skipped' };
     const state = await this.orchestrator.windowState(connection.id, phone);
 
     // Fora da janela (sabido): direto ao template, sem tentar texto livre.

@@ -7,7 +7,10 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { WhatsappAssistantRepository } from './whatsapp-assistant.repository';
-import { WHATSAPP_PROVIDER_KEY } from './whatsapp-orchestrator.service';
+import {
+  allowsAutomaticWhatsappSend,
+  isWhatsappProvider,
+} from '../../../shared/integration/whatsapp-provider.constants';
 
 export interface ChannelAssistantView {
   connection_id: string;
@@ -30,7 +33,7 @@ export class WhatsappAssistantService {
     const connection = await this.connections.findById(connectionId);
     if (
       !connection ||
-      connection.provider_key !== WHATSAPP_PROVIDER_KEY
+      !isWhatsappProvider(connection.provider_key)
     ) {
       throw new NotFoundException('Conexão WhatsApp não encontrada.');
     }
@@ -39,7 +42,12 @@ export class WhatsappAssistantService {
 
   /** Vínculo atual do número (ou null), já com o nome do assistente. */
   async get(connectionId: string): Promise<ChannelAssistantView | null> {
-    await this.assertConnection(connectionId);
+    const connection = await this.assertConnection(connectionId);
+    if (isEnabled && !allowsAutomaticWhatsappSend(connection)) {
+      throw new BadRequestException(
+        'Habilite os envios automáticos desta conexão WAHA antes de ligar um assistente.',
+      );
+    }
     const row = await this.repository.findByConnection(connectionId);
     if (!row) return null;
     const agent = await this.prisma.aiAgent.findUnique({

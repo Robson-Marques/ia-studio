@@ -2,6 +2,8 @@
 
 ## Não publicado
 
+- WhatsApp → Números passa a oferecer dois métodos: **Meta oficial pela Central Nivoo** e **WAHA não oficial por QR Code**. A WAHA aceita várias sessões, exige aceite de risco, valida o webhook com HMAC, entra na mesma Central de Atendimento e envia/recebe texto, imagem, áudio, vídeo e documento. Mídia WAHA é recuperada sob demanda sem persistir base64; automações ficam desligadas por padrão. O legado YCloud permanece fora do runtime.
+
 - v0.12.01: a autenticação WhatsApp hospedada pela Central Nivoo passa a abrir em uma janela popup compacta, preservando o IA Studio visível ao fundo, em vez de ocupar uma nova aba do navegador.
 
 - v0.11.99: separa a preparação técnica da Central Nivoo da conexão de números. A identificação da instalação passa a ser configurada em um modal próprio de **WhatsApp → Números**; depois disso, **Conectar número** abre diretamente a autenticação oficial da Meta na Central, sem redirecionar para Integrações. O consumidor e os espelhos WhatsApp deixam de aparecer no gerenciador genérico de conexões, e o registro técnico deixa de ser reaproveitado como primeiro número.

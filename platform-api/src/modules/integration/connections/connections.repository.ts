@@ -6,6 +6,7 @@ import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface ConnectionFilters {
   providerKey?: string;
+  providerKeys?: string[];
   status?: ConnectionStatus;
 }
 
@@ -16,6 +17,7 @@ export class ConnectionsRepository {
   findAll(filters: ConnectionFilters = {}) {
     const where: Prisma.ConnectionWhereInput = {};
     if (filters.providerKey) where.provider_key = filters.providerKey;
+    if (filters.providerKeys?.length) where.provider_key = { in: filters.providerKeys };
     if (filters.status) where.status = filters.status;
     return this.prisma.connection.findMany({
       where,

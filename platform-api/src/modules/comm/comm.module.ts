@@ -1,5 +1,5 @@
-// Comunicação WhatsApp via Central Nivoo: onboarding, sincronização, inbox,
-// smart-send, templates e atendimento. Ver README.md deste diretório.
+// Comunicação WhatsApp: Meta oficial via Central Nivoo + WAHA por QR Code,
+// com inbox e atendimento compartilhados. Ver README.md deste diretório.
 import { Module } from '@nestjs/common';
 import { IntegrationModule } from '../integration/integration.module';
 
@@ -11,6 +11,9 @@ import { WhatsappInboxService } from './whatsapp/whatsapp-inbox.service';
 import { WhatsappSmartSendService } from './whatsapp/whatsapp-smart-send.service';
 import { WhatsappTemplatesService } from './whatsapp/whatsapp-templates.service';
 import { NivooSyncService } from './whatsapp/nivoo-sync.service';
+import { WhatsappWahaWebhookController } from './whatsapp/whatsapp-waha-webhook.controller';
+import { WhatsappWahaInboundService } from './whatsapp/whatsapp-waha-inbound.service';
+import { WhatsappWahaPairingService } from './whatsapp/whatsapp-waha-pairing.service';
 import { WhatsappInboxController } from './whatsapp/whatsapp-inbox.controller';
 import { WhatsappTemplatesController } from './whatsapp/whatsapp-templates.controller';
 import { WhatsappNumbersController } from './whatsapp/whatsapp-numbers.controller';
@@ -32,6 +35,7 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
 @Module({
   imports: [IntegrationModule],
   controllers: [
+    WhatsappWahaWebhookController,
     WhatsappInboxController,
     WhatsappTemplatesController,
     WhatsappNumbersController,
@@ -49,6 +53,8 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
     WhatsappSmartSendService,
     WhatsappTemplatesService,
     NivooSyncService,
+    WhatsappWahaInboundService,
+    WhatsappWahaPairingService,
     WhatsappAssistantRepository,
     WhatsappAssistantService,
     ConnectchatInboxService,

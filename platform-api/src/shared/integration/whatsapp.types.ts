@@ -1,7 +1,7 @@
-// Tipos internos do canal WhatsApp consumido pela Central Nivoo.
+// Tipos internos do canal WhatsApp: Meta oficial via Central Nivoo + WAHA.
 // Portados/adaptados do orquestrador do Aquapark.
 //
-// RichMessage: formato interno de envio (a Central aceita texto, mídia e template).
+// RichMessage: formato interno de envio compartilhado pelos providers.
 // Sem fallback automatico: quem chama decide o que fazer quando um tipo
 // nao e suportado.
 
@@ -23,12 +23,15 @@ export interface RichText {
 export interface RichMedia {
   kind: 'image' | 'audio' | 'video' | 'document';
   /**
-   * URL HTTPS de mídia OU media_id devolvido pelo upload da Central. Ao menos
+   * URL HTTPS de mídia OU media_id/referência devolvida pelo provider. Ao menos
    * um dos dois é obrigatório; mediaId tem precedência sobre url.
    */
   url?: string;
-  /** media_id retornado pelo POST /media/upload da Central. */
+  /** media_id da Central ou data URI efêmera produzida pelo upload WAHA. */
   mediaId?: string;
+  /** Base64 efêmero usado no envio direto pela WAHA; nunca é persistido. */
+  data?: string;
+  mimeType?: string;
   caption?: string;
   filename?: string;
   /** Nota de voz gravada no painel; o codec/MIME ainda deve ser aceito pela Meta. */

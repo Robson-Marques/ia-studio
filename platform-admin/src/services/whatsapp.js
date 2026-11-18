@@ -275,6 +275,21 @@ export async function syncNumber(id) {
   catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao sincronizar o número')); }
 }
 
+export async function createWahaNumber(body) {
+  try { const { data } = await api.post('/comm/whatsapp/numbers/waha', body); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao criar a conexão por QR Code')); }
+}
+
+export async function getWahaPairing(id) {
+  try { const { data } = await api.get(`/comm/whatsapp/numbers/${id}/waha/pairing`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar o QR Code')); }
+}
+
+export async function restartWahaPairing(id) {
+  try { const { data } = await api.post(`/comm/whatsapp/numbers/${id}/waha/restart`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao gerar um novo QR Code')); }
+}
+
 // ─── Assistente do número (vínculo) ──────────────────────────
 
 // Vínculo atual do número (ou null): { connection_id, agent_id, agent_name, is_enabled }.

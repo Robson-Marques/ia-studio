@@ -70,8 +70,9 @@ export default function Templates() {
   useEffect(() => {
     listNumbers()
       .then((n) => {
-        setNumbers(n);
-        if (n.length) setConnectionId((atual) => atual || n[0].id);
+        const official = n.filter((item) => item.supports_templates);
+        setNumbers(official);
+        if (official.length) setConnectionId((atual) => atual || official[0].id);
       })
       .catch((err) => toast.error(err.message));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
