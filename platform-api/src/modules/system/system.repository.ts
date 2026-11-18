@@ -40,6 +40,14 @@ export class SystemRepository {
     });
   }
 
+  /** Versão efetivamente aplicada pelo atualizador (não apenas checkout Git). */
+  findLatestSuccessfulUpgrade() {
+    return this.prisma.systemUpgrade.findFirst({
+      where: { status: SystemJobStatus.SUCCESS },
+      orderBy: { finished_at: 'desc' },
+    });
+  }
+
   listUpgrades(take = 20) {
     return this.prisma.systemUpgrade.findMany({ orderBy: { created_at: 'desc' }, take });
   }

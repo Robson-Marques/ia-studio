@@ -14,7 +14,7 @@ import * as path from 'node:path';
 import { SystemRepository } from './system.repository';
 import { VersionService } from './version.service';
 import { AuditLogService } from '../../shared/audit/audit-log.service';
-import { scriptsDir } from './system.paths';
+import { appDir, scriptsDir } from './system.paths';
 
 // Lock orfao: apos este tempo sem terminar, o front oferece "Liberar lock".
 const ORPHAN_MS = 10 * 60 * 1000;
@@ -110,7 +110,7 @@ export class UpgradeService {
     // API (pm2 reload na ultima fase). stdio ignorado — o log vai pra row via
     // psql dentro do script.
     try {
-      const child = spawn('bash', [script, version, upgradeId], {
+      const child = spawn('bash', [script, '--to', version, '--upgrade-id', upgradeId, '--repo-path', appDir()], {
         detached: true,
         stdio: 'ignore',
         cwd: scriptsDir(),
