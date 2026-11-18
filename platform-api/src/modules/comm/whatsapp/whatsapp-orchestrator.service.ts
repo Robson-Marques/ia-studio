@@ -25,7 +25,9 @@ import {
   allowsAutomaticWhatsappSend,
   usesOfficialWhatsappWindow,
 } from '../../../shared/integration/whatsapp-provider.constants';
-import { encodeWahaMediaRef } from '../../../shared/integration/waha.client';
+import {
+  encodeWahaMediaRef, normalizeWahaChatId, wahaChatIdFromMessageId,
+} from '../../../shared/integration/waha.client';
 
 export const WHATSAPP_PROVIDER_KEY = 'whatsapp-nivoo';
 
@@ -126,40 +128,56 @@ export class WhatsappOrchestratorService {
     rawPhone: string,
     message: RichMessage,
     sender = 'system',
+    explicitWahaChatId?: string,
   ): Promise<OrchestratorSendResult> {
     const phone = normalizePhone(rawPhone);
     if (!phone) throw new BadRequestException('Telefone de destino inválido.');
 
-    const { operation, params } = this.toOperation(phone, message);
+    const wahaChatId = connection.provider_key === WHATSAPP_WAHA_PROVIDER_KEY
+      ? await this.wahaDestination(connection.id, phone, explicitWahaChatId)
+      : undefined;
+    const { operation, params } = this.toOperation(wahaChatId ?? phone, message);
     const result = (await this.connections.execute(connection.id, operation, params)) as { wamid?: string | null; job_id?: string };
 
     if (connection.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) {
       const responseChatId = result.wamid?.match(/(?:true|false)_([^_]+@(?:c\.us|lid))_/i)?.[1]
+        ?? wahaChatId
         ?? `${phone}@c.us`;
       const chat = await this.chats.upsertChat({
         connectionId: connection.id,
         phone,
+        remoteHistory: {
+          waha_chat_id: normalizeWahaChatId(responseChatId),
+          ...(normalizeWahaChatId(responseChatId).endsWith('@lid')
+            ? { whatsapp_lid: normalizeWahaChatId(responseChatId) }
+            : {}),
+        },
         lastMessage: this.preview(message),
         direction: CommMessageDirection.OUTGOING,
       });
-      await this.chats.createMessage({
-        chat_id: chat.id,
-        connection_id: connection.id,
-        external_id: result.wamid ?? null,
-        direction: CommMessageDirection.OUTGOING,
-        sender,
-        type: message.kind === 'template' ? 'template' : message.kind === 'text' ? 'text' : message.kind,
-        content: this.preview(message),
-        media: ['image', 'audio', 'video', 'document'].includes(message.kind)
-          ? {
-              ...(result.wamid ? { media_id: encodeWahaMediaRef(responseChatId, result.wamid) } : {}),
-              ...((message as { url?: string }).url ? { url: (message as { url: string }).url } : {}),
-              ...((message as { caption?: string }).caption ? { caption: (message as { caption: string }).caption } : {}),
-              ...((message as { filename?: string }).filename ? { filename: (message as { filename: string }).filename } : {}),
-            }
-          : undefined,
-        status: 'sent',
-      });
+      const echoed = result.wamid
+        ? await this.chats.findMessageByConnectionExternalId(connection.id, result.wamid)
+        : null;
+      if (!echoed) {
+        await this.chats.createMessage({
+          chat_id: chat.id,
+          connection_id: connection.id,
+          external_id: result.wamid ?? null,
+          direction: CommMessageDirection.OUTGOING,
+          sender,
+          type: message.kind === 'template' ? 'template' : message.kind === 'text' ? 'text' : message.kind,
+          content: this.preview(message),
+          media: ['image', 'audio', 'video', 'document'].includes(message.kind)
+            ? {
+                ...(result.wamid ? { media_id: encodeWahaMediaRef(responseChatId, result.wamid) } : {}),
+                ...((message as { url?: string }).url ? { url: (message as { url: string }).url } : {}),
+                ...((message as { caption?: string }).caption ? { caption: (message as { caption: string }).caption } : {}),
+                ...((message as { filename?: string }).filename ? { filename: (message as { filename: string }).filename } : {}),
+              }
+            : undefined,
+          status: 'sent',
+        });
+      }
       return { wamid: result.wamid ?? null, connectionId: connection.id, chatId: chat.id };
     }
 
@@ -187,6 +205,25 @@ export class WhatsappOrchestratorService {
       this.logger.error(`A Central aceitou o job ${result.job_id}, mas o registro local falhou: ${(error as Error).message}`);
     }
     return { wamid: null, connectionId: connection.id, chatId: chat?.remote_chat_id ? chat.id : null, jobId: result.job_id };
+  }
+
+  private async wahaDestination(
+    connectionId: string,
+    phone: string,
+    explicit?: string,
+  ): Promise<string> {
+    if (explicit) return normalizeWahaChatId(explicit);
+    const chat = await this.chats.findChatByConnectionPhone(connectionId, phone);
+    const history = (chat?.remote_history ?? {}) as Record<string, unknown>;
+    if (typeof history['waha_chat_id'] === 'string') {
+      return normalizeWahaChatId(history['waha_chat_id']);
+    }
+    if (chat) {
+      const anchor = await this.chats.findLastMessageAnchor(chat.id);
+      const address = anchor?.external_id ? wahaChatIdFromMessageId(anchor.external_id) : null;
+      if (address) return address;
+    }
+    return normalizeWahaChatId(phone);
   }
 
   // ─── Lida (tick azul) + digitando ──────────────────────────────────
@@ -256,14 +293,14 @@ export class WhatsappOrchestratorService {
 
   // ─── Helpers privados ───────────────────────────────
 
-  private toOperation(phone: string, message: RichMessage): { operation: string; params: unknown } {
+  private toOperation(destination: string, message: RichMessage): { operation: string; params: unknown } {
     switch (message.kind) {
       case 'text':
-        return { operation: 'sendText', params: { to: phone, body: message.body } };
+        return { operation: 'sendText', params: { to: destination, body: message.body } };
       case 'template':
         return {
           operation: 'sendTemplate',
-          params: { to: phone, name: message.name, language: message.language, variables: message.variables },
+          params: { to: destination, name: message.name, language: message.language, variables: message.variables },
         };
       case 'image':
       case 'audio':
@@ -272,7 +309,7 @@ export class WhatsappOrchestratorService {
         return {
           operation: 'sendMedia',
           params: {
-            to: phone,
+            to: destination,
             kind: message.kind,
             url: message.url,
             media_id: message.mediaId,

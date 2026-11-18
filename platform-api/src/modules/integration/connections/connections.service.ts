@@ -36,6 +36,7 @@ import {
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { ConnectchatApiError } from '../../../shared/integration/connectchat.client';
+import { WahaApiError } from '../../../shared/integration/waha.client';
 import { ConnectionStateAction } from './dto/update-connection-state.dto';
 
 const STATE_ACTION_TARGET: Record<ConnectionStateAction, ConnectionStatus> = {
@@ -347,6 +348,13 @@ export class ConnectionsService {
           message: e.message,
           code: e.code ?? 'CONNECTCHAT_REQUEST_FAILED',
         }, status);
+      }
+      if (e instanceof WahaApiError) {
+        throw new HttpException({
+          statusCode: HttpStatus.BAD_GATEWAY,
+          message: e.message,
+          code: 'WAHA_REQUEST_FAILED',
+        }, HttpStatus.BAD_GATEWAY);
       }
       throw e;
     }

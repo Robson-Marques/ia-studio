@@ -6,11 +6,13 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-11-18 (`v0.12.5` provisiona WAHA local por Docker e reduz a jornada do painel a confirmar + escanear QR Code).
+> Última atualização: 2026-11-18 (`v0.12.6` corrige identidade LID, envio pelo painel e eco das mensagens enviadas no celular).
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
 
 **Atualização de 2026-11-18 — WAHA por QR Code:** `WhatsApp → Números` mantém a Meta oficial pela Central Nivoo e passa a oferecer WAHA como segunda opção não oficial. A `v0.12.5` porta o modelo operacional já validado no Control Leads: instalação/upgrade provisionam um container WEBJS por aplicação, API restrita a localhost, segredo gerado e sessões em volume Docker. O usuário apenas confirma o risco e escaneia o QR; URL/chave não aparecem no painel. Cada Connection ganha sessão e HMAC próprios, mostra/renova o QR e compartilha inbox, atendimento e vínculo com assistente. Imagem, áudio, vídeo e documento são enviados e recuperados sob demanda, com referência opaca no histórico e sem base64 persistido. Automações ficam desligadas por padrão e YCloud continua fora do runtime. O build/deploy ocorre somente no servidor; falta validar o primeiro pareamento real após aplicar a tag.
+
+**Correção v0.12.6 — LID e mensagens próprias:** o primeiro pareamento real mostrou que o WEBJS entregava o contato como `@lid`. A versão resolve esse identificador pela API `/api/{session}/lids/{lid}`, mantém o JID técnico no `remote_history` e usa o telefone `pn` apenas na interface/chave da conversa. No boot, sessões antigas recebem via `PUT` a assinatura `message.any` e chats já gravados são reconciliados. Mensagens `fromMe` vindas do aparelho viram saída no histórico; envios do painel reutilizam o JID observado, inclusive para mídia, sem fabricar `@c.us` a partir do LID.
 
 **Falha da v0.12.2 e correção da v0.12.3:** a tag `v0.12.2` foi criada em uma branch histórica que divergiu antes da conversão dedicada e ainda continha o schema SaaS. O `prisma db push` recusou adicionar `organization_id`/`workspace_id` obrigatórios em tabelas com dados; o rollback manteve a versão anterior e nenhum dado foi apagado. Não fazer backfill nem usar `--force-reset`. A `v0.12.3` parte da linha dedicada correta, não altera o schema em relação à `v0.12.01`, incorpora o relatório documental da tag divergente e filtra futuras tags que não descendam da versão instalada.
 

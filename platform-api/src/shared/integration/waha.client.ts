@@ -113,26 +113,38 @@ export async function ensureWahaSession(
   webhookSecret: string,
 ): Promise<WahaSession> {
   let session = await getWahaSession(refs);
+  const payload = {
+    name: refs.session,
+    config: {
+      metadata: { connection: refs.session.replace(/^iastudio-/, '') },
+      client: { deviceName: 'IA Studio', browserName: 'Chrome' },
+      ignore: { status: true, groups: true, channels: true, broadcast: true },
+      webhooks: [{
+        url: webhookUrl,
+        // message.any inclui mensagens recebidas e também as enviadas pelo
+        // aparelho conectado. O external_id deduplica o eco da própria API.
+        events: ['message.any', 'message.ack', 'session.status'],
+        hmac: webhookSecret ? { key: webhookSecret } : undefined,
+        retries: { policy: 'constant', attempts: 5, delaySeconds: 2 },
+      }],
+    },
+  };
   if (!session) {
     session = await request<WahaSession>(refs, '/api/sessions', {
       method: 'POST',
       body: JSON.stringify({
-        name: refs.session,
+        ...payload,
         start: true,
-        config: {
-          metadata: { connection: refs.session.replace(/^iastudio-/, '') },
-          client: { deviceName: 'IA Studio', browserName: 'Chrome' },
-          ignore: { status: true, groups: true, channels: true, broadcast: true },
-          webhooks: [{
-            url: webhookUrl,
-            events: ['message', 'message.ack', 'session.status'],
-            hmac: webhookSecret ? { key: webhookSecret } : undefined,
-            retries: { policy: 'constant', attempts: 5, delaySeconds: 2 },
-          }],
-        },
       }),
     });
-  } else if (session.status === 'STOPPED' || session.status === 'FAILED') {
+  } else {
+    // PUT é idempotente e atualiza também sessões criadas por releases
+    // anteriores, que ouviam apenas `message` e perdiam envios do celular.
+    session = await request<WahaSession>(refs, `/api/sessions/${encodeURIComponent(refs.session)}`, {
+      method: 'PUT', body: JSON.stringify(payload),
+    });
+  }
+  if (session.status === 'STOPPED' || session.status === 'FAILED') {
     await startWahaSession(refs);
     session = (await getWahaSession(refs)) ?? session;
   }
@@ -163,8 +175,32 @@ export function getWahaMe(refs: WahaRefs): Promise<{ id?: string; pushName?: str
   return request<{ id?: string; pushName?: string }>(refs, `/api/sessions/${encodeURIComponent(refs.session)}/me`);
 }
 
-function chatId(phone: string): string {
-  return `${phone.replace(/\D/g, '')}@c.us`;
+export function normalizeWahaChatId(value: string): string {
+  const input = value.trim();
+  const jid = input.match(/^(\d+)(?::\d+)?@(c\.us|s\.whatsapp\.net|lid)$/i);
+  if (jid) return `${jid[1]}@${jid[2].toLowerCase() === 's.whatsapp.net' ? 'c.us' : jid[2].toLowerCase()}`;
+  return `${input.replace(/\D/g, '')}@c.us`;
+}
+
+export function wahaChatIdFromMessageId(messageId: string): string | null {
+  const match = messageId.match(/(?:true|false)_([^_]+@(?:c\.us|s\.whatsapp\.net|lid))_/i);
+  return match ? normalizeWahaChatId(match[1]) : null;
+}
+
+export async function getWahaPhoneByLid(refs: WahaRefs, lid: string): Promise<string | null> {
+  const address = normalizeWahaChatId(lid);
+  if (!address.endsWith('@lid')) return address.replace(/\D/g, '') || null;
+  try {
+    const result = await request<{ pn?: unknown }>(
+      refs,
+      `/api/${encodeURIComponent(refs.session)}/lids/${encodeURIComponent(address)}`,
+    );
+    const pn = typeof result?.pn === 'string' ? normalizeWahaChatId(result.pn) : '';
+    return pn.endsWith('@c.us') ? pn.replace(/\D/g, '') : null;
+  } catch (error) {
+    if (error instanceof WahaApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 function responseMessageId(response: Record<string, unknown>): string | null {
@@ -182,7 +218,7 @@ function responseMessageId(response: Record<string, unknown>): string | null {
 export async function sendWahaText(refs: WahaRefs, to: string, text: string): Promise<{ wamid: string | null }> {
   const response = await request<Record<string, unknown>>(refs, '/api/sendText', {
     method: 'POST',
-    body: JSON.stringify({ session: refs.session, chatId: chatId(to), text }),
+    body: JSON.stringify({ session: refs.session, chatId: normalizeWahaChatId(to), text }),
   });
   return { wamid: responseMessageId(response) };
 }
@@ -203,7 +239,7 @@ export async function sendWahaMedia(
   };
   const payload: Record<string, unknown> = {
     session: refs.session,
-    chatId: chatId(input.to),
+    chatId: normalizeWahaChatId(input.to),
     file: {
       mimetype: input.mimeType ?? dataUri?.[1] ?? defaultMime[input.kind],
       data: dataUri?.[2] ?? input.data,

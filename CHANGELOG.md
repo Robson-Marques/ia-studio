@@ -2,6 +2,12 @@
 
 ## Não publicado
 
+## v0.12.6 - 2026-11-18 (telefone real, eco do celular e envio WAHA)
+
+- Corrige conversas WAHA que exibiam o identificador privado `@lid` como telefone: o backend consulta o mapa oficial LID→PN da sessão, preserva o endereço técnico do chat separadamente e migra o registro existente sem perder mensagens ou atendimento.
+- Atualiza inclusive as sessões já pareadas para o evento `message.any`, passando a espelhar na conversa as mensagens enviadas diretamente pelo celular. Ecos de envios feitos pelo painel são deduplicados pelo identificador WAHA.
+- Texto, imagem, áudio, vídeo e documento passam a responder usando o endereço real já observado (`@lid` ou `@c.us`), em vez de transformar os dígitos do LID em um destinatário `@c.us` inválido. Sem alteração de schema.
+
 ## v0.12.5 - 2026-11-18 (WAHA local e conexão direta por QR Code)
 
 - Porta para o IA Studio o provisionamento Docker já validado no Control Leads: durante instalação/upgrade, cada aplicação recebe container, porta local, chave técnica e volume de sessões próprios. A API WAHA fica restrita a `127.0.0.1`; o painel não pede URL nem chave.

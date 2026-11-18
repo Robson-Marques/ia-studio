@@ -20,6 +20,7 @@ export interface UpsertChatInput {
   connectionId: string;
   phone: string;
   contactName?: string | null;
+  remoteHistory?: Prisma.InputJsonValue;
   lastMessage: string;
   direction: CommMessageDirection;
   /** Timestamp do inbound (base da janela de 24h). */
@@ -230,6 +231,51 @@ export class WhatsappChatsRepository {
     });
   }
 
+  listChatsByConnection(connectionId: string): Promise<WhatsappChat[]> {
+    return this.prisma.whatsappChat.findMany({
+      where: { connection_id: connectionId },
+      orderBy: { created_at: 'asc' },
+    });
+  }
+
+  /**
+   * Troca o LID usado como chave provisória pelo telefone resolvido pela WAHA.
+   * Se a conversa pelo telefone já existe, consolida o histórico sem perder
+   * mensagens, eventos ou análises de atendimento.
+   */
+  async reconcileWahaChatIdentity(input: {
+    connectionId: string;
+    provisionalPhone: string;
+    phone: string;
+    contactName?: string | null;
+    remoteHistory: Prisma.InputJsonValue;
+  }): Promise<WhatsappChat | null> {
+    const provisional = await this.findChatByConnectionPhone(input.connectionId, input.provisionalPhone);
+    const resolved = await this.findChatByConnectionPhone(input.connectionId, input.phone);
+    const details = {
+      ...(input.contactName ? { contact_name: input.contactName } : {}),
+      remote_history: input.remoteHistory,
+    };
+    if (provisional && resolved && provisional.id !== resolved.id) {
+      await this.prisma.$transaction([
+        this.prisma.whatsappMessage.updateMany({ where: { chat_id: provisional.id }, data: { chat_id: resolved.id } }),
+        this.prisma.whatsappChatEvent.updateMany({ where: { chat_id: provisional.id }, data: { chat_id: resolved.id } }),
+        this.prisma.aiAttendanceAnalysis.updateMany({ where: { chat_id: provisional.id }, data: { chat_id: resolved.id } }),
+        this.prisma.whatsappChat.delete({ where: { id: provisional.id } }),
+        this.prisma.whatsappChat.update({ where: { id: resolved.id }, data: details }),
+      ]);
+      return this.findChatById(resolved.id);
+    }
+    if (provisional) {
+      return this.prisma.whatsappChat.update({
+        where: { id: provisional.id },
+        data: { phone: input.phone, ...details },
+      });
+    }
+    if (resolved) return this.prisma.whatsappChat.update({ where: { id: resolved.id }, data: details });
+    return null;
+  }
+
   async listChats(filters: ChatListFilters): Promise<{ items: WhatsappChat[]; total: number }> {
     const available = await this.prisma.connection.findMany({
       where: {
@@ -327,6 +373,7 @@ export class WhatsappChatsRepository {
         connection_id: input.connectionId,
         phone: input.phone,
         contact_name: input.contactName ?? null,
+        ...(input.remoteHistory ? { remote_history: input.remoteHistory } : {}),
         last_message: input.lastMessage.slice(0, 500),
         last_message_at: now,
         last_inbound_at: isInbound ? (input.inboundAt ?? now) : null,
@@ -334,6 +381,7 @@ export class WhatsappChatsRepository {
       },
       update: {
         ...(input.contactName ? { contact_name: input.contactName } : {}),
+        ...(input.remoteHistory ? { remote_history: input.remoteHistory } : {}),
         last_message: input.lastMessage.slice(0, 500),
         last_message_at: now,
         ...(isInbound
@@ -424,6 +472,16 @@ export class WhatsappChatsRepository {
   async findLastIncomingAnchor(chatId: string): Promise<{ external_id: string; connection_id: string } | null> {
     const msg = await this.prisma.whatsappMessage.findFirst({
       where: { chat_id: chatId, direction: CommMessageDirection.INCOMING, external_id: { not: null } },
+      orderBy: { created_at: 'desc' },
+      select: { external_id: true, connection_id: true },
+    });
+    if (!msg?.external_id) return null;
+    return { external_id: msg.external_id, connection_id: msg.connection_id };
+  }
+
+  async findLastMessageAnchor(chatId: string): Promise<{ external_id: string; connection_id: string } | null> {
+    const msg = await this.prisma.whatsappMessage.findFirst({
+      where: { chat_id: chatId, external_id: { not: null } },
       orderBy: { created_at: 'desc' },
       select: { external_id: true, connection_id: true },
     });

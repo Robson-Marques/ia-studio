@@ -2,10 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CommMessageDirection, Connection, IntegrationDirection, IntegrationLogStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { EventBusService } from '../../../shared/events/event-bus.service';
-import { encodeWahaMediaRef } from '../../../shared/integration/waha.client';
+import {
+  WahaRefs, encodeWahaMediaRef, getWahaPhoneByLid, normalizeWahaChatId, resolveWahaRuntime,
+} from '../../../shared/integration/waha.client';
 import { WhatsappMessageType } from '../../../shared/integration/whatsapp.types';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { IntegrationLogsRepository } from '../../integration/connections/integration-logs.repository';
+import { SecretsService } from '../../integration/secrets/secrets.service';
 import { ChatAssignmentService } from '../attendance/chat-assignment.service';
 import { WHATSAPP_INBOUND_EVENT } from './whatsapp.events';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
@@ -14,7 +17,7 @@ import { normalizePhoneFromWhatsApp } from './whatsapp.helpers';
 interface WahaEvent {
   event?: string;
   payload?: Record<string, unknown>;
-  me?: { id?: string; pushName?: string } | null;
+  me?: { id?: string; lid?: string; pushName?: string } | null;
 }
 
 @Injectable()
@@ -26,11 +29,14 @@ export class WhatsappWahaInboundService {
     private readonly events: EventBusService,
     private readonly connections: ConnectionsRepository,
     private readonly logs: IntegrationLogsRepository,
+    private readonly secrets: SecretsService,
   ) {}
 
   async handleEvent(connection: Connection, body: unknown): Promise<void> {
     const event = (body ?? {}) as WahaEvent;
-    if (event.event === 'message') return this.message(connection, event.payload ?? {});
+    if (event.event === 'message' || event.event === 'message.any') {
+      return this.message(connection, event.payload ?? {}, event.me);
+    }
     if (event.event === 'message.ack') return this.ack(connection, event.payload ?? {});
     if (event.event === 'session.status') return this.sessionStatus(connection, event.payload ?? {}, event.me);
     await this.logs.record({
@@ -39,14 +45,35 @@ export class WhatsappWahaInboundService {
     });
   }
 
-  private async message(connection: Connection, payload: Record<string, unknown>): Promise<void> {
-    if (payload['fromMe'] === true) return;
-    const chatAddress = String(payload['chatId'] ?? payload['from'] ?? '');
+  private async message(
+    connection: Connection,
+    payload: Record<string, unknown>,
+    me?: WahaEvent['me'],
+  ): Promise<void> {
+    const fromMe = payload['fromMe'] === true;
+    const ownIds = new Set([me?.id, me?.lid].filter((value): value is string => typeof value === 'string' && !!value));
+    const candidates = [
+      payload['chatId'],
+      fromMe ? payload['to'] : payload['from'],
+      fromMe ? payload['from'] : payload['to'],
+    ];
+    const candidate = candidates.find((value) => typeof value === 'string' && value && !ownIds.has(value));
+    const rawChatAddress = typeof candidate === 'string' ? candidate : '';
     if (
-      chatAddress.endsWith('@g.us') || chatAddress.endsWith('@newsletter') ||
-      chatAddress.endsWith('@broadcast') || chatAddress === 'status@broadcast'
+      rawChatAddress.endsWith('@g.us') || rawChatAddress.endsWith('@newsletter') ||
+      rawChatAddress.endsWith('@broadcast') || rawChatAddress === 'status@broadcast'
     ) return;
-    const phone = normalizePhoneFromWhatsApp(chatAddress);
+    const chatAddress = rawChatAddress ? normalizeWahaChatId(rawChatAddress) : '';
+    if (!chatAddress) return;
+    const provisionalPhone = normalizePhoneFromWhatsApp(chatAddress);
+    const refs = await this.refs(connection);
+    const resolvedPhone = chatAddress.endsWith('@lid')
+      ? await getWahaPhoneByLid(refs, chatAddress).catch((error) => {
+          this.logger.warn(`Não foi possível resolver o LID ${chatAddress}: ${(error as Error).message}`);
+          return null;
+        })
+      : null;
+    const phone = resolvedPhone || provisionalPhone;
     if (!phone) return;
     const idNode = payload['id'];
     const externalId = typeof idNode === 'string'
@@ -65,22 +92,42 @@ export class WhatsappWahaInboundService {
     const timestamp = rawTs > 0
       ? new Date(rawTs < 10_000_000_000 ? rawTs * 1000 : rawTs)
       : new Date();
+    const notifyName = String(payload['pushName'] ?? payload['notifyName'] ?? '') || null;
+    const remoteHistory = {
+      waha_chat_id: chatAddress,
+      ...(chatAddress.endsWith('@lid') ? { whatsapp_lid: chatAddress } : {}),
+      ...(resolvedPhone ? { resolved_phone: resolvedPhone } : {}),
+    } as Prisma.InputJsonValue;
+    if (resolvedPhone && provisionalPhone !== resolvedPhone) {
+      await this.chats.reconcileWahaChatIdentity({
+        connectionId: connection.id,
+        provisionalPhone,
+        phone: resolvedPhone,
+        contactName: notifyName,
+        remoteHistory,
+      });
+    }
     const existing = await this.chats.findMessageByConnectionExternalId(connection.id, externalId);
     if (existing) {
-      if (!existing.inbound_event_published) {
-        await this.publishInbound(connection, existing.chat_id, phone, externalId, timestamp, type, content, payload['notifyName']);
+      if (!fromMe && !existing.inbound_event_published) {
+        await this.publishInbound(connection, existing.chat_id, phone, externalId, timestamp, type, content, notifyName);
       }
       return;
     }
     const chat = await this.chats.upsertChat({
       connectionId: connection.id, phone,
-      contactName: String(payload['notifyName'] ?? '') || null,
-      lastMessage: preview || `[${type}]`, direction: CommMessageDirection.INCOMING, inboundAt: timestamp,
+      contactName: notifyName,
+      remoteHistory,
+      lastMessage: preview || `[${type}]`,
+      direction: fromMe ? CommMessageDirection.OUTGOING : CommMessageDirection.INCOMING,
+      inboundAt: fromMe ? undefined : timestamp,
     });
     await this.chats.createMessage({
       chat_id: chat.id, connection_id: connection.id, external_id: externalId,
-      direction: CommMessageDirection.INCOMING, sender: 'contact', type,
-      content, status: 'received', inbound_event_published: false,
+      direction: fromMe ? CommMessageDirection.OUTGOING : CommMessageDirection.INCOMING,
+      sender: fromMe ? 'system' : 'contact', type,
+      content, status: fromMe ? 'sent' : 'received', inbound_event_published: fromMe,
+      occurred_at: timestamp, created_at: timestamp,
       media: hasMedia ? ({
         media_id: encodeWahaMediaRef(chatAddress, externalId),
         mime_type: mime,
@@ -90,7 +137,19 @@ export class WhatsappWahaInboundService {
         ...(content ? { caption: content } : {}),
       } as Prisma.InputJsonValue) : undefined,
     });
-    await this.publishInbound(connection, chat.id, phone, externalId, timestamp, type, content, payload['notifyName']);
+    if (!fromMe) {
+      await this.publishInbound(connection, chat.id, phone, externalId, timestamp, type, content, notifyName);
+    }
+  }
+
+  private async refs(connection: Connection): Promise<WahaRefs> {
+    const config = (connection.config ?? {}) as Record<string, unknown>;
+    const legacyApiKey = connection.secret_id
+      ? (await this.secrets.accessorFor(connection.secret_id).get('api_key')) ?? ''
+      : '';
+    const runtime = resolveWahaRuntime(config, legacyApiKey);
+    if (!runtime) throw new Error('Serviço WAHA local indisponível.');
+    return { apiUrl: runtime.apiUrl, apiKey: runtime.apiKey, session: `iastudio-${connection.id}` };
   }
 
   private async publishInbound(
