@@ -24,6 +24,7 @@ import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { appDir } from './system.paths';
+import { SystemRepository } from './system.repository';
 
 const exec = promisify(execFile);
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -44,12 +45,14 @@ export class VersionService {
   private readonly logger = new Logger(VersionService.name);
   private cache: { info: VersionInfo; at: number } | null = null;
 
+  constructor(private readonly repository: SystemRepository) {}
+
   async getVersionInfo(force = false): Promise<VersionInfo> {
     if (!force && this.cache && Date.now() - this.cache.at < CACHE_TTL_MS) {
       return this.cache.info;
     }
     const expectedMajor = await this.readExpectedMajor();
-    const current = await this.readCurrentVersion(expectedMajor);
+    const current = await this.readInstalledVersion(expectedMajor);
     const remoteSynced = await this.fetchTags();
     const tags = await this.readTags(expectedMajor);
     const available = tags
@@ -93,6 +96,23 @@ export class VersionService {
     if (expectedMajor == null) return true;
     const p = TAG_REGEX.exec(tag);
     return !!p && Number(p[1]) === expectedMajor;
+  }
+
+  /**
+   * O checkout Git não prova que o deploy ocorreu: o build e o restart são feitos
+   * pelo upgrade.sh. Se existir histórico SUCCESS, ele é a fonte confiável.
+   * Instalações antigas sem histórico preservam o fallback anterior.
+   */
+  private async readInstalledVersion(expectedMajor: number | null): Promise<string | null> {
+    try {
+      const last = await this.repository.findLatestSuccessfulUpgrade();
+      if (last?.to_version && TAG_REGEX.test(last.to_version) && this.isOwnLine(last.to_version, expectedMajor)) {
+        return last.to_version;
+      }
+    } catch (error) {
+      this.logger.warn(`Falha ao consultar versão instalada no histórico: ${(error as Error).message}`);
+    }
+    return this.readCurrentVersion(expectedMajor);
   }
 
   private async readCurrentVersion(expectedMajor: number | null): Promise<string | null> {
