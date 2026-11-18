@@ -36,8 +36,7 @@ function StatusTicks({ status }) {
 function ChatMedia({ chatId, message }) {
   const toast = useToast();
   const media = message.media || {};
-  const outgoing = message.direction === 'OUTGOING';
-  const [data, setData] = useState(media.url ? { src: media.url, mime: media.mime_type } : null);
+  const [data, setData] = useState(!media.media_id && media.url ? { src: media.url, mime: media.mime_type } : null);
   const [loading, setLoading] = useState(false);
 
   async function load() {
@@ -53,12 +52,12 @@ function ChatMedia({ chatId, message }) {
     }
   }
 
-  // O que o próprio atendente enviou carrega sozinho; o que chegou fica sob
-  // demanda, para não baixar tudo ao abrir a conversa.
+  // Imagens carregam automaticamente; áudio, vídeo e documentos ficam sob demanda.
+  // A primeira busca grava a cópia no servidor e as seguintes usam o StorageService.
   useEffect(() => {
-    if (outgoing && !data && media.media_id) load();
+    if (message.type === 'image' && !data && media.media_id) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [media.media_id]);
+  }, [chatId, media.media_id]);
 
   const NOME_TIPO = { image: 'imagem', audio: 'áudio', video: 'vídeo' };
 
