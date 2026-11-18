@@ -2,6 +2,13 @@
 
 ## Não publicado
 
+## v0.12.5 - 2026-11-18 (WAHA local e conexão direta por QR Code)
+
+- Porta para o IA Studio o provisionamento Docker já validado no Control Leads: durante instalação/upgrade, cada aplicação recebe container, porta local, chave técnica e volume de sessões próprios. A API WAHA fica restrita a `127.0.0.1`; o painel não pede URL nem chave.
+- **WhatsApp → Números** passa a criar a sessão automaticamente após o aviso de risco e abre diretamente o QR Code. Nome, conexão padrão e bloqueio de automações são definidos de forma segura; ainda é possível conectar vários números.
+- Remove a repetição das três ações no estado vazio da tela de Números; as ações permanecem uma única vez no cabeçalho.
+- Mantém compatibilidade de leitura com conexões WAHA externas criadas na versão anterior. Sem alteração de schema.
+
 ## v0.12.4 - 2026-11-18 (correção do build WAHA)
 
 - Corrige os dois erros TypeScript encontrados pelo build da `v0.12.3`: a guarda de automação WAHA passa a usar `isEnabled` somente no método de vínculo do assistente, e `WhatsappMessageType` ganha sua exportação explícita com os tipos inbound suportados.

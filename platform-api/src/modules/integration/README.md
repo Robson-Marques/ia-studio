@@ -28,7 +28,7 @@ Plataforma de integrações do IA Studio — diretrizes 1, 2, 5, 21, 43, 48, 51,
   - **postgresql** (DATABASE): health via socket TCP (`require('net')`) — sem driver `pg` nesta fase.
   - **smtp / s3**: health stub OK (validação de configuração; handshake real nas Fases 7 / Storage).
   - **whatsapp-nivoo**: método oficial; consome a Central Nivoo/Meta, com chave interna no Secrets Manager e onboarding hospedado pela Central.
-  - **whatsapp-waha**: método não oficial por QR Code; uma sessão por Connection, API key e segredo HMAC no Cofre, várias conexões e automações somente por opt-in. `whatsapp-meta` direto e `whatsapp-ycloud` permanecem aposentados; conexões/logs históricos ficam, segredos exclusivos são removidos.
+  - **whatsapp-waha**: método não oficial por QR Code; container e chave técnica provisionados localmente, uma sessão e um segredo HMAC por Connection, várias conexões e automações desligadas por padrão. `whatsapp-meta` direto e `whatsapp-ycloud` permanecem aposentados; conexões/logs históricos ficam, segredos exclusivos são removidos.
 
 ## catalog/ (diretrizes 1/43/48)
 

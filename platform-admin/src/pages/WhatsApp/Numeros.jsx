@@ -50,9 +50,8 @@ export default function Numeros() {
   const [sessionId, setSessionId] = useState(null);
   const [disconnectTarget, setDisconnectTarget] = useState(null);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [wahaOpen, setWahaOpen] = useState(false);
+  const [wahaConfirmOpen, setWahaConfirmOpen] = useState(false);
   const [wahaSaving, setWahaSaving] = useState(false);
-  const [wahaForm, setWahaForm] = useState({ name: '', api_url: '', api_key: '', department: '', is_default: false, allow_automations: false, risk_accepted: false });
   const [pairing, setPairing] = useState(null);
   const [pairingState, setPairingState] = useState(null);
   const [pairingBusy, setPairingBusy] = useState(false);
@@ -219,19 +218,16 @@ export default function Numeros() {
   }
 
   async function saveWaha() {
-    if (!wahaForm.name.trim() || !wahaForm.api_url.trim() || !wahaForm.api_key.trim()) {
-      toast.error('Informe nome, URL e chave da API WAHA.'); return;
-    }
-    if (!wahaForm.risk_accepted) { toast.error('Confirme o aviso sobre a conexão não oficial.'); return; }
     setWahaSaving(true);
     try {
       const created = await createWahaNumber({
-        ...wahaForm,
-        webhook_url: `${window.location.origin}/api/webhooks/whatsapp/waha`,
+        name: `WhatsApp QR Code ${items.filter((item) => item.provider_key === 'whatsapp-waha').length + 1}`,
+        department: '',
+        is_default: items.length === 0,
+        allow_automations: false,
+        risk_accepted: true,
       });
-      setWahaOpen(false);
-      // Não mantém a chave da API no estado do navegador depois da criação.
-      setWahaForm({ name: '', api_url: '', api_key: '', department: '', is_default: false, allow_automations: false, risk_accepted: false });
+      setWahaConfirmOpen(false);
       setPairing({ id: created.id, name: created.name });
       setPairingState(null);
       toast.success('Sessão criada. Leia o QR Code para conectar.');
@@ -340,7 +336,7 @@ export default function Numeros() {
     </Button>
   );
   const conectarWaha = canManageConnections && (
-    <Button variant="primary" icon="plus" title="Conectar uma sessão WAHA lendo um QR Code" onClick={() => setWahaOpen(true)}>
+    <Button variant="primary" icon="plus" title="Conectar uma sessão WAHA lendo um QR Code" onClick={() => setWahaConfirmOpen(true)}>
       Conectar por QR Code
     </Button>
   );
@@ -460,7 +456,6 @@ export default function Numeros() {
         icon: 'phone',
         title: 'Nenhum número conectado',
         description: 'Escolha a Meta oficial ou conecte uma sessão WAHA lendo o QR Code.',
-        action: headerActions,
       }}
       emptyFiltered={{ title: 'Nenhum número encontrado', description: 'Nenhum número com esse nome ou telefone.', onClear: () => setQ('') }}
     />
@@ -529,26 +524,15 @@ export default function Numeros() {
       </div>
     </Modal>
 
-    <Modal
-      open={wahaOpen}
-      onClose={() => (wahaSaving ? null : setWahaOpen(false))}
+    <ConfirmDialog
+      open={wahaConfirmOpen}
+      onClose={() => !wahaSaving && setWahaConfirmOpen(false)}
+      onConfirm={saveWaha}
+      loading={wahaSaving}
       title="Conectar WhatsApp por QR Code"
-      maxWidth={620}
-      footer={<div className="flex justify-end gap-2"><Button variant="secondary" disabled={wahaSaving} onClick={() => setWahaOpen(false)}>Cancelar</Button><Button variant="primary" loading={wahaSaving} onClick={saveWaha}>Criar e mostrar QR Code</Button></div>}
-    >
-      <div className="space-y-4">
-        <p style={{ margin: 0, color: 'var(--su-text-muted)', fontSize: 13 }}>
-          A WAHA é uma integração não oficial e precisa estar instalada em um servidor acessível pelo IA Studio. Cada conexão cria uma sessão independente.
-        </p>
-        <Field label="Nome da conexão"><Input value={wahaForm.name} onChange={(e) => setWahaForm({ ...wahaForm, name: e.target.value })} placeholder="WhatsApp Comercial" /></Field>
-        <Field label="URL do servidor WAHA"><Input type="url" value={wahaForm.api_url} onChange={(e) => setWahaForm({ ...wahaForm, api_url: e.target.value })} placeholder="https://waha.seudominio.com" /></Field>
-        <Field label="Chave da API WAHA"><Input type="password" value={wahaForm.api_key} onChange={(e) => setWahaForm({ ...wahaForm, api_key: e.target.value })} autoComplete="new-password" /></Field>
-        <Field label="Departamento (opcional)"><Input value={wahaForm.department} onChange={(e) => setWahaForm({ ...wahaForm, department: e.target.value })} placeholder="Comercial, Suporte…" /></Field>
-        <Checkbox id="waha-default" label="Usar como conexão padrão" checked={wahaForm.is_default} onChange={(e) => setWahaForm({ ...wahaForm, is_default: e.target.checked })} />
-        <Checkbox id="waha-automations" label="Permitir envios automáticos por esta conexão (maior risco de bloqueio)" checked={wahaForm.allow_automations} onChange={(e) => setWahaForm({ ...wahaForm, allow_automations: e.target.checked })} />
-        <Checkbox id="waha-risk" label="Entendo que esta conexão não é oficial e pode sofrer limitações ou bloqueio pela Meta" checked={wahaForm.risk_accepted} onChange={(e) => setWahaForm({ ...wahaForm, risk_accepted: e.target.checked })} />
-      </div>
-    </Modal>
+      message="Esta conexão usa um método não oficial e pode sofrer limitações ou bloqueio pela Meta. O servidor já está configurado nesta instalação; ao continuar, basta escanear o QR Code no WhatsApp."
+      confirmLabel="Continuar e mostrar QR Code"
+    />
 
     <Modal
       open={!!pairing}

@@ -8,6 +8,7 @@ import { RichMessage } from '../../../../shared/integration/whatsapp.types';
 import {
   WahaRefs, downloadWahaMedia, ensureWahaSession, getWahaMe, getWahaSession,
   markWahaRead, sendWahaMedia, sendWahaText, stopWahaSession,
+  resolveWahaRuntime,
 } from '../../../../shared/integration/waha.client';
 import { WHATSAPP_WAHA_PROVIDER_KEY } from '../../../../shared/integration/whatsapp-provider.constants';
 
@@ -31,12 +32,9 @@ export class WhatsappWahaProvider extends BaseProvider {
         webhookPath: '/api/webhooks/whatsapp/waha',
         steps: [{
           id: 'waha',
-          title: 'Servidor WAHA',
-          description: 'A conexão e o QR Code são concluídos em WhatsApp → Números.',
+          title: 'WhatsApp por QR Code',
+          description: 'O servidor WAHA é provisionado automaticamente. A conexão é concluída em WhatsApp → Números.',
           fields: [
-            { key: 'api_url', label: 'URL do servidor WAHA', type: 'url', required: true, placeholder: 'https://waha.seudominio.com' },
-            { key: 'webhook_url', label: 'URL pública do webhook do IA Studio', type: 'url', required: true, placeholder: 'https://studio.seudominio.com/api/webhooks/whatsapp/waha', help: 'Em WhatsApp → Números esta URL é preenchida automaticamente.' },
-            { key: 'api_key', label: 'Chave da API WAHA', type: 'password', secret: true, required: true },
             { key: 'webhook_secret', label: 'Segredo do webhook', type: 'password', secret: true, required: true, generatable: true },
             { key: 'department', label: 'Departamento', type: 'text' },
             { key: 'is_default', label: 'Conexão padrão?', type: 'select', default: 'nao', options: [{ value: 'nao', label: 'Não' }, { value: 'sim', label: 'Sim' }] },
@@ -49,14 +47,13 @@ export class WhatsappWahaProvider extends BaseProvider {
 
   async refs(ctx: ProviderContext): Promise<WahaRefs & { webhookUrl: string; webhookSecret: string }> {
     const config = (ctx.connection.config ?? {}) as Record<string, unknown>;
-    const apiUrl = String(config['api_url'] ?? '').trim();
-    const webhookUrl = String(config['webhook_url'] ?? '').trim();
-    const apiKey = (await ctx.secrets.get('api_key')) ?? '';
+    const legacyApiKey = (await ctx.secrets.get('api_key')) ?? '';
     const webhookSecret = (await ctx.secrets.get('webhook_secret')) ?? '';
-    if (!apiUrl || !apiKey || !webhookUrl || !webhookSecret) {
-      throw new BadRequestException('Conexão WAHA sem URL, chave da API ou webhook configurado.');
+    const runtime = resolveWahaRuntime(config, legacyApiKey);
+    if (!runtime || !webhookSecret) {
+      throw new BadRequestException('Conexão WAHA incompleta ou serviço local indisponível.');
     }
-    return { apiUrl, apiKey, session: `iastudio-${ctx.connection.id}`, webhookUrl, webhookSecret };
+    return { ...runtime, session: `iastudio-${ctx.connection.id}`, webhookSecret };
   }
 
   override async connect(ctx: ProviderContext): Promise<ConnectResult> {

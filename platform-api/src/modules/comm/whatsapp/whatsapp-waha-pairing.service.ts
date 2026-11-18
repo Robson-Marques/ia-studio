@@ -8,7 +8,8 @@ import { CreateWahaNumberDto } from '../dto/create-waha-number.dto';
 import { WHATSAPP_WAHA_PROVIDER_KEY } from '../../../shared/integration/whatsapp-provider.constants';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import {
-  WahaApiError, WahaRefs, ensureWahaSession, getWahaMe, getWahaQr, getWahaSession, logoutWahaSession,
+  WahaApiError, WahaRefs, ensureWahaSession, getWahaMe, getWahaQr, getWahaSession, localWahaRuntime, logoutWahaSession,
+  resolveWahaRuntime,
   restartWahaSession, startWahaSession,
   stopWahaSession,
 } from '../../../shared/integration/waha.client';
@@ -26,18 +27,19 @@ export class WhatsappWahaPairingService {
     if (!dto.risk_accepted) {
       throw new BadRequestException('Confirme que entende que a WAHA é uma conexão não oficial.');
     }
+    if (!localWahaRuntime()) {
+      throw new BadRequestException('O WAHA local ainda não foi provisionado nesta instalação. Reaplique a versão ou contate o administrador do servidor.');
+    }
     return this.connections.create({
       provider_key: WHATSAPP_WAHA_PROVIDER_KEY,
       name: dto.name,
       config: {
-        api_url: dto.api_url.replace(/\/+$/, ''),
-        webhook_url: dto.webhook_url,
+        runtime: 'local_docker',
         department: dto.department?.trim() || '',
         is_default: dto.is_default ? 'sim' : 'nao',
         allow_automations: dto.allow_automations ? 'sim' : 'nao',
       },
       secrets: {
-        api_key: dto.api_key,
         webhook_secret: randomBytes(32).toString('hex'),
       },
     }, userId, { allowWhatsappWaha: true });
@@ -123,12 +125,11 @@ export class WhatsappWahaPairingService {
       throw new NotFoundException('Conexão WAHA não encontrada.');
     }
     const accessor = this.secrets.accessorFor(connection.secret_id);
-    const apiKey = (await accessor.get('api_key')) ?? '';
+    const legacyApiKey = (await accessor.get('api_key')) ?? '';
     const webhookSecret = (await accessor.get('webhook_secret')) ?? '';
     const config = (connection.config ?? {}) as Record<string, unknown>;
-    const apiUrl = String(config['api_url'] ?? '');
-    const webhookUrl = String(config['webhook_url'] ?? '');
-    if (!apiUrl || !apiKey || !webhookUrl || !webhookSecret) throw new BadRequestException('Conexão WAHA incompleta.');
-    return { connection, refs: { apiUrl, apiKey, session: `iastudio-${connection.id}`, webhookUrl, webhookSecret } };
+    const runtime = resolveWahaRuntime(config, legacyApiKey);
+    if (!runtime || !webhookSecret) throw new BadRequestException('Conexão WAHA incompleta ou serviço local indisponível.');
+    return { connection, refs: { ...runtime, session: `iastudio-${connection.id}`, webhookSecret } };
   }
 }

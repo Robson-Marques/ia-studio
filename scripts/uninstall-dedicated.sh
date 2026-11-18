@@ -46,6 +46,15 @@ assert_owned_path "$IASTUDIO_CONFIG_FILE" "$APPLICATION_CONFIG_BASE"
 pm2 delete "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
 pm2 save --force >/dev/null 2>&1 || true
 
+# O runtime WAHA é exclusivo desta aplicação. O container nunca sobrevive à
+# remoção do app; o volume de sessões segue a mesma política de --keep-data.
+if command -v docker >/dev/null 2>&1; then
+  docker rm -f "${IASTUDIO_APP_ID}-waha" >/dev/null 2>&1 || true
+  if [ "$KEEP_DATA" != 1 ]; then
+    docker volume rm "${IASTUDIO_APP_ID}-waha-sessions" >/dev/null 2>&1 || true
+  fi
+fi
+
 rm -f "/etc/nginx/sites-enabled/$IASTUDIO_NGINX_SITE" "/etc/nginx/sites-available/$IASTUDIO_NGINX_SITE"
 nginx -t && systemctl reload nginx
 

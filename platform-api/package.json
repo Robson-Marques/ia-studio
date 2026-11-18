@@ -4,6 +4,7 @@
   "description": "IA Studio — API de uma instalação dedicada (monólito modular NestJS + Fastify + Prisma)",
   "private": true,
   "scripts": {
+    "postinstall": "node ../scripts/waha-container.js --optional --install-docker",
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",

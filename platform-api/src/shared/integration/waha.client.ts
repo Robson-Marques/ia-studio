@@ -19,12 +19,37 @@ export interface WahaRefs {
   session: string;
 }
 
+export interface WahaRuntimeConfig {
+  apiUrl: string;
+  apiKey: string;
+  webhookUrl: string;
+}
+
 interface WahaMediaRef {
   chatId: string;
   messageId: string;
 }
 
 const MAX_MEDIA_BYTES = 32 * 1024 * 1024;
+
+export function localWahaRuntime(): WahaRuntimeConfig | null {
+  const apiUrl = process.env.IASTUDIO_WAHA_URL?.trim().replace(/\/+$/, '') ?? '';
+  const apiKey = process.env.IASTUDIO_WAHA_API_KEY?.trim() ?? '';
+  const webhookUrl = process.env.IASTUDIO_WAHA_WEBHOOK_URL?.trim() ?? '';
+  return apiUrl && apiKey && webhookUrl ? { apiUrl, apiKey, webhookUrl } : null;
+}
+
+export function resolveWahaRuntime(
+  config: Record<string, unknown>,
+  legacyApiKey = '',
+): WahaRuntimeConfig | null {
+  const local = localWahaRuntime();
+  if (config['runtime'] === 'local_docker') return local;
+  const apiUrl = String(config['api_url'] ?? '').trim().replace(/\/+$/, '');
+  const webhookUrl = String(config['webhook_url'] ?? '').trim();
+  if (apiUrl && legacyApiKey && webhookUrl) return { apiUrl, apiKey: legacyApiKey, webhookUrl };
+  return local;
+}
 
 export class WahaApiError extends Error {
   constructor(message: string, readonly status: number) {
