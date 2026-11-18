@@ -2,6 +2,12 @@
 
 ## Não publicado
 
+## v0.12.8 - 2026-11-18 (mídia WAHA reconciliada pelo evento canônico)
+
+- Corrige o download de imagem, figurinha, áudio, vídeo e documento enviados pelo painel: o eco `message.any` agora substitui a referência provisória pelo `chatId+messageId` definitivo publicado pela própria WAHA.
+- Mensagens de mídia já gravadas por versões anteriores são recuperadas sem migração de banco: o proxy reconstrói o descritor com o endereço técnico observado na conversa e mantém o descritor original como fallback auditável.
+- Mantém os bytes protegidos pelo proxy autenticado, o limite de 32 MB e o carregamento visual já existente. Sem alteração de schema.
+
 ## v0.12.7 - 2026-11-18 (miniatura de mídia e nome do contato WAHA)
 
 - Imagens, figurinhas e áudios da conversa passam a carregar automaticamente quando entram na área visível, preservando o download autenticado e sob demanda; falhas continuam com ação explícita para tentar novamente.

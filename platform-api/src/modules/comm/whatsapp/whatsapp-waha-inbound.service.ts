@@ -119,6 +119,26 @@ export class WhatsappWahaInboundService {
     }
     const existing = await this.chats.findMessageByConnectionExternalId(connection.id, externalId);
     if (existing) {
+      // O POST de envio grava uma bolha imediatamente, mas somente o
+      // `message.any` conhece o par chatId+messageId definitivo que a WAHA
+      // aceita no download. Reconciliar o eco evita manter a referência
+      // provisória e vale igualmente para imagem, áudio, vídeo e documento.
+      if (fromMe && hasMedia) {
+        await this.chats.reconcileWahaMediaEcho(existing.id, {
+          type,
+          content,
+          status: 'sent',
+          occurredAt: timestamp,
+          media: {
+            media_id: encodeWahaMediaRef(chatAddress, externalId),
+            mime_type: mime,
+            ...((mediaNode?.['filename'] ?? rawNode?.['filename'])
+              ? { filename: String(mediaNode?.['filename'] ?? rawNode?.['filename']) }
+              : {}),
+            ...(content ? { caption: content } : {}),
+          } as Prisma.InputJsonValue,
+        });
+      }
       if (!fromMe && !existing.inbound_event_published) {
         await this.publishInbound(connection, existing.chat_id, phone, externalId, timestamp, type, content, notifyName);
       }

@@ -421,6 +421,33 @@ export class WhatsappChatsRepository {
     return this.prisma.whatsappMessage.create({ data });
   }
 
+  /**
+   * Substitui os dados provisórios gravados pelo envio WAHA pelos identificadores
+   * definitivos publicados no `message.any`. O evento é a fonte canônica para
+   * mídia porque traz exatamente o chatId+messageId aceito pela API de download.
+   */
+  reconcileWahaMediaEcho(
+    messageId: string,
+    data: {
+      type: string;
+      content: string;
+      status: string;
+      occurredAt: Date;
+      media: Prisma.InputJsonValue;
+    },
+  ): Promise<WhatsappMessage> {
+    return this.prisma.whatsappMessage.update({
+      where: { id: messageId },
+      data: {
+        type: data.type,
+        content: data.content,
+        status: data.status,
+        occurred_at: data.occurredAt,
+        media: data.media,
+      },
+    });
+  }
+
   /** Ultimas mensagens (desc); `before` pagina pra tras no historico. */
   listMessages(chatId: string, take = 50, before?: Date): Promise<WhatsappMessage[]> {
     return this.prisma.whatsappMessage.findMany({

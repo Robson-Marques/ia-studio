@@ -6,7 +6,7 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-11-18 (`v0.12.7` completa miniatura automática e identidade visual/nome do contato WAHA).
+> Última atualização: 2026-11-18 (`v0.12.8` reconcilia e recupera mídia WAHA de todos os tipos).
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
 
@@ -15,6 +15,8 @@
 **Correção v0.12.6 — LID e mensagens próprias:** o primeiro pareamento real mostrou que o WEBJS entregava o contato como `@lid`. A versão resolve esse identificador pela API `/api/{session}/lids/{lid}`, mantém o JID técnico no `remote_history` e usa o telefone `pn` apenas na interface/chave da conversa. No boot, sessões antigas recebem via `PUT` a assinatura `message.any` e chats já gravados são reconciliados. Mensagens `fromMe` vindas do aparelho viram saída no histórico; envios do painel reutilizam o JID observado, inclusive para mídia, sem fabricar `@c.us` a partir do LID.
 
 **Refino v0.12.7 — mídia e identidade:** o componente de mídia porta o lazy-load visível do Control Leads: imagem/figurinha/áudio abrem automaticamente na bolha, mantendo bytes atrás do proxy autenticado e sem base64 no histórico. Nome considera o envelope e `_data` do webhook e, se ausente, consulta `GET /api/{session}/contacts/{id}`; a reconciliação de boot completa chats existentes. Avatar usa iniciais do nome e nunca mais o `(` da máscara do telefone.
+
+**Correção v0.12.8 — descritor canônico de mídia:** o envio pelo painel cria a bolha antes do webhook, mas o par definitivo aceito pelo endpoint de mídia pertence ao `message.any`. O eco agora reconcilia a mensagem existente e substitui o descritor provisório para imagem, figurinha, áudio, vídeo e documento. O proxy também reconstrói sob demanda as referências gravadas pela v0.12.7 usando `remote_history.waha_chat_id` e `external_id`, com fallback explícito para o descritor original. Não há migração nem persistência de base64.
 
 **Falha da v0.12.2 e correção da v0.12.3:** a tag `v0.12.2` foi criada em uma branch histórica que divergiu antes da conversão dedicada e ainda continha o schema SaaS. O `prisma db push` recusou adicionar `organization_id`/`workspace_id` obrigatórios em tabelas com dados; o rollback manteve a versão anterior e nenhum dado foi apagado. Não fazer backfill nem usar `--force-reset`. A `v0.12.3` parte da linha dedicada correta, não altera o schema em relação à `v0.12.01`, incorpora o relatório documental da tag divergente e filtra futuras tags que não descendam da versão instalada.
 

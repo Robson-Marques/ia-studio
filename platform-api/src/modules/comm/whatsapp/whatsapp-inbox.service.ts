@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -24,6 +25,7 @@ import { ConnectionsService } from '../../integration/connections/connections.se
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { NivooCentralError } from '../../../shared/integration/nivoo-whatsapp.client';
+import { encodeWahaMediaRef, wahaChatIdFromMessageId } from '../../../shared/integration/waha.client';
 import { RichMessage, WindowState, computeWindowState } from '../../../shared/integration/whatsapp.types';
 import { SendChatMessageDto } from '../dto/send-chat-message.dto';
 import { NivooConnectionsService } from './nivoo-connections.service';
@@ -65,6 +67,8 @@ export interface ListChatsArgs {
 
 @Injectable()
 export class WhatsappInboxService {
+  private readonly logger = new Logger(WhatsappInboxService.name);
+
   constructor(
     private readonly chats: WhatsappChatsRepository,
     private readonly orchestrator: WhatsappOrchestratorService,
@@ -386,9 +390,34 @@ export class WhatsappInboxService {
     if (connection?.provider_key === WHATSAPP_WAHA_PROVIDER_KEY) {
       const message = await this.chats.findMessageByChatAndMediaRef(chatId, mediaId);
       if (!message) throw new NotFoundException('Mídia não encontrada nesta conversa.');
-      const result = (await this.connections.execute(connection.id, 'downloadMedia', {
-        media_id: mediaId,
-      })) as { base64?: string; mime?: string };
+      const history = chat.remote_history && typeof chat.remote_history === 'object' && !Array.isArray(chat.remote_history)
+        ? chat.remote_history as Record<string, unknown>
+        : {};
+      const storedChatId = typeof history['waha_chat_id'] === 'string' ? history['waha_chat_id'] : '';
+      // Releases anteriores gravavam a referência antes do eco `message.any`.
+      // Para recuperar essas mensagens sem migração de banco, reconstruímos o
+      // descritor com o último endereço técnico observado na conversa ou, como
+      // fallback, com o chat embutido no id definitivo.
+      const canonicalChatId = message.external_id
+        ? storedChatId || wahaChatIdFromMessageId(message.external_id) || ''
+        : storedChatId;
+      const providerMediaId = canonicalChatId && message.external_id
+        ? encodeWahaMediaRef(canonicalChatId, message.external_id)
+        : mediaId;
+      let result: { base64?: string; mime?: string };
+      try {
+        result = (await this.connections.execute(connection.id, 'downloadMedia', {
+          media_id: providerMediaId,
+        })) as { base64?: string; mime?: string };
+      } catch (error) {
+        if (providerMediaId === mediaId) throw error;
+        this.logger.warn(
+          `Referência WAHA reconstruída falhou para a mensagem ${message.id}; tentando o descritor original: ${(error as Error).message}`,
+        );
+        result = (await this.connections.execute(connection.id, 'downloadMedia', {
+          media_id: mediaId,
+        })) as { base64?: string; mime?: string };
+      }
       if (!result?.base64) throw new NotFoundException('Mídia não encontrada nesta conversa.');
       return {
         bytes: Buffer.from(result.base64, 'base64'),
