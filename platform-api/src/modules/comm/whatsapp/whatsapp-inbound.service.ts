@@ -8,6 +8,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CommMessageDirection, Connection, IntegrationDirection, IntegrationLogStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { WhatsappMediaService } from './whatsapp-media.service';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
 import { WhatsappTemplatesRepository } from './whatsapp-templates.repository';
 import { ChatAssignmentService } from '../attendance/chat-assignment.service';
@@ -54,6 +55,7 @@ export class WhatsappInboundService {
     private readonly assignment: ChatAssignmentService,
     private readonly integrationLogs: IntegrationLogsRepository,
     private readonly eventBus: EventBusService,
+    private readonly mediaStorage: WhatsappMediaService,
   ) {}
 
   /** Processa um "change" do webhook já roteado pra conexao dona do numero. */
@@ -119,7 +121,7 @@ export class WhatsappInboundService {
         inboundAt: ts,
       });
 
-      await this.chats.createMessage({
+      const createdMessage = await this.chats.createMessage({
         organization_id: connection.organization_id,
         chat_id: chat.id,
         connection_id: connection.id,
@@ -131,6 +133,10 @@ export class WhatsappInboundService {
         media: media ? { ...media } : undefined,
         status: 'received',
       });
+
+      // Copia a mídia enquanto a URL do provedor ainda está disponível.
+      // Falhas são registradas, mantendo o histórico e permitindo retry pela interface.
+      if (media?.media_id) await this.mediaStorage.persistBestEffort(createdMessage);
 
       // Conversa encerrada + cliente voltou a falar → reabre (SYSTEM).
       await this.assignment.reopenByInbound(connection.organization_id, chat.id).catch(() => null);

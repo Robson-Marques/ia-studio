@@ -11,6 +11,7 @@ import { WhatsappTemplatesRepository } from './whatsapp/whatsapp-templates.repos
 import { WhatsappOrchestratorService } from './whatsapp/whatsapp-orchestrator.service';
 import { EmailOrchestratorService } from './email/email-orchestrator.service';
 import { WhatsappInboundService } from './whatsapp/whatsapp-inbound.service';
+import { WhatsappMediaService } from './whatsapp/whatsapp-media.service';
 import { WhatsappInboxService } from './whatsapp/whatsapp-inbox.service';
 import { WhatsappSmartSendService } from './whatsapp/whatsapp-smart-send.service';
 import { WhatsappTemplatesService } from './whatsapp/whatsapp-templates.service';
@@ -58,6 +59,7 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
     WhatsappYcloudInboundService,
     WhatsappBaileysSessionRepository,
     WhatsappBaileysRegistryService,
+    WhatsappMediaService,
     WhatsappInboxService,
     WhatsappSmartSendService,
     WhatsappTemplatesService,

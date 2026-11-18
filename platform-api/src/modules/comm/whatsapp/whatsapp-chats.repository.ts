@@ -157,6 +157,20 @@ export class WhatsappChatsRepository {
     return this.prisma.whatsappMessage.create({ data });
   }
 
+  findMessageById(id: string): Promise<WhatsappMessage | null> {
+    return this.prisma.whatsappMessage.findUnique({ where: { id } });
+  }
+
+  findMessageByChatAndMediaId(organizationId: string, chatId: string, mediaId: string): Promise<WhatsappMessage | null> {
+    return this.prisma.whatsappMessage.findFirst({
+      where: { organization_id: organizationId, chat_id: chatId, media: { path: ['media_id'], equals: mediaId } },
+    });
+  }
+
+  updateMessageMedia(id: string, media: Prisma.InputJsonValue): Promise<WhatsappMessage> {
+    return this.prisma.whatsappMessage.update({ where: { id }, data: { media } });
+  }
+
   /** Ultimas mensagens (desc); `before` pagina pra tras no historico. */
   listMessages(chatId: string, take = 50, before?: Date): Promise<WhatsappMessage[]> {
     return this.prisma.whatsappMessage.findMany({

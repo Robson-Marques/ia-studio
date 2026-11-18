@@ -15,6 +15,7 @@ import { ReplyGateService } from '../attendance/reply-gate.service';
 import { AttendanceRepository } from '../attendance/attendance.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
+import { WhatsappMediaService } from './whatsapp-media.service';
 import { WhatsappBaileysRegistryService } from './whatsapp-baileys-registry.service';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import {
@@ -65,6 +66,7 @@ export class WhatsappInboxService {
     private readonly connections: ConnectionsService,
     private readonly connectionsRepository: ConnectionsRepository,
     private readonly baileys: WhatsappBaileysRegistryService,
+    private readonly mediaStorage: WhatsappMediaService,
   ) {}
 
   // ─── Escopo (a UI monta as abas a partir daqui) ─────
@@ -320,6 +322,14 @@ export class WhatsappInboxService {
     // Reaproveita o mesmo envio (ja passou pelo reply gate/janela acima, mas
     // deliver revalida — barato e mantem uma porta unica de envio).
     const result = await this.deliver(organizationId, user, chat, message, args.confirmTakeover === true, false);
+    // O arquivo local sobrevive à expiração do media_id da Meta.
+    if (result.wamid) {
+      const savedMessage = await this.chats.findMessageByExternalId(result.wamid);
+      if (savedMessage && savedMessage.chat_id === chat.id && savedMessage.organization_id === organizationId) {
+        await this.mediaStorage.saveBuffer(savedMessage, args.data, args.mimeType, args.filename)
+          .catch(() => undefined); // envio bem-sucedido nunca deve ser relatado como falha de storage
+      }
+    }
     return { wamid: result.wamid, via: 'media' };
   }
 
@@ -419,11 +429,7 @@ export class WhatsappInboxService {
     mediaId: string,
   ): Promise<{ base64: string; mime: string }> {
     const chat = await this.getChat(organizationId, chatId);
-    const result = (await this.connections.execute(organizationId, chat.connection_id, 'downloadMedia', {
-      media_id: mediaId,
-    })) as { base64: string; mime: string } | null;
-    if (!result) throw new NotFoundException('Mídia não encontrada na Meta (pode ter expirado).');
-    return result;
+    return this.mediaStorage.load(organizationId, chat.id, mediaId);
   }
 
   // ─── Helpers privados ───────────────────────────────
