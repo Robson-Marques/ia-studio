@@ -2,6 +2,11 @@
 
 ## Não publicado
 
+## v0.12.4 - 2026-11-18 (correção do build WAHA)
+
+- Corrige os dois erros TypeScript encontrados pelo build da `v0.12.3`: a guarda de automação WAHA passa a usar `isEnabled` somente no método de vínculo do assistente, e `WhatsappMessageType` ganha sua exportação explícita com os tipos inbound suportados.
+- Sem mudança de schema. O rollback da tentativa anterior preservou a `v0.12.01`; a atualização deve seguir diretamente para `v0.12.4`.
+
 ## v0.12.3 - 2026-11-18 (WAHA por QR Code + blindagem da linha de release)
 
 - WhatsApp → Números passa a oferecer dois métodos: **Meta oficial pela Central Nivoo** e **WAHA não oficial por QR Code**. A WAHA aceita várias sessões, exige aceite de risco, valida o webhook com HMAC, entra na mesma Central de Atendimento e envia/recebe texto, imagem, áudio, vídeo e documento. Mídia WAHA é recuperada sob demanda sem persistir base64; automações ficam desligadas por padrão. O legado YCloud permanece fora do runtime.

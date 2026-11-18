@@ -42,12 +42,7 @@ export class WhatsappAssistantService {
 
   /** Vínculo atual do número (ou null), já com o nome do assistente. */
   async get(connectionId: string): Promise<ChannelAssistantView | null> {
-    const connection = await this.assertConnection(connectionId);
-    if (isEnabled && !allowsAutomaticWhatsappSend(connection)) {
-      throw new BadRequestException(
-        'Habilite os envios automáticos desta conexão WAHA antes de ligar um assistente.',
-      );
-    }
+    await this.assertConnection(connectionId);
     const row = await this.repository.findByConnection(connectionId);
     if (!row) return null;
     const agent = await this.prisma.aiAgent.findUnique({
@@ -77,7 +72,12 @@ export class WhatsappAssistantService {
     isEnabled: boolean,
     createdBy: string | null,
   ): Promise<ChannelAssistantView> {
-    await this.assertConnection(connectionId);
+    const connection = await this.assertConnection(connectionId);
+    if (isEnabled && !allowsAutomaticWhatsappSend(connection)) {
+      throw new BadRequestException(
+        'Habilite os envios automáticos desta conexão WAHA antes de ligar um assistente.',
+      );
+    }
 
     // O assistente precisa existir localmente e estar ativo.
     const agent = await this.prisma.aiAgent.findUnique({ where: { id: agentId } });

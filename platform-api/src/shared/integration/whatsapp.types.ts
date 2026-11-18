@@ -7,6 +7,16 @@
 
 // ─── RichMessage (envio) ────────────────────────────────────────────────
 
+/** Tipos normalizados persistidos/emitidos por mensagens recebidas. */
+export type WhatsappMessageType =
+  | 'text'
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'document'
+  | 'sticker'
+  | 'location';
+
 export type RichMessage =
   | RichText
   | RichMedia

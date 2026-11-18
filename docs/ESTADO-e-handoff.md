@@ -6,14 +6,16 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-11-18 (a tentativa de `v0.12.2` fez rollback; a
-> próxima release correta é `v0.12.3`, na linha dedicada com WAHA).
+> Última atualização: 2026-11-18 (as tentativas de `v0.12.2` e `v0.12.3`
+> fizeram rollback; a correção de build da linha dedicada segue em `v0.12.4`).
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
 
 **Atualização de 2026-11-18 — WAHA por QR Code:** `WhatsApp → Números` mantém a Meta oficial pela Central Nivoo e passa a oferecer WAHA como segunda opção não oficial. Cada Connection WAHA cria sua própria sessão, mostra/renova o QR e compartilha inbox, atendimento e vínculo com assistente. API key e HMAC ficam no Cofre; automações exigem opt-in. Imagem, áudio, vídeo e documento são enviados e recuperados sob demanda, com referência opaca no histórico e sem base64 persistido. YCloud continua fora do runtime. Ainda faltam build/deploy e pareamento contra um servidor WAHA real; o Windows local não tem Node.
 
 **Falha da v0.12.2 e correção da v0.12.3:** a tag `v0.12.2` foi criada em uma branch histórica que divergiu antes da conversão dedicada e ainda continha o schema SaaS. O `prisma db push` recusou adicionar `organization_id`/`workspace_id` obrigatórios em tabelas com dados; o rollback manteve a versão anterior e nenhum dado foi apagado. Não fazer backfill nem usar `--force-reset`. A `v0.12.3` parte da linha dedicada correta, não altera o schema em relação à `v0.12.01`, incorpora o relatório documental da tag divergente e filtra futuras tags que não descendam da versão instalada.
+
+**Falha de build da v0.12.3 e correção da v0.12.4:** o Prisma passou, mas o Nest encontrou duas falhas TypeScript introduzidas na integração WAHA: `isEnabled` fora do escopo em `WhatsappAssistantService.get()` e ausência da exportação `WhatsappMessageType`. A guarda foi movida para `set()`, onde o parâmetro existe, e o tipo inbound foi declarado/exportado. Sem alteração de schema; o rollback preservou a `v0.12.01`.
 
 O IA Studio Newnet está sendo migrado para o contrato remoto da Central WhatsApp v2.6.0. O código local já contém cliente autenticado, provider `whatsapp-nivoo`, onboarding, sincronização paginada de conversas/mensagens, reconciliação de jobs, mídia autenticada, templates e tela de números. O runtime Meta/YCloud e seus webhooks foram retirados; conexões antigas são desativadas no boot e seus registros relacionados são preservados para auditoria. Fonte técnica local: `platform-api/src/modules/comm/README.md`.
 
