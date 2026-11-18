@@ -143,10 +143,10 @@ find_pm2_name() {
     process.stdin.on("data", chunk => json += chunk);
     process.stdin.on("end", () => {
       try {
-        const dir = process.argv[1].replace(/\\/$/, "");
+        const dir = process.argv[1].replace(/[/]$/, "");
         const role = process.argv[2];
         const matches = JSON.parse(json).filter(p => {
-          const cwd = (p.pm2_env?.pm_cwd || "").replace(/\\/$/, "");
+          const cwd = (p.pm2_env?.pm_cwd || "").replace(/[/]$/, "");
           return cwd === dir && (role === "worker" ? /worker/i.test(p.name) : /api/i.test(p.name) && !/worker/i.test(p.name));
         });
         if (matches.length !== 1) process.exit(1);
