@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Badge, Button, IconButton, Avatar, ConfirmDialog, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
+import { Badge, Button, IconButton, Avatar, ConfirmDialog, Modal, Field, Select, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia, unlinkCustomer,
+  listManualChannels, setManualChannel,
 } from '../../services/whatsapp';
-import { ATTENDANCE_STATUS, contactInitials, formatPhone } from './whatsapp.constants';
+import { ATTENDANCE_STATUS, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
 import AudioPlayer from './AudioPlayer';
 import { statusToTone } from '../../lib/tone';
@@ -31,57 +32,49 @@ function StatusTicks({ status }) {
   return <DSIcon name="clock" size="sm" style={{ color: '#8696a0' }} />;
 }
 
-// Mídia da Central: baixa sob demanda pelo proxy autenticado do backend.
+// Mídia (recebida ou enviada): baixa da Meta sob demanda via proxy do backend.
 function ChatMedia({ chatId, message }) {
   const toast = useToast();
   const media = message.media || {};
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(!media.media_id && media.url ? { src: media.url, mime: media.mime_type } : null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const targetRef = useRef(null);
-
-  useEffect(() => () => {
-    if (data?.src) URL.revokeObjectURL(data.src);
-  }, [data?.src]);
+  const loadTriggerRef = useRef(null);
 
   async function load() {
-    if (!media.media_id || loading || data) return;
+    if (!media.media_id) return;
     setLoading(true);
-    setError(null);
     try {
-      const blob = await downloadChatMedia(chatId, media.media_id);
-      setData({ src: URL.createObjectURL(blob), mime: blob.type });
+      const r = await downloadChatMedia(chatId, media.media_id);
+      setData({ src: `data:${r.mime};base64,${r.base64}`, mime: r.mime });
     } catch (err) {
-      setError(err.message);
       toast.error(err.message);
     } finally {
       setLoading(false);
     }
   }
 
-  // Porte do comportamento validado no Control Leads: imagem/figurinha/áudio
-  // carregam sob demanda assim que entram na área visível, sem exigir clique.
+  // Imagens apenas quando entram perto da tela; outros arquivos sob demanda.
   useEffect(() => {
-    if (data || loading || error || !media.media_id || !['image', 'sticker', 'audio'].includes(message.type)) return undefined;
-    const element = targetRef.current;
-    if (!element) return undefined;
-    if (typeof IntersectionObserver === 'undefined') { load(); return undefined; }
+    if (message.type !== 'image' || !media.media_id || data) return;
+    const el = loadTriggerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         observer.disconnect();
         load();
       }
-    }, { rootMargin: '120px' });
-    observer.observe(element);
+    }, { rootMargin: '160px' });
+    observer.observe(el);
     return () => observer.disconnect();
-  }, [chatId, media.media_id, message.type, data, loading, error]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, media.media_id]);
 
   const NOME_TIPO = { image: 'imagem', audio: 'áudio', video: 'vídeo' };
 
   if (!data) {
     return (
       <button
-        ref={targetRef}
+        ref={loadTriggerRef}
         type="button"
         onClick={load}
         disabled={loading}
@@ -89,13 +82,13 @@ function ChatMedia({ chatId, message }) {
         style={{ fontSize: 12, color: '#027eb5', minHeight: 32, background: 'none', border: 0, padding: 0, font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
       >
         {loading ? <Spinner size="sm" /> : <DSIcon name="download" size="sm" />}
-        {error ? 'Tentar novamente' : message.media_state === 'UNAVAILABLE' ? 'Tentar carregar mídia indisponível' : `Carregar ${NOME_TIPO[message.type] || 'arquivo'}`}
+        Carregar {NOME_TIPO[message.type] || 'arquivo'}
       </button>
     );
   }
 
   const mime = data.mime || media.mime_type || '';
-  if (message.type === 'image' || message.type === 'sticker' || mime.startsWith('image/')) {
+  if (message.type === 'image' || mime.startsWith('image/')) {
     return <img src={data.src} alt="Imagem recebida na conversa" className="rounded-lg max-w-full max-h-64" />;
   }
   if (message.type === 'audio' || mime.startsWith('audio/')) {
@@ -118,7 +111,7 @@ function ChatMedia({ chatId, message }) {
   );
 }
 
-function Bubble({ chatId, message, reactions }) {
+function Bubble({ chatId, message }) {
   const outgoing = message.direction === 'OUTGOING';
   return (
     <div className={outgoing ? 'flex justify-end' : 'flex justify-start'}>
@@ -145,23 +138,10 @@ function Bubble({ chatId, message, reactions }) {
               </a>
             ))
         )}
-        {message.reply_to_message_id && <p className="text-xs opacity-70">↳ Resposta a {message.reply_to_from || 'outra mensagem'}</p>}
         {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
-        {message.type === 'reaction' && message.reaction_emoji && <p>{message.reaction_emoji} · reação a uma mensagem anterior</p>}
-        {message.interactive_reply && <p className="text-xs">Opção: {message.interactive_reply.title || message.interactive_reply.id || 'resposta interativa'}{message.interactive_reply.description ? ` · ${message.interactive_reply.description}` : ''}</p>}
-        {message.referral && <p className="text-xs">Origem: {message.referral.headline || message.referral.source_url || 'anúncio'}{!message.referral.source_id && ' · identificação de origem indisponível'}</p>}
-        {message.template?.name && <p className="text-xs">Modelo: {message.template.name}</p>}
-        {message.media_metadata && <p className="text-xs opacity-70">
-          {[
-            message.media_metadata.size_bytes != null ? `${Math.round(message.media_metadata.size_bytes / 1024)} KB` : null,
-            message.media_metadata.width_px && message.media_metadata.height_px ? `${message.media_metadata.width_px}×${message.media_metadata.height_px}` : null,
-            message.media_metadata.duration_ms != null ? `${Math.round(message.media_metadata.duration_ms / 1000)} s` : null,
-          ].filter(Boolean).join(' · ')}
-        </p>}
-        {reactions?.length > 0 && <p className="text-xs" aria-label="Reações">{reactions.join(' ')}</p>}
         <div className="flex items-center gap-1 justify-end" style={{ fontSize: 10, color: '#667781' }}>
           {message.type === 'template' && <span>(modelo)</span>}
-          <span>{new Date(message.occurred_at || message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>{new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           {outgoing && <StatusTicks status={message.status} />}
         </div>
         {message.status === 'failed' && message.error_detail && (
@@ -182,22 +162,47 @@ export default function ChatWindow({
   const [acting, setActing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
 
+  // Coexistência: canais Baileys manuais elegíveis para esta conversa + escolha
+  // no seletor (quando há mais de um). O estado atual do modo vem do próprio
+  // chat (chat.manual_connection_id).
+  const [manualChannels, setManualChannels] = useState(null);
+  const [manualPickerOpen, setManualPickerOpen] = useState(false);
+  const [pickChannelId, setPickChannelId] = useState('');
+
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [chat?.id, messages.length]);
+
+  // Busca os canais manuais elegíveis ao abrir a conversa. Sem eles (e fora do
+  // modo manual), o controle nem aparece — quem não configurou coexistência não
+  // vê ruído. Best-effort: falha silenciosa.
+  useEffect(() => {
+    if (!chat?.id) return;
+    let vivo = true;
+    setManualChannels(null);
+    listManualChannels(chat.id).then((cs) => { if (vivo) setManualChannels(cs); }).catch(() => { if (vivo) setManualChannels([]); });
+    return () => { vivo = false; };
+  }, [chat?.id]);
 
   if (!chat) return null;
   const st = ATTENDANCE_STATUS[chat.attendance_status] || ATTENDANCE_STATUS.OPEN;
   const isMine = chat.current_handler_type === 'USER' && chat.current_handler_id === meId;
   const closed = chat.attendance_status === 'CLOSED';
   const nome = chat.contact_name || formatPhone(chat.phone);
-  const reactions = new Map();
-  const knownMessageIds = new Set(messages.flatMap((m) => [m.remote_message_id, m.external_id].filter(Boolean)));
-  for (const message of messages) {
-    if (!message.reaction_emoji || !message.reaction_to_message_id) continue;
-    const target = message.reaction_to_message_id;
-    reactions.set(target, [...(reactions.get(target) || []), message.reaction_emoji]);
+
+  const manualOn = !!chat.manual_connection_id;
+  const canais = manualChannels || [];
+  const manualName = canais.find((c) => c.id === chat.manual_connection_id)?.name || 'canal manual';
+
+  async function ligarManual(connectionId) {
+    await run(() => setManualChannel(chat.id, connectionId), 'Conversa em modo manual — respondida pelo número Baileys.');
+  }
+
+  function abrirModoManual() {
+    if (canais.length === 1) { ligarManual(canais[0].id); return; }
+    setPickChannelId(canais[0]?.id || '');
+    setManualPickerOpen(true);
   }
 
   async function run(fn, okMsg) {
@@ -219,7 +224,7 @@ export default function ChatWindow({
         className="flex items-center gap-2 flex-wrap"
         style={{ padding: 'var(--su-space-2) var(--su-space-3)', borderBottom: '1px solid var(--su-border-default)' }}
       >
-        <Avatar initials={contactInitials(chat.contact_name, chat.phone)} size="sm" alt="" />
+        <Avatar initials={(nome || '?').slice(0, 1).toUpperCase()} size="sm" alt="" />
 
         <div className="min-w-0 flex-1">
           <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">
@@ -251,6 +256,7 @@ export default function ChatWindow({
         </div>
 
         <Badge tone={statusToTone(st.variant)}>{st.label}</Badge>
+        {manualOn && <Badge tone="warning">Modo manual</Badge>}
 
         <div className="flex items-center gap-1">
           {!closed && !isMine && can('comm.whatsapp.claim') && (
@@ -298,6 +304,27 @@ export default function ChatWindow({
               Reabrir
             </Button>
           )}
+          {/* Coexistência: passa a conversa para um número Baileys (modo manual)
+              ou volta ao oficial. Só aparece quando há canal manual elegível
+              (ou já está ligado, para poder desligar). */}
+          {!closed && manualOn && (
+            <Button
+              variant="secondary" size="sm" icon="refresh" disabled={acting}
+              title={`Voltar ao número oficial (hoje respondendo por ${manualName})`}
+              onClick={() => ligarManual(null)}
+            >
+              Voltar ao oficial
+            </Button>
+          )}
+          {!closed && !manualOn && canais.length > 0 && (
+            <Button
+              variant="secondary" size="sm" disabled={acting}
+              title="Passar esta conversa para um número Baileys — IA, automações e modelos ficam de fora até você voltar ao oficial"
+              onClick={abrirModoManual}
+            >
+              Modo manual
+            </Button>
+          )}
           <IconButton
             icon="history"
             aria-label="Ver o histórico de atendimento"
@@ -318,15 +345,30 @@ export default function ChatWindow({
           backgroundSize: '22px 22px',
         }}
       >
-        {messages.filter((m) => m.type !== 'reaction' || !knownMessageIds.has(m.reaction_to_message_id)).map((m) => (
-          <Bubble key={m.id} chatId={chat.id} message={m} reactions={reactions.get(m.remote_message_id) || reactions.get(m.external_id) || []} />
-        ))}
+        {messages.map((m) => <Bubble key={m.id} chatId={chat.id} message={m} />)}
         {messages.length === 0 && (
           <p className="text-center py-8" style={{ fontSize: 12, color: '#667781' }}>
             Nenhuma mensagem nesta conversa ainda.
           </p>
         )}
       </div>
+
+      {manualOn && (
+        <div
+          className="flex items-center gap-2"
+          style={{
+            fontSize: 12, padding: '8px 12px',
+            borderTop: '1px solid var(--su-border-default)',
+            background: 'var(--su-warning-bg)', color: 'var(--su-warning-fg)',
+          }}
+        >
+          <DSIcon name="alert-triangle" size="sm" className="shrink-0" />
+          <span style={{ flex: 1 }}>
+            Modo manual — respondendo por <strong>{manualName}</strong>. IA, automações e modelos ficam fora desta conversa,
+            e o envio sai pelo número Baileys (sem janela de 24h). Volte ao oficial para usar modelos ou mídia gravada.
+          </span>
+        </div>
+      )}
 
       <MessageComposer chat={chat} windowInfo={windowInfo} templates={templates} scope={scope} onSent={onSent} />
 
@@ -340,6 +382,38 @@ export default function ChatWindow({
         onClose={() => setConfirmClose(false)}
         onConfirm={() => run(() => closeChat(chat.id), 'Conversa encerrada.').then(() => setConfirmClose(false))}
       />
+
+      {/* Seletor de canal manual — só aparece quando há mais de um elegível. */}
+      <Modal
+        open={manualPickerOpen}
+        onClose={acting ? undefined : () => setManualPickerOpen(false)}
+        title="Passar para modo manual"
+        maxWidth={480}
+        footer={
+          <>
+            <Button variant="secondary" disabled={acting} onClick={() => setManualPickerOpen(false)}>Cancelar</Button>
+            <Button
+              variant="primary" loading={acting} disabled={!pickChannelId}
+              onClick={() => ligarManual(pickChannelId).then(() => setManualPickerOpen(false))}
+            >
+              Ativar modo manual
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
+            A conversa passa a ser respondida por um número Baileys. Enquanto estiver em modo manual, IA, automações e
+            modelos não enviam por ela — e o atendente responde sem a janela de 24h da Meta.
+          </p>
+          <Field label="Número Baileys" required>
+            <Select value={pickChannelId} onChange={(e) => setPickChannelId(e.target.value)}>
+              <option value="">Escolha…</option>
+              {canais.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </Field>
+        </div>
+      </Modal>
     </div>
   );
 }
