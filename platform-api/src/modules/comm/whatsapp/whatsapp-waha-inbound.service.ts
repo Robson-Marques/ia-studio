@@ -12,6 +12,7 @@ import { SecretsService } from '../../integration/secrets/secrets.service';
 import { ChatAssignmentService } from '../attendance/chat-assignment.service';
 import { WHATSAPP_INBOUND_EVENT } from './whatsapp.events';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
+import { WhatsappMediaStoreService } from './whatsapp-media-store.service';
 import { normalizePhoneFromWhatsApp } from './whatsapp.helpers';
 
 interface WahaEvent {
@@ -30,6 +31,7 @@ export class WhatsappWahaInboundService {
     private readonly connections: ConnectionsRepository,
     private readonly logs: IntegrationLogsRepository,
     private readonly secrets: SecretsService,
+    private readonly mediaStore: WhatsappMediaStoreService,
   ) {}
 
   async handleEvent(connection: Connection, body: unknown): Promise<void> {
@@ -124,7 +126,7 @@ export class WhatsappWahaInboundService {
       // aceita no download. Reconciliar o eco evita manter a referência
       // provisória e vale igualmente para imagem, áudio, vídeo e documento.
       if (fromMe && hasMedia) {
-        await this.chats.reconcileWahaMediaEcho(existing.id, {
+        const updated = await this.chats.reconcileWahaMediaEcho(existing.id, {
           type,
           content,
           status: 'sent',
@@ -138,6 +140,7 @@ export class WhatsappWahaInboundService {
             ...(content ? { caption: content } : {}),
           } as Prisma.InputJsonValue,
         });
+        await this.mediaStore.persistWahaBestEffort(updated);
       }
       if (!fromMe && !existing.inbound_event_published) {
         await this.publishInbound(connection, existing.chat_id, phone, externalId, timestamp, type, content, notifyName);
@@ -152,7 +155,7 @@ export class WhatsappWahaInboundService {
       direction: fromMe ? CommMessageDirection.OUTGOING : CommMessageDirection.INCOMING,
       inboundAt: fromMe ? undefined : timestamp,
     });
-    await this.chats.createMessage({
+    const created = await this.chats.createMessage({
       chat_id: chat.id, connection_id: connection.id, external_id: externalId,
       direction: fromMe ? CommMessageDirection.OUTGOING : CommMessageDirection.INCOMING,
       sender: fromMe ? 'system' : 'contact', type,
@@ -170,6 +173,7 @@ export class WhatsappWahaInboundService {
     if (!fromMe) {
       await this.publishInbound(connection, chat.id, phone, externalId, timestamp, type, content, notifyName);
     }
+    if (hasMedia) await this.mediaStore.persistWahaBestEffort(created);
   }
 
   private async refs(connection: Connection): Promise<WahaRefs> {
