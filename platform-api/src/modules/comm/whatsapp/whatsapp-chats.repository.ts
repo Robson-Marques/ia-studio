@@ -421,6 +421,10 @@ export class WhatsappChatsRepository {
     return this.prisma.whatsappMessage.create({ data });
   }
 
+  updateMessageMedia(messageId: string, media: Prisma.InputJsonValue): Promise<WhatsappMessage> {
+    return this.prisma.whatsappMessage.update({ where: { id: messageId }, data: { media } });
+  }
+
   /**
    * Substitui os dados provisórios gravados pelo envio WAHA pelos identificadores
    * definitivos publicados no `message.any`. O evento é a fonte canônica para
