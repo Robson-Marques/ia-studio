@@ -3,7 +3,7 @@ import { CommMessageDirection, Connection, IntegrationDirection, IntegrationLogS
 import { randomUUID } from 'crypto';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import {
-  WahaRefs, encodeWahaMediaRef, getWahaPhoneByLid, normalizeWahaChatId, resolveWahaRuntime,
+  WahaRefs, encodeWahaMediaRef, getWahaContactName, getWahaPhoneByLid, normalizeWahaChatId, resolveWahaRuntime,
 } from '../../../shared/integration/waha.client';
 import { WhatsappMessageType } from '../../../shared/integration/whatsapp.types';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
@@ -92,7 +92,17 @@ export class WhatsappWahaInboundService {
     const timestamp = rawTs > 0
       ? new Date(rawTs < 10_000_000_000 ? rawTs * 1000 : rawTs)
       : new Date();
-    const notifyName = String(payload['pushName'] ?? payload['notifyName'] ?? '') || null;
+    const rawData = payload['_data'] && typeof payload['_data'] === 'object'
+      ? payload['_data'] as Record<string, unknown>
+      : {};
+    const payloadName = [payload['pushName'], payload['notifyName'], rawData['notifyName'], rawData['pushName']]
+      .find((value) => typeof value === 'string' && value.trim());
+    const notifyName = typeof payloadName === 'string'
+      ? payloadName.trim().slice(0, 255)
+      : await getWahaContactName(refs, chatAddress).catch((error) => {
+          this.logger.warn(`Não foi possível carregar o nome de ${chatAddress}: ${(error as Error).message}`);
+          return null;
+        });
     const remoteHistory = {
       waha_chat_id: chatAddress,
       ...(chatAddress.endsWith('@lid') ? { whatsapp_lid: chatAddress } : {}),

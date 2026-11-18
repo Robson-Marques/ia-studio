@@ -2,6 +2,12 @@
 
 ## Não publicado
 
+## v0.12.7 - 2026-11-18 (miniatura de mídia e nome do contato WAHA)
+
+- Imagens, figurinhas e áudios da conversa passam a carregar automaticamente quando entram na área visível, preservando o download autenticado e sob demanda; falhas continuam com ação explícita para tentar novamente.
+- O nome do contato WAHA passa a considerar `pushName`/`notifyName` também dentro de `_data` e usa a Contacts API como fallback, inclusive para completar conversas já existentes no boot.
+- Avatares da lista e do cabeçalho usam até duas iniciais do nome; quando o nome não está disponível, usam os dois últimos dígitos do telefone em vez do primeiro caractere da máscara `(`. Sem alteração de schema.
+
 ## v0.12.6 - 2026-11-18 (telefone real, eco do celular e envio WAHA)
 
 - Corrige conversas WAHA que exibiam o identificador privado `@lid` como telefone: o backend consulta o mapa oficial LID→PN da sessão, preserva o endereço técnico do chat separadamente e migra o registro existente sem perder mensagens ou atendimento.

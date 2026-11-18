@@ -9,7 +9,7 @@ import { WHATSAPP_WAHA_PROVIDER_KEY } from '../../../shared/integration/whatsapp
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
 import {
-  WahaApiError, WahaRefs, ensureWahaSession, getWahaMe, getWahaPhoneByLid, getWahaQr, getWahaSession,
+  WahaApiError, WahaRefs, ensureWahaSession, getWahaContactName, getWahaMe, getWahaPhoneByLid, getWahaQr, getWahaSession,
   localWahaRuntime, logoutWahaSession, normalizeWahaChatId, resolveWahaRuntime, wahaChatIdFromMessageId,
   restartWahaSession, startWahaSession,
   stopWahaSession,
@@ -162,11 +162,15 @@ export class WhatsappWahaPairingService implements OnApplicationBootstrap {
       const resolvedPhone = chatAddress.endsWith('@lid')
         ? await getWahaPhoneByLid(refs, chatAddress)
         : chatAddress.replace(/\D/g, '');
+      const contactName = chat.contact_name || await getWahaContactName(refs, chatAddress).catch((error) => {
+        this.logger.warn(`Nome WAHA indisponível para ${chatAddress}: ${(error as Error).message}`);
+        return null;
+      });
       await this.chats.reconcileWahaChatIdentity({
         connectionId: connection.id,
         provisionalPhone: chat.phone,
         phone: resolvedPhone || chat.phone,
-        contactName: chat.contact_name,
+        contactName,
         remoteHistory: {
           waha_chat_id: chatAddress,
           ...(chatAddress.endsWith('@lid') ? { whatsapp_lid: chatAddress } : {}),

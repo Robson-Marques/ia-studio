@@ -4,7 +4,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import {
   claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia, unlinkCustomer,
 } from '../../services/whatsapp';
-import { ATTENDANCE_STATUS, formatPhone } from './whatsapp.constants';
+import { ATTENDANCE_STATUS, contactInitials, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
 import AudioPlayer from './AudioPlayer';
 import { statusToTone } from '../../lib/tone';
@@ -37,29 +37,51 @@ function ChatMedia({ chatId, message }) {
   const media = message.media || {};
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const targetRef = useRef(null);
 
   useEffect(() => () => {
     if (data?.src) URL.revokeObjectURL(data.src);
   }, [data?.src]);
 
   async function load() {
-    if (!media.media_id) return;
+    if (!media.media_id || loading || data) return;
     setLoading(true);
+    setError(null);
     try {
       const blob = await downloadChatMedia(chatId, media.media_id);
       setData({ src: URL.createObjectURL(blob), mime: blob.type });
     } catch (err) {
+      setError(err.message);
       toast.error(err.message);
     } finally {
       setLoading(false);
     }
   }
 
+  // Porte do comportamento validado no Control Leads: imagem/figurinha/áudio
+  // carregam sob demanda assim que entram na área visível, sem exigir clique.
+  useEffect(() => {
+    if (data || loading || error || !media.media_id || !['image', 'sticker', 'audio'].includes(message.type)) return undefined;
+    const element = targetRef.current;
+    if (!element) return undefined;
+    if (typeof IntersectionObserver === 'undefined') { load(); return undefined; }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        observer.disconnect();
+        load();
+      }
+    }, { rootMargin: '120px' });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [chatId, media.media_id, message.type, data, loading, error]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const NOME_TIPO = { image: 'imagem', audio: 'áudio', video: 'vídeo' };
 
   if (!data) {
     return (
       <button
+        ref={targetRef}
         type="button"
         onClick={load}
         disabled={loading}
@@ -67,13 +89,13 @@ function ChatMedia({ chatId, message }) {
         style={{ fontSize: 12, color: '#027eb5', minHeight: 32, background: 'none', border: 0, padding: 0, font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
       >
         {loading ? <Spinner size="sm" /> : <DSIcon name="download" size="sm" />}
-        {message.media_state === 'UNAVAILABLE' ? 'Tentar carregar mídia indisponível' : `Carregar ${NOME_TIPO[message.type] || 'arquivo'}`}
+        {error ? 'Tentar novamente' : message.media_state === 'UNAVAILABLE' ? 'Tentar carregar mídia indisponível' : `Carregar ${NOME_TIPO[message.type] || 'arquivo'}`}
       </button>
     );
   }
 
   const mime = data.mime || media.mime_type || '';
-  if (message.type === 'image' || mime.startsWith('image/')) {
+  if (message.type === 'image' || message.type === 'sticker' || mime.startsWith('image/')) {
     return <img src={data.src} alt="Imagem recebida na conversa" className="rounded-lg max-w-full max-h-64" />;
   }
   if (message.type === 'audio' || mime.startsWith('audio/')) {
@@ -197,7 +219,7 @@ export default function ChatWindow({
         className="flex items-center gap-2 flex-wrap"
         style={{ padding: 'var(--su-space-2) var(--su-space-3)', borderBottom: '1px solid var(--su-border-default)' }}
       >
-        <Avatar initials={(nome || '?').slice(0, 1).toUpperCase()} size="sm" alt="" />
+        <Avatar initials={contactInitials(chat.contact_name, chat.phone)} size="sm" alt="" />
 
         <div className="min-w-0 flex-1">
           <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">

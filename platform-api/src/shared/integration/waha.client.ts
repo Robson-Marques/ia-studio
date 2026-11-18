@@ -203,6 +203,22 @@ export async function getWahaPhoneByLid(refs: WahaRefs, lid: string): Promise<st
   }
 }
 
+export async function getWahaContactName(refs: WahaRefs, chatId: string): Promise<string | null> {
+  try {
+    const contact = await request<{ name?: unknown; pushname?: unknown; shortName?: unknown }>(
+      refs,
+      `/api/${encodeURIComponent(refs.session)}/contacts/${encodeURIComponent(normalizeWahaChatId(chatId))}`,
+    );
+    for (const value of [contact?.name, contact?.pushname, contact?.shortName]) {
+      if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 255);
+    }
+    return null;
+  } catch (error) {
+    if (error instanceof WahaApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 function responseMessageId(response: Record<string, unknown>): string | null {
   const direct = response['id'];
   if (typeof direct === 'string' || typeof direct === 'number') return String(direct) || null;
