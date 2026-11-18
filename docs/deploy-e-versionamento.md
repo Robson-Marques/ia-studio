@@ -95,6 +95,9 @@ A atualização normal acontece pelo painel local em **Configurações →
 Administração da instalação**. O processo consulta as tags do repositório da
 vertente instalada, cria backup próprio, compila e reinicia somente seus
 processos. Em caso de falha, a aplicação permanece na revisão anterior.
+O painel só oferece uma tag quando ela é descendente da versão atualmente
+instalada; uma tag numericamente maior criada em outra branch é ignorada para
+não trocar a aplicação por uma linha histórica incompatível.
 
 Na instalação Newnet que possui ConnectChat em `/opt/connectchat-newnet`, a
 mesma ação também aplica a mesma tag no serviço ConnectChat. A etapa usa a

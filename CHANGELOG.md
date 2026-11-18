@@ -2,7 +2,13 @@
 
 ## Não publicado
 
+## v0.12.3 - 2026-11-18 (WAHA por QR Code + blindagem da linha de release)
+
 - WhatsApp → Números passa a oferecer dois métodos: **Meta oficial pela Central Nivoo** e **WAHA não oficial por QR Code**. A WAHA aceita várias sessões, exige aceite de risco, valida o webhook com HMAC, entra na mesma Central de Atendimento e envia/recebe texto, imagem, áudio, vídeo e documento. Mídia WAHA é recuperada sob demanda sem persistir base64; automações ficam desligadas por padrão. O legado YCloud permanece fora do runtime.
+- A tela de atualização passa a ignorar qualquer tag numericamente maior que não descenda da versão instalada. Isso impede que uma tag criada na branch histórica anterior à conversão dedicada volte a oferecer schema SaaS com `organization_id`/`workspace_id`.
+- O relatório documental publicado isoladamente na `v0.12.2` foi incorporado à linha dedicada correta. A `v0.12.2` não deve ser reaplicada: ela pertence ao histórico divergente e o rollback preservou a instalação anterior.
+
+## Histórico coordenado recente
 
 - v0.12.01: a autenticação WhatsApp hospedada pela Central Nivoo passa a abrir em uma janela popup compacta, preservando o IA Studio visível ao fundo, em vez de ocupar uma nova aba do navegador.
 

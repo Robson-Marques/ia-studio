@@ -52,9 +52,19 @@ export class VersionService {
     const current = await this.readCurrentVersion(expectedMajor);
     const remoteSynced = await this.fetchTags();
     const tags = await this.readTags(expectedMajor);
-    const available = tags
+    const newer = tags
       .filter((t) => (current ? this.compare(t, current) > 0 : true))
       .sort((a, b) => this.compare(b, a));
+    // Uma tag com número maior pode ter sido criada em outra branch. Só é uma
+    // atualização válida quando contém a versão atualmente instalada em sua
+    // própria ancestralidade; caso contrário o checkout pode reintroduzir um
+    // schema antigo e fazer o Prisma tentar desfazer a linha dedicada.
+    const available = current
+      ? (await Promise.all(newer.map(async (tag) => ({
+          tag,
+          valid: await this.isDescendantOfCurrent(current, tag),
+        })))).filter((item) => item.valid).map((item) => item.tag)
+      : newer;
 
     const info: VersionInfo = {
       current_version: current,
@@ -144,6 +154,21 @@ export class VersionService {
     } catch (e) {
       this.logger.warn(`Falha ao listar tags git: ${(e as Error).message}`);
       return [];
+    }
+  }
+
+  private async isDescendantOfCurrent(current: string, candidate: string): Promise<boolean> {
+    try {
+      await exec('git', ['merge-base', '--is-ancestor', current, candidate], { cwd: appDir() });
+      return true;
+    } catch (e) {
+      const code = (e as { code?: number | string }).code;
+      if (code !== 1 && code !== '1') {
+        this.logger.warn(`Não foi possível validar a linhagem de ${candidate}: ${(e as Error).message}`);
+      } else {
+        this.logger.warn(`Tag ${candidate} ignorada: não descende da versão instalada ${current}.`);
+      }
+      return false;
     }
   }
 
