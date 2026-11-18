@@ -2,6 +2,15 @@
 
 ## Não publicado
 
+## v0.12.10 - 2026-11-18 (persistência de mídias WhatsApp sem alterar o atualizador)
+
+- Correção baseada diretamente na v0.12.8 e no conector WAHA realmente utilizado pela instalação.
+- Mensagens de mídia recebidas e ecos enviados tentam guardar os bytes imediatamente no StorageService local/S3 da instância.
+- Download pelo painel passa a servir a cópia persistida; quando ainda não existe, mantém o proxy original e armazena a mídia recuperada para os próximos acessos.
+- Mantém as validações de acesso à conversa, estrutura de mensagens, fluxo de atualização, PM2 e schema existentes.
+- Sem alteração de banco. Verificar que o STORAGE_LOCAL_PATH reside em armazenamento persistente quando STORAGE_DRIVER=local.
+
+
 ## v0.12.8 - 2026-11-18 (mídia WAHA reconciliada pelo evento canônico)
 
 - Corrige o download de imagem, figurinha, áudio, vídeo e documento enviados pelo painel: o eco `message.any` agora substitui a referência provisória pelo `chatId+messageId` definitivo publicado pela própria WAHA.
