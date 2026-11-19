@@ -55,6 +55,16 @@ export class CodexCliService implements OnModuleDestroy {
     : '';
   private running = 0;
 
+  /** O login usa PTY (script); encerrar todo o grupo evita processos órfãos. */
+  private stopLogin(session: LoginSession) {
+    try {
+      if (session.child.pid) process.kill(-session.child.pid, 'SIGTERM');
+      else session.child.kill('SIGTERM');
+    } catch {
+      try { session.child.kill('SIGTERM'); } catch { /* já terminou */ }
+    }
+  }
+
   private async home(id: string): Promise<string> {
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new BadRequestException('Identificador da conexão inválido.');
     if (!/^[a-z][a-z0-9-]{2,31}$/.test(this.appId)) throw new Error('IASTUDIO_APP_ID ausente para isolamento do Codex.');
@@ -166,40 +176,76 @@ export class CodexCliService implements OnModuleDestroy {
     if (this.sessions.get(id)?.stage === 'waiting') return preflight;
     const home = await this.home(id);
     const command = this.command(['login', '--device-auth'], home);
-    const child = spawn(command.command, command.args, {
+    // O prompt de device auth do Codex é interativo e algumas versões
+    // mantêm stdout em buffer quando não há TTY. util-linux "script" fornece
+    // PTY e -f encaminha cada linha imediatamente, sem salvar transcrições.
+    // Argumentos são escapados individualmente antes do shell de "script".
+    const shellQuote = (value: string): string => "'" + value.replace(/'/g, "'\\''") + "'";
+    const commandLine = [command.command, ...command.args].map(shellQuote).join(' ');
+    const child = spawn('/usr/bin/script', [
+      '-q', '-f', '-e', '-c', commandLine, '/dev/null',
+    ], {
       cwd: this.root, stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true, // PGID próprio para cancelar também o processo Codex.
     });
+    const stop = () => {
+      try { process.kill(-child.pid!, 'SIGTERM'); }
+      catch { child.kill('SIGTERM'); }
+    };
     const session: LoginSession = {
       child, startedAt: Date.now(), stage: 'waiting',
+      detail: 'Obtendo o código de autorização do Codex…',
       timer: setTimeout(() => {
         session.stage = 'error';
         session.detail = 'O login expirou. Inicie novamente.';
-        child.kill('SIGTERM');
+        stop();
       }, LOGIN_TIMEOUT_MS),
     };
     this.sessions.set(id, session);
     let buffer = '';
+    let hadOutput = false;
+    const codeWait = setTimeout(() => {
+      if (session.stage === 'waiting' && !session.deviceCode) {
+        session.stage = 'error';
+        session.detail = hadOutput
+          ? 'O Codex iniciou, mas não apresentou o código. Verifique se o login por dispositivo está habilitado para sua conta.'
+          : 'O Codex não respondeu com o código de autorização. Verifique o acesso à rede do servidor.';
+        this.logger.warn('Codex device auth: código não recebido no prazo.');
+        stop();
+      }
+    }, 45_000);
     const take = (part: Buffer) => {
-      buffer = (buffer + part.toString('utf8')).slice(-8_000);
-      // Apenas o código de dispositivo é apresentado ao navegador.
-      // Nunca repassar stdout integral nem mensagens contendo tokens.
-      const code = buffer.match(/(?:code|código)\s*:?\s*([A-Z0-9]{4,8}-[A-Z0-9]{4,8})/i)
-        || buffer.match(/\b([A-Z0-9]{4,8}-[A-Z0-9]{4,8})\b/);
-      if (code) session.deviceCode = code[1];
+      hadOutput = true;
+      // Remover ANSI/controles e guardar um buffer pequeno somente em memória.
+      const plain = part.toString('utf8')
+        .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+        .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
+      buffer = (buffer + plain).slice(-8000);
+      // O site oficial solicita 9 caracteres (XXXX-XXXXX). Ancorar no
+      // formato impede capturar números de versão ou URLs do terminal.
+      const code = buffer.match(/\b([A-Z0-9]{4}-[A-Z0-9]{5})\b/i);
+      if (code) {
+        session.deviceCode = code[1].toUpperCase();
+        session.detail = 'Código disponível. Informe-o na página oficial da OpenAI.';
+        clearTimeout(codeWait);
+      }
     };
     child.stdout?.on('data', take);
     child.stderr?.on('data', take);
-    child.on('error', () => {
+    child.on('error', (error) => {
+      clearTimeout(codeWait);
       clearTimeout(session.timer);
       session.stage = 'error';
-      session.detail = 'Não foi possível iniciar o Codex CLI. Verifique se está instalado.';
+      session.detail = 'Não foi possível iniciar o terminal de autenticação Codex. Verifique a presença do util-linux script.';
+      this.logger.warn('Falha ao abrir PTY para Codex device auth: ' + ((error as NodeJS.ErrnoException).code || 'unknown'));
     });
     child.on('close', (code) => {
+      clearTimeout(codeWait);
       clearTimeout(session.timer);
       if (session.stage !== 'waiting') return;
       session.stage = code === 0 ? 'authenticated' : 'error';
       session.detail = code === 0 ? 'Login concluído. Clique em Testar para ativar a conexão.'
-        : 'Login não concluído. Inicie novamente.';
+        : 'Login não concluído. Reinicie a autorização ou verifique acesso à OpenAI.';
     });
     return this.status(id);
   }
@@ -252,7 +298,7 @@ export class CodexCliService implements OnModuleDestroy {
     if (current?.stage === 'waiting') {
       clearTimeout(current.timer);
       current.stage = 'error';
-      current.child.kill('SIGTERM');
+      this.stopLogin(current);
     }
     const preflight = await this.status(id);
     if (!preflight.installed) throw new BadRequestException(preflight.detail);
@@ -276,7 +322,7 @@ export class CodexCliService implements OnModuleDestroy {
     const current = this.sessions.get(id);
     if (current) {
       clearTimeout(current.timer);
-      if (current.stage === 'waiting') current.child.kill('SIGTERM');
+      if (current.stage === 'waiting') this.stopLogin(current);
       this.sessions.delete(id);
     }
     // Limite estrito ao namespace Codex da aplicação para evitar qualquer
@@ -294,7 +340,7 @@ export class CodexCliService implements OnModuleDestroy {
       session.stage = 'error';
       session.detail = 'Login cancelado.';
       clearTimeout(session.timer);
-      session.child.kill('SIGTERM');
+      this.stopLogin(session);
     }
     return this.status(id);
   }
@@ -418,7 +464,7 @@ export class CodexCliService implements OnModuleDestroy {
   onModuleDestroy() {
     for (const session of this.sessions.values()) {
       clearTimeout(session.timer);
-      if (session.stage === 'waiting') session.child.kill('SIGTERM');
+      if (session.stage === 'waiting') this.stopLogin(session);
     }
   }
 }
