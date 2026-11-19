@@ -166,21 +166,39 @@ export class ConnectchatAgentLabController {
       && conversation.businessContact?.linkStatus === 'ACTIVE';
     // Identificação permite somente busca. Consultas do titular só entram
     // quando há vínculo já confirmado no próprio ConnectChat.
-    const available = linked
-      ? [...CONNECTCHAT_PREVIEW_TOOLS]
-      : ['identificar_cliente', 'consultar_faq', 'current_datetime'];
+    // Sem vínculo confirmado a IA apenas conversa e consulta a base interna;
+    // não pesquisa cadastros de terceiros pelo CPF fornecido em mensagens.
+    let available: string[] = ['consultar_faq', 'current_datetime'];
     // Contexto pré-carregado no servidor: o modelo não escolhe o cliente nem
     // a conexão IXC e não precisa gastar etapas para buscar os últimos tickets.
     // O customerRef só vem da vinculação confirmada pelo próprio ConnectChat.
     const rules = await this.rules();
     let ixchistory: Record<string, unknown>[] = [];
     let historyStatus = linked && rules.inspect_recent_tickets ? 'unavailable' : 'not_requested';
+    let verifiedDocument: string | undefined;
+    let verifiedConnectionId: string | undefined;
     if (linked && rules.inspect_recent_tickets) {
       const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(conversation.customerRef!);
       if (match) {
         try {
           const connection = await this.connections.findById(match[1]);
           if (connection.provider_key === 'ixc' && connection.status === 'ACTIVE') {
+            const identityResult = await this.connections.execute(connection.id, 'ixc.listar', {
+              tabela: 'cliente',
+              qtype: 'cliente.id',
+              query: match[2],
+              oper: '=',
+              rp: '1',
+              sortname: 'cliente.id',
+            });
+            const identity = rows(identityResult)
+              .find((item) => String(item['id']) === match[2]);
+            const candidate = String(identity?.['cnpj_cpf'] || '').replace(/\D/g, '');
+            if (candidate.length === 11 || candidate.length === 14) {
+              verifiedDocument = candidate;
+              verifiedConnectionId = connection.id;
+              available = [...CONNECTCHAT_PREVIEW_TOOLS];
+            }
             const raw = await this.connections.execute(connection.id, 'atendimento.listar_chamados_recentes', {
               id_cliente: match[2],
             });
@@ -233,6 +251,8 @@ export class ConnectchatAgentLabController {
       scopeKeys: { contact: 'connectchat:' + conversation.id },
       previewAllowedTools: available,
       previewInstructions: instructions,
+      previewCustomerDocument: verifiedDocument,
+      previewIxcConnectionId: verifiedConnectionId,
     });
     return {
       runId: result.runId,
@@ -243,6 +263,7 @@ export class ConnectchatAgentLabController {
       customer_linked: linked,
       ixc_history_status: historyStatus,
       ixc_history_count: ixchistory.length,
+      ixc_customer_resolved: !!verifiedDocument,
       recurrence_detected: historyStatus === 'loaded' ? recentCount >= rules.recurrence_min_tickets : null,
       disclaimer: 'Prévia interna: nenhuma mensagem foi enviada ao cliente.',
     };
