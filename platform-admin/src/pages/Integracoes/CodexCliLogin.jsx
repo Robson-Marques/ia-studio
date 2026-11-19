@@ -12,9 +12,11 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
   const toast = useToast();
   const [state, setState] = useState(null);
   const [working, setWorking] = useState(false);
+  const [statusError, setStatusError] = useState('');
 
   const refresh = useCallback(async () => {
     const result = await getCodexLoginStatus(connectionId);
+    setStatusError('');
     setState(result);
     return result;
   }, [connectionId]);
@@ -23,7 +25,7 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
     let active = true;
     getCodexLoginStatus(connectionId)
       .then((data) => { if (active) setState(data); })
-      .catch((err) => { if (active) toast.error(err.message); });
+      .catch((err) => { if (active) setStatusError(err.message || 'Não foi possível consultar o serviço Codex.'); });
     return () => { active = false; };
   }, [connectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -44,7 +46,7 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
 
   const waiting = state?.login?.stage === 'waiting';
   const logged = state?.authenticated === true;
-  const stage = !state ? 'Verificando' : logged ? 'Conectado' : waiting ? 'Aguardando autorização' : state?.installed === false ? 'Não instalado' : 'Não conectado';
+  const stage = statusError ? 'Falha ao consultar' : !state ? 'Verificando' : logged ? 'Conectado' : waiting ? 'Aguardando autorização' : !state?.provisioned ? 'Configuração pendente' : state?.installed === false ? 'Não instalado' : 'Não conectado';
   const tone = logged ? 'success' : waiting ? 'warning' : 'neutral';
 
   return (
@@ -61,15 +63,14 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
           A autorização acontece no site da OpenAI; a sessão fica isolada no servidor.
         </p>
         <DescriptionList items={[
-          { key: 'Estado', value: state?.detail || 'Consultando o Codex CLI…' },
+          { key: 'Estado', value: statusError || state?.detail || 'Consultando o Codex CLI…' },
           { key: 'Versão instalada', value: state?.version || '—' },
           { key: 'Autenticação', value: logged ? 'Autenticada' : 'Pendente' },
         ]} />
 
-        {state?.installed === false && (
+        {state && (!state.provisioned || state.installed === false) && (
           <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
-            O instalador automático do Codex CLI não concluiu a configuração.
-            Confira o registro CODEX_CLI da atualização antes de conectar.
+            {state.detail} Confira a etapa CODEX_CLI da atualização; o cadastro da conexão foi preservado.
           </p>
         )}
 
@@ -106,7 +107,7 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          {!logged && !waiting && state?.installed !== false && (
+          {!logged && !waiting && state?.installed === true && state?.provisioned === true && (
             <Button size="sm" disabled={working}
               onClick={() => act(async () => setState(await startCodexLogin(connectionId)))}>
               Entrar com ChatGPT
