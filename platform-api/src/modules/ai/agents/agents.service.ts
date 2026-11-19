@@ -30,6 +30,7 @@ export const AGENT_EXPORT_SCHEMA_VERSION = 1;
 const ISP_DEFAULT_READ_TOOLS = [
   'identificar_cliente',
   'consultar_chamados_recentes',
+  'consultar_os_recentes',
   'diagnosticar_conexao',
   'consultar_contrato',
   'status_conexao',
