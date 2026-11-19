@@ -49,6 +49,23 @@ export class ToolRuntimeService {
     if (!tool || !tool.is_active) {
       return this.fail(`Ferramenta "${toolKey}" não encontrada ou inativa.`, started, ctx, toolKey, args);
     }
+    // Laboratório não confia na identidade indicada pelo modelo: substitui
+    // o CPF placeholder pelo documento do cadastro vinculado no ConnectChat.
+    // Não habilitar login/contrato informados pelo modelo como rota alternativa.
+    if (ctx.previewMode && [
+      'consultar_chamados_recentes', 'consultar_contrato', 'status_conexao',
+    ].includes(toolKey)) {
+      const verified = ctx.previewCustomerDocument;
+      const cpf = typeof args['cpf'] === 'string' ? args['cpf'].replace(/\D/g, '') : '';
+      const supplied = args['cpf'];
+      if (!verified || (supplied !== 'cliente_vinculado' && cpf !== verified.replace(/\D/g, ''))) {
+        return this.fail('O documento consultado não corresponde ao cliente vinculado no ConnectChat.', started, ctx, toolKey, {});
+      }
+      if (toolKey === 'status_conexao' && args['login'] !== undefined) {
+        return this.fail('Consulta por login manual não permitida no laboratório.', started, ctx, toolKey, {});
+      }
+      args = { ...args, cpf: verified };
+    }
 
     // Gate de aprovacao: flag da tool OU policy ativa que case (diretriz 31).
     const requiresByFlag = tool.requires_approval;
@@ -61,6 +78,9 @@ export class ToolRuntimeService {
       },
     });
 
+    if (ctx.previewMode && (requiresByFlag || policyEval.required)) {
+      return this.fail('Esta ação exige aprovação e não pode ser executada no laboratório.', started, ctx, toolKey, {});
+    }
     if (!ctx.dryRun && (requiresByFlag || policyEval.required)) {
       const approval = await this.approvals.createApproval({
         policyId: policyEval.policy?.id,
