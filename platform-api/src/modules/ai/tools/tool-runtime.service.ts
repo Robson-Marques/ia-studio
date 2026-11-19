@@ -64,7 +64,10 @@ export class ToolRuntimeService {
       if (toolKey === 'status_conexao' && args['login'] !== undefined) {
         return this.fail('Consulta por login manual não permitida no laboratório.', started, ctx, toolKey, {});
       }
-      args = { ...args, cpf: verified };
+      if (!ctx.previewIxcConnectionId) {
+        return this.fail('Conexão IXC do cliente não confirmada.', started, ctx, toolKey, {});
+      }
+      args = { ...args, cpf: verified, connection_id: ctx.previewIxcConnectionId };
     }
 
     // Gate de aprovacao: flag da tool OU policy ativa que case (diretriz 31).
