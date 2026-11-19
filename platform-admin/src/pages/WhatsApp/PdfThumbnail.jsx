@@ -1,68 +1,64 @@
 import React, { useEffect, useRef, useState } from 'react';
+import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 
-// Renderiza apenas a primeira página. O iframe de PDF não fornece miniatura
-// confiável em Firefox/iOS e pode mostrar a barra completa do visualizador.
-// PDF.js fica em chunk lazy, só carregado para documentos PDF visíveis.
-export default function PdfThumbnail({ file, url, onPageCount }) {
+// Uma miniatura real da primeira página, nunca o visualizador embutido do
+// navegador (que no Firefox mostra barra de ferramentas e várias páginas).
+// O worker é empacotado pelo Vite na MESMA versão do PDF.js instalado.
+export default function PdfThumbnail({ file, onPageCount }) {
   const canvasRef = useRef(null);
-  const [preview, setPreview] = useState('loading');
+  const [state, setState] = useState('loading');
 
   useEffect(() => {
     if (!file) return undefined;
-    let disposed = false;
-    let task;
+    let cancelled = false;
+    let loadingTask;
     let renderTask;
-    let pdf;
-    setPreview('loading');
+    setState('loading');
 
-    const render = async () => {
+    const run = async () => {
       try {
-        // PDF grande segue disponível para download, sem alocar um segundo
-        // arquivo enorme em memória apenas para mostrar a miniatura.
         if (file.size > 25 * 1024 * 1024) {
-          setPreview('unavailable');
+          setState('fallback');
           return;
         }
-        const [pdfjs, workerModule] = await Promise.all([
-          import('pdfjs-dist'),
-          import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
-        ]);
-        if (disposed) return;
-        pdfjs.GlobalWorkerOptions.workerSrc = workerModule.default;
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        if (disposed) return;
-        task = pdfjs.getDocument({ data: bytes, useSystemFonts: true });
-        pdf = await task.promise;
-        if (disposed) return;
-        if (!disposed) onPageCount(pdf.numPages);
-        const page = await pdf.getPage(1);
-        if (disposed) return;
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        if (cancelled) return;
+        pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+        const data = new Uint8Array(await file.arrayBuffer());
+        if (cancelled) return;
+        loadingTask = pdfjs.getDocument({ data, useSystemFonts: true });
+        const document = await loadingTask.promise;
+        if (cancelled) return;
+        onPageCount?.(document.numPages);
+
+        const page = await document.getPage(1);
+        if (cancelled) return;
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        const viewport = page.getViewport({ scale: 1 });
-        const scale = Math.min(1.7, 520 / viewport.width);
-        const target = page.getViewport({ scale });
-        const context = canvas.getContext('2d', { alpha: false });
-        if (!context) throw new Error('Canvas indisponível');
-        canvas.width = Math.round(target.width);
-        canvas.height = Math.round(target.height);
-        renderTask = page.render({ canvasContext: context, viewport: target });
+        const context = canvas?.getContext('2d', { alpha: false });
+        if (!canvas || !context) throw new Error('Canvas indisponível');
+
+        const original = page.getViewport({ scale: 1 });
+        const scale = Math.min(2, 520 / original.width);
+        const viewport = page.getViewport({ scale });
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        renderTask = page.render({ canvasContext: context, viewport });
         await renderTask.promise;
-        if (!disposed) setPreview('ready');
+        if (!cancelled) setState('ready');
       } catch (error) {
-        if (!disposed && error?.name !== 'RenderingCancelledException') {
-          // Falha na renderização não invalida o documento. O usuário pode
-          // visualizá-lo no PDF nativo ou abri-lo pelo botão do cartão.
-          console.warn('[WhatsApp PDF] Falha ao renderizar miniatura:', error);
-          setPreview('unavailable');
+        if (!cancelled && error?.name !== 'RenderingCancelledException') {
+          console.warn('[IA Studio PDF] Não foi possível gerar miniatura:', error);
+          setState('fallback');
         }
       }
     };
-    void render();
+
+    void run();
     return () => {
-      disposed = true;
-      try { renderTask?.cancel(); } catch { /* task cancelável */ }
-      void task?.destroy();
+      cancelled = true;
+      try { renderTask?.cancel(); } catch { /* já finalizada */ }
+      void loadingTask?.destroy();
     };
   }, [file, onPageCount]);
 
@@ -70,28 +66,19 @@ export default function PdfThumbnail({ file, url, onPageCount }) {
     <div className="relative flex h-[180px] w-full items-center justify-center overflow-hidden bg-[#f5f5f5]">
       <canvas
         ref={canvasRef}
-        aria-label="Primeira página do documento PDF"
-        className={preview === 'ready' ? 'block max-h-full max-w-full object-contain' : 'hidden'}
+        aria-label="Miniatura da primeira página do PDF"
+        className={state === 'ready' ? 'block max-h-full max-w-full object-contain' : 'hidden'}
       />
-      {preview === 'loading' && (
-        <span className="text-xs text-gray-500">Preparando prévia do PDF…</span>
+      {state === 'loading' && (
+        <span className="text-xs text-[#667781]">Gerando miniatura…</span>
       )}
-      {preview === 'unavailable' && url && (
-        <object
-          data={`${url}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-          type="application/pdf"
-          title="Prévia do documento PDF"
-          className="h-full w-full border-0"
-          aria-label="Primeira página do documento PDF"
-        >
-          <div className="flex flex-col items-center gap-1 text-gray-500">
-            <span className="rounded-md bg-red-600 px-2 py-1 text-xs font-semibold text-white">PDF</span>
-            <span className="text-xs">Abrir documento para visualizar</span>
+      {state === 'fallback' && (
+        <div className="flex flex-col items-center gap-2 text-[#667781]">
+          <div className="flex h-16 w-12 items-center justify-center rounded border border-gray-200 bg-white shadow-sm">
+            <span className="rounded-sm bg-[#e53935] px-1 py-0.5 text-xs font-bold text-white">PDF</span>
           </div>
-        </object>
-      )}
-      {preview === 'unavailable' && !url && (
-        <span className="text-xs text-gray-500">Prévia indisponível</span>
+          <span className="text-xs">Documento PDF</span>
+        </div>
       )}
     </div>
   );
