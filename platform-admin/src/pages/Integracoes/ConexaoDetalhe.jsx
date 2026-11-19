@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { DetailScreen, Card, Badge, Button, CopyButton, DescriptionList, Timeline, EmptyState, Spinner, useToast } from '@studio-ux-ds/react';
+import { DetailScreen, Card, Badge, Button, CopyButton, DescriptionList, Timeline, EmptyState, Spinner, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import {
-  getConnection, listConnectionLogs, discoverConnection, testConnection,
+  getConnection, listConnectionLogs, discoverConnection, testConnection, archiveCodexConnection,
 } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
@@ -38,6 +38,8 @@ export default function ConexaoDetalhe() {
   const [loading, setLoading] = useState(true);
   const [aba, setAba] = useState('dados');
   const [testando, setTestando] = useState(false);
+  const [confirmarRemocao, setConfirmarRemocao] = useState(false);
+  const [removendo, setRemovendo] = useState(false);
 
   const [logs, setLogs] = useState(null);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
@@ -152,6 +154,11 @@ export default function ConexaoDetalhe() {
               Editar
             </Button>
           )}
+          {podeEscrever && conexao.provider_key === 'codex-cli' && (
+            <Button variant="secondary" onClick={() => setConfirmarRemocao(true)}>
+              Remover conexão
+            </Button>
+          )
         </>
       }
       tabs={abas}
@@ -311,5 +318,23 @@ export default function ConexaoDetalhe() {
         </Card>
       )}
     </DetailScreen>
+      <ConfirmDialog
+        open={confirmarRemocao}
+        danger
+        loading={removendo}
+        title="Remover conexão Codex CLI"
+        message="Retirar esta conexão da lista? Ela será desativada, mas seu histórico será preservado. Os agentes que usam esta conexão precisarão de outra conexão ativa."
+        confirmLabel="Remover conexão"
+        onClose={() => setConfirmarRemocao(false)}
+        onConfirm={async () => {
+          setRemovendo(true);
+          try {
+            await archiveCodexConnection(id);
+            toast.success('Conexão removida da lista.');
+            navigate('/integracoes/conexoes');
+          } catch (err) { toast.error(err.message); }
+          finally { setRemovendo(false); setConfirmarRemocao(false); }
+        }}
+      />
   );
 }
