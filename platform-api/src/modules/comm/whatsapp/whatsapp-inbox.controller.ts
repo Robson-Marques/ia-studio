@@ -230,6 +230,20 @@ export class WhatsappInboxController {
     });
   }
 
+  // Referências WAHA codificadas podem ultrapassar os 100 caracteres aceitos
+  // por padrão em parâmetros de rota do Fastify. A query string evita o 404
+  // antes da execução do controller, sem afrouxar o limite global do roteador.
+  @Get('chats/:id/media')
+  @RequirePermissions(...ANY_VIEW)
+  mediaFromQuery(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('ref') mediaId: string,
+    @Query('organization_id') orgQuery?: string,
+  ) {
+    return this.inbox.downloadMedia(resolveOrganizationId(user, orgQuery), id, mediaId);
+  }
+
   @Get('chats/:id/media/:mediaId')
   @RequirePermissions(...ANY_VIEW)
   media(
