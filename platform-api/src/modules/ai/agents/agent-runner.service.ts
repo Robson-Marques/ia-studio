@@ -44,6 +44,8 @@ export interface RunAgentParams {
   previewAllowedTools?: string[];
   /** Regras de testes adicionadas pelo servidor, nunca pelo cliente. */
   previewInstructions?: string;
+  /** Somente em memória: CPF/CNPJ obtido de vínculo IXC validado pelo servidor. */
+  previewCustomerDocument?: string;
 }
 
 export interface RunAgentOutput {
@@ -119,6 +121,8 @@ export class AgentRunnerService {
       dryRun,
       scopeKeys: params.scopeKeys,
       executionId: params.executionId ?? null,
+      previewMode: !!params.previewAllowedTools,
+      previewCustomerDocument: params.previewCustomerDocument,
     });
   }
 
@@ -167,7 +171,7 @@ export class AgentRunnerService {
     messages: LlmMessage[],
     llmTools: LlmTool[],
     guardrails: Guardrails,
-    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null; previewMode?: boolean; previewCustomerDocument?: string },
   ): Promise<RunAgentOutput> {
     let promptTokens = 0;
     let completionTokens = 0;
@@ -390,13 +394,15 @@ export class AgentRunnerService {
   private buildToolContext(
     agent: AiAgent,
     runId: string,
-    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null; previewMode?: boolean; previewCustomerDocument?: string },
     allowedToolKeys: string[],
   ): ToolExecutionContext {
     return {
       agentId: agent.id,
       agentRunId: runId,
       allowedToolKeys,
+      previewMode: ctx.previewMode,
+      previewCustomerDocument: ctx.previewCustomerDocument,
       traceId: ctx.traceId,
       executionId: ctx.executionId,
       scopeKeys: ctx.scopeKeys,
