@@ -158,7 +158,7 @@ export class ConnectchatAgentLabController {
     if (!lastCustomer) {
       throw new BadRequestException('Envie uma mensagem de teste pelo ConnectChat antes de gerar a prévia.');
     }
-    if (transcript.at(-1)?.senderKind !== 'CUSTOMER') {
+    if (transcript[transcript.length - 1]?.senderKind !== 'CUSTOMER') {
       throw new BadRequestException('A última mensagem já é da empresa. Envie uma nova mensagem de teste pelo ConnectChat para avaliar a IA.');
     }
     const lastIdx = transcript.findIndex((m) => m.id === lastCustomer.id);
