@@ -78,6 +78,7 @@ function MessageAttachment({ attachment }) {
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
+  const canPilotRead = can('ai.agents.read') && can('comm.connectchat.read');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -136,12 +137,12 @@ export default function ConnectchatConversas() {
     } catch (error) {
       if (!silent) toast.error(error.message);
     }
-  }, [can, toast]);
+  }, [canPilotRead]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
   useEffect(() => {
-    if (!can('ai.agents.read') || !can('comm.connectchat.read')) return undefined;
+    if (!canPilotRead) return undefined;
     let alive = true;
     Promise.all([listAgents(), getConnectchatPilotBinding()])
       .then(([result, binding]) => {
