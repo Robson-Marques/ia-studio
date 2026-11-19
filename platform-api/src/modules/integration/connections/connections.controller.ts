@@ -51,6 +51,26 @@ export class ConnectionsController {
     return this.codexCli.cancelLogin(id);
   }
 
+  @Post(':id/codex-repair')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  async codexRepair(@Param('id') id: string) {
+    await this.checkCodexConnection(id);
+    return this.codexCli.repair(id);
+  }
+
+  @Post(':id/codex-reconnect')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  async codexReconnect(@Param('id') id: string) {
+    await this.checkCodexConnection(id);
+    return this.codexCli.reconnect(id);
+  }
+
+  @Post(':id/archive')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  archiveCodex(@Param('id') id: string) {
+    return this.connections.archiveCodex(id);
+  }
+
   @Get()
   @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ)
   findAll(
