@@ -26,6 +26,7 @@ de leitura já existentes e ativas:
 
 - `identificar_cliente`
 - `consultar_chamados_recentes`
+- `consultar_os_recentes`
 - `diagnosticar_conexao`
 - `consultar_contrato`
 - `status_conexao`
@@ -59,9 +60,10 @@ agente ativo. O vínculo da bancada é persistido em
 5. Sem vínculo ativo de cliente, só oferece FAQ e hora atual. Mesmo que o usuário
    desmarque controles na UI, a consulta de dados pessoais exige vínculo ativo.
 6. Com o vínculo IXC ativo, o backend lê deterministicamente os **cinco últimos
-   chamados** do titular pelo ID armazenado no vínculo, reduz os campos pela
-   projeção `projectChamado` e anexa as evidências ao contexto antes da IA
-   responder. Se o IXC falhar, informa indisponibilidade, nunca ausência.
+   atendimentos** e as **cinco últimas ordens de serviço** do titular pelo
+   ID armazenado no vínculo, reduz os campos pela projeção `projectChamado`
+   e anexa ambas as fontes separadas ao contexto antes da IA responder.
+   Se uma consulta falhar, informa indisponibilidade, nunca ausência.
 7. Ensaia o AgentRunner com ferramentas explicitamente autorizadas. Nunca
    disponibiliza no ensaio ferramentas de escrita, boleto em PDF, WhatsApp,
    desbloqueio, criação de OS ou alteração em conexão.
@@ -79,8 +81,8 @@ alterado. Não existe mudança de esquema Prisma nem migração de banco.
   realiza verificação explícita **AND** de ambas as permissões necessárias.
 - As regras e o vínculo são auditados pelo `SettingsService`. Chamadas de
   ferramentas passam pelo log existente do `AgentRunner`.
-- `identificar_cliente` só grava vínculo automático na conversa quando o
-  canal é WhatsApp, nunca no ensaio ConnectChat.
+- `identificar_cliente` mantém o comportamento de vínculo automático existente
+  do WhatsApp; o ensaio ConnectChat bloqueia esse efeito colateral.
 - Titularidade confirmada via vínculo é condição mínima, não substitui as
   regras reais de identidade para envio de faturas e ações financeiras; essas
   operações continuam sob revisão humana.
