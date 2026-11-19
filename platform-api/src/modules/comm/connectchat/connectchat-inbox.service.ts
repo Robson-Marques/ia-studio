@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { ConnectchatConversation, ConnectchatMention } from '../../../shared/integration/connectchat.client';
+import { ConnectchatConversation, ConnectchatMention, ConnectchatMessage } from '../../../shared/integration/connectchat.client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
 
@@ -98,6 +98,27 @@ export class ConnectchatInboxService {
       // com @ID, sem transformar a indisponibilidade do ERP em perda do chat.
       return null;
     }
+  }
+
+  /**
+   * Leitura para SIMULAÇÃO da IA. Não marca mensagens como lidas, não envia
+   * mensagens e não altera o vínculo. A identidade é considerada confirmada
+   * apenas quando a própria Central mantém vínculo ACTIVE + CUSTOMER.
+   */
+  async contextForAgentPreview(conversationId: string): Promise<{
+    conversation: ConnectchatConversation;
+    messages: ConnectchatMessage[];
+    verified: boolean;
+  }> {
+    const conversations = await this.execute('listConversations') as ConnectchatConversation[];
+    const conversation = conversations.find((row) => row.id === conversationId);
+    if (!conversation) throw new BadRequestException('Conversa não encontrada no ConnectChat.');
+    const messages = await this.getMessages(conversationId, '0', 100) as ConnectchatMessage[];
+    const verified = conversation.businessContact?.status === 'CUSTOMER'
+      && conversation.businessContact?.linkStatus === 'ACTIVE'
+      && typeof conversation.customerRef === 'string'
+      && /^ixc:[0-9a-f-]{36}:[1-9]\\d*$/i.test(conversation.customerRef);
+    return { conversation, messages, verified };
   }
 
   getMessages(conversationId: string, afterSequence?: string, limit?: number) {
