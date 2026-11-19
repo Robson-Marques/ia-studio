@@ -47,7 +47,7 @@ export class ConnectionsRepository {
   archive(id: string) {
     return this.prisma.connection.update({
       where: { id },
-      data: { is_active: false, status: 'DISABLED', status_detail: 'Conexão removida da lista pelo administrador.' },
+      data: { is_active: false, status: 'DISABLED', tags: { push: '__archived_codex__' }, status_detail: 'Conexão removida da lista pelo administrador.' },
     });
   }
 
