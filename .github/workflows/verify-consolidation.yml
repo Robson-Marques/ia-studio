@@ -30,9 +30,16 @@ jobs:
         run: |
           npx prisma generate
           npm run build
-      - name: Install admin dependencies
+      - name: Install admin dependencies (private Studio UX registry)
         working-directory: platform-admin
-        run: npm install --no-package-lock --no-audit --no-fund
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo '::error::Configure repository secret NPM_TOKEN for the private @studio-ux-ds GitLab registry.'
+            exit 1
+          fi
+          npm install --no-package-lock --no-audit --no-fund
       - name: Compile admin with PDF preview and WhatsApp
         working-directory: platform-admin
         run: npm run build
