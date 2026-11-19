@@ -113,7 +113,13 @@ export class ConnectchatInboxService {
     const conversations = await this.execute('listConversations') as ConnectchatConversation[];
     const conversation = conversations.find((row) => row.id === conversationId);
     if (!conversation) throw new BadRequestException('Conversa não encontrada no ConnectChat.');
-    const messages = await this.getMessages(conversationId, '0', 100) as ConnectchatMessage[];
+    // O ConnectChat usa cursor crescente. Ler desde 0 retornaria o começo da
+    // conversa longa; o teste precisa do contexto mais recente.
+    const lastSequence = typeof conversation.lastSequence === 'string'
+      && /^\d+$/.test(conversation.lastSequence)
+      ? BigInt(conversation.lastSequence) : 0n;
+    const after = lastSequence > 100n ? (lastSequence - 100n).toString() : '0';
+    const messages = await this.getMessages(conversationId, after, 100) as ConnectchatMessage[];
     const verified = conversation.businessContact?.status === 'CUSTOMER'
       && conversation.businessContact?.linkStatus === 'ACTIVE'
       && typeof conversation.customerRef === 'string'
