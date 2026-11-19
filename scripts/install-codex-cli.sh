@@ -29,10 +29,39 @@ if [ -x "$BIN" ] && "$BIN" --version >/dev/null 2>&1; then
   echo "Codex CLI: binário oficial já disponível: $("$BIN" --version)"
 else
   command -v npm >/dev/null || { echo "Codex CLI: npm não encontrado" >&2; exit 3; }
-  npm install -g --prefix "$PREFIX" --no-audit --no-fund \
-    "@openai/codex@$INSTALL_VERSION" >/dev/null
+  # Umask 077 permanece para credenciais, mas um executável global exige
+  # leitura/travessia pelo usuário isolado. Limitar umask 022 ao npm.
+  ( umask 022; npm install -g --prefix "$PREFIX" --no-audit --no-fund \
+    "@openai/codex@$INSTALL_VERSION" >/dev/null )
   test -x "$BIN" || { echo "Codex CLI: instalação não gerou binário" >&2; exit 4; }
   "$BIN" --version
 fi
+# Corrige TAMBÉM instalações anteriores: o npm havia sido executado sob
+# umask 077, tornando diretórios do pacote 0700 e inacessíveis ao runuser.
+# Estes caminhos contêm apenas o binário/pacote público do Codex. Não alteramos
+# permissões do CODEX_HOME (0700), do .env nem de outros serviços.
+for dir in "$PREFIX" "$PREFIX/bin" "$PREFIX/lib" "$PREFIX/lib/node_modules" \
+  "$PREFIX/lib/node_modules/@openai"; do
+  [ ! -d "$dir" ] || chmod 0755 "$dir"
+done
+if [ -d "$PREFIX/lib/node_modules/@openai/codex" ]; then
+  chmod -R a+rX "$PREFIX/lib/node_modules/@openai/codex"
+fi
+# O binário nativo pode estar em uma dependência opcional @openai/codex-*
+# separada. Tudo dentro do prefixo é público, mas os arquivos fora dele não.
+for pkg in "$PREFIX"/lib/node_modules/@openai/codex-*; do
+  [ ! -d "$pkg" ] || chmod -R a+rX "$pkg"
+done
+
+# Provar que o usuário efetivo usado pelo serviço consegue executar o Codex,
+# não apenas root. Falhar impede o botão de reparo de apresentar falso sucesso.
+if ! runuser -u "$RUN_USER" -- env -i \
+    HOME="$CODEX_ROOT" CODEX_HOME="$CODEX_ROOT" \
+    PATH=/opt/iastudio-codex/bin:/usr/local/bin:/usr/bin:/bin \
+    "$BIN" --version >/dev/null; then
+  echo "Codex CLI: binário inacessível ao usuário restrito $RUN_USER" >&2
+  exit 5
+fi
+
 # Configuração imprimível pelo operador; nunca mostra sessão nem token.
 echo "Codex CLI pronto: usuário $RUN_USER; CODEX_HOME isolado em $CODEX_ROOT"
