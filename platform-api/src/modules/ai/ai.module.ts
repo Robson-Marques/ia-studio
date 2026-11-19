@@ -9,6 +9,7 @@ import { Module } from '@nestjs/common';
 import { IntegrationModule } from '../integration/integration.module';
 import { CommModule } from '../comm/comm.module';
 import { AutomationModule } from '../automation/automation.module';
+import { SettingsModule } from '../core/settings/settings.module';
 
 // Providers (LLM)
 import { LlmProviderRegistryService } from './providers/llm-provider-registry.service';
@@ -75,13 +76,14 @@ import { ContentReviewController } from './content-review/content-review.control
 
 // Condutor embutido inbound → assistente (atende WhatsApp sem fluxo)
 import { WhatsappAssistantResponderService } from './responders/whatsapp-assistant-responder.service';
+import { ConnectchatPilotController } from './responders/connectchat-pilot.controller';
 
 // Seed
 import { AiSeedRepository } from './seed/ai-seed.repository';
 import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
 
 @Module({
-  imports: [IntegrationModule, CommModule, AutomationModule],
+  imports: [IntegrationModule, CommModule, AutomationModule, SettingsModule],
   controllers: [
     MemoryController,
     KnowledgeController,
@@ -90,6 +92,7 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     CollaborationController,
     McpController,
     AgentsController,
+    ConnectchatPilotController,
     AttendanceAnalysisController,
     ContentReviewController,
   ],
