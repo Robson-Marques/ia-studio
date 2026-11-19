@@ -2,7 +2,7 @@
 // Nunca publica respostas automaticamente nem habilita o WhatsApp.
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../../shared/auth/auth.types';
@@ -28,11 +28,7 @@ type PilotRules = {
   requireCustomerLink: boolean;
 };
 // Nenhuma ferramenta com escrita, envio, desbloqueio, emissão ou alteração
-// é oferecida ao LLM durante o ensaio. Não confiar no nome/categoria dinâmica.
-const READ_TOOLS = [
-  'identificar_cliente', 'consultar_chamados_recentes', 'diagnosticar_conexao',
-  'consultar_contrato', 'status_conexao', 'current_datetime', 'consultar_faq',
-] as const;
+// é oferecida ao LLM durante o ensaio. A lista é montada por política fixa.
 
 class BindPilotDto {
   @IsOptional() @IsUUID() agentId?: string;
@@ -41,12 +37,11 @@ class PreviewPilotDto {
   @IsString() @MaxLength(2000) @IsOptional() guidance?: string;
 }
 class PilotRulesDto {
-  @IsOptional() @IsString() version?: string;
-  // Booleanos são validados no backend: nada de JSON editável na interface.
-  @IsOptional() ticketHistory?: boolean;
-  @IsOptional() networkDiagnosis?: boolean;
-  @IsOptional() financialRead?: boolean;
-  @IsOptional() requireCustomerLink?: boolean;
+  // Booleanos validados na entrada: nada de JSON editável na interface.
+  @IsOptional() @IsBoolean() ticketHistory?: boolean;
+  @IsOptional() @IsBoolean() networkDiagnosis?: boolean;
+  @IsOptional() @IsBoolean() financialRead?: boolean;
+  @IsOptional() @IsBoolean() requireCustomerLink?: boolean;
 }
 
 @ApiTags('IA — Bancada ConnectChat')
@@ -99,9 +94,9 @@ export class ConnectchatPilotController {
       if (typeof value !== 'boolean') throw new BadRequestException('As regras da bancada precisam ser verdadeiras ou falsas.');
       updated[key] = value;
     }
-    // Nunca permitir leitura financeira sem exigir cliente vinculado.
-    if (updated.financialRead && !updated.requireCustomerLink) {
-      throw new BadRequestException('Para consultar débitos, a validação do vínculo do cliente é obrigatória.');
+    // Titularidade não é escolha do modelo nem do operador: segurança fixa.
+    if (!updated.requireCustomerLink) {
+      throw new BadRequestException('É obrigatório confirmar o vínculo do cliente para consultar dados cadastrais.');
     }
     await this.settings.set(RULES_KEY, updated);
     return { ...updated, automaticReplies: false, writeActions: false, whatsappEnabled: false };
