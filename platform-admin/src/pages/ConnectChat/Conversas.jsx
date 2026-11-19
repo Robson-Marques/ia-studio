@@ -427,7 +427,7 @@ export default function ConnectchatConversas() {
                     <input type="checkbox" checked={includeTicketHistory}
                       onChange={(event) => setIncludeTicketHistory(event.target.checked)}
                       disabled={!can('ai.agents.write')} />
-                    Consultar até 5 chamados IXC do cliente confirmado
+                    Consultar últimos 5 chamados e 5 ordens de serviço do cliente confirmado
                   </label>
                   <span>Regras fixas: confirmar vínculo · sem financeiro · sem alterar IXC · revisão humana obrigatória · WhatsApp desligado</span>
                 </div>
