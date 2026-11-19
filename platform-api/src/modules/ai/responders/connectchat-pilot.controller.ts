@@ -1,9 +1,11 @@
 // Bancada segura do ConnectChat: vínculo de agente para ensaio supervisionado.
 // Nunca publica respostas automaticamente nem habilita o WhatsApp.
-import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
+import { CurrentUser } from '../../../shared/auth/current-user.decorator';
+import type { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { SettingsService } from '../../core/settings/settings.service';
 import { ConnectchatInboxService } from '../../comm/connectchat/connectchat-inbox.service';
@@ -37,16 +39,25 @@ export class ConnectchatPilotController {
     private readonly runner: AgentRunnerService,
   ) {}
 
+  private requireBoth(user: AuthenticatedUser, a: string, b: string) {
+    const permissions = user.permissions ?? [];
+    if (!permissions.includes('*') && (!permissions.includes(a) || !permissions.includes(b))) {
+      throw new ForbiddenException('Esta operação exige permissões de agentes e leitura do ConnectChat.');
+    }
+  }
+
   @Get()
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ, PERMISSIONS.COMM_CONNECTCHAT_READ)
-  async getBinding() {
+  async getBinding(@CurrentUser() user: AuthenticatedUser) {
+    this.requireBoth(user, PERMISSIONS.AI_AGENTS_READ, PERMISSIONS.COMM_CONNECTCHAT_READ);
     const value = await this.settings.getValue(BINDING_KEY);
     return { agentId: typeof value === 'string' ? value : null, automaticReplies: false, whatsappEnabled: false };
   }
 
   @Post('binding')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_WRITE, PERMISSIONS.COMM_CONNECTCHAT_READ)
-  async setBinding(@Body() body: BindPilotDto) {
+  async setBinding(@CurrentUser() user: AuthenticatedUser, @Body() body: BindPilotDto) {
+    this.requireBoth(user, PERMISSIONS.AI_AGENTS_WRITE, PERMISSIONS.COMM_CONNECTCHAT_READ);
     if (body.agentId) {
       const agent = await this.agents.findById(body.agentId);
       if (!agent?.is_active) throw new BadRequestException('Escolha um agente ativo.');
@@ -57,7 +68,8 @@ export class ConnectchatPilotController {
 
   @Post('conversations/:conversationId/preview')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_EXECUTE, PERMISSIONS.COMM_CONNECTCHAT_READ)
-  async preview(@Param('conversationId') conversationId: string, @Body() body: PreviewPilotDto) {
+  async preview(@CurrentUser() user: AuthenticatedUser, @Param('conversationId') conversationId: string, @Body() body: PreviewPilotDto) {
+    this.requireBoth(user, PERMISSIONS.AI_AGENTS_EXECUTE, PERMISSIONS.COMM_CONNECTCHAT_READ);
     if (!/^[0-9a-f-]{36}$/i.test(conversationId)) throw new BadRequestException('Conversa inválida.');
     const agentId = await this.settings.getValue(BINDING_KEY);
     if (typeof agentId !== 'string') throw new BadRequestException('Selecione e vincule um agente à bancada ConnectChat.');
@@ -101,6 +113,7 @@ export class ConnectchatPilotController {
     ].filter(Boolean).join('\n');
     const result = await this.runner.run({
       agentId, input, history: history.slice(0, -1),
+      createdBy: user.sub,
       scopeKeys: { channel: 'connectchat', session: conversationId, contact: conversationId },
       toolAllowlist: tools,
       // dryRun não é usado aqui: consultas de leitura devem chegar ao IXC,
