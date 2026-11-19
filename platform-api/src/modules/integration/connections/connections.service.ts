@@ -65,7 +65,7 @@ export class ConnectionsService {
     // Eles continuam preservados (sem apagar segredo/log), mas não reaparecem na
     // superfície operacional nem podem ser selecionados por fluxos atuais.
     return connections.filter((connection) =>
-      this.registry.has(connection.provider_key) && connection.provider_key !== 'whatsapp-nivoo');
+      connection.is_active && this.registry.has(connection.provider_key) && connection.provider_key !== 'whatsapp-nivoo');
   }
 
   listAvailableProviders() {
@@ -77,8 +77,25 @@ export class ConnectionsService {
 
   async findById(id: string): Promise<Connection> {
     const connection = await this.repository.findById(id);
-    if (!connection || !this.registry.has(connection.provider_key)) throw new NotFoundException('Conexão não encontrada.');
+    if (!connection || !connection.is_active || !this.registry.has(connection.provider_key)) throw new NotFoundException('Conexão não encontrada.');
     return connection;
+  }
+
+  /** Oculta apenas conexões Codex; mantém logs, vínculo e ID no banco. */
+  async archiveCodex(id: string) {
+    const connection = await this.findById(id);
+    if (connection.provider_key !== 'codex-cli') {
+      throw new BadRequestException('Arquivamento pela interface permitido apenas para conexões Codex CLI.');
+    }
+    const result = await this.repository.archive(id);
+    await this.audit.record({
+      action: 'integration.connection.archive',
+      entityType: 'Connection',
+      entityId: id,
+      oldValue: { status: connection.status, is_active: connection.is_active },
+      newValue: { status: result.status, is_active: result.is_active },
+    });
+    return { archived: true, id };
   }
 
   async findLogs(id: string, take = 50) {
