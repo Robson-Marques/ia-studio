@@ -14,6 +14,8 @@ import { WhatsappNivooProvider } from './providers/whatsapp-nivoo.provider';
 import { WhatsappWahaProvider } from './providers/whatsapp-waha.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 import { ConnectchatProvider } from './providers/connectchat.provider';
+import { CodexCliService } from './providers/codex-cli.service';
+import { CodexCliIntegrationProvider } from './providers/codex-cli.provider';
 
 @Module({
   providers: [
@@ -31,9 +33,11 @@ import { ConnectchatProvider } from './providers/connectchat.provider';
     WhatsappWahaProvider,
     GoogleWorkspaceProvider,
     ConnectchatProvider,
+    CodexCliService,
+    CodexCliIntegrationProvider,
   ],
   // GoogleWorkspaceProvider exportado: o OAuth controller monta a URL de
   // consentimento (buildConsentUrl) direto no provider.
-  exports: [ProviderRegistryService, RegistryRepository, GoogleWorkspaceProvider],
+  exports: [ProviderRegistryService, RegistryRepository, GoogleWorkspaceProvider, CodexCliService],
 })
 export class RegistryModule {}
