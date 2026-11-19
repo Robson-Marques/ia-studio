@@ -21,7 +21,10 @@ jobs:
           test -f scripts/install-dedicated.sh
           test -f platform-admin/src/pages/WhatsApp/PdfThumbnail.jsx
       - name: Check updater shell syntax
-        run: bash -n scripts/upgrade.sh
+        run: |
+          bash -n scripts/upgrade.sh
+          bash -n scripts/install-dedicated.sh
+          bash -n scripts/install-codex-cli.sh
       - name: Install API dependencies without provisioning Docker
         working-directory: platform-api
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
@@ -30,13 +33,16 @@ jobs:
         run: |
           npx prisma generate
           npm run build
+      - name: Parse Codex CLI login JSX without private dependencies
+        working-directory: platform-admin
+        run: npx --yes esbuild@0.25.12 src/pages/Integracoes/CodexCliLogin.jsx --bundle --external:* --outfile=/tmp/iastudio-codex-ui-parse.js
       - name: Install admin dependencies (private Studio UX registry)
         working-directory: platform-admin
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITLAB_PACKAGE_TOKEN: ${{ secrets.GITLAB_PACKAGE_TOKEN || secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo '::error::Configure repository secret NPM_TOKEN for the private @studio-ux-ds GitLab registry.'
+          if [ -z "$GITLAB_PACKAGE_TOKEN" ]; then
+            echo '::error::Configure GitHub secret GITLAB_PACKAGE_TOKEN (or NPM_TOKEN) for @studio-ux-ds GitLab registry.'
             exit 1
           fi
           npm install --no-package-lock --no-audit --no-fund
