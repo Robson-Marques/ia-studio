@@ -97,13 +97,13 @@ export class CodexCliService implements OnModuleDestroy {
       const home = await this.home(id);
       provisioned = true;
       const check = this.command(['--version'], home);
-      const result = await execFileAsync(check.command, check.args, { timeout: 10000 });
+      const result = await execFileAsync(check.command, check.args, { timeout: 10000, cwd: this.root });
       version = result.stdout.trim();
       installed = true;
       code = 'LOGIN_REQUIRED';
       try {
         const checkLogin = this.command(['login', 'status'], home);
-        const login = await execFileAsync(checkLogin.command, checkLogin.args, { timeout: 10000 });
+        const login = await execFileAsync(checkLogin.command, checkLogin.args, { timeout: 10000, cwd: this.root });
         // Uma sessão autenticada por API key não equivale a login ChatGPT.
         authenticated = !/api key/i.test(login.stdout + login.stderr);
         code = authenticated ? 'CONNECTED' : 'LOGIN_REQUIRED';
@@ -134,7 +134,14 @@ export class CodexCliService implements OnModuleDestroy {
         detail = 'Binário do Codex CLI não encontrado. A instalação automática precisa ser reparada no servidor.';
       } else {
         code = 'PROVISIONING_FAILED';
-        detail = 'Não foi possível inicializar o executor Codex. Consulte a etapa CODEX_CLI da atualização e os logs da API.';
+        // Exibir causa técnica limitada, sem dados da sessão/auth.json ou
+        // stdout arbitrário. Útil para diagnosticar runuser/PATH/cwd no painel.
+        const diagnostic = message.split('\n').map((line) => line.trim())
+          .filter(Boolean).slice(0, 2).join(' ').slice(0, 180)
+          .replace(/(token|password|secret|api[_-]?key)\s*[:=]\s*\S+/gi, '$1=[oculto]');
+        detail = diagnostic
+          ? 'Não foi possível inicializar o executor Codex: ' + diagnostic
+          : 'Não foi possível inicializar o executor Codex. Consulte os logs da API.';
       }
     }
     const session = this.sessions.get(id);
@@ -230,7 +237,13 @@ export class CodexCliService implements OnModuleDestroy {
       this.logger.warn('Falha ao reparar a instalação isolada do Codex CLI.');
       throw new BadRequestException('Não foi possível instalar/reparar o Codex CLI. Confira a conexão de rede e os registros do servidor.');
     }
-    return this.status(id);
+    const verified = await this.status(id);
+    if (!verified.installed || !verified.provisioned) {
+      // O shell de instalação pode ter saído 0, mas o runuser ainda não
+      // conseguir lançar o Codex. Nunca informar sucesso sem health real.
+      throw new BadRequestException(verified.detail);
+    }
+    return verified;
   }
 
   /** Inicia um novo login oficial sem reutilizar a autorização antiga. */
@@ -246,7 +259,7 @@ export class CodexCliService implements OnModuleDestroy {
     const home = await this.home(id);
     const cmd = this.command(['logout'], home);
     try {
-      await execFileAsync(cmd.command, cmd.args, { timeout: 15000 });
+      await execFileAsync(cmd.command, cmd.args, { timeout: 15000, cwd: this.root });
     } catch {
       // A conta pode estar sem login anterior; continua com device login.
     }
