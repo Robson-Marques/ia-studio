@@ -1,51 +1,12 @@
-name: Validate IA Studio main consolidation
+# Validação automática desativada para evitar execuções e notificações
+# em cada commit/PR. A validação será feita pontualmente antes de uma release.
+name: Validate IA Studio manually
 on:
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
-  dedicated-build:
+  disabled:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Ensure previous dedicated release is an ancestor
-        run: |
-          git merge-base --is-ancestor v0.12.17 HEAD
-          test -f scripts/install-dedicated.sh
-          test -f platform-admin/src/pages/WhatsApp/PdfThumbnail.jsx
-      - name: Check updater shell syntax
-        run: |
-          bash -n scripts/upgrade.sh
-          bash -n scripts/install-dedicated.sh
-          bash -n scripts/install-codex-cli.sh
-      - name: Install API dependencies without provisioning Docker
-        working-directory: platform-api
-        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
-      - name: Generate Prisma client and compile API
-        working-directory: platform-api
-        run: |
-          npx prisma generate
-          npm run build
-      - name: Parse Codex CLI login JSX without private dependencies
-        working-directory: platform-admin
-        run: npx --yes esbuild@0.25.12 src/pages/Integracoes/CodexCliLogin.jsx --bundle --external:* --outfile=/tmp/iastudio-codex-ui-parse.js
-      - name: Install admin dependencies (private Studio UX registry)
-        working-directory: platform-admin
-        env:
-          GITLAB_PACKAGE_TOKEN: ${{ secrets.GITLAB_PACKAGE_TOKEN || secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$GITLAB_PACKAGE_TOKEN" ]; then
-            echo '::error::Configure GitHub secret GITLAB_PACKAGE_TOKEN (or NPM_TOKEN) for @studio-ux-ds GitLab registry.'
-            exit 1
-          fi
-          npm install --no-package-lock --no-audit --no-fund
-      - name: Compile admin with PDF preview and WhatsApp
-        working-directory: platform-admin
-        run: npm run build
+      - run: echo "Automated CI disabled"
