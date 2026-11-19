@@ -116,7 +116,7 @@ export class IspTools implements OnModuleInit {
         // achou EXATAMENTE 1 cliente e há uma conversa em contexto → grava o
         // vínculo CPF↔WhatsApp. Outro CPF depois re-identifica e re-vincula.
         const session = ctx.scopeKeys?.['session'];
-        if (clientes.length === 1 && session) {
+        if (clientes.length === 1 && session && ctx.scopeKeys?.['channel'] === 'whatsapp') {
           const c = clientes[0];
           await this.whatsappInbox
             .linkCustomer(session, {
