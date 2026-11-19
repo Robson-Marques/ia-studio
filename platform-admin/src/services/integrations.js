@@ -86,6 +86,27 @@ export async function cancelCodexLogin(connectionId) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao cancelar login Codex')); }
 }
 
+export async function repairCodex(connectionId) {
+  try {
+    const { data } = await api.post(`/connections/${connectionId}/codex-repair`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Falha ao reparar instalação Codex')); }
+}
+
+export async function reconnectCodex(connectionId) {
+  try {
+    const { data } = await api.post(`/connections/${connectionId}/codex-reconnect`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Falha ao reconectar conta ChatGPT')); }
+}
+
+export async function archiveCodexConnection(connectionId) {
+  try {
+    const { data } = await api.post(`/connections/${connectionId}/archive`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Falha ao remover conexão Codex')); }
+}
+
 // ─── OAuth Google (Email Platform — Fase 7) ──────────────────
 
 // O endpoint de start é VERSION_NEUTRAL (/api/integrations/... sem /v1). Usamos
