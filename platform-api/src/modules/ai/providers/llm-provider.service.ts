@@ -16,6 +16,7 @@ import {
   LlmTool,
 } from './llm.interface';
 import { computeCost } from './pricing';
+import { CodexCliService } from '../../integration/registry/providers/codex-cli.service';
 
 // provider_key da Connection AI → AiProviderKind. OpenRouter/Groq/DeepSeek/
 // Mistral/Azure reusam o provider OpenAI-compatible via base_url da connection.
@@ -28,6 +29,7 @@ const KIND_BY_PROVIDER_KEY: Record<string, AiProviderKind> = {
   mistral: AiProviderKind.OPENAI,
   'azure-openai': AiProviderKind.OPENAI,
   cohere: AiProviderKind.COHERE,
+  'codex-cli': AiProviderKind.OPENAI,
 };
 
 export interface ResolvedLlmConnection {
@@ -35,6 +37,7 @@ export interface ResolvedLlmConnection {
   kind: AiProviderKind;
   baseUrl?: string;
   apiKey?: string;
+  transport?: 'codex-cli' | 'api';
 }
 
 export interface ChatViaConnectionArgs {
@@ -59,6 +62,7 @@ export class LlmProviderService {
     private readonly connections: ConnectionsService,
     private readonly secrets: SecretsService,
     private readonly registry: LlmProviderRegistryService,
+    private readonly codexCli: CodexCliService,
   ) {}
 
   /** Mapeia provider_key da Connection AI pro AiProviderKind (ou 400). */
@@ -76,11 +80,13 @@ export class LlmProviderService {
     const kind = this.kindForProviderKey(connection.provider_key);
     const config = (connection.config ?? {}) as Record<string, unknown>;
     const accessor = this.secrets.accessorFor(connection.secret_id);
-    const apiKey = (await accessor.get('api_key')) ?? undefined;
+    const apiKey = connection.provider_key === 'codex-cli'
+      ? undefined
+      : (await accessor.get('api_key')) ?? undefined;
     const baseUrl = typeof config['base_url'] === 'string' && config['base_url']
       ? String(config['base_url'])
       : undefined;
-    return { connection, kind, baseUrl, apiKey };
+    return { connection, kind, baseUrl, apiKey, transport: connection.provider_key === 'codex-cli' ? 'codex-cli' : 'api' };
   }
 
   /** Chat via connection resolvida: delega ao provider e calcula custo. */
@@ -100,7 +106,7 @@ export class LlmProviderService {
     resolved: ResolvedLlmConnection,
     opts: { model: string; messages: LlmMessage[]; tools?: LlmTool[]; temperature?: number; maxTokens?: number },
   ): Promise<ChatResultWithCost> {
-    const provider = this.registry.get(resolved.kind);
+    const provider = resolved.transport === 'codex-cli' ? null : this.registry.get(resolved.kind);
     const req: LlmChatRequest = {
       model: opts.model,
       messages: opts.messages,
@@ -110,8 +116,13 @@ export class LlmProviderService {
       baseUrl: resolved.baseUrl,
       apiKey: resolved.apiKey,
     };
-    const result = await provider.chat(req);
-    const costUsd = computeCost(opts.model, result.usage.promptTokens, result.usage.completionTokens);
+    const result = resolved.transport === 'codex-cli'
+      ? await this.codexCli.chat(resolved.connection.id, req)
+      : await provider!.chat(req);
+    // O login ChatGPT não usa faturamento por API: custo monetário aqui é zero,
+    // mas continua sujeito aos limites do plano e ao volume de tokens.
+    const costUsd = resolved.transport === 'codex-cli' ? 0
+      : computeCost(opts.model, result.usage.promptTokens, result.usage.completionTokens);
     return { ...result, providerKind: resolved.kind, costUsd };
   }
 
@@ -122,6 +133,9 @@ export class LlmProviderService {
     input: string[],
   ): Promise<{ result: LlmEmbedResult; providerKind: AiProviderKind }> {
     const resolved = await this.resolveConnection(connectionId);
+    if (resolved.transport === 'codex-cli') {
+      throw new BadRequestException('Codex CLI não fornece embeddings. Configure uma conexão de API para a base de conhecimento.');
+    }
     const provider = this.registry.get(resolved.kind);
     if (!provider.embed) {
       throw new BadRequestException(`Provedor "${resolved.kind}" não gera embeddings — use OpenAI.`);

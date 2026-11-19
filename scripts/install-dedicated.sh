@@ -177,6 +177,15 @@ bash "$IASTUDIO_APP_DIR/scripts/provision-dedicated-schema.sh" --app-id "$IASTUD
 (cd "$IASTUDIO_APP_DIR/platform-api" && npm run build)
 (cd "$IASTUDIO_APP_DIR/platform-admin" && npm install && npm run build)
 
+# O conector Codex é opcional. Provisiona um usuário Unix exclusivo desta
+# aplicação e instala o binário oficial em prefixo dedicado, sem mudar outros
+# serviços. Falha do registry não compromete uma instalação funcional.
+if [ -f "$IASTUDIO_APP_DIR/scripts/install-codex-cli.sh" ]; then
+  if ! bash "$IASTUDIO_APP_DIR/scripts/install-codex-cli.sh" "$IASTUDIO_APP_ID"; then
+    echo 'AVISO: Codex CLI não ficou disponível. Configure a instalação mais tarde; a API por chave permanece funcional.' >&2
+  fi
+fi
+
 # nginx (www-data) serve os estáticos do platform-admin. Com umask 077 o clone e
 # o dist ficaram só-root e o nginx respondia 500 (EACCES ao atravessar o caminho).
 # Abrimos SÓ o necessário: travessia (o+x) nos diretórios até o dist e leitura

@@ -8,6 +8,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import { statusMeta, RESOURCE_KIND_LABELS, prettifyProviderKey } from './integration.constants';
 import GoogleOAuthButton from './GoogleOAuthButton';
+import CodexCliLogin from './CodexCliLogin';
 
 // Integrações/ConexaoDetalhe — uma conexão (v0.10.11).
 //
@@ -162,6 +163,9 @@ export default function ConexaoDetalhe() {
     >
       {aba === 'dados' && (
         <>
+          {podeEscrever && conexao.provider_key === 'codex-cli' && (
+            <CodexCliLogin connectionId={conexao.id} onActivated={() => load()} />
+          )}
           <Card>
             <div style={{ padding: 20 }}>
               <DescriptionList

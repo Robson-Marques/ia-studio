@@ -63,6 +63,29 @@ export async function listConnectionLogs(id, take = 50) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar logs da conexão')); }
 }
 
+// ─── Codex CLI: login oficial por código de dispositivo ───────────
+
+export async function getCodexLoginStatus(connectionId) {
+  try {
+    const { data } = await api.get(`/connections/${connectionId}/codex-login`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao consultar login Codex')); }
+}
+
+export async function startCodexLogin(connectionId) {
+  try {
+    const { data } = await api.post(`/connections/${connectionId}/codex-login`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao iniciar login Codex')); }
+}
+
+export async function cancelCodexLogin(connectionId) {
+  try {
+    const { data } = await api.post(`/connections/${connectionId}/codex-login/cancel`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao cancelar login Codex')); }
+}
+
 // ─── OAuth Google (Email Platform — Fase 7) ──────────────────
 
 // O endpoint de start é VERSION_NEUTRAL (/api/integrations/... sem /v1). Usamos

@@ -5,6 +5,7 @@ import { listConnectionProviders, createConnection } from '../../services/integr
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
 import { statusMeta } from './integration.constants';
 import GoogleOAuthButton from './GoogleOAuthButton';
+import CodexCliLogin from './CodexCliLogin';
 
 // Integrações/ConexaoNova — o passo a passo de criar uma conexão (v0.10.11).
 //
@@ -134,6 +135,12 @@ export default function ConexaoNova() {
             <Badge tone={meta.tone}>{meta.label}</Badge>
             {resultado.status_detail && (
               <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>{resultado.status_detail}</p>
+            )}
+            {resultado.provider_key === 'codex-cli' && (
+              <CodexCliLogin
+                connectionId={resultado.id}
+                onActivated={() => navigate(`/integracoes/conexoes/${resultado.id}`)}
+              />
             )}
             {precisaGoogle && (
               <div className="space-y-1.5">
