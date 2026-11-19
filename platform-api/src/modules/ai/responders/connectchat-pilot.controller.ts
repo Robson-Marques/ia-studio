@@ -84,10 +84,10 @@ export class ConnectchatPilotController {
     // Nunca tomar a presença de um telefone ou nome como prova de titularidade.
     // Sem vínculo IXC confirmado, o ensaio não recebe ferramentas cadastrais.
     const linked = conversation.businessContact?.linkStatus === 'ACTIVE'
-      && conversation.businessContact.status === 'CUSTOMER';
+      && conversation.businessContact?.status === 'CUSTOMER';
     const tools = linked
       ? [...READ_TOOLS] : ['current_datetime', 'consultar_faq'];
-    const customerName = linked ? (conversation.customerDisplayName || conversation.businessContact?.customerDisplayName || '') : '';
+    const customerName = linked ? (conversation.businessContact?.customerDisplayName || '') : '';
     const caution = linked
       ? 'Existe vínculo de cliente no ConnectChat. Use apenas dados necessários; não execute operações financeiras ou alterações.'
       : 'O cliente ainda não teve a titularidade validada. Não consulte ou divulgue cadastros, chamados, débitos ou dados pessoais. Solicite identificação segura.';
