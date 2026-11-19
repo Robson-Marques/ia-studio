@@ -336,6 +336,22 @@ export class WhatsappInboxService {
     // Reaproveita o mesmo envio (ja passou pelo reply gate/janela acima, mas
     // deliver revalida — barato e mantem uma porta unica de envio).
     const result = await this.deliver(user, chat, message, args.confirmTakeover === true, false);
+    // O arquivo já está disponível neste request. Não esperar o eco da WAHA
+    // nem um segundo download para conservar a mídia enviada pelo painel.
+    if (connection.provider_key === WHATSAPP_WAHA_PROVIDER_KEY && result.wamid) {
+      try {
+        const savedMessage = await this.chats.findMessageByConnectionExternalId(connection.id, result.wamid);
+        if (savedMessage) {
+          await this.mediaStore.save(savedMessage, args.data, args.mimeType);
+        } else {
+          this.logger.warn(`Envio WAHA ${result.wamid} sem registro local para persistência imediata.`);
+        }
+      } catch (error) {
+        // A WAHA já confirmou o envio. Falha de storage não deve pedir ao
+        // operador para reenviar e acabar duplicando mensagens.
+        this.logger.error(`Falha ao preservar mídia enviada WAHA: ${(error as Error).message}`);
+      }
+    }
     return { wamid: result.wamid, job_id: result.jobId, via: 'media' };
   }
 
