@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 // Renderiza apenas a primeira página. O iframe de PDF não fornece miniatura
 // confiável em Firefox/iOS e pode mostrar a barra completa do visualizador.
 // PDF.js fica em chunk lazy, só carregado para documentos PDF visíveis.
-export default function PdfThumbnail({ file, onPageCount }) {
+export default function PdfThumbnail({ file, url, onPageCount }) {
   const canvasRef = useRef(null);
   const [preview, setPreview] = useState('loading');
 
@@ -51,6 +51,9 @@ export default function PdfThumbnail({ file, onPageCount }) {
         if (!disposed) setPreview('ready');
       } catch (error) {
         if (!disposed && error?.name !== 'RenderingCancelledException') {
+          // Falha na renderização não invalida o documento. O usuário pode
+          // visualizá-lo no PDF nativo ou abri-lo pelo botão do cartão.
+          console.warn('[WhatsApp PDF] Falha ao renderizar miniatura:', error);
           setPreview('unavailable');
         }
       }
@@ -73,11 +76,22 @@ export default function PdfThumbnail({ file, onPageCount }) {
       {preview === 'loading' && (
         <span className="text-xs text-gray-500">Preparando prévia do PDF…</span>
       )}
-      {preview === 'unavailable' && (
-        <div className="flex flex-col items-center gap-1 text-gray-500">
-          <span className="rounded-md bg-red-600 px-2 py-1 text-xs font-semibold text-white">PDF</span>
-          <span className="text-xs">Prévia indisponível</span>
-        </div>
+      {preview === 'unavailable' && url && (
+        <object
+          data={`${url}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+          type="application/pdf"
+          title="Prévia do documento PDF"
+          className="h-full w-full border-0"
+          aria-label="Primeira página do documento PDF"
+        >
+          <div className="flex flex-col items-center gap-1 text-gray-500">
+            <span className="rounded-md bg-red-600 px-2 py-1 text-xs font-semibold text-white">PDF</span>
+            <span className="text-xs">Abrir documento para visualizar</span>
+          </div>
+        </object>
+      )}
+      {preview === 'unavailable' && !url && (
+        <span className="text-xs text-gray-500">Prévia indisponível</span>
       )}
     </div>
   );
