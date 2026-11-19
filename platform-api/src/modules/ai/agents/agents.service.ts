@@ -23,6 +23,20 @@ import {
 
 export const AGENT_EXPORT_SCHEMA_VERSION = 1;
 
+// Capacidades ISP de consulta que já existem no catálogo. Não incluir aqui
+// operações de escrita, acesso SQL/HTTP genérico ou ações financeiras sensíveis.
+// Se o IXC estiver ativo, novos assistentes nascem com as consultas habilitadas;
+// o operador ainda pode modificar a lista em "O que faz".
+const ISP_DEFAULT_READ_TOOLS = [
+  'identificar_cliente',
+  'consultar_chamados_recentes',
+  'diagnosticar_conexao',
+  'consultar_contrato',
+  'status_conexao',
+  'conversation_history',
+  'current_datetime',
+] as const;
+
 @Injectable()
 export class AgentsService {
   private readonly logger = new Logger(AgentsService.name);
@@ -99,6 +113,25 @@ export class AgentsService {
   async create(dto: CreateAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
     await this.assertActionGrant(dto.allowed_tools, actor);
 
+    // Conectou o IXC? O assistente já conhece as ferramentas ISP de leitura,
+    // sem configurar IDs, schemas ou endpoints. Quem informou allowed_tools
+    // explicitamente (inclusive []) tem sua decisão preservada.
+    let allowedTools = dto.allowed_tools;
+    if (allowedTools === undefined) {
+      const ixc = await this.prisma.connection.findMany({
+        where: { provider_key: 'ixc', is_active: true, status: 'ACTIVE' },
+        select: { id: true },
+        take: 2,
+      });
+      if (ixc.length === 1) {
+        const available = await this.prisma.aiTool.findMany({
+          where: { key: { in: [...ISP_DEFAULT_READ_TOOLS] }, is_active: true, builtin: true, requires_approval: false },
+          select: { key: true },
+        });
+        allowedTools = available.map((tool) => tool.key);
+      }
+    }
+
     const agent = await this.repository.create({
       name: dto.name,
       description: dto.description,
@@ -111,7 +144,7 @@ export class AgentsService {
       temperature: dto.temperature ?? 0.3,
       max_steps: dto.max_steps ?? 6,
       max_tokens: dto.max_tokens,
-      allowed_tools: dto.allowed_tools ?? [],
+      allowed_tools: allowedTools ?? [],
       knowledge_base_ids: dto.knowledge_base_ids ?? [],
       memory_profile_ids: dto.memory_profile_ids ?? [],
       action_permissions: dto.action_permissions ?? [],
