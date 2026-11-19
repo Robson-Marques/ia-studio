@@ -43,6 +43,14 @@ export class ConnectionsRepository {
     return this.prisma.connection.create({ data });
   }
 
+  /** Arquivamento lógico: preserva histórico e referências para auditoria. */
+  archive(id: string) {
+    return this.prisma.connection.update({
+      where: { id },
+      data: { is_active: false, status: 'DISABLED', status_detail: 'Conexão removida da lista pelo administrador.' },
+    });
+  }
+
   update(id: string, data: Prisma.ConnectionUpdateInput) {
     return this.prisma.connection.update({ where: { id }, data });
   }
