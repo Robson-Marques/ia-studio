@@ -126,7 +126,7 @@ export class CodexCliService implements OnModuleDestroy {
       } else if (/unknown user|user .* does not exist|invalid user|unknown group|does not exist|cannot find name/i.test(message)) {
         code = 'USER_NOT_PROVISIONED';
         detail = 'Usuário isolado do Codex não foi criado. Execute a etapa de provisionamento do Codex no servidor.';
-      } else if (/permission denied|EACCES|operation not permitted/i.test(message)) {
+      } else if (/permission denied|permissão negada|permissao negada|EACCES|operation not permitted/i.test(message)) {
         code = 'ACCESS_DENIED';
         detail = 'Permissões do diretório ou do executor Codex impedem o acesso. Verifique o provisionamento.';
       } else if (/ENOENT|no such file|not found/i.test(message)) {
