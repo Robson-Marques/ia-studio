@@ -23,6 +23,14 @@ export class ConnectchatInboxService {
     return this.connections.execute(await this.connectionId(), operation, params);
   }
 
+  /** Confirma que a conversa pertence à conexão ConnectChat desta instalação. */
+  async conversationForAgent(conversationId: string): Promise<ConnectchatConversation> {
+    const conversations = await this.execute('listConversations') as ConnectchatConversation[];
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (!conversation) throw new BadRequestException('Conversa não encontrada nesta instalação.');
+    return conversation;
+  }
+
   private async conversation(conversationId: string): Promise<ConnectchatConversation> {
     const conversations = await this.execute('listConversations') as ConnectchatConversation[];
     const conversation = conversations.find((item) => item.id === conversationId);
