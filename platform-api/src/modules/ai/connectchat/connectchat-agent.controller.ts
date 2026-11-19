@@ -9,7 +9,7 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { SettingsService } from '../../core/settings/settings.service';
 import { ConnectionsService } from '../../integration/connections/connections.service';
-import { rows, projectChamado } from '../../isp/isp-projections';
+import { rows, projectChamado, projectOrdemServico } from '../../isp/isp-projections';
 import { ConnectchatInboxService } from '../../comm/connectchat/connectchat-inbox.service';
 import { AgentsService } from '../agents/agents.service';
 import { AgentRunnerService } from '../agents/agent-runner.service';
@@ -127,6 +127,7 @@ export class ConnectchatAgentController {
     // Na fase de validação não entregamos ferramentas livres de consulta ao
     // modelo. O histórico é preparado pelo servidor e a saída é só prévia.
     let chamados: Record<string, unknown>[] = [];
+    let ordens: Record<string, unknown>[] = [];
     const canUseIsp = user.permissions?.includes('*')
       || user.permissions?.includes(PERMISSIONS.ISP_TOOLS_USE);
     const readTickets = context.verified && binding.includeTicketHistory && canUseIsp === true;
@@ -142,6 +143,14 @@ export class ConnectchatAgentController {
           // Fail closed: não inventar atendimento, nem consultar outro cliente.
           chamados = [];
         }
+        try {
+          const foundOs = await this.connections.execute(match[1], 'os.listar_recentes', {
+            id_cliente: match[2],
+          });
+          ordens = rows(foundOs).slice(0, 5).map(projectOrdemServico);
+        } catch {
+          ordens = [];
+        }
       }
     }
     // Indício de reincidência ≠ diagnóstico de mesma causa. Contar somente
@@ -156,6 +165,7 @@ export class ConnectchatAgentController {
     const evidence = readTickets
       ? {
           amostra: chamados.length,
+          ordens_de_servico_na_amostra: ordens.length,
           chamados_com_data_valida: openedAt.length,
           ultimos_7_dias: recent7,
           ultimos_30_dias: recent30,
@@ -173,6 +183,7 @@ export class ConnectchatAgentController {
       'Chamados consultados no IXC são registros históricos, não prova de que uma falha atual foi resolvida.',
       readTickets
         ? 'Últimos chamados IXC conhecidos (até cinco): ' + JSON.stringify(chamados)
+          + '\\nÚltimas ordens de serviço reais IXC (até cinco): ' + JSON.stringify(ordens)
         : 'Nenhum histórico IXC foi disponibilizado (identidade não validada ou leitura desligada pelo operador).',
       evidence ? 'Contagem determinística de chamados: ' + JSON.stringify(evidence) : '',
       context.verified
