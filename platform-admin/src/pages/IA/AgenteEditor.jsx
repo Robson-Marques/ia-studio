@@ -96,6 +96,7 @@ export default function AgenteEditor() {
   const [bases, setBases] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [loadingRefs, setLoadingRefs] = useState(true);
+  const [ispAutoConfigured, setIspAutoConfigured] = useState(false);
 
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versions, setVersions] = useState([]);
@@ -145,7 +146,29 @@ export default function AgenteEditor() {
     ])
       .then(([conns, tls, bs, prs]) => {
         if (!alive) return;
-        setConnections(conns); setTools(tls); setBases(bs); setProfiles(prs);
+        // /connections devolve todas as categorias; apenas providers LLM
+        // pertencem ao seletor de Conta de IA (IXC/ConnectChat não são modelos).
+        const aiKeys = new Set([
+          'codex-cli', 'openai', 'anthropic', 'openrouter', 'groq',
+          'deepseek', 'mistral', 'azure-openai', 'cohere',
+        ]);
+        setConnections((conns || []).filter((c) => aiKeys.has(c.provider_key)));
+        setTools(tls); setBases(bs); setProfiles(prs);
+        // Conexão IXC única e ativa: pré-seleciona habilidades de consulta no
+        // cadastro, permitindo ver o que será concedido antes de salvar.
+        if (!isEdit && (conns || []).filter((c) => c.provider_key === 'ixc'
+          && c.status === 'ACTIVE' && c.is_active !== false).length === 1) {
+          const readKeys = new Set([
+            'identificar_cliente', 'consultar_chamados_recentes',
+            'diagnosticar_conexao', 'consultar_contrato', 'status_conexao',
+            'conversation_history', 'current_datetime',
+          ]);
+          const selected = (tls || []).filter((t) => readKeys.has(t.key)
+            && t.is_active !== false && t.builtin && !t.requires_approval).map((t) => t.key);
+          setForm((prev) => prev.allowed_tools?.length
+            ? prev : { ...prev, allowed_tools: selected });
+          setIspAutoConfigured(selected.length > 0);
+        }
       })
       .finally(() => { if (alive) setLoadingRefs(false); });
     return () => { alive = false; };
@@ -428,9 +451,14 @@ export default function AgenteEditor() {
                 ))}
               </div>
               <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
-                Preencha <strong>Quem é</strong> e <strong>O que faz</strong>, ligue <strong>O que sabe</strong> e{' '}
-                <strong>O que pode fazer</strong>, e teste.
+                Defina o objetivo, conecte as fontes da empresa e teste antes de habilitar atendimento automático.
               </p>
+              {ispAutoConfigured && !isEdit && (
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--su-text-secondary)' }}>
+                  IXC conectado: habilidades de identificação, chamados e diagnóstico já selecionadas.
+                  Confira-as em “O que faz”; ações de escrita continuam desabilitadas.
+                </p>
+              )}
             </div>
           </Card>
 
