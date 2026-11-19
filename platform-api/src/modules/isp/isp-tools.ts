@@ -171,6 +171,34 @@ export class IspTools implements OnModuleInit {
       },
     });
 
+    // ─── consultar_os_recentes ────────────────────────
+    this.registry.register({
+      key: 'consultar_os_recentes',
+      name: 'Consultar últimas ordens de serviço (IXC)',
+      description: 'Lê até cinco OS recentes, abertas ou encerradas, do titular identificado no IXC. Use para reconhecer reincidência; status não demonstra por si só que o defeito foi resolvido.',
+      category: 'isp',
+      input_schema: {
+        type: 'object',
+        properties: {
+          cpf: { type: 'string', description: 'CPF/CNPJ do titular já identificado e confirmado.' },
+        },
+        required: ['cpf'],
+      },
+      handler: async (args, ctx) => {
+        const cpf = asString(args['cpf'], 'cpf');
+        if (ctx.dryRun) return { simulated: true, cpf, limite: 5 };
+        const connection = await this.resolver.resolve({ providerKey: 'ixc' });
+        const ordens = rows(await this.connections.execute(
+          connection.id, 'os.listar_recentes', { cpf },
+        )).slice(0, 5).map(projectChamado);
+        return {
+          fonte: 'IXC Soft', tipo: 'ordem_de_servico',
+          dados_historicos_nao_confiaveis: true,
+          ordem: 'identificador_decrescente', ordens,
+        };
+      },
+    });
+
     // ─── diagnosticar_conexao (determinístico contrato→login) ──
     this.registry.register({
       key: 'diagnosticar_conexao',
