@@ -5,8 +5,6 @@ import { Prisma, WorkflowStatus } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface WorkflowFilters {
-  workspaceId?: string;
-  environmentId?: string;
   status?: WorkflowStatus;
   search?: string;
 }
@@ -15,10 +13,8 @@ export interface WorkflowFilters {
 export class WorkflowsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string, filters: WorkflowFilters = {}) {
-    const where: Prisma.WorkflowWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
+  findAll(filters: WorkflowFilters = {}) {
+    const where: Prisma.WorkflowWhereInput = {};
     if (filters.status) where.status = filters.status;
     if (filters.search) where.name = { contains: filters.search, mode: 'insensitive' };
     return this.prisma.workflow.findMany({
@@ -36,14 +32,13 @@ export class WorkflowsRepository {
     return this.prisma.workflow.findUnique({ where: { webhook_token: token } });
   }
 
-  findPublishedByOrg(organizationId: string) {
-    return this.prisma.workflow.findMany({
-      where: { organization_id: organizationId, status: 'PUBLISHED' },
-    });
+  /** Fluxos publicados da única instância dedicada. */
+  findPublished() {
+    return this.prisma.workflow.findMany({ where: { status: 'PUBLISHED' } });
   }
 
-  countByOrg(organizationId: string) {
-    return this.prisma.workflow.count({ where: { organization_id: organizationId } });
+  count() {
+    return this.prisma.workflow.count();
   }
 
   create(data: Prisma.WorkflowUncheckedCreateInput) {

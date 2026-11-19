@@ -5,6 +5,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -22,15 +24,10 @@ import { ConnectionsRepository } from './connections.repository';
 import { IntegrationLogsRepository } from './integration-logs.repository';
 import { assertConnectionTransition } from './connection-state.machine';
 import { SecretsService } from '../secrets/secrets.service';
-import { MarketplaceService } from '../marketplace/marketplace.service';
+import { ProviderCatalogService } from '../catalog/provider-catalog.service';
 import { ProviderRegistryService } from '../registry/provider-registry.service';
-import { CATALOG_ONLY_PROVIDERS } from '../registry/provider-catalog';
-import { LimitsService } from '../../licensing/limits.service';
-import { UsageService } from '../../licensing/usage.service';
 import { AuditLogService, redactSensitive } from '../../../shared/audit/audit-log.service';
 import { getRequestStore } from '../../../shared/audit/request-context';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { assertSameOrg, validateWorkspaceScope } from '../../../shared/auth/tenant.util';
 import {
   HealthResult,
   ProviderContext,
@@ -38,6 +35,8 @@ import {
 } from '../../../shared/integration/provider.interface';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
+import { ConnectchatApiError } from '../../../shared/integration/connectchat.client';
+import { WahaApiError } from '../../../shared/integration/waha.client';
 import { ConnectionStateAction } from './dto/update-connection-state.dto';
 
 const STATE_ACTION_TARGET: Record<ConnectionStateAction, ConnectionStatus> = {
@@ -54,51 +53,55 @@ export class ConnectionsService {
     private readonly repository: ConnectionsRepository,
     private readonly integrationLogs: IntegrationLogsRepository,
     private readonly secrets: SecretsService,
-    private readonly marketplace: MarketplaceService,
+    private readonly providerCatalog: ProviderCatalogService,
     private readonly registry: ProviderRegistryService,
-    private readonly limits: LimitsService,
-    private readonly usage: UsageService,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // ─── Leitura ────────────────────────────────────────
-  findAll(organizationId: string, filters: { workspaceId?: string; environmentId?: string }) {
-    return this.repository.findAllByOrg(organizationId, filters);
+  async findAll() {
+    const connections = await this.repository.findAll();
+    // Providers retirados da instalação podem ter registros históricos no banco.
+    // Eles continuam preservados (sem apagar segredo/log), mas não reaparecem na
+    // superfície operacional nem podem ser selecionados por fluxos atuais.
+    return connections.filter((connection) =>
+      this.registry.has(connection.provider_key) && connection.provider_key !== 'whatsapp-nivoo');
   }
 
-  async findById(organizationId: string, id: string): Promise<Connection> {
+  listAvailableProviders() {
+    // Os dois métodos de WhatsApp têm jornadas próprias em WhatsApp → Números.
+    // A WAHA também exige aceite explícito do risco antes de criar a sessão.
+    return this.providerCatalog.listAvailable().then((providers) =>
+      providers.filter((provider) => !['whatsapp-nivoo', 'whatsapp-waha'].includes(provider.key)));
+  }
+
+  async findById(id: string): Promise<Connection> {
     const connection = await this.repository.findById(id);
-    if (!connection) throw new NotFoundException('Conexão não encontrada.');
-    assertSameOrg(connection.organization_id, organizationId);
+    if (!connection || !this.registry.has(connection.provider_key)) throw new NotFoundException('Conexão não encontrada.');
     return connection;
   }
 
-  async findLogs(organizationId: string, id: string, take = 50) {
-    await this.findById(organizationId, id); // ownership
-    return this.integrationLogs.findByConnection(organizationId, id, take);
+  async findLogs(id: string, take = 50) {
+    await this.findById(id);
+    return this.integrationLogs.findByConnection(id, take);
   }
 
   // ─── Criacao via wizard ─────────────────────────────
-  async create(organizationId: string, dto: CreateConnectionDto, createdBy: string | null) {
-    // Escopo (diretriz 4): workspace/ambiente validados contra a org.
-    await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
-
-    // Provider instalado + ativo no marketplace.
-    const definition = await this.marketplace.assertInstalled(organizationId, dto.provider_key);
-
-    // Enforcement de limite (diretriz 19): metrica estrutural 'connections'.
-    const currentCount = await this.repository.countByOrg(organizationId);
-    await this.limits.assertCountWithin(organizationId, 'connections', currentCount);
-
-    // Metrica adicional POR PROVIDER declarada no metadata() (ex.: o
-    // whatsapp-meta conta 'whatsapp_numbers' — 1 conexao = 1 numero).
-    if (this.registry.has(dto.provider_key)) {
-      const countMetric = this.registry.get(dto.provider_key).metadata().countMetric;
-      if (countMetric) {
-        const providerCount = await this.repository.countByOrgProvider(organizationId, dto.provider_key);
-        await this.limits.assertCountWithin(organizationId, countMetric, providerCount);
-      }
+  async create(
+    dto: CreateConnectionDto,
+    createdBy: string | null,
+    options: { allowWhatsappConsumer?: boolean; allowWhatsappWaha?: boolean } = {},
+  ) {
+    const definition = await this.providerCatalog.definitionForConnection(dto.provider_key);
+    if (dto.provider_key === 'whatsapp-nivoo' && !options.allowWhatsappConsumer) {
+      throw new BadRequestException('Configure a Central Nivoo em WhatsApp → Números.');
+    }
+    if (dto.provider_key === 'whatsapp-nivoo' &&
+        (await this.repository.countByProvider('whatsapp-nivoo')) > 0) {
+      throw new ConflictException('O consumidor da Central WhatsApp já está configurado. Conecte outros números em WhatsApp → Números.');
+    }
+    if (dto.provider_key === 'whatsapp-waha' && !options.allowWhatsappWaha) {
+      throw new BadRequestException('Conecte a WAHA em WhatsApp → Números e confirme o aviso de risco.');
     }
 
     // Higiene: campo marcado como secret no wizard NUNCA entra no config.
@@ -109,9 +112,6 @@ export class ConnectionsService {
     let secretId: string | null = null;
     if (Object.keys(secretValues).length > 0) {
       const secret = await this.secrets.create({
-        organizationId,
-        workspaceId: dto.workspace_id,
-        environmentId: dto.environment_id,
         name: `${dto.name} — credenciais (${dto.provider_key})`,
         kind: this.resolveSecretKind(dto.provider_key),
         values: secretValues,
@@ -121,9 +121,6 @@ export class ConnectionsService {
     }
 
     let connection = await this.repository.create({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       provider_key: dto.provider_key,
       name: dto.name,
       status: 'PENDING_AUTH',
@@ -153,30 +150,24 @@ export class ConnectionsService {
       });
     }
 
-    // Metering (diretriz 40).
-    await this.usage.increment(organizationId, dto.workspace_id, 'connections');
-
     await this.audit.record({
       action: 'integration.connection.create',
       entityType: 'Connection',
       entityId: connection.id,
-      organizationId,
-      workspaceId: dto.workspace_id,
       newValue: {
         name: connection.name,
         provider_key: connection.provider_key,
         status: connection.status,
-        environment_id: connection.environment_id,
       },
     });
     return connection;
   }
 
   // ─── Atualizacao (nome/tags/prioridade + credenciais) ─
-  // provider_key/workspace/environment NUNCA mudam aqui. config faz merge
+  // provider_key nunca muda aqui. config faz merge
   // shallow no atual; secrets grava so as chaves nao-vazias (mantem o resto).
-  async update(organizationId: string, id: string, dto: UpdateConnectionDto) {
-    const before = await this.findById(organizationId, id);
+  async update(id: string, dto: UpdateConnectionDto) {
+    const before = await this.findById(id);
     const data: Prisma.ConnectionUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.tags !== undefined) data.tags = dto.tags;
@@ -185,7 +176,7 @@ export class ConnectionsService {
     // Config: merge shallow (novos valores sobrescrevem, mantem os nao
     // enviados). Higiene: remove qualquer campo secreto que tenha vazado.
     if (dto.config !== undefined) {
-      const definition = await this.marketplace.assertInstalled(organizationId, before.provider_key);
+      const definition = await this.providerCatalog.definitionForConnection(before.provider_key);
       const incoming = this.stripSecretFields(dto.config, definition);
       const currentConfig = (before.config ?? {}) as Record<string, unknown>;
       data.config = { ...currentConfig, ...incoming } as Prisma.InputJsonValue;
@@ -205,9 +196,6 @@ export class ConnectionsService {
           await this.secrets.mergeValues(before.secret_id, provided);
         } else {
           const created = await this.secrets.create({
-            organizationId,
-            workspaceId: before.workspace_id,
-            environmentId: before.environment_id,
             name: `${before.name} — credenciais (${before.provider_key})`,
             kind: this.resolveSecretKind(before.provider_key),
             values: provided,
@@ -222,7 +210,6 @@ export class ConnectionsService {
       action: 'integration.connection.update',
       entityType: 'Connection',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name, tags: before.tags, priority: before.priority },
       newValue: {
         name: connection.name,
@@ -236,8 +223,11 @@ export class ConnectionsService {
   }
 
   // ─── Estado (enable/disable/maintenance) ────────────
-  async changeState(organizationId: string, id: string, action: ConnectionStateAction) {
-    const connection = await this.findById(organizationId, id);
+  async changeState(id: string, action: ConnectionStateAction) {
+    const connection = await this.findById(id);
+    if (connection.provider_key === 'whatsapp-nivoo') {
+      throw new ConflictException('Gerencie este número em WhatsApp → Números. A desconexão precisa ser confirmada pela Central.');
+    }
     const target = STATE_ACTION_TARGET[action];
     assertConnectionTransition(connection.status, target);
 
@@ -251,7 +241,6 @@ export class ConnectionsService {
       action: `integration.connection.${action}`,
       entityType: 'Connection',
       entityId: id,
-      organizationId,
       oldValue: { status: connection.status },
       newValue: { status: updated.status },
     });
@@ -259,8 +248,8 @@ export class ConnectionsService {
   }
 
   // ─── Teste de saude ─────────────────────────────────
-  async test(organizationId: string, id: string) {
-    const connection = await this.findById(organizationId, id);
+  async test(id: string) {
+    const connection = await this.findById(id);
     if (!this.registry.has(connection.provider_key)) {
       throw new BadRequestException('Conector sem implementação nesta fase — teste indisponível.');
     }
@@ -270,43 +259,59 @@ export class ConnectionsService {
 
     const updated = await this.applyHealthResult(connection, result);
     await this.integrationLogs.record({
-      organizationId,
       connectionId: id,
       direction: IntegrationDirection.OUTBOUND,
       operation: 'health',
-      status: result.ok ? IntegrationLogStatus.SUCCESS : IntegrationLogStatus.FAILURE,
+      status: result.ok || result.pendingAuth ? IntegrationLogStatus.SUCCESS : IntegrationLogStatus.FAILURE,
       durationMs,
       responseMeta: { detail: result.detail, checks: result.checks },
-      error: result.ok ? undefined : result.detail,
+      error: result.ok || result.pendingAuth ? undefined : result.detail,
       traceId: getRequestStore()?.traceId ?? null,
     });
     return { connection: updated, health: result };
   }
 
   // ─── Execucao de operacao ───────────────────────────
-  async execute(organizationId: string, id: string, operation: string, params: unknown) {
-    const connection = await this.findById(organizationId, id);
+  async execute(id: string, operation: string, params: unknown) {
+    const connection = await this.repository.findById(id);
+    if (!connection) throw new NotFoundException('Conexão não encontrada.');
     if (connection.status !== 'ACTIVE') {
       throw new ConflictException('Conexão não está ativa — teste/reative antes de executar operações.');
     }
     const provider = this.registry.get(connection.provider_key);
     const ctx = this.buildContext(connection);
     const startedAt = Date.now();
+    // Conversas são conteúdo de atendimento. Mantemos operação e metadados
+    // rastreáveis, mas nunca o texto da mensagem ou a prova de vínculo no log.
+    const sensitiveParamKeys = connection.provider_key === 'connectchat'
+      ? ['body', 'proof', 'customerRef', 'globalIdentityId']
+      : connection.provider_key === 'whatsapp-nivoo'
+        ? ['to', 'body', 'variables', 'caption', 'url', 'media_id', 'remote_chat_id', 'filename']
+        : connection.provider_key === 'whatsapp-waha'
+          ? ['to', 'body', 'data', 'variables', 'caption', 'url', 'media_id', 'filename']
+          : connection.provider_key === 'ixc' ? ['cpf', 'customerId'] : [];
     try {
       const result = await provider.execute(ctx, operation, params);
       const durationMs = Date.now() - startedAt;
-      await this.repository.update(id, { last_used_at: new Date() });
-      await this.integrationLogs.record({
-        organizationId,
-        connectionId: id,
-        direction: IntegrationDirection.OUTBOUND,
-        operation,
-        status: IntegrationLogStatus.SUCCESS,
-        durationMs,
-        requestMeta: redactSensitive({ operation, params }),
-        responseMeta: { summary: this.summarize(result) },
-        traceId: getRequestStore()?.traceId ?? null,
-      });
+      try {
+        await this.repository.update(id, { last_used_at: new Date() });
+        await this.integrationLogs.record({
+          connectionId: id,
+          direction: IntegrationDirection.OUTBOUND,
+          operation,
+          status: IntegrationLogStatus.SUCCESS,
+          durationMs,
+          requestMeta: redactSensitive({ operation, params: this.withoutBinary(params) }, sensitiveParamKeys),
+          responseMeta: { summary: this.summarize(result) },
+          traceId: getRequestStore()?.traceId ?? null,
+        });
+      } catch (logError) {
+        const acceptedNivooJob = connection.provider_key === 'whatsapp-nivoo' &&
+          ['sendText', 'sendMedia', 'sendTemplate'].includes(operation) &&
+          !!(result as { job_id?: string } | null)?.job_id;
+        if (!acceptedNivooJob) throw logError;
+        this.logger.error(`A Central aceitou o envio, mas o registro de uso/log local falhou: ${(logError as Error).message}`);
+      }
       return result;
     } catch (e) {
       const durationMs = Date.now() - startedAt;
@@ -322,16 +327,35 @@ export class ConnectionsService {
           .catch(() => undefined);
       }
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation,
         status: IntegrationLogStatus.FAILURE,
         durationMs,
-        requestMeta: redactSensitive({ operation, params }),
+        requestMeta: redactSensitive({ operation, params: this.withoutBinary(params) }, sensitiveParamKeys),
         error: (e as Error).message,
         traceId: getRequestStore()?.traceId ?? null,
       });
+      // O ConnectChat já devolve erros públicos e seguros (por exemplo,
+      // credencial sem escopo). Preservar essa informação evita que a Central
+      // transforme uma falha configurável em um opaco "Internal server error".
+      if (e instanceof ConnectchatApiError) {
+        const status = e.status >= HttpStatus.BAD_REQUEST && e.status < HttpStatus.INTERNAL_SERVER_ERROR
+          ? e.status
+          : HttpStatus.BAD_GATEWAY;
+        throw new HttpException({
+          statusCode: status,
+          message: e.message,
+          code: e.code ?? 'CONNECTCHAT_REQUEST_FAILED',
+        }, status);
+      }
+      if (e instanceof WahaApiError) {
+        throw new HttpException({
+          statusCode: HttpStatus.BAD_GATEWAY,
+          message: e.message,
+          code: 'WAHA_REQUEST_FAILED',
+        }, HttpStatus.BAD_GATEWAY);
+      }
       throw e;
     }
   }
@@ -345,8 +369,8 @@ export class ConnectionsService {
    * mais o IntegrationLog. Serve pra UI preencher ids que o usuario nao deve
    * digitar a mao (ex.: `id_assunto` da OS no IXC).
    */
-  async discover(organizationId: string, id: string) {
-    const connection = await this.findById(organizationId, id);
+  async discover(id: string) {
+    const connection = await this.findById(id);
     if (!this.registry.has(connection.provider_key)) {
       throw new BadRequestException('Conector sem implementação — descoberta de recursos indisponível.');
     }
@@ -361,7 +385,6 @@ export class ConnectionsService {
       const durationMs = Date.now() - startedAt;
       await this.repository.update(id, { last_sync_at: new Date() });
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation: 'discover',
@@ -374,7 +397,6 @@ export class ConnectionsService {
     } catch (e) {
       const durationMs = Date.now() - startedAt;
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation: 'discover',
@@ -388,17 +410,16 @@ export class ConnectionsService {
   }
 
   /**
-   * Upload de midia binaria pra Meta (retorna media_id). Caminho SEPARADO do
+   * Upload de mídia binária pelo provider WhatsApp (retorna media_id/referência). Caminho separado do
    * execute() porque o binario NAO pode ir pro log de integracao (redactSensitive
    * serializaria o Buffer inteiro) — aqui logamos so metadados (mime/filename/tamanho).
-   * O provider whatsapp-meta expoe a operacao 'uploadMedia'.
+   * Os providers whatsapp-nivoo e whatsapp-waha expõem `uploadMedia`.
    */
   async uploadMedia(
-    organizationId: string,
     id: string,
-    file: { data: Buffer; mimeType: string; filename: string },
+    file: { data: Buffer; mimeType: string; filename: string; kind: 'image' | 'audio' | 'video' | 'document' },
   ): Promise<{ media_id: string }> {
-    const connection = await this.findById(organizationId, id);
+    const connection = await this.findById(id);
     if (connection.status !== 'ACTIVE') {
       throw new ConflictException('Conexão não está ativa — teste/reative antes de enviar mídia.');
     }
@@ -409,28 +430,30 @@ export class ConnectionsService {
       const result = (await provider.execute(ctx, 'uploadMedia', file)) as { media_id?: string };
       await this.repository.update(id, { last_used_at: new Date() });
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation: 'uploadMedia',
         status: IntegrationLogStatus.SUCCESS,
         durationMs: Date.now() - startedAt,
         // So metadados — nunca o binario.
-        requestMeta: { mime_type: file.mimeType, filename: file.filename, size: file.data.length },
-        responseMeta: { media_id: result?.media_id ?? null },
+        requestMeta: { kind: file.kind, mime_type: file.mimeType, filename: file.filename, size: file.data.length },
+        responseMeta: {
+          media_id: connection.provider_key === 'whatsapp-waha'
+            ? (result?.media_id ? '[base64 protegido]' : null)
+            : result?.media_id ?? null,
+        },
         traceId: getRequestStore()?.traceId ?? null,
       });
       if (!result?.media_id) throw new BadRequestException('Falha ao subir a mídia (sem media_id).');
       return { media_id: result.media_id };
     } catch (e) {
       await this.integrationLogs.record({
-        organizationId,
         connectionId: id,
         direction: IntegrationDirection.OUTBOUND,
         operation: 'uploadMedia',
         status: IntegrationLogStatus.FAILURE,
         durationMs: Date.now() - startedAt,
-        requestMeta: { mime_type: file.mimeType, filename: file.filename, size: file.data.length },
+        requestMeta: { kind: file.kind, mime_type: file.mimeType, filename: file.filename, size: file.data.length },
         error: (e as Error).message,
         traceId: getRequestStore()?.traceId ?? null,
       });
@@ -458,9 +481,6 @@ export class ConnectionsService {
       await this.secrets.updateOauth(secretId, tokens, meta);
     } else {
       const created = await this.secrets.create({
-        organizationId: connection.organization_id,
-        workspaceId: connection.workspace_id,
-        environmentId: connection.environment_id,
         name: `${connection.name} — OAuth (${connection.provider_key})`,
         kind: SecretKind.OAUTH,
         values: tokens,
@@ -481,7 +501,6 @@ export class ConnectionsService {
     });
 
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId,
       direction: IntegrationDirection.OUTBOUND,
       operation: 'oauth.callback',
@@ -493,8 +512,6 @@ export class ConnectionsService {
       action: 'integration.connection.oauth',
       entityType: 'Connection',
       entityId: connectionId,
-      organizationId: connection.organization_id,
-      workspaceId: connection.workspace_id,
       newValue: { status: 'ACTIVE', account: meta.account },
     });
     return updated;
@@ -528,14 +545,13 @@ export class ConnectionsService {
       result = { ok: false, detail: (e as Error).message };
     }
     await this.integrationLogs.record({
-      organizationId: connection.organization_id,
       connectionId: connection.id,
       direction: IntegrationDirection.OUTBOUND,
       operation: 'connect',
-      status: result.ok ? IntegrationLogStatus.SUCCESS : IntegrationLogStatus.FAILURE,
+      status: result.ok || result.pendingAuth ? IntegrationLogStatus.SUCCESS : IntegrationLogStatus.FAILURE,
       durationMs: Date.now() - startedAt,
       responseMeta: { detail: result.detail, checks: result.checks },
-      error: result.ok ? undefined : result.detail,
+      error: result.ok || result.pendingAuth ? undefined : result.detail,
       traceId: getRequestStore()?.traceId ?? null,
     });
     return this.applyHealthResult(connection, result, true);
@@ -549,7 +565,7 @@ export class ConnectionsService {
   ): Promise<Connection> {
     const data: Prisma.ConnectionUpdateInput = {
       last_health_at: new Date(),
-      last_health_ok: result.ok,
+      last_health_ok: result.pendingAuth ? null : result.ok,
       status_detail: result.detail ?? null,
     };
 
@@ -557,10 +573,14 @@ export class ConnectionsService {
     // os sobrepoe; so registra o resultado.
     const userPinned: ConnectionStatus[] = ['DISABLED', 'MAINTENANCE'];
     if (!userPinned.includes(connection.status)) {
-      const target: ConnectionStatus = result.ok ? 'ACTIVE' : 'ERROR';
+      const target: ConnectionStatus = result.pendingAuth
+        ? 'PENDING_AUTH'
+        : result.ok
+          ? 'ACTIVE'
+          : 'ERROR';
       assertConnectionTransition(connection.status, target);
       data.status = target;
-      data.is_active = result.ok;
+      data.is_active = result.ok && !result.pendingAuth;
       if (result.ok && (isFirstConnect || !connection.connected_at)) {
         data.connected_at = new Date();
       }
@@ -601,8 +621,6 @@ export class ConnectionsService {
       const kind = this.registry.get(providerKey).metadata().secretKind;
       if (kind) return kind as SecretKind;
     }
-    const catalogMeta = CATALOG_ONLY_PROVIDERS.find((m) => m.key === providerKey);
-    if (catalogMeta?.secretKind) return catalogMeta.secretKind as SecretKind;
     return SecretKind.API_KEY;
   }
 
@@ -612,5 +630,14 @@ export class ConnectionsService {
     if (Array.isArray(result)) return `array[${result.length}]`;
     if (typeof result === 'object') return `object{${Object.keys(result as object).length} chaves}`;
     return typeof result;
+  }
+
+  private withoutBinary(value: unknown): unknown {
+    if (Buffer.isBuffer(value)) return `[arquivo: ${value.length} bytes]`;
+    if (Array.isArray(value)) return value.map((item) => this.withoutBinary(item));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, this.withoutBinary(item)]));
+    }
+    return value;
   }
 }

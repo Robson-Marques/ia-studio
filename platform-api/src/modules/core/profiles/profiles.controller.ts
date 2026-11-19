@@ -1,10 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
-import { CurrentUser } from '../../../shared/auth/current-user.decorator';
-import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { ProfilesService } from './profiles.service';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -24,48 +21,40 @@ export class ProfilesController {
 
   @Get()
   @RequirePermissions(PERMISSIONS.CORE_PROFILES_READ)
-  findAll(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
-    return this.profiles.findAll(resolveOrganizationId(user, orgQuery));
+  findAll() {
+    return this.profiles.findAll();
   }
 
   @Get(':id')
   @RequirePermissions(PERMISSIONS.CORE_PROFILES_READ)
   findById(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.profiles.findById(resolveOrganizationId(user, orgQuery), id);
+    return this.profiles.findById(id);
   }
 
   @Post()
   @RequirePermissions(PERMISSIONS.CORE_PROFILES_WRITE)
   create(
-    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateProfileDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.profiles.create(resolveOrganizationId(user, orgQuery), dto);
+    return this.profiles.create(dto);
   }
 
   @Patch(':id')
   @RequirePermissions(PERMISSIONS.CORE_PROFILES_WRITE)
   update(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateProfileDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.profiles.update(resolveOrganizationId(user, orgQuery), id, dto);
+    return this.profiles.update(id, dto);
   }
 
   @Delete(':id')
   @RequirePermissions(PERMISSIONS.CORE_PROFILES_WRITE)
   inactivate(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.profiles.inactivate(resolveOrganizationId(user, orgQuery), id);
+    return this.profiles.inactivate(id);
   }
 }

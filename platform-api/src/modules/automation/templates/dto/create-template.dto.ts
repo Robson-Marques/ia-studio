@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 import { TemplateChannel } from '@prisma/client';
 
 export class CreateTemplateDto {
@@ -9,12 +9,6 @@ export class CreateTemplateDto {
 
   @IsEnum(TemplateChannel)
   channel!: TemplateChannel;
-
-  @IsUUID()
-  workspace_id!: string;
-
-  @IsUUID()
-  environment_id!: string;
 
   @IsOptional()
   @IsString()

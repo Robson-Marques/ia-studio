@@ -1,5 +1,5 @@
-// Feature Flags (diretriz 6): flag global + overrides segmentados.
-// Precedencia da avaliacao: user > profile > workspace > org > flag global.
+// Feature Flags locais da instalação + overrides por usuário/perfil.
+// Precedência da avaliação: user > profile > flag global.
 // Flag expirada (expires_at < agora) avalia como DESABILITADA.
 // Cache em memoria 30s (avaliacao em runtime nao pode custar query por request).
 import {
@@ -16,8 +16,6 @@ import { UpdateFlagDto } from './dto/update-flag.dto';
 import { CreateOverrideDto } from './dto/create-override.dto';
 
 export interface FlagContext {
-  organizationId?: string | null;
-  workspaceId?: string | null;
   userId?: string | null;
   profileId?: string | null;
 }
@@ -34,7 +32,7 @@ export class FeatureFlagsService {
     private readonly audit: AuditLogService,
   ) {}
 
-  // ─── CRUD (Console) ─────────────────────────────────
+  // ─── CRUD administrativo local ───────────────────────
   findAll() {
     return this.repository.findAll();
   }
@@ -84,15 +82,13 @@ export class FeatureFlagsService {
 
   async addOverride(flagId: string, dto: CreateOverrideDto) {
     await this.findById(flagId);
-    if (!dto.organization_id && !dto.workspace_id && !dto.user_id && !dto.profile_id) {
+    if (!dto.user_id && !dto.profile_id) {
       throw new BadRequestException(
-        'Informe pelo menos um alvo (organization_id, workspace_id, user_id ou profile_id).',
+        'Informe pelo menos um alvo local (user_id ou profile_id).',
       );
     }
     const override = await this.repository.createOverride({
       flag: { connect: { id: flagId } },
-      organization_id: dto.organization_id ?? null,
-      workspace_id: dto.workspace_id ?? null,
       user_id: dto.user_id ?? null,
       profile_id: dto.profile_id ?? null,
       enabled: dto.enabled,
@@ -146,7 +142,7 @@ export class FeatureFlagsService {
     // Flag expirada = desabilitada (inclusive overrides)
     if (flag.expires_at && flag.expires_at.getTime() <= Date.now()) return false;
 
-    // Precedencia: user > profile > workspace > org
+    // Precedência: user > profile
     const byUser = ctx.userId
       ? flag.overrides.find((o) => o.user_id === ctx.userId)
       : undefined;
@@ -156,18 +152,6 @@ export class FeatureFlagsService {
       ? flag.overrides.find((o) => o.profile_id === ctx.profileId && !o.user_id)
       : undefined;
     if (byProfile) return byProfile.enabled;
-
-    const byWorkspace = ctx.workspaceId
-      ? flag.overrides.find((o) => o.workspace_id === ctx.workspaceId && !o.user_id && !o.profile_id)
-      : undefined;
-    if (byWorkspace) return byWorkspace.enabled;
-
-    const byOrg = ctx.organizationId
-      ? flag.overrides.find(
-          (o) => o.organization_id === ctx.organizationId && !o.user_id && !o.profile_id && !o.workspace_id,
-        )
-      : undefined;
-    if (byOrg) return byOrg.enabled;
 
     return flag.enabled;
   }

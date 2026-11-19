@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { listWorkflows, archiveWorkflow, deleteWorkflow } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { EXECUTION_STATUS, formatDateTime } from './automation.constants';
 import { statusToTone } from '../../lib/tone';
 import WorkflowStatusBadge from './WorkflowStatusBadge';
@@ -25,7 +24,6 @@ export default function Fluxos() {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState(null); // { kind: 'archive'|'delete', ids, clear }
@@ -43,7 +41,7 @@ export default function Fluxos() {
   async function load() {
     setLoading(true);
     try {
-      const { items: list } = await listWorkflows({ environment_id: environmentId || undefined });
+      const { items: list } = await listWorkflows();
       setItems(list);
     } catch (err) {
       toast.error(err.message);
@@ -52,7 +50,7 @@ export default function Fluxos() {
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleConfirm() {
     setBusy(true);
@@ -178,7 +176,7 @@ export default function Fluxos() {
         filterActive={!!q.trim()}
         emptyNew={{
           icon: 'settings',
-          title: 'Nenhum fluxo neste ambiente',
+          title: 'Nenhum fluxo nesta instalação',
           description: 'Um fluxo tem um gatilho (o que o dispara) e uma sequência de passos. Crie um e monte os passos no editor.',
           action: acoesCabecalho,
         }}

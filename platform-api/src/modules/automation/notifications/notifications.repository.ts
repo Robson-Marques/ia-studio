@@ -13,11 +13,10 @@ export class NotificationsRepository {
     return this.prisma.automationNotification.create({ data });
   }
 
-  /** Notificacoes do usuario: direcionadas a ele OU broadcast da org. */
-  findInbox(organizationId: string, userId: string, onlyUnread = false, take = 20) {
+  /** Notificações do usuário: direcionadas a ele ou broadcast da instância. */
+  findInbox(userId: string, onlyUnread = false, take = 20) {
     return this.prisma.automationNotification.findMany({
       where: {
-        organization_id: organizationId,
         OR: [{ user_id: userId }, { user_id: null }],
         ...(onlyUnread ? { read_at: null } : {}),
       },
@@ -26,10 +25,9 @@ export class NotificationsRepository {
     });
   }
 
-  countUnread(organizationId: string, userId: string) {
+  countUnread(userId: string) {
     return this.prisma.automationNotification.count({
       where: {
-        organization_id: organizationId,
         OR: [{ user_id: userId }, { user_id: null }],
         read_at: null,
       },
@@ -44,10 +42,9 @@ export class NotificationsRepository {
     return this.prisma.automationNotification.update({ where: { id }, data: { read_at: new Date() } });
   }
 
-  markAllRead(organizationId: string, userId: string) {
+  markAllRead(userId: string) {
     return this.prisma.automationNotification.updateMany({
       where: {
-        organization_id: organizationId,
         OR: [{ user_id: userId }, { user_id: null }],
         read_at: null,
       },
@@ -61,11 +58,10 @@ export class NotificationsRepository {
     return this.prisma.automationNotificationLog.create({ data });
   }
 
-  findLog(organizationId: string, take = 50, skip = 0) {
+  findLog(take = 50, skip = 0) {
     return this.prisma.$transaction([
-      this.prisma.automationNotificationLog.count({ where: { organization_id: organizationId } }),
+      this.prisma.automationNotificationLog.count(),
       this.prisma.automationNotificationLog.findMany({
-        where: { organization_id: organizationId },
         orderBy: { created_at: 'desc' },
         take,
         skip,

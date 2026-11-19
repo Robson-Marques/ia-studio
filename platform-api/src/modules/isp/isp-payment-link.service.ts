@@ -1,5 +1,5 @@
 // Link público de pagamento (frente 5). Cria o token com SNAPSHOT dos boletos e
-// TTL (janela de tempo), e resolve a rota pública sem login. A org sai do próprio
+// TTL (janela de tempo), e resolve a rota pública sem login. A instalação sai do próprio
 // token. Porte do PortalAccessToken do Aquapark — SEM sessão JWT: a página só
 // mostra a 2ª via e o link morre no vencimento.
 import { GoneException, Injectable, Logger } from '@nestjs/common';
@@ -14,9 +14,6 @@ import {
 } from './isp.constants';
 
 export interface CreatePaymentLinkArgs {
-  organizationId: string;
-  workspaceId?: string | null;
-  environmentId?: string | null;
   connectionId: string;
   customerRef?: string | null;
   customerName?: string | null;
@@ -42,16 +39,16 @@ export class IspPaymentLinkService {
   ) {}
 
   /** TTL do link em horas (1..168). Ausente/ inválido → default. */
-  async getTtlHoras(organizationId: string): Promise<number> {
-    const raw = await this.settings.getValue(organizationId, ISP_PAGAMENTO_TTL_SETTING_KEY);
+  async getTtlHoras(): Promise<number> {
+    const raw = await this.settings.getValue(ISP_PAGAMENTO_TTL_SETTING_KEY);
     if (typeof raw !== 'string' || !raw.trim()) return ISP_PAGAMENTO_TTL_DEFAULT;
     const n = Number.parseInt(raw, 10);
     return Number.isFinite(n) && n > 0 && n <= 168 ? n : ISP_PAGAMENTO_TTL_DEFAULT;
   }
 
   /** URL pública base (sem barra final). Null = não configurada. */
-  async getBaseUrl(organizationId: string): Promise<string | null> {
-    const raw = await this.settings.getValue(organizationId, ISP_PAGAMENTO_BASE_URL_SETTING_KEY);
+  async getBaseUrl(): Promise<string | null> {
+    const raw = await this.settings.getValue(ISP_PAGAMENTO_BASE_URL_SETTING_KEY);
     return typeof raw === 'string' && raw.trim() ? raw.trim().replace(/\/$/, '') : null;
   }
 
@@ -63,20 +60,17 @@ export class IspPaymentLinkService {
   async createLink(
     args: CreatePaymentLinkArgs,
   ): Promise<{ url: string; token: string; expires_at: string } | { error: string }> {
-    const baseUrl = await this.getBaseUrl(args.organizationId);
+    const baseUrl = await this.getBaseUrl();
     if (!baseUrl) {
       return { error: 'A URL pública do link de pagamento ainda não foi configurada em ISP → Abertura de chamado.' };
     }
     if (!args.boletos.length) {
       return { error: 'Não há boletos em aberto para gerar um link de pagamento.' };
     }
-    const ttl = await this.getTtlHoras(args.organizationId);
+    const ttl = await this.getTtlHoras();
     const token = randomBytes(24).toString('hex'); // 48 chars — inguessável
     const expiresAt = new Date(Date.now() + ttl * 60 * 60 * 1000);
     await this.repo.create({
-      organizationId: args.organizationId,
-      workspaceId: args.workspaceId ?? null,
-      environmentId: args.environmentId ?? null,
       connectionId: args.connectionId,
       token,
       customerRef: args.customerRef ?? null,

@@ -30,17 +30,16 @@ modules/automation/
 ## Fluxo de execução (diretriz 33 — a API enfileira, o worker executa)
 
 1. Gatilho (manual/evento/agendamento/webhook) → `WorkflowsService.startExecution`
-   cria `automation_executions` (QUEUED, dedup por `source_event_id`), registra
-   consumo `executions` (limite `executions_month`) e enfileira em
-   `automation-executions` (jobId = execution.id).
+   cria `automation_executions` (QUEUED, dedup por `source_event_id`) e
+   enfileira em `automation-executions` (jobId = execution.id).
 2. Processor chama `WorkflowEngineService.run`: percorre o grafo, interpola
    variáveis, executa cada nó via NodeRegistry, grava `automation_execution_logs`
    por nó. `DELAY` > 30s pausa e re-agenda a continuação via broker (estado no
    job, nada em memória). Cancelamento é cooperativo (checado entre nós).
 3. Evento publicado no bus (`EventBusService.publish`): persiste (dedup) →
    EventEmitter2 (assinantes síncronos, compat Fase 3) → fila `automation-events`
-   → dispatcher casa com fluxos PUBLICADOS de gatilho `event` no MESMO
-   workspace/ambiente.
+   → dispatcher casa com fluxos PUBLICADOS de gatilho `event` da própria
+   instalação.
 
 ## Worker vs inline (fallback dev)
 

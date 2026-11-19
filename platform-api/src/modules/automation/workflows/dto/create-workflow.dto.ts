@@ -1,4 +1,4 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateWorkflowDto {
   @IsString()
@@ -10,12 +10,6 @@ export class CreateWorkflowDto {
   @IsString()
   @MaxLength(500)
   description?: string;
-
-  @IsUUID()
-  workspace_id!: string;
-
-  @IsUUID()
-  environment_id!: string;
 
   @IsOptional()
   @IsArray()

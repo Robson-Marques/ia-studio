@@ -9,25 +9,36 @@
 set -euo pipefail
 
 DUMP="${1:?uso: restore-backup.sh <arquivo.sql|.sql.gz>}"
-APP_DIR="/opt/iastudio"
-API_DIR="$APP_DIR/platform-api"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+API_DIR="$APP_DIR/platform-api"
 
 [ -f "$DUMP" ] || { echo "Dump nao encontrado: $DUMP"; exit 1; }
 set -a; . "$API_DIR/.env"; set +a
+: "${IASTUDIO_APP_ID:?IASTUDIO_APP_ID ausente no .env da aplicação}"
+: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da aplicação}"
+: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da aplicação}"
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib/instance.sh"
+set_application "$IASTUDIO_APP_ID"
+[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || { echo 'Configuração não pertence ao diretório da aplicação.' >&2; exit 1; }
+acquire_application_lock
 
 echo "[restore-backup] Parando PM2..."
-pm2 stop iastudio-api iastudio-worker >/dev/null 2>&1 || true
+pm2 stop "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
 
-echo "[restore-backup] Recriando schema e restaurando o dump..."
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;"
+echo "[restore-backup] Garantindo pgvector e restaurando o dump..."
+# A extensão do cluster é criada por postgres, não pelo role da aplicação.
+# Não derrube public aqui: dumps novos usam --clean --if-exists e preservam as
+# extensões; apagar o schema antes do load deixa a aplicação sem banco se o
+# restore falhar.
+su -s /bin/sh postgres -c "psql -v ON_ERROR_STOP=1 -d '$IASTUDIO_DB_NAME' -c 'CREATE EXTENSION IF NOT EXISTS vector;'"
 case "$DUMP" in
-  *.gz) gunzip -c "$DUMP" | psql "$DATABASE_URL" -v ON_ERROR_STOP=1 ;;
-  *)    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$DUMP" ;;
+  *.gz) gunzip -c "$DUMP" | psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 ;;
+  *)    psql "$(db_url_for_psql)" -v ON_ERROR_STOP=1 -f "$DUMP" ;;
 esac
 
 echo "[restore-backup] Subindo PM2..."
 cd "$API_DIR"
-pm2 reload "$SCRIPT_DIR/ecosystem.config.js" || pm2 restart iastudio-api iastudio-worker
+pm2 reload "$SCRIPT_DIR/ecosystem.config.js" || pm2 restart "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER"
 echo "[restore-backup] Concluido."

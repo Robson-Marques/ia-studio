@@ -1,7 +1,6 @@
 // Constantes da solucao ISP (Fase 6). Nenhuma dependencia de segmento no core:
 // tudo que e ISP mora neste modulo, nos providers de ERP e nas tools ISP.
 
-export const ALTAREDE_PROVIDER_KEY = 'altarede';
 export const IXC_PROVIDER_KEY = 'ixc';
 
 /**
@@ -56,17 +55,14 @@ export const ISP_PLANTAO_COOLDOWN_SETTING_KEY = 'isp.incidente.cooldown_min';
 export const ISP_PLANTAO_COOLDOWN_DEFAULT = 60;
 
 /**
- * ERPs de provedor suportados. Todos implementam o MESMO contrato canonico de
- * operacoes (`cliente.dados`, `financeiro.*`, `os.cadastrar`,
- * `conectividade.listar_com_status`...), traduzido internamente por cada
- * provider. As tools do agente nunca sabem qual ERP esta do outro lado.
- * Ordem = preferencia em empate (a prioridade da Connection decide antes).
+ * ERP de provedor embarcado nesta vertente. O contrato canônico permanece no
+ * módulo ISP para que cada tool dependa de operações, não de HTTP ou de IDs.
+ * As tools do agente nunca recebem a Connection nem o provider.
  */
-export const ISP_ERP_PROVIDER_KEYS: readonly string[] = [ALTAREDE_PROVIDER_KEY, IXC_PROVIDER_KEY];
+export const ISP_ERP_PROVIDER_KEYS: readonly string[] = [IXC_PROVIDER_KEY];
 
 /**
- * Chaves de filtro de conectividade (nomeadas a partir do Altarede; cada provider
- * traduz o que tem equivalente e ignora o resto — ver `ixc.helpers.ts`).
+ * Chaves de filtro de conectividade suportadas pelo IXC (ver `ixc.helpers.ts`).
  *
  * Um incidente de rede e um evento de TOPOLOGIA, nao de geografia: `cidade` e
  * `bairro` sao proxies ruins (vizinhos de rua podem estar em PONs diferentes).

@@ -1,6 +1,6 @@
 // Modulo System (Fase 8): Atualizacao (upgrade.sh), Backup/Restauracao
 // (backup-full.sh / restore-full.sh) e leitura de versao (CHANGELOG + git tags).
-// Infra global da instancia — rotas exclusivas do Console (@PlatformAdminOnly).
+// Infra global da instancia — rotas exclusivas do administrador local.
 import { Module } from '@nestjs/common';
 import { SystemController } from './system.controller';
 import { SystemRepository } from './system.repository';

@@ -9,7 +9,7 @@ import AudioPlayer from '../AudioPlayer';
 // envio. Aqui responde uma pergunta: "como o atendente escolhe e confere um
 // arquivo antes de mandar?".
 
-/** Tipo que a Meta espera, a partir do mime do arquivo. */
+/** Tipo normalizado do canal, a partir do MIME do arquivo. */
 export function kindFromMime(mime = '') {
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('audio/')) return 'audio';

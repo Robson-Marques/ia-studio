@@ -12,12 +12,7 @@ import { AiMcpServer, McpTransport, Prisma } from '@prisma/client';
 import { McpRepository } from './mcp.repository';
 import { SecretsService } from '../../integration/secrets/secrets.service';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { httpRequest } from '../../../shared/integration/http.util';
-import {
-  assertSameOrg,
-  validateWorkspaceScope,
-} from '../../../shared/auth/tenant.util';
 import { CreateMcpServerDto, UpdateMcpServerDto } from './dto/mcp.dtos';
 
 /** Tool descoberta no servidor MCP (forma minima persistida no cache). */
@@ -58,59 +53,48 @@ export class McpClientService {
     private readonly repository: McpRepository,
     private readonly secrets: SecretsService,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // ─── Leitura ────────────────────────────────────────
 
-  list(organizationId: string, filters: { workspaceId?: string; environmentId?: string }) {
-    return this.repository.findAll(organizationId, filters);
+  list() {
+    return this.repository.findAll();
   }
 
-  async getServer(organizationId: string, id: string): Promise<AiMcpServer> {
+  async getServer(id: string): Promise<AiMcpServer> {
     const server = await this.repository.findById(id);
     if (!server) throw new NotFoundException('Servidor MCP não encontrado.');
-    assertSameOrg(server.organization_id, organizationId);
     return server;
   }
 
   // ─── Escrita ────────────────────────────────────────
 
   async create(
-    organizationId: string,
     dto: CreateMcpServerDto,
     createdBy: string | null,
   ): Promise<AiMcpServer> {
-    await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
-
     // Nasce OFF (is_active default false) — nao forcamos ativacao (diretriz de flags).
     const server = await this.repository.create({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       name: dto.name,
       transport: dto.transport,
       endpoint: dto.endpoint,
       secret_id: dto.secret_id,
       created_by: createdBy,
-    });
+    } as Prisma.AiMcpServerUncheckedCreateInput);
     await this.audit.record({
       action: 'ai.mcp.create',
       entityType: 'AiMcpServer',
       entityId: server.id,
-      organizationId,
-      workspaceId: dto.workspace_id,
       newValue: {
         name: server.name,
         transport: server.transport,
-        environment_id: server.environment_id,
       },
     });
     return server;
   }
 
-  async update(organizationId: string, id: string, dto: UpdateMcpServerDto): Promise<AiMcpServer> {
-    const before = await this.getServer(organizationId, id);
+  async update(id: string, dto: UpdateMcpServerDto): Promise<AiMcpServer> {
+    const before = await this.getServer(id);
     const server = await this.repository.update(id, {
       name: dto.name ?? undefined,
       endpoint: dto.endpoint ?? undefined,
@@ -121,7 +105,6 @@ export class McpClientService {
       action: 'ai.mcp.update',
       entityType: 'AiMcpServer',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name, endpoint: before.endpoint, is_active: before.is_active },
       newValue: { name: server.name, endpoint: server.endpoint, is_active: server.is_active },
     });
@@ -136,8 +119,8 @@ export class McpClientService {
    * - HTTP/SSE: POST JSON-RPC 2.0 method "tools/list" ao endpoint.
    * Falha de rede NAO derruba: retorna detail com o erro e discovered 0 (sem gravar).
    */
-  async sync(organizationId: string, id: string): Promise<SyncResult> {
-    const server = await this.getServer(organizationId, id);
+  async sync(id: string): Promise<SyncResult> {
+    const server = await this.getServer(id);
 
     if (server.transport === McpTransport.STDIO) {
       return {
@@ -202,7 +185,6 @@ export class McpClientService {
       action: 'ai.mcp.sync',
       entityType: 'AiMcpServer',
       entityId: id,
-      organizationId,
       newValue: { discovered: discovered.length },
     });
 
@@ -215,10 +197,9 @@ export class McpClientService {
 
   /** Le o cache discovered_tools do servidor e normaliza (vazio se null). */
   async discoveredTools(
-    organizationId: string,
     id: string,
   ): Promise<Array<{ name: string; description: string }>> {
-    const server = await this.getServer(organizationId, id);
+    const server = await this.getServer(id);
     if (!server.discovered_tools) return [];
     const cached = server.discovered_tools as unknown as DiscoveredTool[];
     if (!Array.isArray(cached)) return [];

@@ -5,7 +5,7 @@
 // Nota de arquitetura: este service E a porta unica de escrita na tabela
 // core_audit_logs (papel de repository da infra de auditoria).
 import { Injectable, Logger } from '@nestjs/common';
-import { AuditActorType, AuditStatus, Prisma } from '@prisma/client';
+import { AuditStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getRequestStore } from './request-context';
 
@@ -15,8 +15,6 @@ export interface AuditRecordInput {
   action: string;
   entityType: string;
   entityId?: string;
-  organizationId?: string | null;
-  workspaceId?: string | null;
   oldValue?: unknown;
   newValue?: unknown;
   params?: unknown;
@@ -54,20 +52,10 @@ export class AuditLogService {
     try {
       const store = getRequestStore();
       const actor = store?.actor;
-      const actorType: AuditActorType =
-        actor?.actorType === 'platform'
-          ? AuditActorType.PLATFORM
-          : actor?.id
-            ? AuditActorType.ORG
-            : AuditActorType.SYSTEM;
-
       await this.prisma.auditLog.create({
         data: {
-          organization_id: input.organizationId ?? actor?.organizationId ?? null,
-          workspace_id: input.workspaceId ?? store?.workspaceId ?? null,
           actor_id: actor?.id ?? null,
           actor_email: actor?.email ?? null,
-          actor_type: actorType,
           action: input.action,
           entity_type: input.entityType,
           entity_id: input.entityId ?? null,

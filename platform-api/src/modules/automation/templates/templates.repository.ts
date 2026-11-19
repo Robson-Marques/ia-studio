@@ -7,13 +7,8 @@ import { PrismaService } from '../../../shared/prisma/prisma.service';
 export class TemplatesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(
-    organizationId: string,
-    filters: { workspaceId?: string; environmentId?: string; channel?: TemplateChannel } = {},
-  ) {
-    const where: Prisma.AutomationTemplateWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
+  findAll(filters: { channel?: TemplateChannel } = {}) {
+    const where: Prisma.AutomationTemplateWhereInput = {};
     if (filters.channel) where.channel = filters.channel;
     return this.prisma.automationTemplate.findMany({ where, orderBy: { updated_at: 'desc' } });
   }

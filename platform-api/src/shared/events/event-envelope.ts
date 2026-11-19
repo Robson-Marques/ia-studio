@@ -4,9 +4,6 @@
 export interface EventEnvelope<T = Record<string, unknown>> {
   /** Nome canonico: 'whatsapp.inbound.message', 'connection.token_expired'... */
   event: string;
-  organization_id: string;
-  workspace_id?: string | null;
-  environment_id?: string | null;
   /** Correlacao ponta-a-ponta (workflow → no → provider → mensagem). */
   trace_id: string;
   /** Idempotencia: dedup no bus e jobId no broker. */

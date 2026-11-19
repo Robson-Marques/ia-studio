@@ -26,8 +26,8 @@ export class EventLogRepository {
     return this.prisma.automationEventLog.findUnique({ where: { source_event_id: sourceEventId } });
   }
 
-  findAllByOrg(organizationId: string, filters: EventLogFilters = {}, take = 50, skip = 0) {
-    const where: Prisma.AutomationEventLogWhereInput = { organization_id: organizationId };
+  findAll(filters: EventLogFilters = {}, take = 50, skip = 0) {
+    const where: Prisma.AutomationEventLogWhereInput = {};
     if (filters.event) where.event = filters.event;
     if (filters.traceId) where.trace_id = filters.traceId;
     if (filters.from || filters.to) {

@@ -1,15 +1,13 @@
-// Porta unica ao banco do modulo users (+ memberships).
+// Porta única ao banco de usuários da instalação dedicada.
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 const USER_SAFE_SELECT = {
   id: true,
-  organization_id: true,
   name: true,
   email: true,
   whatsapp_phone: true,
-  is_platform_admin: true,
   profile_id: true,
   is_active: true,
   last_login_at: true,
@@ -23,10 +21,9 @@ const USER_SAFE_SELECT = {
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string, includeDeleted = false) {
+  findAll(includeDeleted = false) {
     return this.prisma.user.findMany({
       where: {
-        organization_id: organizationId,
         ...(includeDeleted ? {} : { deleted_at: null }),
       },
       select: USER_SAFE_SELECT,
@@ -39,15 +36,6 @@ export class UsersRepository {
       where: { id },
       select: {
         ...USER_SAFE_SELECT,
-        memberships: {
-          select: {
-            id: true,
-            workspace_id: true,
-            profile_id: true,
-            workspace: { select: { id: true, name: true, slug: true } },
-            profile: { select: { id: true, name: true } },
-          },
-        },
       },
     });
   }
@@ -56,9 +44,9 @@ export class UsersRepository {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
-  countActive(organizationId: string) {
+  countActive() {
     return this.prisma.user.count({
-      where: { organization_id: organizationId, deleted_at: null, is_active: true },
+      where: { deleted_at: null, is_active: true },
     });
   }
 
@@ -70,19 +58,4 @@ export class UsersRepository {
     return this.prisma.user.update({ where: { id }, data, select: USER_SAFE_SELECT });
   }
 
-  // ─── Memberships ────────────────────────────────────
-  upsertMembership(workspaceId: string, userId: string, profileId: string | null) {
-    return this.prisma.workspaceMember.upsert({
-      where: { workspace_id_user_id: { workspace_id: workspaceId, user_id: userId } },
-      create: { workspace_id: workspaceId, user_id: userId, profile_id: profileId },
-      update: { profile_id: profileId },
-      include: { workspace: { select: { id: true, name: true, slug: true } } },
-    });
-  }
-
-  removeMembership(workspaceId: string, userId: string) {
-    return this.prisma.workspaceMember.deleteMany({
-      where: { workspace_id: workspaceId, user_id: userId },
-    });
-  }
 }

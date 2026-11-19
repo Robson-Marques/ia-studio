@@ -1,10 +1,18 @@
-# ARCHITECTURE_LOCK.md — Congelamento da Arquitetura V1
+# ARCHITECTURE_LOCK.md — Registro histórico do congelamento SaaS V1
 
-**Data do congelamento:** 02/07/2026 · **Status: CONGELADA** · Autoridade: Robson (product owner)
+**Data do congelamento:** 02/07/2026 · **Status: arquivada e substituída pela arquitetura dedicada** · Autoridade: Robson (product owner)
 
-## Declaração
+> Este arquivo preserva somente a fotografia do estado SaaS recuperado. A
+> arquitetura oficial vigente é a dedicada, definida em
+> `docs/diretrizes-arquiteturais.md`, decidida em
+> `docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md` e aceita em
+> `docs/capabilities/saas-to-dedicated-installation.md`. Nada abaixo autoriza
+> ampliar, preservar ou recriar contratos SaaS.
 
-A arquitetura oficial da V1 do **IA Studio** é composta por, e somente por:
+## Registro histórico: declaração SaaS substituída
+
+Na data do congelamento, a arquitetura SaaS proposta para a V1 do **IA Studio**
+era composta por, e somente por:
 
 | # | Bloco | Escopo resumido |
 |---|---|---|
@@ -18,11 +26,14 @@ A arquitetura oficial da V1 do **IA Studio** é composta por, e somente por:
 | 8 | **Console** | Painel administrativo da operação SaaS (tenants, planos, licenças, flags globais, consumo, marketplace, atualizações) — isolado do painel do cliente |
 | 9 | **IA Studio (módulo Studio)** | Camada visual: editor de fluxos/agentes, publicação, testes, versionamento — execução sempre na Automation Platform |
 
-Documentos vinculados ao congelamento: `CLAUDE.md`, `docs/plano-de-execucao.md`, `docs/diretrizes-arquiteturais.md` (58 diretrizes, blocos 1–4), `docs/deploy-e-versionamento.md`, `RELATORIO-ANALISE-E-ARQUITETURA.md`.
+Documentos vinculados ao congelamento: `CLAUDE.md`, `docs/plano-de-execucao.md`, `docs/diretrizes-arquiteturais.md` (58 diretrizes, blocos 1–4) e `docs/deploy-e-versionamento.md`.
 
 ## Princípio reitor (parte do lock)
 
-> A plataforma é totalmente genérica e orientada a integrações. A primeira solução oficial será para provedores (ISP) com o Altarede como primeiro Provider ERP. Nenhuma decisão arquitetural pode depender de segmento específico; funcionalidade de negócio entra via Providers, Tools, Resource Extensions e Templates.
+> Registro histórico: a plataforma é orientada a integrações. A solução ISP
+> atualmente embarcada usa o IXC; nenhuma decisão arquitetural pode depender de
+> segmento específico, e funcionalidade de negócio entra via Providers, Tools e
+> Templates.
 
 ## Regra de mudança a partir de agora
 

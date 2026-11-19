@@ -9,18 +9,24 @@ Leia sempre antes de qualquer pedido:
 - [`STUDIO-WORKFLOW\README.md`](../../../STUDIO-WORKFLOW/README.md) — porta de entrada.
 - [`STUDIO-WORKFLOW\framework.md`](../../../STUDIO-WORKFLOW/framework.md) — especificação normativa do paradigma (schema YAML, tipos, `extends`/`uses`, SemVer por ativo, ciclo de vida, template do ativo).
 - [`STUDIO-WORKFLOW\prompt-alinhamento.md`](../../../STUDIO-WORKFLOW/prompt-alinhamento.md) — `workflow.prompt-alignment@2.0.0`. Bloco a colar + formato do relatório.
-- [`STUDIO-WORKFLOW\shared\system-change-base.md`](../../../STUDIO-WORKFLOW/shared/system-change-base.md) — `workflow.system-change-base@1.0.0`. **Capability base** que toda especialidade local herda via `extends`.
+- [`STUDIO-WORKFLOW\shared\system-change-base.md`](../../../STUDIO-WORKFLOW/shared/system-change-base.md) — `workflow.system-change-base@1.1.0`. **Capability base** que toda especialidade local herda via `extends` direto ou derivado.
 - [`STUDIO-WORKFLOW\architecture-review.md`](../../../STUDIO-WORKFLOW/architecture-review.md) — ADR do paradigma.
 - [`STUDIO-WORKFLOW\COMO-INTERAGIR-COM-ROBSON.md`](../../../STUDIO-WORKFLOW/COMO-INTERAGIR-COM-ROBSON.md) — regras de comportamento com o Robson.
 
 ## Específico do IA Studio (fica aqui)
 
-**Ainda não existe** catálogo local nem especialidades. Enquanto as frentes puderem ser resolvidas com o alinhador genérico do STUDIO-WORKFLOW respondendo `especialidade não catalogada`, não há motivo para criar.
+O catálogo local existe em
+[`catalogo-especialidades.md`](catalogo-especialidades.md). Ele define as
+especialidades liberadas para o IA Studio e aponta para seus contratos em
+`especialidades/`. O alinhador deve escolher uma delas pela missão e fronteira
+técnica; quando não houver cobertura, responde `especialidade não catalogada`,
+registra a lacuna e aguarda a criação aprovada.
 
-Quando uma responsabilidade se repetir o suficiente para justificar (checklist em `STUDIO-WORKFLOW\framework.md` §7 "Versionamento e ciclo de vida" + §10 "Checklist de liberação"), criar aqui:
-
-- `catalogo-especialidades.md` — `kind: shared`, id `ia-studio.specialty-catalog`, lista das especialidades do projeto (namespace `ia-studio.*`; domínio: plataforma de assistentes IA — assistants, knowledge base, tools, memory, workflows, automações).
-- `especialidades/<slug>.md` — uma por especialidade, `kind: task`, com `extends: workflow.system-change-base@1.0.0` no front matter.
+Uma nova especialidade só é criada quando a responsabilidade se repetir e não
+for coberta pelo catálogo, seguindo o checklist de
+`STUDIO-WORKFLOW\framework.md` §7 e §10. O ativo usa o namespace
+`ia-studio.*`, `kind: task` e herda `workflow.system-change-base` na versão
+vigente declarada pelo próprio contrato.
 
 ## Não confunda
 

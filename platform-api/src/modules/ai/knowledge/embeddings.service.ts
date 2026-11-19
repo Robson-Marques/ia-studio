@@ -54,13 +54,8 @@ export class EmbeddingsService implements OnApplicationBootstrap {
   async embed(base: AiKnowledgeBase, input: string[]): Promise<number[][]> {
     if (input.length === 0) return [];
     const connectionId = base.embedding_connection_id
-      ?? (await this.orchestrator.resolve({
-        organizationId: base.organization_id,
-        workspaceId: base.workspace_id,
-        environmentId: base.environment_id,
-      }, base.embedding_model)).connection.id;
+      ?? (await this.orchestrator.resolve(base.embedding_model)).connection.id;
     const { result } = await this.llm.embedViaConnection(
-      base.organization_id,
       connectionId,
       base.embedding_model,
       input,

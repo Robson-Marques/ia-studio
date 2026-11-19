@@ -1,11 +1,9 @@
 // Porta unica ao banco do Storage Manager (integration_storage_files).
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface CreateStorageFileRow {
-  organizationId: string;
-  workspaceId?: string | null;
-  environmentId?: string | null;
   driver: string;
   bucket?: string | null;
   path: string;
@@ -19,12 +17,9 @@ export interface CreateStorageFileRow {
 export class StorageRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string, workspaceId?: string) {
+  findAll() {
     return this.prisma.storageFile.findMany({
-      where: {
-        organization_id: organizationId,
-        ...(workspaceId ? { workspace_id: workspaceId } : {}),
-      },
+      where: {},
       orderBy: { created_at: 'desc' },
       take: 200,
     });
@@ -37,9 +32,6 @@ export class StorageRepository {
   create(row: CreateStorageFileRow) {
     return this.prisma.storageFile.create({
       data: {
-        organization_id: row.organizationId,
-        workspace_id: row.workspaceId ?? null,
-        environment_id: row.environmentId ?? null,
         driver: row.driver,
         bucket: row.bucket ?? null,
         path: row.path,
@@ -47,7 +39,7 @@ export class StorageRepository {
         mime: row.mime,
         size_bytes: row.sizeBytes,
         created_by: row.createdBy ?? null,
-      },
+      } as Prisma.StorageFileUncheckedCreateInput,
     });
   }
 

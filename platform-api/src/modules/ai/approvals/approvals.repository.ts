@@ -4,10 +4,6 @@ import { Injectable } from '@nestjs/common';
 import { AiApprovalStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
-export interface ApprovalPolicyFilters {
-  workspaceId?: string;
-}
-
 export interface ApprovalFilters {
   status?: AiApprovalStatus;
 }
@@ -18,11 +14,9 @@ export class ApprovalsRepository {
 
   // ─── Politicas ──────────────────────────────────────
 
-  findPolicies(organizationId: string, filters: ApprovalPolicyFilters = {}) {
-    const where: Prisma.AiApprovalPolicyWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
+  findPolicies() {
     return this.prisma.aiApprovalPolicy.findMany({
-      where,
+      where: {},
       orderBy: { created_at: 'desc' },
     });
   }
@@ -32,9 +26,9 @@ export class ApprovalsRepository {
   }
 
   /** So politicas ativas — base da avaliacao do ApprovalPolicyService. */
-  findActivePolicies(organizationId: string) {
+  findActivePolicies() {
     return this.prisma.aiApprovalPolicy.findMany({
-      where: { organization_id: organizationId, is_active: true },
+      where: { is_active: true },
       orderBy: { created_at: 'asc' },
     });
   }
@@ -49,8 +43,8 @@ export class ApprovalsRepository {
 
   // ─── Aprovacoes de acao ─────────────────────────────
 
-  findApprovals(organizationId: string, filters: ApprovalFilters = {}) {
-    const where: Prisma.AiActionApprovalWhereInput = { organization_id: organizationId };
+  findApprovals(filters: ApprovalFilters = {}) {
+    const where: Prisma.AiActionApprovalWhereInput = {};
     if (filters.status) where.status = filters.status;
     return this.prisma.aiActionApproval.findMany({
       where,

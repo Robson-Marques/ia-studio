@@ -40,11 +40,4 @@ export class OrchestratorSendDto {
   @IsObject()
   message!: Record<string, unknown>;
 
-  @IsOptional()
-  @IsUUID()
-  workspace_id?: string;
-
-  @IsOptional()
-  @IsUUID()
-  environment_id?: string;
 }

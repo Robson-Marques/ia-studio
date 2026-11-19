@@ -8,7 +8,6 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { PermissionsGuard } from './permissions.guard';
-import { PlatformAdminGuard } from './platform-admin.guard';
 import { getJwtSecret, JWT_EXPIRES_IN } from './jwt.config';
 
 @Global()
@@ -22,7 +21,7 @@ import { getJwtSecret, JWT_EXPIRES_IN } from './jwt.config';
       }),
     }),
   ],
-  providers: [JwtStrategy, JwtAuthGuard, PermissionsGuard, PlatformAdminGuard],
-  exports: [JwtModule, JwtAuthGuard, PermissionsGuard, PlatformAdminGuard],
+  providers: [JwtStrategy, JwtAuthGuard, PermissionsGuard],
+  exports: [JwtModule, JwtAuthGuard, PermissionsGuard],
 })
 export class AuthModule {}

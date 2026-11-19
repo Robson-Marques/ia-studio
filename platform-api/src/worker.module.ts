@@ -12,7 +12,6 @@ import { AuthModule } from './shared/auth/auth.module';
 import { AuditModule } from './shared/audit/audit.module';
 import { BrokerModule } from './shared/broker/broker.module';
 import { EventsModule } from './shared/events/events.module';
-import { LicensingModule } from './modules/licensing/licensing.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { CommModule } from './modules/comm/comm.module';
 import { AutomationModule } from './modules/automation/automation.module';
@@ -32,7 +31,6 @@ import { IspModule } from './modules/isp/isp.module';
     AuditModule,
     BrokerModule,
     EventsModule,
-    LicensingModule,
     IntegrationModule,
     CommModule,
     AutomationModule,

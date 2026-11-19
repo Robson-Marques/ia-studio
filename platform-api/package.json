@@ -1,9 +1,10 @@
 {
   "name": "platform-api",
   "version": "0.1.0",
-  "description": "IA Studio — API da plataforma SaaS multi-tenant (monolito modular NestJS + Fastify + Prisma)",
+  "description": "IA Studio — API de uma instalação dedicada (monólito modular NestJS + Fastify + Prisma)",
   "private": true,
   "scripts": {
+    "postinstall": "node ../scripts/waha-container.js --optional --install-docker",
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
@@ -25,7 +26,6 @@
     "@fastify/multipart": "^8.3.0",
     "@fastify/static": "^7.0.0",
     "@prisma/client": "^5.0.0",
-    "@whiskeysockets/baileys": "^7.0.0-rc14",
     "bullmq": "^5.8.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
@@ -36,7 +36,6 @@
     "passport": "^0.6.0",
     "passport-jwt": "^4.0.0",
     "pdf-lib": "^1.17.1",
-    "qrcode": "^1.5.4",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
     "uuid": "^9.0.0"
@@ -47,7 +46,6 @@
     "@types/node": "^20.0.0",
     "@types/nodemailer": "^6.4.15",
     "@types/passport-jwt": "^4.0.0",
-    "@types/qrcode": "^1.5.5",
     "@types/uuid": "^9.0.0",
     "prisma": "^5.0.0",
     "ts-node": "^10.9.0",

@@ -10,30 +10,30 @@ export class SettingsService {
     private readonly audit: AuditLogService,
   ) {}
 
-  findAll(orgId: string) {
-    return this.repository.findAllByOrg(orgId);
+  findAll() {
+    return this.repository.findAll();
   }
 
-  async findByKey(orgId: string, key: string) {
-    const setting = await this.repository.findByKey(orgId, key);
+  async findByKey(key: string) {
+    const setting = await this.repository.findByKey(key);
     if (!setting) throw new NotFoundException('Configuração não encontrada.');
     return setting;
   }
 
   /** Valor da config ou `null` se não existir (uso interno — não lança). */
-  async getValue(orgId: string, key: string): Promise<unknown> {
-    const setting = await this.repository.findByKey(orgId, key);
+  /** Valor da configuração da instalação dedicada, ou `null` se não existir. */
+  async getValue(key: string): Promise<unknown> {
+    const setting = await this.repository.findByKey(key);
     return setting ? setting.value : null;
   }
 
-  async set(orgId: string, key: string, value: unknown) {
-    const before = await this.repository.findByKey(orgId, key);
-    const setting = await this.repository.upsert(orgId, key, value as Prisma.InputJsonValue);
+  async set(key: string, value: unknown) {
+    const before = await this.repository.findByKey(key);
+    const setting = await this.repository.upsert(key, value as Prisma.InputJsonValue);
     await this.audit.record({
       action: 'core.setting.set',
       entityType: 'SystemSetting',
       entityId: setting.id,
-      organizationId: orgId,
       oldValue: before ? { key, value: before.value } : null,
       newValue: { key, value: setting.value },
     });

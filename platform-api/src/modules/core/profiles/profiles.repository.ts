@@ -7,13 +7,12 @@ import { PrismaService } from '../../../shared/prisma/prisma.service';
 export class ProfilesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string, includeDeleted = false) {
+  findAll(includeDeleted = false) {
     return this.prisma.permissionProfile.findMany({
       where: {
-        organization_id: organizationId,
         ...(includeDeleted ? {} : { deleted_at: null }),
       },
-      include: { _count: { select: { users: true, members: true } } },
+      include: { _count: { select: { users: true } } },
       orderBy: [{ is_system: 'desc' }, { name: 'asc' }],
     });
   }
@@ -22,10 +21,8 @@ export class ProfilesRepository {
     return this.prisma.permissionProfile.findUnique({ where: { id } });
   }
 
-  findByName(organizationId: string, name: string) {
-    return this.prisma.permissionProfile.findUnique({
-      where: { organization_id_name: { organization_id: organizationId, name } },
-    });
+  findByName(name: string) {
+    return this.prisma.permissionProfile.findFirst({ where: { name } });
   }
 
   create(data: Prisma.PermissionProfileCreateInput) {

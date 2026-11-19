@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common';
 import { ProviderRegistryService } from './provider-registry.service';
 import { ProviderSeedService } from './provider-seed.service';
 import { RegistryRepository } from './registry.repository';
-import { AltaredeProvider } from './providers/altarede.provider';
 import { IxcProvider } from './providers/ixc.provider';
 import { OpenAiProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
@@ -11,18 +10,16 @@ import { PostgresqlProvider } from './providers/postgresql.provider';
 import { SqlServerProvider } from './providers/sqlserver.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { S3Provider } from './providers/s3.provider';
-import { WhatsappMetaProvider } from './providers/whatsapp-meta.provider';
-import { WhatsappYcloudProvider } from './providers/whatsapp-ycloud.provider';
-import { WhatsappBaileysInternalProvider } from './providers/whatsapp-baileys-internal.provider';
-import { WhatsappBaileysManualProvider } from './providers/whatsapp-baileys-manual.provider';
+import { WhatsappNivooProvider } from './providers/whatsapp-nivoo.provider';
+import { WhatsappWahaProvider } from './providers/whatsapp-waha.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
+import { ConnectchatProvider } from './providers/connectchat.provider';
 
 @Module({
   providers: [
     ProviderRegistryService,
     ProviderSeedService,
     RegistryRepository,
-    AltaredeProvider,
     IxcProvider,
     OpenAiProvider,
     AnthropicProvider,
@@ -30,14 +27,13 @@ import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
     SqlServerProvider,
     SmtpProvider,
     S3Provider,
-    WhatsappMetaProvider,
-    WhatsappYcloudProvider,
-    WhatsappBaileysInternalProvider,
-    WhatsappBaileysManualProvider,
+    WhatsappNivooProvider,
+    WhatsappWahaProvider,
     GoogleWorkspaceProvider,
+    ConnectchatProvider,
   ],
   // GoogleWorkspaceProvider exportado: o OAuth controller monta a URL de
   // consentimento (buildConsentUrl) direto no provider.
-  exports: [ProviderRegistryService, GoogleWorkspaceProvider],
+  exports: [ProviderRegistryService, RegistryRepository, GoogleWorkspaceProvider],
 })
 export class RegistryModule {}

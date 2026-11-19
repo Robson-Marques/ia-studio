@@ -5,9 +5,8 @@ import { ConnectionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface ConnectionFilters {
-  workspaceId?: string;
-  environmentId?: string;
   providerKey?: string;
+  providerKeys?: string[];
   status?: ConnectionStatus;
 }
 
@@ -15,11 +14,10 @@ export interface ConnectionFilters {
 export class ConnectionsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string, filters: ConnectionFilters = {}) {
-    const where: Prisma.ConnectionWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
+  findAll(filters: ConnectionFilters = {}) {
+    const where: Prisma.ConnectionWhereInput = {};
     if (filters.providerKey) where.provider_key = filters.providerKey;
+    if (filters.providerKeys?.length) where.provider_key = { in: filters.providerKeys };
     if (filters.status) where.status = filters.status;
     return this.prisma.connection.findMany({
       where,
@@ -31,29 +29,14 @@ export class ConnectionsRepository {
     return this.prisma.connection.findUnique({ where: { id } });
   }
 
-  countByOrg(organizationId: string) {
-    return this.prisma.connection.count({ where: { organization_id: organizationId } });
+  count() {
+    return this.prisma.connection.count();
   }
 
-  countByOrgProvider(organizationId: string, providerKey: string) {
+  countByProvider(providerKey: string) {
     return this.prisma.connection.count({
-      where: { organization_id: organizationId, provider_key: providerKey },
+      where: { provider_key: providerKey },
     });
-  }
-
-  /** Conexao whatsapp-meta cujo config.phone_number_id casa com o webhook. */
-  findByProviderConfigValue(providerKey: string, configPath: string, value: string) {
-    return this.prisma.connection.findFirst({
-      where: {
-        provider_key: providerKey,
-        config: { path: [configPath], equals: value },
-      },
-    });
-  }
-
-  /** Todas as conexoes de um provider (todas as orgs) — verify token do webhook. */
-  findAllByProvider(providerKey: string) {
-    return this.prisma.connection.findMany({ where: { provider_key: providerKey } });
   }
 
   create(data: Prisma.ConnectionUncheckedCreateInput) {

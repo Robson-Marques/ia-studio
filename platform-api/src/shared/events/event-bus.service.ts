@@ -33,9 +33,6 @@ export class EventBusService {
     let logId: string | null = null;
     try {
       const row = await this.repository.create({
-        organization_id: envelope.organization_id,
-        workspace_id: envelope.workspace_id ?? null,
-        environment_id: envelope.environment_id ?? null,
         event: envelope.event,
         trace_id: envelope.trace_id,
         source_event_id: envelope.source_event_id,
@@ -58,16 +55,13 @@ export class EventBusService {
   }
 
   /** Replay de um evento persistido (perm automation.events.retry). */
-  async replay(organizationId: string, eventLogId: string): Promise<AutomationEventLog> {
+  async replay(eventLogId: string): Promise<AutomationEventLog> {
     const row = await this.repository.findById(eventLogId);
-    if (!row || row.organization_id !== organizationId) {
+    if (!row) {
       throw new NotFoundException('Evento não encontrado.');
     }
     const envelope: EventEnvelope = {
       event: row.event,
-      organization_id: row.organization_id,
-      workspace_id: row.workspace_id,
-      environment_id: row.environment_id,
       trace_id: row.trace_id,
       source_event_id: row.source_event_id,
       occurred_at: row.occurred_at.toISOString(),

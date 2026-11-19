@@ -91,6 +91,7 @@ export async function uploadChatMedia(chatId, file, kind, opts = {}) {
     // os campos que vieram antes da parte de arquivo no stream multipart.
     form.append('kind', kind);
     if (opts.caption) form.append('caption', opts.caption);
+    if (opts.voice) form.append('voice', 'true');
     if (opts.confirm_takeover) form.append('confirm_takeover', 'true');
     form.append('file', file, file.name || `${kind}-${Date.now()}`);
     const { data } = await api.post(`/comm/whatsapp/chats/${chatId}/media/upload`, form, {
@@ -109,29 +110,9 @@ export async function uploadChatMedia(chatId, file, kind, opts = {}) {
 
 export async function downloadChatMedia(chatId, mediaId) {
   try {
-    const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media`, { params: { ref: mediaId } });
-    return data; // { base64, mime }
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao baixar mídia')); }
-}
-
-// ─── Coexistência (modo manual / Baileys) ────────────────────
-
-// Canais Baileys manuais elegíveis para esta conversa — ativos e vinculados à
-// conexão oficial dela. Retorna [{ id, name, status }].
-export async function listManualChannels(id) {
-  try {
-    const { data } = await api.get(`/comm/whatsapp/chats/${id}/manual-channels`);
-    return Array.isArray(data) ? data : [];
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar canais manuais')); }
-}
-
-// Liga o modo manual (passa o id de um canal Baileys manual) ou desliga (null,
-// volta ao número oficial). Retorna a conversa atualizada.
-export async function setManualChannel(id, connectionId) {
-  try {
-    const { data } = await api.post(`/comm/whatsapp/chats/${id}/manual-channel`, { connection_id: connectionId ?? null });
+    const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media`, { params: { ref: mediaId }, responseType: 'blob', timeout: 120000 });
     return data;
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao mudar o modo da conversa')); }
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao baixar mídia')); }
 }
 
 // ─── Atendimento (claim/transfer/close/reopen/timeline) ──────
@@ -183,6 +164,11 @@ export async function createTemplate(body) {
 export async function syncTemplates(connectionId) {
   try { const { data } = await api.post('/comm/whatsapp/templates/sync', { connection_id: connectionId }); return data; }
   catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao sincronizar templates')); }
+}
+
+export async function publishTemplate(id) {
+  try { const { data } = await api.post(`/comm/whatsapp/templates/${id}/publish`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao publicar o template')); }
 }
 
 export async function getTemplate(id) {
@@ -248,7 +234,34 @@ export async function uploadTemplateHeaderMedia(connectionId, file) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao subir a mídia do cabeçalho')); }
 }
 
-// ─── Números (conexões whatsapp-meta) ────────────────────────
+// ─── Números (Central WhatsApp Nivoo) ────────────────────────
+
+export async function getCentralSetup() {
+  const { data } = await api.get('/comm/whatsapp/numbers/setup');
+  return data;
+}
+
+export async function configureCentralSetup(body) {
+  try {
+    const { data } = await api.put('/comm/whatsapp/numbers/setup', body);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao configurar a Central Nivoo')); }
+}
+
+export async function startCentralOnboarding() {
+  const { data } = await api.post('/comm/whatsapp/numbers/onboarding/sessions');
+  return data;
+}
+
+export async function getCentralOnboardingSession(sessionId) {
+  const { data } = await api.get(`/comm/whatsapp/numbers/onboarding/sessions/${encodeURIComponent(sessionId)}`);
+  return data.session;
+}
+
+export async function disconnectCentralNumber(id) {
+  const { data } = await api.post(`/comm/whatsapp/numbers/${encodeURIComponent(id)}/disconnect`);
+  return data;
+}
 
 export async function listNumbers(params = {}) {
   try {
@@ -260,6 +273,21 @@ export async function listNumbers(params = {}) {
 export async function syncNumber(id) {
   try { const { data } = await api.post(`/comm/whatsapp/numbers/${id}/sync`); return data; }
   catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao sincronizar o número')); }
+}
+
+export async function createWahaNumber(body) {
+  try { const { data } = await api.post('/comm/whatsapp/numbers/waha', body); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao criar a conexão por QR Code')); }
+}
+
+export async function getWahaPairing(id) {
+  try { const { data } = await api.get(`/comm/whatsapp/numbers/${id}/waha/pairing`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar o QR Code')); }
+}
+
+export async function restartWahaPairing(id) {
+  try { const { data } = await api.post(`/comm/whatsapp/numbers/${id}/waha/restart`); return data; }
+  catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao gerar um novo QR Code')); }
 }
 
 // ─── Assistente do número (vínculo) ──────────────────────────

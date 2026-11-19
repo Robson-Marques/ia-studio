@@ -1,6 +1,8 @@
-// IA Studio — schema.prisma (fonte unica da verdade — PROIBIDO migrations/ALTER TABLE)
-// Evolucao: editar aqui + `npx prisma db push --accept-data-loss`.
-// Namespacing: core_*, licensing_*, billing_*, integration_*, comm_*, system_*.
+// IA Studio — schema alvo da instalação dedicada.
+// Nunca aplicar este schema contra a base SaaS histórica: a instância ISP nasce
+// limpa após backup/exportação verificáveis. A materialização em PostgreSQL e
+// a migration auditável pertencem ao slice de implantação dedicado.
+// Namespacing: core_*, integration_*, comm_*, automation_*, ai_*, isp_*, system_*.
 
 generator client {
   provider        = "prisma-client-js"
@@ -17,47 +19,9 @@ datasource db {
 // Enums
 // ─────────────────────────────────────────────────────────────────────
 
-enum EnvironmentKind {
-  PRODUCTION
-  STAGING
-  DEVELOPMENT
-}
-
-enum AuditActorType {
-  PLATFORM
-  ORG
-  SYSTEM
-}
-
 enum AuditStatus {
   SUCCESS
   FAILURE
-}
-
-enum LicenseStatus {
-  TRIAL
-  ACTIVE
-  RESTRICTED
-  SUSPENDED
-  EXPIRED
-}
-
-enum SubscriptionStatus {
-  TRIALING
-  ACTIVE
-  PAST_DUE
-  GRACE
-  RESTRICTED
-  SUSPENDED
-  CANCELED
-}
-
-enum ChargeStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
-  CANCELED
 }
 
 // ─── Integration Manager (Fase 2 — diretrizes 1/2/5/21/43/48/51/52) ──
@@ -149,155 +113,14 @@ enum CommTemplateStatus {
   DISABLED
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// CORE — Organization → Workspace → Environment (diretrizes 4/36)
-// ─────────────────────────────────────────────────────────────────────
-
-model Organization {
-  id            String   @id @default(uuid())
-  name          String
-  slug          String   @unique
-  // White Label preparado desde a Fase 1 (diretriz 54): logo/cores/favicon.
-  branding      Json     @default("{}")
-  // LEGADO (coexistencia): dominio proprio unico da org. O registro autoritativo
-  // passou a ser PlatformDomain (varios por org + subdominio + console/api).
-  // Mantido intacto ate a migracao — nada le/escreve os dois em conflito.
-  custom_domain String?  @unique
-  is_active     Boolean  @default(true)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-
-  workspaces    Workspace[]
-  users         User[]
-  profiles      PermissionProfile[]
-  invites       UserInvite[]
-  license       License?
-  subscriptions Subscription[]
-  domains       PlatformDomain[]
-
-  @@map("core_organizations")
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Dominios/subdominios atendidos pela instalacao (tenancy por Host).
-// Um registro por HOSTNAME. Cobre os dois escopos:
-//   * PLATFORM     — hosts da propria plataforma (Console SaaS, API, painel
-//                    base). `organization_id` NULO.
-//   * ORGANIZATION — host de um cliente (subdominio no dominio-base ou dominio
-//                    proprio). `organization_id` preenchido.
-// A emissao/renovacao de certificado (fase 4) le `cert_status`; o app NUNCA
-// edita Nginx/TLS direto (fronteira app↔infra — `upgrade.sh` nao toca no nginx).
-// ─────────────────────────────────────────────────────────────────────
-
-enum DomainScope {
-  PLATFORM
-  ORGANIZATION
-}
-
-// Qual superficie o host serve (o Console tem host proprio — no modo single
-// hoje ele vive sob /console/ do mesmo dominio).
-enum DomainSurface {
-  ADMIN
-  CONSOLE
-  API
-}
-
-// SUBDOMAIN = host sob o dominio-base da instalacao (coberto por wildcard);
-// CUSTOM    = dominio proprio do cliente (exige certificado por dominio).
-enum DomainKind {
-  SUBDOMAIN
-  CUSTOM
-}
-
-enum DomainStatus {
-  PENDING_DNS
-  VERIFYING
-  ACTIVE
-  FAILED
-  DISABLED
-}
-
-enum DomainCertStatus {
-  NONE
-  PENDING
-  ISSUED
-  ERROR
-}
-
-model PlatformDomain {
-  id              String           @id @default(uuid())
-  // NULO = host da plataforma (Console/API/painel base). Preenchido = do cliente.
-  organization_id String?
-  // Host completo, minusculo, sem esquema nem porta (ex.: "acme.studio.app.br").
-  hostname        String           @unique
-  scope           DomainScope      @default(ORGANIZATION)
-  surface         DomainSurface    @default(ADMIN)
-  kind            DomainKind       @default(SUBDOMAIN)
-  // Host canonico do escopo (para onde os demais apontam/redirecionam).
-  is_primary      Boolean          @default(false)
-  status          DomainStatus     @default(PENDING_DNS)
-  // Token do registro TXT de verificacao de posse (dominio proprio).
-  verify_token    String?
-  verified_at     DateTime?
-  cert_status     DomainCertStatus @default(NONE)
-  cert_issued_at  DateTime?
-  last_error      String?
-  notes           String?
-  created_by      String?
-  created_at      DateTime         @default(now())
-  updated_at      DateTime         @updatedAt
-
-  organization Organization? @relation(fields: [organization_id], references: [id])
-
-  @@index([organization_id])
-  @@index([status])
-  @@index([scope, surface])
-  @@map("core_platform_domains")
-}
-
-model Workspace {
-  id              String   @id @default(uuid())
-  organization_id String
-  name            String
-  slug            String
-  is_active       Boolean  @default(true)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  organization Organization       @relation(fields: [organization_id], references: [id])
-  environments Environment[]
-  members      WorkspaceMember[]
-
-  @@unique([organization_id, slug])
-  @@map("core_workspaces")
-}
-
-model Environment {
-  id           String          @id @default(uuid())
-  workspace_id String
-  name         String
-  kind         EnvironmentKind
-  is_default   Boolean         @default(false)
-  created_at   DateTime        @default(now())
-  updated_at   DateTime        @updatedAt
-
-  workspace Workspace @relation(fields: [workspace_id], references: [id])
-
-  @@unique([workspace_id, kind])
-  @@map("core_environments")
-}
-
 model User {
   id                String    @id @default(uuid())
-  // null = admin de plataforma (ator do Console — diretriz 41)
-  organization_id   String?
   name              String
   email             String    @unique
   // Telefone (E.164) para notificacoes internas via WhatsApp (ex.: alerta de
   // incidente ISP ao plantao). null = usuario nao recebe WhatsApp.
   whatsapp_phone    String?
   password_hash     String
-  is_platform_admin Boolean   @default(false)
   profile_id        String?
   is_active         Boolean   @default(true)
   last_login_at     DateTime?
@@ -308,62 +131,35 @@ model User {
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
 
-  organization Organization?      @relation(fields: [organization_id], references: [id])
-  profile      PermissionProfile? @relation(fields: [profile_id], references: [id])
-  memberships  WorkspaceMember[]
+  profile PermissionProfile? @relation(fields: [profile_id], references: [id])
 
   @@map("core_users")
 }
 
-model WorkspaceMember {
-  id           String   @id @default(uuid())
-  workspace_id String
-  user_id      String
-  profile_id   String?
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
-
-  workspace Workspace          @relation(fields: [workspace_id], references: [id])
-  user      User               @relation(fields: [user_id], references: [id])
-  profile   PermissionProfile? @relation(fields: [profile_id], references: [id])
-
-  @@unique([workspace_id, user_id])
-  @@map("core_workspace_members")
-}
-
 model PermissionProfile {
-  id              String    @id @default(uuid())
-  organization_id String
-  name            String
-  description     String?
-  permissions     String[]  @default([])
-  is_system       Boolean   @default(false)
-  deleted_at      DateTime?
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  permissions String[]  @default([])
+  is_system   Boolean   @default(false)
+  deleted_at  DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
 
-  organization Organization      @relation(fields: [organization_id], references: [id])
-  users        User[]
-  members      WorkspaceMember[]
-
-  @@unique([organization_id, name])
+  users User[]
   @@map("core_permission_profiles")
 }
 
 model UserInvite {
-  id              String    @id @default(uuid())
-  organization_id String
-  workspace_id    String?
-  email           String
-  profile_id      String?
-  token           String    @unique
-  expires_at      DateTime
-  accepted_at     DateTime?
-  created_by      String?
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
-
-  organization Organization @relation(fields: [organization_id], references: [id])
+  id          String    @id @default(uuid())
+  email       String
+  profile_id  String?
+  token       String    @unique
+  expires_at  DateTime
+  accepted_at DateTime?
+  created_by  String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
 
   @@map("core_user_invites")
 }
@@ -389,8 +185,6 @@ model FeatureFlag {
 model FeatureFlagOverride {
   id              String   @id @default(uuid())
   flag_id         String
-  organization_id String?
-  workspace_id    String?
   user_id         String?
   profile_id      String?
   enabled         Boolean
@@ -408,32 +202,27 @@ model FeatureFlagOverride {
 // ─────────────────────────────────────────────────────────────────────
 
 model AuditLog {
-  id              String         @id @default(uuid())
-  organization_id String?
-  workspace_id    String?
-  actor_id        String?
-  actor_email     String?
-  actor_type      AuditActorType
-  action          String
-  entity_type     String
-  entity_id       String?
-  status          AuditStatus
-  old_value       Json?
-  new_value       Json?
-  params          Json?
-  ip              String?
-  user_agent      String?
-  trace_id        String?
-  created_at      DateTime       @default(now())
+  id          String      @id @default(uuid())
+  actor_id    String?
+  actor_email String?
+  action      String
+  entity_type String
+  entity_id   String?
+  status      AuditStatus
+  old_value   Json?
+  new_value   Json?
+  params      Json?
+  ip          String?
+  user_agent  String?
+  trace_id    String?
+  created_at  DateTime    @default(now())
 
-  @@index([organization_id, created_at])
   @@index([entity_type, entity_id])
   @@map("core_audit_logs")
 }
 
 model SecurityLog {
   id              String   @id @default(uuid())
-  organization_id String?
   user_id         String?
   email           String?
   // LOGIN_SUCCESS | LOGIN_FAILED | PASSWORD_CHANGED | TOKEN_REVOKED | INVITE_ACCEPTED
@@ -450,144 +239,20 @@ model SecurityLog {
 // ─────────────────────────────────────────────────────────────────────
 
 model SystemSetting {
-  id              String   @id @default(uuid())
-  organization_id String?
-  key             String
-  value           Json
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  @@unique([organization_id, key])
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      Json
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
   @@map("system_settings")
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// LICENSING (diretrizes 19/39/40) — enforcement central de limites
-// ─────────────────────────────────────────────────────────────────────
-
-model Plan {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  is_active   Boolean  @default(true)
-  trial_days  Int      @default(0)
-  price_cents Int?
-  // Mapa metric→limite (users, workspaces, agents, flows, executions_month,
-  // ai_tokens_month, whatsapp_numbers, google_accounts, connections).
-  // Metrica ausente = ilimitado. Tudo dado configuravel — zero codigo pra plano novo.
-  limits      Json     @default("{}")
-  // Features ligaveis: whatsapp, email, automation, studio, mcp, marketplace,
-  // api, white_label, rag, voice, analytics.
-  features    String[] @default([])
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  licenses      License[]
-  subscriptions Subscription[]
-
-  @@map("licensing_plans")
-}
-
-model License {
-  id              String        @id @default(uuid())
-  organization_id String        @unique
-  plan_id         String
-  status          LicenseStatus
-  // Formato XXXX-XXXX-XXXX-XXXX
-  license_key     String        @unique
-  activated_at    DateTime?
-  expires_at      DateTime?
-  trial_ends_at   DateTime?
-  // Override pontual dos limites do plano (merge por metrica)
-  limits_override Json?
-  created_at      DateTime      @default(now())
-  updated_at      DateTime      @updatedAt
-
-  organization Organization @relation(fields: [organization_id], references: [id])
-  plan         Plan         @relation(fields: [plan_id], references: [id])
-
-  @@map("licensing_licenses")
-}
-
-model UsageRecord {
-  id              String   @id @default(uuid())
-  organization_id String
-  // "" = agregado no nivel da organization (evita o furo de unique com NULL
-  // no Postgres e permite upsert atomico — ver README do modulo licensing)
-  workspace_id    String   @default("")
-  metric          String
-  // Periodo mensal: "YYYY-MM"
-  period          String
-  value           BigInt   @default(0)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  @@unique([organization_id, workspace_id, metric, period])
-  @@map("licensing_usage_records")
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// BILLING (diretrizes 20/38/53/58) — controla a ASSINATURA, nunca a plataforma.
-// Cadeia: Billing → Licensing → Feature Flags → Sistema.
-// ─────────────────────────────────────────────────────────────────────
-
-model Subscription {
-  id                 String             @id @default(uuid())
-  organization_id    String
-  plan_id            String
-  status             SubscriptionStatus
-  started_at         DateTime           @default(now())
-  current_period_end DateTime?
-  // Grace period (diretriz 58): venceu → N dias de graca → RESTRICTED → SUSPENDED.
-  grace_days         Int                @default(5)
-  coupon_id          String?
-  canceled_at        DateTime?
-  created_at         DateTime           @default(now())
-  updated_at         DateTime           @updatedAt
-
-  organization Organization @relation(fields: [organization_id], references: [id])
-  plan         Plan         @relation(fields: [plan_id], references: [id])
-
-  @@map("billing_subscriptions")
-}
-
-model Coupon {
-  id               String    @id @default(uuid())
-  code             String    @unique
-  percent_off      Int?
-  amount_off_cents Int?
-  valid_until      DateTime?
-  max_redemptions  Int?
-  redeemed_count   Int       @default(0)
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @updatedAt
-
-  @@map("billing_coupons")
-}
-
-model Charge {
-  id              String       @id @default(uuid())
-  organization_id String
-  subscription_id String?
-  amount_cents    Int
-  status          ChargeStatus
-  method          String?
-  due_date        DateTime?
-  paid_at         DateTime?
-  external_ref    String?
-  created_at      DateTime     @default(now())
-  updated_at      DateTime     @updatedAt
-
-  @@map("billing_charges")
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// INTEGRATION — Marketplace + Provider Registry + Connections + Secrets
+// INTEGRATION — Catálogo local + Provider Registry + Connections + Secrets
 // + Integration Logs + Storage (Fase 2)
 // ─────────────────────────────────────────────────────────────────────
 
-// Provider = o TIPO/conector do marketplace (diretriz 52). Catalogo global
-// (curadoria pelo Console — diretriz 43). wizard_schema descreve os passos
+// Provider = o TIPO/conector local (diretriz 52). wizard_schema descreve os passos
 // do Connection Wizard (declarativo — o front renderiza sem codigo por tipo).
 model ProviderDefinition {
   id                      String           @id @default(uuid())
@@ -598,6 +263,7 @@ model ProviderDefinition {
   icon                    String?
   wizard_schema           Json
   capabilities            Json             @default("[]")
+  // Campo legado da instalação SaaS. Não é lido nem escrito pelo runtime dedicado.
   is_installed_by_default Boolean          @default(false)
   is_active               Boolean          @default(true)
   created_at              DateTime         @default(now())
@@ -606,27 +272,22 @@ model ProviderDefinition {
   @@map("integration_providers")
 }
 
-// "Instalar do marketplace": habilita o provider pra organization (diretriz 1).
+// Registro legado da instalação SaaS. Preservado fisicamente para upgrades não
+// destrutivos; o runtime dedicado não o lê nem escreve.
 model ProviderInstall {
-  id              String   @id @default(uuid())
-  organization_id String
-  provider_key    String
-  installed_at    DateTime @default(now())
-  installed_by    String?
-
-  @@unique([organization_id, provider_key])
+  id           String   @id @default(uuid())
+  provider_key String   @unique
+  installed_at DateTime @default(now())
+  installed_by String?
   @@map("integration_provider_installs")
 }
 
 // Instance = conexao nomeada de um provider (diretriz 52). NUNCA deletada —
-// sem endpoint DELETE; so mudanca de estado. Escopo org+workspace+ambiente
-// (diretriz 4). config guarda SOMENTE campos nao sensiveis; credenciais
+// sem endpoint DELETE; so mudanca de estado. A conexão pertence à instalação;
+// config guarda SOMENTE campos nao sensiveis; credenciais
 // vivem no Secret referenciado por secret_id (diretriz 5).
 model Connection {
   id              String           @id @default(uuid())
-  organization_id String
-  workspace_id    String
-  environment_id  String
   provider_key    String
   name            String
   status          ConnectionStatus @default(PENDING_AUTH)
@@ -645,8 +306,7 @@ model Connection {
   created_at      DateTime         @default(now())
   updated_at      DateTime         @updatedAt
 
-  @@index([organization_id, provider_key])
-  @@index([organization_id, workspace_id, environment_id])
+  @@index([provider_key])
   @@map("integration_connections")
 }
 
@@ -654,9 +314,6 @@ model Connection {
 // NUNCA sai por HTTP — endpoints listam so metadados; getDecrypted e interno.
 model Secret {
   id              String     @id @default(uuid())
-  organization_id String
-  workspace_id    String?
-  environment_id  String?
   name            String
   kind            SecretKind
   encrypted_value String
@@ -668,14 +325,12 @@ model Secret {
   created_at      DateTime   @default(now())
   updated_at      DateTime   @updatedAt
 
-  @@index([organization_id])
   @@map("integration_secrets")
 }
 
 // Log de integracao (diretriz 55 — natureza propria, separado de audit/app).
 model IntegrationLog {
   id              String               @id @default(uuid())
-  organization_id String
   connection_id   String
   direction       IntegrationDirection
   operation       String
@@ -687,17 +342,15 @@ model IntegrationLog {
   trace_id        String?
   created_at      DateTime             @default(now())
 
-  @@index([organization_id, created_at])
   @@index([connection_id, created_at])
   @@map("integration_logs")
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // COMM — Communication Platform / WhatsApp Meta Cloud API (Fase 3)
-// A CONEXAO WhatsApp e uma Connection (provider_key 'whatsapp-meta') do
+// A CONEXAO WhatsApp e uma Connection (provider_key 'whatsapp-nivoo') do
 // Integration Manager — NAO existe tabela propria de conexao (diretriz 52).
-// Toda tabela operacional carrega organization_id + workspace_id +
-// environment_id (regra de ouro do tenant).
+// Toda tabela operacional pertence à própria instalação dedicada.
 // ─────────────────────────────────────────────────────────────────────
 
 // Conversa (chat) por conexao+telefone. last_inbound_at e a base da janela
@@ -705,14 +358,9 @@ model IntegrationLog {
 // atende agora), attendance_status (ciclo de vida).
 model WhatsappChat {
   id                   String           @id @default(uuid())
-  organization_id      String
-  workspace_id         String
-  environment_id       String
   connection_id        String
-  // Canal manual (baileys_manual) escolhido para escrita manual. Mantém a
-  // origem oficial (connection_id) intacta. Coexistência: enquanto setado,
-  // IA, modelos e automações NÃO podem usar esta conversa. FK solta.
-  manual_connection_id String?
+  remote_chat_id       String?          @unique
+  remote_history       Json?
   phone                String
   contact_name         String?
   last_message         String?
@@ -746,10 +394,9 @@ model WhatsappChat {
   attendance_analyses  AiAttendanceAnalysis[]
 
   @@unique([connection_id, phone])
-  @@index([organization_id, environment_id, last_message_at])
-  @@index([organization_id, attendance_status])
-  @@index([organization_id, current_handler_id])
-  @@index([manual_connection_id])
+  @@index([last_message_at])
+  @@index([attendance_status])
+  @@index([current_handler_id])
   @@map("comm_whatsapp_chats")
 }
 
@@ -760,9 +407,6 @@ model WhatsappChat {
 // condutor embutido (próximo checkpoint) lê daqui qual assistente chamar.
 model CommChannelAgent {
   id              String   @id @default(uuid())
-  organization_id String
-  workspace_id    String
-  environment_id  String
   connection_id   String   @unique
   agent_id        String
   is_enabled      Boolean  @default(true)
@@ -770,16 +414,18 @@ model CommChannelAgent {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  @@index([organization_id, workspace_id, environment_id])
   @@index([agent_id])
   @@map("comm_channel_agents")
 }
 
 model WhatsappMessage {
   id              String               @id @default(uuid())
-  organization_id String
   chat_id         String
   connection_id   String
+  remote_message_id String?            @unique
+  remote_job_id    String?             @unique
+  occurred_at      DateTime?
+  inbound_event_published Boolean      @default(true)
   // wamid da Meta (mensagens inbound/outbound aceitas pela Cloud API)
   external_id     String?
   direction       CommMessageDirection
@@ -790,6 +436,15 @@ model WhatsappMessage {
   content         String               @default("")
   // Midia: { media_id, mime_type, filename?, caption?, url? }
   media           Json?
+  media_state     String?
+  media_metadata  Json?
+  reply_to_message_id String?
+  reply_to_from   String?
+  reaction_emoji  String?
+  reaction_to_message_id String?
+  interactive_reply Json?
+  template        Json?
+  referral        Json?
   // sent | delivered | read | failed | received
   status          String               @default("sent")
   error_detail    String?
@@ -798,8 +453,8 @@ model WhatsappMessage {
   chat WhatsappChat @relation(fields: [chat_id], references: [id])
 
   @@index([chat_id, created_at])
+  @@index([inbound_event_published, created_at])
   @@index([external_id])
-  @@index([organization_id, created_at])
   @@map("comm_whatsapp_messages")
 }
 
@@ -810,9 +465,6 @@ model WhatsappMessage {
 // Uma execução gera várias linhas com o mesmo `analysis_trace_id`.
 model AiAttendanceAnalysis {
   id                 String    @id @default(uuid())
-  organization_id    String
-  workspace_id       String
-  environment_id     String
   chat_id            String
   improvement_target String // 'AI' | 'HUMAN'
   content            String
@@ -825,7 +477,6 @@ model AiAttendanceAnalysis {
 
   chat WhatsappChat @relation(fields: [chat_id], references: [id])
 
-  @@index([organization_id, environment_id, created_at])
   @@index([chat_id])
   @@index([analysis_trace_id])
   @@map("ai_attendance_analyses")
@@ -834,7 +485,6 @@ model AiAttendanceAnalysis {
 // Trilha de atendimento por conversa (claim/transfer/close/reopen/takeover).
 model WhatsappChatEvent {
   id              String   @id @default(uuid())
-  organization_id String
   chat_id         String
   // CLAIMED | RELEASED | TRANSFERRED | CLOSED | REOPENED | TAKEOVER
   event_type      String
@@ -850,16 +500,12 @@ model WhatsappChatEvent {
   chat WhatsappChat @relation(fields: [chat_id], references: [id])
 
   @@index([chat_id, created_at])
-  @@index([organization_id, created_at])
   @@map("comm_whatsapp_chat_events")
 }
 
 // Catalogo de templates HSM por conexao (sync bidirecional com a Meta).
 model WhatsappTemplate {
   id               String             @id @default(uuid())
-  organization_id  String
-  workspace_id     String
-  environment_id   String
   connection_id    String
   name             String
   language         String             @default("pt_BR")
@@ -889,18 +535,15 @@ model WhatsappTemplate {
   updated_at       DateTime           @updatedAt
 
   @@unique([connection_id, name, language])
-  @@index([organization_id, connection_id])
-  @@index([organization_id, is_system_template])
+  @@index([connection_id])
+  @@index([is_system_template])
   @@map("comm_whatsapp_templates")
 }
 
-// Estado de sincronizacao continua (~10 min) por conexao whatsapp-meta:
+// Estado histórico de sincronizacao do conector Meta direto (sem novas escritas):
 // display name, qualidade do numero, limite de mensagens, contagem de templates.
 model WhatsappSyncState {
   id              String    @id @default(uuid())
-  organization_id String
-  workspace_id    String
-  environment_id  String
   connection_id   String    @unique
   phone_number    String?
   display_name    String?
@@ -916,16 +559,35 @@ model WhatsappSyncState {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
-  @@index([organization_id])
   @@map("comm_whatsapp_sync_state")
+}
+
+model NivooWhatsappSyncCheckpoint {
+  id                String   @id @default("primary")
+  last_completed_at DateTime?
+  last_error        String?
+  updated_at        DateTime @updatedAt
+
+  @@map("comm_nivoo_whatsapp_sync_checkpoint")
+}
+
+model NivooWhatsappOutboundJob {
+  id              String   @id
+  connection_id   String
+  chat_id         String?
+  status          String   @default("PENDING")
+  meta_message_id String?
+  last_error      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([status, created_at])
+  @@map("comm_nivoo_whatsapp_outbound_jobs")
 }
 
 // Equipes de atendimento (soft-delete via is_active — nunca DELETE fisico).
 model AttendanceTeam {
   id               String   @id @default(uuid())
-  organization_id  String
-  workspace_id     String
-  environment_id   String
   name             String
   description      String?
   default_queue_id String?
@@ -936,15 +598,11 @@ model AttendanceTeam {
   members AttendanceTeamMember[]
   queues  AttendanceQueue[]
 
-  @@index([organization_id, environment_id])
   @@map("comm_attendance_teams")
 }
 
 model AttendanceQueue {
   id              String   @id @default(uuid())
-  organization_id String
-  workspace_id    String
-  environment_id  String
   team_id         String?
   name            String
   description     String?
@@ -954,13 +612,11 @@ model AttendanceQueue {
 
   team AttendanceTeam? @relation(fields: [team_id], references: [id])
 
-  @@index([organization_id, environment_id])
   @@map("comm_attendance_queues")
 }
 
 model AttendanceTeamMember {
   id              String       @id @default(uuid())
-  organization_id String
   team_id         String
   user_id         String
   role            CommTeamRole @default(MEMBER)
@@ -979,9 +635,6 @@ model AttendanceTeamMember {
 // Storage Manager (diretriz 21): todo arquivo passa pelo IStorageDriver.
 model StorageFile {
   id              String   @id @default(uuid())
-  organization_id String
-  workspace_id    String?
-  environment_id  String?
   driver          String
   bucket          String?
   path            String
@@ -991,7 +644,7 @@ model StorageFile {
   created_by      String?
   created_at      DateTime @default(now())
 
-  @@index([organization_id, created_at])
+  @@index([created_at])
   @@map("integration_storage_files")
 }
 
@@ -1031,9 +684,6 @@ enum TemplateChannel {
 // Dedup por source_event_id (@unique) — o mesmo evento nunca entra 2x.
 model AutomationEventLog {
   id              String    @id @default(uuid())
-  organization_id String
-  workspace_id    String?
-  environment_id  String?
   event           String
   trace_id        String
   source_event_id String    @unique
@@ -1043,7 +693,6 @@ model AutomationEventLog {
   replay_count    Int       @default(0)
   created_at      DateTime  @default(now())
 
-  @@index([organization_id, created_at])
   @@index([event, created_at])
   @@map("automation_event_log")
 }
@@ -1052,9 +701,6 @@ model AutomationEventLog {
 // versoes imutaveis (WorkflowVersion) — aqui so o ponteiro current_version.
 model Workflow {
   id              String         @id @default(uuid())
-  organization_id String
-  workspace_id    String
-  environment_id  String
   name            String
   description     String?
   status          WorkflowStatus @default(DRAFT)
@@ -1070,8 +716,7 @@ model Workflow {
   executions WorkflowExecution[]
   schedule   AutomationSchedule?
 
-  @@index([organization_id, workspace_id, environment_id])
-  @@index([organization_id, status])
+  @@index([status])
   @@map("automation_workflows")
 }
 
@@ -1100,9 +745,6 @@ model WorkflowVersion {
 // workflow → no → provider → mensagem ponta-a-ponta.
 model WorkflowExecution {
   id              String          @id @default(uuid())
-  organization_id String
-  workspace_id    String
-  environment_id  String
   workflow_id     String
   version         Int
   trace_id        String
@@ -1125,10 +767,9 @@ model WorkflowExecution {
   logs     ExecutionLog[]
 
   @@unique([workflow_id, source_event_id])
-  @@index([organization_id, created_at])
   @@index([workflow_id, created_at])
   @@index([trace_id])
-  @@index([organization_id, status])
+  @@index([status])
   @@map("automation_executions")
 }
 
@@ -1154,7 +795,6 @@ model ExecutionLog {
 // amigavel mora na versao publicada; aqui so o proximo disparo persistido.
 model AutomationSchedule {
   id              String    @id @default(uuid())
-  organization_id String
   workflow_id     String    @unique
   enabled         Boolean   @default(true)
   next_run_at     DateTime?
@@ -1168,10 +808,9 @@ model AutomationSchedule {
   @@map("automation_schedules")
 }
 
-// Calendario por organization (feriados/dias uteis) — diretriz 12.
+// Calendário local da instalação (feriados/dias úteis) — diretriz 12.
 model AutomationCalendar {
   id              String   @id @default(uuid())
-  organization_id String
   name            String
   // ["2026-12-25", ...]
   holidays        Json     @default("[]")
@@ -1180,7 +819,7 @@ model AutomationCalendar {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  @@unique([organization_id, name])
+  @@unique([name])
   @@map("automation_calendars")
 }
 
@@ -1188,9 +827,6 @@ model AutomationCalendar {
 // A automacao referencia o template e troca so o canal.
 model AutomationTemplate {
   id              String          @id @default(uuid())
-  organization_id String
-  workspace_id    String
-  environment_id  String
   name            String
   channel         TemplateChannel
   subject         String?
@@ -1200,18 +836,15 @@ model AutomationTemplate {
   created_at      DateTime        @default(now())
   updated_at      DateTime        @updatedAt
 
-  @@unique([organization_id, environment_id, name, channel])
-  @@index([organization_id, channel])
+  @@unique([name, channel])
+  @@index([channel])
   @@map("automation_templates")
 }
 
 // Notificacao in-app (sino do painel) — Notification Center (diretriz 22).
 model AutomationNotification {
   id              String    @id @default(uuid())
-  organization_id String
-  workspace_id    String?
-  environment_id  String?
-  // Destinatario (usuario do painel). null = broadcast pra organization.
+  // Destinatario (usuario do painel). null = broadcast local.
   user_id         String?
   kind            String    @default("GENERIC")
   title           String
@@ -1220,15 +853,13 @@ model AutomationNotification {
   read_at         DateTime?
   created_at      DateTime  @default(now())
 
-  @@index([organization_id, user_id, created_at])
+  @@index([user_id, created_at])
   @@map("automation_notifications")
 }
 
 // Log de entrega do Notification Center (diretriz 55 — natureza propria).
 model AutomationNotificationLog {
   id              String   @id @default(uuid())
-  organization_id String
-  environment_id  String?
   // whatsapp | email | in_app
   channel         String
   recipient       String?
@@ -1239,14 +870,13 @@ model AutomationNotificationLog {
   trace_id        String?
   created_at      DateTime @default(now())
 
-  @@index([organization_id, created_at])
+  @@index([created_at])
   @@map("automation_notification_log")
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // AI PLATFORM + STUDIO (Fase 5 — diretrizes 10/15/16/17/26/29/31/32)
-// Namespacing ai_*. Toda tabela operacional carrega organization_id; recursos
-// escopados por ambiente carregam workspace_id + environment_id. Credenciais
+// Namespacing ai_*. As tabelas pertencem à instalação dedicada. Credenciais
 // de LLM vivem em Connections categoria AI (secret AES-256-GCM) — nenhuma
 // tabela guarda chave de API. pgvector via Unsupported("vector(1536)") +
 // coluna espelho embedding_json (fallback cosseno em app).
@@ -1255,8 +885,6 @@ model AutomationNotificationLog {
 enum AiProviderKind {
   OPENAI
   ANTHROPIC
-  GEMINI
-  OLLAMA
   OPENROUTER
   GROQ
   DEEPSEEK
@@ -1315,9 +943,6 @@ enum McpTransport {
 // current_version + config corrente editavel.
 model AiAgent {
   id                 String   @id @default(uuid())
-  organization_id    String
-  workspace_id       String
-  environment_id     String
   name               String
   description        String?
   // Connection AI usada nas chamadas (null = orchestrator resolve fallback/menor custo).
@@ -1356,8 +981,7 @@ model AiAgent {
   collaborations   AiCollaborationRule[]  @relation("PrincipalAgent")
   content_reviews  AiAgentContentReview[]
 
-  @@index([organization_id, workspace_id, environment_id])
-  @@index([organization_id, is_active])
+  @@index([is_active])
   @@map("ai_agents")
 }
 
@@ -1368,19 +992,12 @@ model AiAgent {
 // que o nosso modelo de base não tem). `result_json` = ContentReviewResult.
 model AiAgentContentReview {
   id                String    @id @default(uuid())
-  organization_id   String
-  workspace_id      String
-  environment_id    String
   agent_id          String
   status            String    @default("PENDING") // PENDING | COMPLETED | FAILED
   source_snapshot   Json // [{ base_id, base_name, document_id, document_label }]
   result_json       Json?
   provider_kind     String?
   model             String?
-  prompt_tokens     Int?
-  completion_tokens Int?
-  total_tokens      Int?
-  cost_usd          Float?
   error             String?
   analysis_trace_id String
   created_by        String?
@@ -1389,7 +1006,6 @@ model AiAgentContentReview {
 
   agent AiAgent @relation(fields: [agent_id], references: [id])
 
-  @@index([organization_id, environment_id, created_at])
   @@index([agent_id])
   @@map("ai_agent_content_reviews")
 }
@@ -1417,9 +1033,6 @@ model AiAgentPromptVersion {
 // automacao (WorkflowExecution) via execution_id.
 model AiAgentRun {
   id                String      @id @default(uuid())
-  organization_id   String
-  workspace_id      String?
-  environment_id    String?
   agent_id          String
   // Correlacao com WorkflowExecution da Fase 4 (nó AGENT).
   execution_id      String?
@@ -1451,15 +1064,14 @@ model AiAgentRun {
 
   @@index([agent_id, created_at])
   @@index([trace_id])
-  @@index([organization_id, created_at])
+  @@index([created_at])
   @@map("ai_agent_runs")
 }
 
-// Catalogo de ferramentas (tools) da organization. builtin = handler generico
+// Catálogo de ferramentas local. builtin = handler genérico
 // registrado in-memory; connection_operation = execute de um provider.
 model AiTool {
   id                   String   @id @default(uuid())
-  organization_id      String
   key                  String
   name                 String
   description          String
@@ -1479,15 +1091,14 @@ model AiTool {
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
 
-  @@unique([organization_id, key])
-  @@index([organization_id, is_active])
+  @@unique([key])
+  @@index([is_active])
   @@map("ai_tools")
 }
 
 // Log de chamada de ferramenta (auditoria + retencao via cron).
 model AiToolCallLog {
   id              String   @id @default(uuid())
-  organization_id String
   agent_run_id    String
   tool_key        String
   arguments       Json
@@ -1499,7 +1110,6 @@ model AiToolCallLog {
   run AiAgentRun @relation(fields: [agent_run_id], references: [id])
 
   @@index([agent_run_id])
-  @@index([organization_id, created_at])
   @@map("ai_tool_call_logs")
 }
 
@@ -1507,9 +1117,6 @@ model AiToolCallLog {
 // pra embeddings (null = orchestrator).
 model AiKnowledgeBase {
   id                      String   @id @default(uuid())
-  organization_id         String
-  workspace_id            String
-  environment_id          String
   name                    String
   description             String?
   embedding_connection_id String?
@@ -1526,7 +1133,6 @@ model AiKnowledgeBase {
   chunks      AiKnowledgeChunk[]
   query_logs  AiKnowledgeQueryLog[]
 
-  @@index([organization_id, workspace_id, environment_id])
   @@map("ai_knowledge_bases")
 }
 
@@ -1534,7 +1140,6 @@ model AiKnowledgeBase {
 model AiKnowledgeDocument {
   id              String               @id @default(uuid())
   base_id         String
-  organization_id String
   // TXT | URL | PDF | DOCX | MARKDOWN
   source_type     String
   // url ou nome do arquivo.
@@ -1553,7 +1158,6 @@ model AiKnowledgeDocument {
   chunks AiKnowledgeChunk[]
 
   @@index([base_id])
-  @@index([organization_id])
   @@map("ai_knowledge_documents")
 }
 
@@ -1563,7 +1167,6 @@ model AiKnowledgeChunk {
   id              String                      @id @default(uuid())
   base_id         String
   document_id     String
-  organization_id String
   idx             Int
   content         String
   embedding       Unsupported("vector(1536)")?
@@ -1583,7 +1186,6 @@ model AiKnowledgeChunk {
 model AiKnowledgeQueryLog {
   id              String   @id @default(uuid())
   base_id         String
-  organization_id String
   trace_id        String?
   agent_id        String?
   query           String
@@ -1600,9 +1202,6 @@ model AiKnowledgeQueryLog {
 // Perfil de memoria (escopo + politica de retencao/limite).
 model AiMemoryProfile {
   id                  String        @id @default(uuid())
-  organization_id     String
-  workspace_id        String
-  environment_id      String
   name                String
   scope               AiMemoryScope
   description         String?
@@ -1615,7 +1214,6 @@ model AiMemoryProfile {
 
   entries AiMemoryEntry[]
 
-  @@index([organization_id, workspace_id, environment_id])
   @@map("ai_memory_profiles")
 }
 
@@ -1623,7 +1221,6 @@ model AiMemoryProfile {
 model AiMemoryEntry {
   id              String    @id @default(uuid())
   profile_id      String
-  organization_id String
   scope_key       String
   key             String
   value           Json
@@ -1641,9 +1238,6 @@ model AiMemoryEntry {
 // Politica de aprovacao (diretriz 31 — generica). Nasce OFF.
 model AiApprovalPolicy {
   id                  String   @id @default(uuid())
-  organization_id     String
-  workspace_id        String?
-  environment_id      String?
   name                String
   description         String?
   // TOOL | SQL_WRITE | MASS_SEND | COST | ADMIN
@@ -1660,14 +1254,13 @@ model AiApprovalPolicy {
 
   approvals AiActionApproval[]
 
-  @@index([organization_id, is_active])
+  @@index([is_active])
   @@map("ai_approval_policies")
 }
 
 // Solicitacao de aprovacao de uma acao (retoma o run apos decisao).
 model AiActionApproval {
   id              String           @id @default(uuid())
-  organization_id String
   policy_id       String?
   agent_run_id    String?
   requested_by    String?
@@ -1686,7 +1279,7 @@ model AiActionApproval {
   policy AiApprovalPolicy? @relation(fields: [policy_id], references: [id])
   run    AiAgentRun?       @relation(fields: [agent_run_id], references: [id])
 
-  @@index([organization_id, status])
+  @@index([status])
   @@index([agent_run_id])
   @@map("ai_action_approvals")
 }
@@ -1694,7 +1287,6 @@ model AiActionApproval {
 // Regra de colaboracao entre agentes (diretriz 16).
 model AiCollaborationRule {
   id                   String                     @id @default(uuid())
-  organization_id      String
   principal_agent_id   String
   collaborator_agent_id String
   output_mode          AiCollaborationOutputMode  @default(CONSULTANT)
@@ -1708,58 +1300,12 @@ model AiCollaborationRule {
   principal AiAgent @relation("PrincipalAgent", fields: [principal_agent_id], references: [id])
 
   @@index([principal_agent_id])
-  @@index([organization_id])
   @@map("ai_collaboration_rules")
-}
-
-// Registro agregado de custo por provider×agente×mes (diretriz 17). Upsert por run.
-model AiCostRecord {
-  id                String         @id @default(uuid())
-  organization_id   String
-  workspace_id      String
-  environment_id    String?
-  agent_id          String?
-  provider_kind     AiProviderKind
-  model             String
-  // YYYY-MM
-  period            String
-  tokens_prompt     Int            @default(0)
-  tokens_completion Int            @default(0)
-  cost_usd          Float          @default(0)
-  updated_at        DateTime       @updatedAt
-  created_at        DateTime       @default(now())
-
-  @@unique([organization_id, workspace_id, agent_id, provider_kind, model, period])
-  @@index([organization_id, period])
-  @@map("ai_cost_records")
-}
-
-// Orcamento de IA (alerta liga OFF por default; bloqueio opcional).
-model AiBudget {
-  id                  String   @id @default(uuid())
-  organization_id     String
-  workspace_id        String
-  environment_id      String?
-  // MONTHLY
-  period_kind         String   @default("MONTHLY")
-  limit_usd           Float
-  alert_threshold_pct Int      @default(80)
-  block_on_exceed     Boolean  @default(false)
-  is_active           Boolean  @default(false)
-  created_by          String?
-  created_at          DateTime @default(now())
-  updated_at          DateTime @updatedAt
-
-  @@index([organization_id, workspace_id])
-  @@map("ai_budgets")
 }
 
 // Servidor MCP conectado (diretriz 15 — MCP Client). Nasce OFF.
 model AiMcpServer {
   id               String       @id @default(uuid())
-  organization_id  String
-  workspace_id     String
-  environment_id   String
   name             String
   transport        McpTransport
   // url (HTTP/SSE) ou command (STDIO).
@@ -1773,7 +1319,6 @@ model AiMcpServer {
   created_at       DateTime     @default(now())
   updated_at       DateTime     @updatedAt
 
-  @@index([organization_id, workspace_id, environment_id])
   @@map("ai_mcp_servers")
 }
 
@@ -1782,7 +1327,7 @@ model AiMcpServer {
 // FORA dos namespaces do core (respeita "nada de ISP no core"): a plataforma
 // e generica, esta e a primeira solucao de segmento (provedores/ISP) como
 // Resource Extension. Nenhum dado de negocio do ERP mora aqui — so o
-// informativo de manutencao e os alvos resolvidos via conectividade Altarede.
+// informativo de manutenção e os alvos resolvidos via conectividade IXC.
 // ─────────────────────────────────────────────────────────────────────────
 
 enum IspIncidentStatus {
@@ -1812,15 +1357,12 @@ enum IspIncidentDispatchStatus {
   FAILED
 }
 
-// Incidente/manutencao de rede. scope = filtros de conectividade Altarede
+// Incidente/manutenção de rede. scope = filtros de conectividade IXC
 // ({cidade?,bairro?,ip_concentrador?,interface_concentrador?,id_olt?,id_slot?,id_cto?}).
 // toggles = {suppress_os,inform_forecast,notify_normalization}. auto_detect e
 // modo proativo nascem OFF (diretriz de automatismos).
 model IspIncident {
   id                    String              @id @default(uuid())
-  organization_id       String
-  workspace_id          String
-  environment_id        String
   title                 String
   message               String?
   forecast              String?
@@ -1848,9 +1390,8 @@ model IspIncident {
   dispatches  IspIncidentDispatch[]
   team_alerts IspIncidentTeamAlert[]
 
-  @@index([organization_id, workspace_id, environment_id])
-  @@index([organization_id, status])
-  @@index([organization_id, scope_hash])
+  @@index([status])
+  @@index([scope_hash])
   @@map("isp_incidents")
 }
 
@@ -1858,7 +1399,6 @@ model IspIncident {
 // vinculado manualmente. included controla o checkbox incluir/excluir do disparo.
 model IspIncidentTarget {
   id              String                  @id @default(uuid())
-  organization_id String
   incident_id     String
   customer_ref    String
   name            String?
@@ -1879,11 +1419,11 @@ model IspIncidentTarget {
 // Log por destinatario do disparo proativo (WhatsApp HSM via Meta Orchestrator).
 model IspIncidentDispatch {
   id              String                    @id @default(uuid())
-  organization_id String
   incident_id     String
   target_id       String
   channel         String                    @default("WHATSAPP")
   template_id     String?
+  job_id          String?                   @unique
   status          IspIncidentDispatchStatus @default(PENDING)
   sent_at         DateTime?
   error           String?
@@ -1892,21 +1432,21 @@ model IspIncidentDispatch {
   incident IspIncident @relation(fields: [incident_id], references: [id], onDelete: Cascade)
 
   @@index([incident_id])
-  @@index([organization_id, status])
+  @@index([status])
   @@map("isp_incident_dispatches")
 }
 
 // Log por destinatario do ALERTA INTERNO a equipe de plantao (WhatsApp). Difere
-// do IspIncidentDispatch (que avisa o CLIENTE): aqui o alvo e um usuario da org
+// do IspIncidentDispatch (que avisa o CLIENTE): aqui o alvo é um usuário local
 // (membro da equipe configurada, com telefone e opt-in). via = caminho do envio
 // inteligente (texto dentro da janela / template fora / skipped).
 model IspIncidentTeamAlert {
   id              String                    @id @default(uuid())
-  organization_id String
   incident_id     String
   user_id         String
   phone           String
   via             String?
+  job_id          String?                   @unique
   status          IspIncidentDispatchStatus @default(PENDING)
   error           String?
   sent_at         DateTime?
@@ -1915,7 +1455,7 @@ model IspIncidentTeamAlert {
   incident IspIncident @relation(fields: [incident_id], references: [id], onDelete: Cascade)
 
   @@index([incident_id])
-  @@index([organization_id, status])
+  @@index([status])
   @@map("isp_incident_team_alerts")
 }
 
@@ -1924,7 +1464,6 @@ model IspIncidentTeamAlert {
 // pares ativos aqui. `is_default` marca o par usado no suporte técnico.
 model IspOsConfig {
   id              String   @id @default(uuid())
-  organization_id String
   connection_id   String
   setor_id        String
   setor_nome      String?
@@ -1936,20 +1475,18 @@ model IspOsConfig {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  @@index([organization_id, connection_id])
+  @@index([connection_id])
   @@map("isp_os_config")
 }
 
 // Link público de pagamento (2ª via) gerado pela IA no chat: token aleatório,
 // expira por tempo (TTL), sem login. `snapshot` congela os boletos em aberto no
-// instante da geração (decisão do Robson: janela + snapshot). A org sai do
-// próprio token na rota pública. Porte do PortalAccessToken do Aquapark, SEM a
+// instante da geração (decisão do Robson: janela + snapshot). A instalação
+// dedicada não precisa carregar escopo na rota pública. Porte do
+// PortalAccessToken do Aquapark, SEM a
 // sessão JWT — a página só mostra a 2ª via e morre no vencimento do link.
 model IspPaymentLink {
   id              String    @id @default(uuid())
-  organization_id String
-  workspace_id    String?
-  environment_id  String?
   connection_id   String
   token           String    @unique
   // Rastreio (não é login): documento/nome do titular do snapshot.
@@ -1964,29 +1501,21 @@ model IspPaymentLink {
   created_by      String?
   created_at      DateTime  @default(now())
 
-  @@index([organization_id, connection_id])
+  @@index([connection_id])
   @@index([expires_at])
   @@map("isp_payment_links")
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Resource Model + Mapper (Fase 7 — diretrizes 9/23/24/25). A plataforma NAO
-// e dona de dados de negocio: os TIPOS canonicos (Customer/Invoice/...) vivem
-// EM CODIGO (resource-model.catalog.ts) e aqui persistimos SO o MAPEAMENTO
-// (provider/operacao de origem → campos canonicos). Nenhum registro de negocio
-// (cliente, fatura, OS) e gravado em lugar nenhum.
+// Tabela legada de mapeamentos, preservada fisicamente para atualização não
+// destrutiva. O módulo de Recursos foi retirado da instalação dedicada e o
+// runtime não lê nem escreve esta tabela.
 // ─────────────────────────────────────────────────────────────────────────
 
-// Mapeamento de uma operacao de um provider (ou conexao especifica) para um
-// tipo canonico. field_map = { canonicalField: "sourcePath" } (dot-path na
-// resposta bruta). extensions = mapa das extensoes verticais (ex.: ISP
-// connection_status/olt/cto/slot). is_active nasce OFF ate o usuario confirmar
-// (Mapper Inteligente sugere, nunca aplica sozinho — diretriz 25).
+// Mantido no schema somente para não induzir `db push` a remover dados de
+// instalações existentes. Não criar novos consumidores deste model.
 model ResourceMapping {
   id              String   @id @default(uuid())
-  organization_id String
-  workspace_id    String?
-  environment_id  String?
   provider_key    String
   // Faz parte do @@unique abaixo — precisa ser NOT NULL (Prisma tipa campo
   // nullable em unique-composto como string e null nao faz upsert confiavel).
@@ -2002,9 +1531,8 @@ model ResourceMapping {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  @@unique([organization_id, provider_key, connection_id, resource_type, source_operation])
-  @@index([organization_id, workspace_id, environment_id])
-  @@index([organization_id, resource_type])
+  @@unique([provider_key, connection_id, resource_type, source_operation])
+  @@index([resource_type])
   @@map("resource_mappings")
 }
 
@@ -2017,7 +1545,6 @@ model ResourceMapping {
 
 model DeveloperApiKey {
   id              String    @id @default(uuid())
-  organization_id String
   name            String
   prefix          String
   hashed_key      String
@@ -2030,15 +1557,14 @@ model DeveloperApiKey {
   updated_at      DateTime  @updatedAt
 
   @@unique([hashed_key])
-  @@index([organization_id])
   @@index([prefix])
   @@map("developer_api_keys")
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// SYSTEM (Fase 8 — deploy/atualizacao/backup). Infra GLOBAL da instancia:
-// nao carregam organization_id (sao operacoes do Console sobre o servidor,
-// nao dados de tenant). Namespace system_* (permitido no CLAUDE.md).
+// SYSTEM (Fase 8 — deploy/atualizacao/backup). Infra local da instalação:
+// não carregam escopo de negócio: são operações administrativas da instância.
+// Namespace system_* (permitido no CLAUDE.md).
 // ─────────────────────────────────────────────────────────────────────────
 
 enum SystemJobStatus {
@@ -2089,25 +1615,3 @@ model SystemRestore {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────
-// COMM — Sessão do socket Baileys (Checkpoint 3a do porte de conectores).
-// NÃO é um segredo gerenciado pelo usuário: é o estado de auth do socket
-// (creds + chaves Signal), atualizado a cada rotação de chave. 1 por conexão
-// (provider_key whatsapp-baileys-*). Blob serializado (BufferJSON) e cifrado
-// em repouso (AES-256-GCM via shared/crypto). Multi-tenant (regra do tenant).
-// ─────────────────────────────────────────────────────────────────────
-model WhatsappBaileysSession {
-  id              String   @id @default(uuid())
-  organization_id String
-  workspace_id    String
-  environment_id  String
-  connection_id   String   @unique
-  auth_state      String
-  status          String   @default("disconnected")
-  phone_number    String?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  @@index([organization_id])
-  @@map("comm_whatsapp_baileys_sessions")
-}

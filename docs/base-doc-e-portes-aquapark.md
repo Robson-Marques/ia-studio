@@ -11,8 +11,9 @@
 **Quando o Aquapark já tem algo funcionando e testado, PORTA — não reinventa.**
 Reinventar do zero é repetir bugs já resolvidos lá. Vale para código (upgrade,
 canvas, composer WhatsApp, tela de Atualização) e para regra (a doc). Só se
-constrói do zero o que o IA Studio tem de genuinamente novo (multi-tenant,
-Provider Registry, declarativo) — e mesmo aí, herdando os padrões.
+constrói do zero o que o IA Studio tem de genuinamente novo (Provider Registry e
+arquitetura declarativa) — e mesmo aí, herdando os padrões. A comparação com
+multi-tenancy foi revogada pela conversão dedicada.
 
 ## Lições desta sessão que DEVEM virar regra amarrada (as que doeram)
 
@@ -32,7 +33,7 @@ Legenda: ✅ já amarrada · 🟡 existe rala (expandir) · ❌ falta (portar) �
 |---|---|---|
 | Idioma pt-BR | ✅ | — |
 | Banco: schema fonte única, sem migration, `db push` | ✅ | — |
-| Banco: multi-tenant `organization_id`/workspace/environment | ✅ (IA Studio tem, Aquapark não) | — |
+| Banco: pertencimento implícito à instalação, sem tenant/workspace/ambiente | ✅ | — |
 | Modularização "um arquivo, uma pergunta" + sinais de split | 🟡 (1 linha) | Expandir com sinais de split/não-split e estrutura do módulo |
 | Padrões de código: UTF-8, sem `any`, sem console.log, class-validator | 🟡 | Expandir (encoding, `@Auditable`, eventos payload mínimo) |
 | UX: toast obrigatório, sem confirm nativo | ✅ | — |

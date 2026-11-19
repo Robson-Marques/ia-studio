@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ListScreen, Badge, Button, Select, Field, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { listAutomationTemplates, deleteAutomationTemplate } from '../../services/automation';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { CHANNEL_LABEL, formatDateTime } from './automation.constants';
 import { extractTemplateVars } from './template.helpers';
 
@@ -26,7 +25,6 @@ export default function TemplatesAutomacao() {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState('');
@@ -40,7 +38,6 @@ export default function TemplatesAutomacao() {
     try {
       const { items: list } = await listAutomationTemplates({
         channel: channel || undefined,
-        environment_id: environmentId || undefined,
       });
       setItems(list);
     } catch (err) {
@@ -50,7 +47,7 @@ export default function TemplatesAutomacao() {
     }
   }
 
-  useEffect(() => { load(); }, [channel, environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [channel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function confirmDelete() {
     setDeletingBusy(true);

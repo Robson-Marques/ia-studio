@@ -16,12 +16,6 @@ export class CreateMemoryProfileDto {
   @MaxLength(120)
   name!: string;
 
-  @IsString()
-  workspace_id!: string;
-
-  @IsString()
-  environment_id!: string;
-
   @IsEnum(AiMemoryScope)
   scope!: AiMemoryScope;
 

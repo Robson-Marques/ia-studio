@@ -71,7 +71,7 @@ export class IntegrationNodes implements OnModuleInit {
 
         try {
           if (connectionId) {
-            const result = await this.connections.execute(ctx.organizationId, connectionId, 'http.request', {
+            const result = await this.connections.execute(connectionId, 'http.request', {
               method, path: url, headers, body,
             });
             await ctx.log('info', `HTTP via conexão ${connectionId} concluído.`);
@@ -117,7 +117,7 @@ export class IntegrationNodes implements OnModuleInit {
           return { handle: 'success', output: { simulated: true } };
         }
         try {
-          const result = await this.connections.execute(ctx.organizationId, connectionId, operation, ctx.config['params'] ?? {});
+          const result = await this.connections.execute(connectionId, operation, ctx.config['params'] ?? {});
           await ctx.log('info', `operação "${operation}" concluída.`);
           return { handle: 'success', output: result };
         } catch (e) {

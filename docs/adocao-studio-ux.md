@@ -3,8 +3,12 @@
 > Como o `platform-admin` consome o design system **Studio UX** (pacotes
 > `@studio-ux-ds/*`, publicados no GitLab da Nivoo).
 > Documento vivo — descreve o estado atual, não o histórico. A frente é
-> governada por [`ia-studio.studio-ux-adoption@1.0.0`](prompt-framework/especialidades/adocao-studio-ux.md)
+> governada por [`ia-studio.studio-ux-adoption@1.1.0`](prompt-framework/especialidades/adocao-studio-ux.md)
 > (extends `workflow.consuming-system-adoption@1.0.0`).
+
+> **Atualização dedicada (2026-09-30):** qualquer referência anterior a
+> organização, workspace, ambiente, branding multi-tenant ou página de pagamento
+> SaaS está revogada. O `platform-admin` atende somente a instalação local.
 
 ## Estado atual — legado visual extinto (2026-07-27, v0.10.26 / DS ^1.2.49)
 
@@ -16,11 +20,11 @@ foi removido dele.
 **Famílias já no padrão DS:** IA Studio (6 telas), ISP (2 telas), **Automação
 inteira** — sub-frentes A (os 3 logs + Agendamentos + Templates), B (Fluxos +
 editor de passos + `editor/*`) e C (o canvas) —, **WhatsApp inteira** (11
-arquivos, com o contact center) e **Integrações inteira** (v0.10.11: Marketplace,
-Conexões, Cofre + as três rotas que nasceram dos modais), **Recursos** e
+arquivos, com o contact center) e **Integrações inteira** (Conexões, Cofre + as
+três rotas que nasceram dos modais), **Recursos** e
 **Desenvolvedor** (v0.10.13) e **as 8 últimas telas** (v0.10.16: pessoas, perfis
-— com editor em rota —, workspaces, auditoria, minha conta, mais as três públicas:
-login, aceitar convite e página de pagamento).
+— com editor em rota —, auditoria, minha conta e as telas públicas de login e
+aceitar convite).
 
 **As telas de acesso e de aviso instanciam moldes do DS** (v0.10.21 / DS ^1.2.40):
 login e aceitar convite usam `AuthScreen` (o molde `login`), 404 e sem-permissão
@@ -67,7 +71,7 @@ existia só no canvas, e na lista o campo pedia o id do assistente na mão.
 
   **Nenhum arquivo do painel importa ícone de fora** (v0.10.22): a dependência `lucide-react` saiu do `package.json`. Era o resto mais teimoso da adoção — 62 arquivos, medidos em 2026-07-27, por dois motivos que não eram descuido: 57 desenhavam o próprio *spinner* porque o `Spinner` do DS não tinha `size` nem arranjo centrado, e o resto vivia no composer de áudio do WhatsApp, cujo vocabulário (gravar, pausar, foto, duração) o catálogo não cobria. As duas causas viraram DS v1.2.41 (`Spinner size`/`center` + 10 glifos de mídia/gravação) antes de qualquer troca aqui.
 
-  **Remover a dependência foi três lugares, não dois** (v0.10.23): o código, o `package.json` e **tudo que a nomeia por string**. O `manualChunks: { 'vendor-icons': ['lucide-react'] }` do `vite.config.js` ficou para trás e **derrubou o build da v0.10.22** com `Could not resolve entry module` — `manualChunks` nomeia um módulo de *entrada*, e nenhuma busca por `import … from` o encontra. O `grep` certo é pelo **nome do pacote no repositório inteiro** (fora `node_modules` e `dist`); ele também mostra que o `platform-console` mantém a dependência **de propósito**, porque não foi migrado ao DS.
+  **Remover a dependência foi três lugares, não dois** (v0.10.23): o código, o `package.json` e **tudo que a nomeia por string**. O `manualChunks: { 'vendor-icons': ['lucide-react'] }` do `vite.config.js` ficou para trás e **derrubou o build da v0.10.22** com `Could not resolve entry module` — `manualChunks` nomeia um módulo de *entrada*, e nenhuma busca por `import … from` o encontra. O `grep` certo é pelo **nome do pacote no repositório inteiro** (fora `node_modules` e `dist`). O Console SaaS citado nesta nota foi removido no S3.
 
   **Ícone é NOME, nunca componente.** `<CollapsedRail icon="layers" />` e `{ icon: 'camera' }` — não `icon={Layers}`. Guardar componente era exatamente o que obrigava dois arquivos a manter a outra biblioteca viva: precisavam de algo que se pudesse passar como valor. E foi onde o sweep quase quebrou o sistema: a troca mecânica removeu os `import` e deixou as referências vivas, o que daria tela em branco no trilho do canvas e no menu de anexo — sem erro de build.
 - **Moldes de tela.** Os **9** existem em React (DS v1.2.46). Instanciados aqui: `ListScreen`, `AuthScreen` (login + convite), `MessageScreen` (404 + sem-permissão) e **`FormScreen` em 9 editores** (v0.10.24), mais **`FormRow` em 5 linhas de ação** (v0.10.25) e **`DetailScreen` em 5 telas de registro** (v0.10.26). Faltam adotar: `dashboard` (3), `wizard` (`ConexaoNova`), `list` em ~5 que ainda montam tabela à mão, e os 3 editores grandes com abas (`AgenteEditor`, `IncidenteEditor`, `AberturaChamado`).
@@ -125,9 +129,11 @@ O `workflow.consuming-system-adoption@1.0.0` (herdado) proíbe adoção em lote 
 
 Sweep concluído em 2026-07-24; `lib/toast.js` e `UIToastContainer.jsx` foram excluídos com os demais órfãos em 2026-07-26.
 
-### 6. Multi-tenant branding — fora do escopo desta frente
+### 6. Identidade local — fronteira desta frente
 
-Nenhum resolver de branding por organização existe no `platform-admin` hoje. O `AuthContext` recebe `organization` mas só usa `.name` no Dashboard. O AppShell foi configurado com `customize={true}` para permitir personalização local pelo usuário (accent/tema/idioma/layout), mas a integração com branding por org fica para uma frente futura — quando o backend expuser essas preferências.
+O `AppShell` pode permitir personalização local do usuário (accent/tema/idioma/
+layout), mas não recebe resolver de branding, seletor ou preferências por
+organização. A identidade pertence à instalação dedicada.
 
 ### 7. Ícones — mapeamento por proximidade, com fallback
 
@@ -186,11 +192,11 @@ A migração da família IA rendeu 5 releases do próprio Studio UX. Vale como r
 - **Coexistência de padrão visual pede uma FONTE de cor, não duas.** Enquanto telas migradas e não-migradas convivem, a cor de ação tem que sair de um lugar só: `--ap-accent` e a cor `brand` do Tailwind **herdam** `--su-action` (v0.10.3). Cravar hex no `tailwind.config` é o que produzia o botão verde numa tela e azul na do lado — e não se resolve tela por tela, se resolve na origem.
 - **Não confie que o breadcrumb navega — confira.** Item sem `href` é texto; `href` sem `onNavigate` recarrega a SPA. Ao migrar uma tela de detalhe, **mantenha o Voltar/Cancelar visível** de qualquer jeito: é a saída que o usuário acha primeiro, e não depende de o topo estar certo.
 - **Cor traduzida por um mapa "de/para" engole o que não conhece.** A ponte `lib/tone.js` converte o `variant` legado em `tone`, com `|| 'neutral'` no fim. `TOKEN_EXPIRED` era `'orange'`, que não está no mapa — resultado: o estado mais urgente da tela de Conexões (credencial vencida) era o único cinza, e ninguém percebeu porque cinza é uma cor plausível. Ao migrar uma família, **faça o mapa dela declarar `tone` direto** em vez de passar pela ponte: aí não existe "papel desconhecido" para engolir.
-- **Um `catch` que chama `toast` sem `useToast()` no arquivo troca o erro por outro erro.** Dois casos vivos foram encontrados na família Integrações (`Marketplace.load` e o modal de rotação do Cofre): o `ReferenceError: toast is not defined` só acontece quando a chamada falha, que é exatamente quando ninguém está com o console aberto. Ao migrar, confira se **todo** componente do arquivo — inclusive os auxiliares no fim — tem o hook, e não só o componente principal.
+- **Um `catch` que chama `toast` sem `useToast()` no arquivo troca o erro por outro erro.** Dois casos vivos foram encontrados na família Integrações (a lista de providers e o modal de rotação do Cofre): o `ReferenceError: toast is not defined` só acontece quando a chamada falha, que é exatamente quando ninguém está com o console aberto. Ao migrar, confira se **todo** componente do arquivo — inclusive os auxiliares no fim — tem o hook, e não só o componente principal.
 - **`Switch` do DS não tem rótulo, e o `onChange` dele entrega o BOOLEANO, não o evento.** Escrever `onChange={(e) => patch({ x: e.target.checked })}` num `Switch` lança exceção ao clicar (`e.target` é `undefined`). Mas antes disso: campo de formulário que só vale ao salvar é **`Checkbox variant="card"`** com `label` + `meta` (padrão da v1.2.20), não `Switch` — `Switch` é para alternância de efeito imediato.
 - **Antes de escrever uma tela de classe recorrente (acesso, aviso, lista, detalhe, formulário, busca, assistente de passos), confira a tabela de moldes** em `STUDIO_UX_TEMPLATES` §Estado da implementação. Só 3 dos 9 estão em React; os outros 6 existem como HTML no gerador — e "existe em HTML" foi exatamente o que não me impediu de escrever login, aceitar convite, 404 e sem-permissão do zero. **Componente que falta você percebe por erro; molde que falta você não percebe por nada** — a tela sai plausível.
 - **Antes de improvisar um estado ou variante**, pergunte: *"a spec já prevê isso e o adapter não expõe?"* Nos 8 casos desta adoção a resposta foi sim — e em 3 deles a spec estava certa desde a v1.0.0 (inclusive o anti-padrão "breadcrumb que não navega", que estava escrito e acontecendo).
-| 6 | Multi-tenant branding via Customize (accent/tema por organização) | Quando o backend expuser as preferências por org |
+| 6 | Personalização local via Customize (accent/tema da instalação) | Quando houver preferência local aprovada |
 | 7 | ~~Aposentar `Header.jsx` + `NotificationsBell.jsx`~~ ✅ **excluídos** (2026-07-26), junto dos 13 órfãos. Com isso o item 8 foi decidido por ação: o dropdown do sino **não volta** por enquanto — o conteúdo dele vive só no histórico do git | — |
 | 8 | **Dropdown do sino — decidido por ação:** o `NotificationsBell.jsx` foi excluído, então hoje o sino é sinal + link para `/automacao/notificacoes` (ADR §3) e assim fica. Se um dia voltar, é sub-frente própria que recupera o conteúdo do git e o põe num `Drawer` do DS | Fechado (reabre se você quiser o dropdown) |
 | 9 | ~~`DELETE` de base de conhecimento não existe no backend~~ → **movido para [`docs/divida-tecnica.md`](divida-tecnica.md) como `DT-003`**. Não é do DS: é buraco de backend que a migração só revelou. Critério do Robson em 2026-07-25: *o que não é responsabilidade do DS vive na dívida técnica do IA Studio* | — |
@@ -212,7 +218,7 @@ trocar o import correspondente em `App.jsx`:
 
 Os pacotes são **privados** (org `studio-ux-ds`). Para o `npm install` baixá-los, o ambiente precisa de um token do GitHub com escopo **`read:packages`**.
 
-**Fonte única do token:** `${API_DIR}/.env` (`/opt/iastudio/platform-api/.env`), variável `GITLAB_PACKAGE_TOKEN`. Nada de `.bashrc`, nada de `ecosystem.config.js`, nada de export manual — o `upgrade.sh` faz `source .env` antes de qualquer `npm install`, então o valor fica visível para os builds do platform-api, platform-admin e platform-console.
+**Fonte única do token:** `${API_DIR}/.env`, variável `GITLAB_PACKAGE_TOKEN`. Nada de `.bashrc`, nada de `ecosystem.config.js`, nada de export manual — o `upgrade.sh` faz `source .env` antes de qualquer `npm install`, então o valor fica visível para os builds do platform-api e platform-admin.
 
 1. Gere um token clássico no GitHub (Settings → Developer settings → Personal access tokens → Classic) com o escopo **`read:packages`**. Copie o `ghp_...` (só aparece uma vez).
 

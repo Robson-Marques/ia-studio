@@ -2,14 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import {
-  listConnections, changeConnectionState, testConnection, getMarketplace,
+  listConnections, changeConnectionState, testConnection, listConnectionProviders,
 } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { formatDateTime } from '../../lib/format';
 import { statusMeta, STATE_ACTIONS, prettifyProviderKey } from './integration.constants';
 
-// Integrações/Conexões — as instâncias nomeadas dos conectores instalados.
+// Integrações/Conexões — as instâncias nomeadas dos conectores disponíveis.
 // Migrada pro DS na v0.10.11.
 //
 // Decisões de composição:
@@ -40,7 +39,6 @@ export default function Conexoes() {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { workspaces } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [items, setItems] = useState([]);
@@ -67,11 +65,11 @@ export default function Conexoes() {
 
   useEffect(() => {
     load();
-    // O nome amigável do conector vem do marketplace; sem isto a coluna mostra a
-    // chave crua ("whatsapp-meta") — linguagem de código na tela.
-    getMarketplace()
+    // O nome amigável do conector vem do catálogo local; sem isto a coluna mostra a
+    // chave crua do provider — linguagem de código na tela.
+    listConnectionProviders()
       .then(({ items: list }) => setProviderNames(Object.fromEntries((list || []).map((p) => [p.key, p.name]))))
-      .catch(() => {});
+      .catch((err) => toast.error(err.message));
   }, []);
 
   // `?open=<id>` legado (v0.10.10, deep-link da tela de Números): agora que a
@@ -85,17 +83,6 @@ export default function Conexoes() {
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const providerName = (key) => providerNames[key] || prettifyProviderKey(key);
-
-  const scopeName = useMemo(() => {
-    const map = new Map();
-    workspaces.forEach((ws) => {
-      (ws.environments || []).forEach((env) => {
-        map.set(`${ws.id}:${env.id}`, `${ws.name} / ${env.name || env.kind || ''}`);
-      });
-      map.set(`${ws.id}:`, ws.name);
-    });
-    return (c) => map.get(`${c.workspace_id}:${c.environment_id}`) || map.get(`${c.workspace_id}:`) || '—';
-  }, [workspaces]);
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -159,7 +146,6 @@ export default function Conexoes() {
         </p>
       </div>
     ) },
-    { key: 'scope', header: 'Onde vale', render: (c) => scopeName(c) },
     { key: 'tags', header: 'Etiquetas', render: (c) => (
       (c.tags || []).length
         ? <div className="flex gap-1 flex-wrap">{c.tags.map((t) => <Badge key={t} tone="info">{t}</Badge>)}</div>
@@ -265,7 +251,7 @@ export default function Conexoes() {
         emptyNew={{
           icon: 'zap',
           title: 'Nenhuma conexão ainda',
-          description: 'Instale um conector no Marketplace e crie a primeira conexão — o passo a passo pede só o que aquele sistema precisa.',
+          description: 'Crie a primeira conexão e escolha o sistema que ela vai configurar.',
           action: novaConexao,
         }}
         emptyFiltered={{ title: 'Nenhuma conexão encontrada', description: 'Nenhuma conexão com esse nome, conector ou etiqueta.', onClear: () => setQ('') }}

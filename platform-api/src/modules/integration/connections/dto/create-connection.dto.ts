@@ -5,7 +5,6 @@ import {
   IsObject,
   IsOptional,
   IsString,
-  IsUUID,
   Min,
 } from 'class-validator';
 
@@ -17,12 +16,6 @@ export class CreateConnectionDto {
   @IsString()
   @IsNotEmpty()
   name!: string;
-
-  @IsUUID()
-  workspace_id!: string;
-
-  @IsUUID()
-  environment_id!: string;
 
   /** Campos NAO sensiveis do wizard (base_url, host, porta...). */
   @IsOptional()

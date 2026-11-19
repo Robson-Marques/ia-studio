@@ -46,12 +46,12 @@ export class SchedulerCron {
               sourceEventId: `sched:${workflow.id}:${minute}`,
             });
           }
-          await this.scheduler.advanceSchedule(item.id, workflow.organization_id, trigger, now);
+          await this.scheduler.advanceSchedule(item.id, trigger, now);
         } catch (e) {
           this.logger.warn(`Falha ao disparar agendamento do fluxo ${workflow.id}: ${(e as Error).message}`);
           // Avanca mesmo em falha pra nao re-disparar o mesmo minuto em loop.
           await this.scheduler
-            .advanceSchedule(item.id, workflow.organization_id, null, now)
+            .advanceSchedule(item.id, null, now)
             .catch(() => undefined);
         }
       }

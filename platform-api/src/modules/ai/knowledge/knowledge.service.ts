@@ -1,5 +1,5 @@
 // Knowledge Service (RAG): CRUD de bases/documentos + ingestao (parse → chunk →
-// embed) + query topK. Limite 'ai_knowledge_bases' (Licensing) na criacao.
+// embed) + query topK.
 // Ingestao sincrona simplificada (V1): o documento vira READY ao fim; erros
 // marcam FAILED. Storage via StorageService (PDF/DOCX).
 import {
@@ -15,11 +15,7 @@ import { EmbeddingsService } from './embeddings.service';
 import { chunkText } from './chunker';
 import { parseSource, KnowledgeSourceType } from './parse-source';
 import { StorageService } from '../../integration/storage/storage.service';
-import { LimitsService } from '../../licensing/limits.service';
-import { UsageService } from '../../licensing/usage.service';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { assertSameOrg, validateWorkspaceScope } from '../../../shared/auth/tenant.util';
 import {
   AddDocumentDto,
   CreateKnowledgeBaseDto,
@@ -39,41 +35,31 @@ export class KnowledgeService {
     private readonly repository: KnowledgeRepository,
     private readonly embeddings: EmbeddingsService,
     private readonly storage: StorageService,
-    private readonly limits: LimitsService,
-    private readonly usage: UsageService,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // ─── Bases ──────────────────────────────────────────
 
-  findBases(organizationId: string, filters: { workspaceId?: string; environmentId?: string }) {
-    return this.repository.findBases(organizationId, filters);
+  findBases() {
+    return this.repository.findBases();
   }
 
-  async findBase(organizationId: string, id: string): Promise<AiKnowledgeBase> {
+  async findBase(id: string): Promise<AiKnowledgeBase> {
     const base = await this.repository.findBaseById(id);
     if (!base) throw new NotFoundException('Base de conhecimento não encontrada.');
-    assertSameOrg(base.organization_id, organizationId);
     return base;
   }
 
-  async findBaseDetail(organizationId: string, id: string) {
-    const base = await this.findBase(organizationId, id);
+  async findBaseDetail(id: string) {
+    const base = await this.findBase(id);
     const documents = await this.repository.findDocuments(id);
     const query_logs = await this.repository.findQueryLogs(id, 20);
     return { ...base, documents, query_logs };
   }
 
-  async createBase(organizationId: string, dto: CreateKnowledgeBaseDto, createdBy: string | null) {
-    await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
-    const count = await this.repository.countBases(organizationId);
-    await this.limits.assertCountWithin(organizationId, 'ai_knowledge_bases', count);
+  async createBase(dto: CreateKnowledgeBaseDto, createdBy: string | null) {
 
     const base = await this.repository.createBase({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       name: dto.name,
       description: dto.description,
       embedding_connection_id: dto.embedding_connection_id,
@@ -82,21 +68,18 @@ export class KnowledgeService {
       chunk_size: dto.chunk_size ?? 800,
       chunk_overlap: dto.chunk_overlap ?? 120,
       created_by: createdBy,
-    });
-    await this.usage.increment(organizationId, dto.workspace_id, 'ai_knowledge_bases');
+    } as Prisma.AiKnowledgeBaseUncheckedCreateInput);
     await this.audit.record({
       action: 'ai.knowledge.base.create',
       entityType: 'AiKnowledgeBase',
       entityId: base.id,
-      organizationId,
-      workspaceId: dto.workspace_id,
       newValue: { name: base.name },
     });
     return base;
   }
 
-  async updateBase(organizationId: string, id: string, dto: UpdateKnowledgeBaseDto) {
-    const before = await this.findBase(organizationId, id);
+  async updateBase(id: string, dto: UpdateKnowledgeBaseDto) {
+    const before = await this.findBase(id);
     const data: Prisma.AiKnowledgeBaseUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description;
@@ -109,7 +92,6 @@ export class KnowledgeService {
       action: 'ai.knowledge.base.update',
       entityType: 'AiKnowledgeBase',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name, is_active: before.is_active },
       newValue: { name: base.name, is_active: base.is_active },
     });
@@ -119,23 +101,21 @@ export class KnowledgeService {
   // ─── Documentos + ingestao ──────────────────────────
 
   async addDocument(
-    organizationId: string,
     baseId: string,
     dto: AddDocumentDto,
     createdBy: string | null,
   ): Promise<AiKnowledgeDocument> {
-    const base = await this.findBase(organizationId, baseId);
+    const base = await this.findBase(baseId);
     const sourceType = dto.source_type as KnowledgeSourceType;
 
     const document = await this.repository.createDocument({
       base_id: base.id,
-      organization_id: organizationId,
       source_type: sourceType,
       source_ref: dto.source_ref ?? dto.url ?? null,
       storage_file_id: dto.storage_file_id ?? null,
       status: 'PENDING',
       created_by: createdBy,
-    });
+    } as Prisma.AiKnowledgeDocumentUncheckedCreateInput);
 
     // Ingestao inline (V1). Falha marca FAILED — nunca lanca pro caller alem
     // de validacao inicial.
@@ -147,7 +127,6 @@ export class KnowledgeService {
       action: 'ai.knowledge.document.add',
       entityType: 'AiKnowledgeDocument',
       entityId: document.id,
-      organizationId,
       newValue: { base_id: base.id, source_type: sourceType },
     });
     return this.repository.findDocumentById(document.id) as Promise<AiKnowledgeDocument>;
@@ -159,7 +138,7 @@ export class KnowledgeService {
       let buffer: Buffer | undefined;
       if (dto.storage_file_id) {
         const stored = await this.storage
-          .getContent(base.organization_id, dto.storage_file_id)
+          .getContent(dto.storage_file_id)
           .catch(() => null);
         buffer = stored?.content;
       }
@@ -180,7 +159,6 @@ export class KnowledgeService {
         const created = await this.repository.createChunk({
           base_id: base.id,
           document_id: document.id,
-          organization_id: base.organization_id,
           idx: chunks[i].idx,
           content: chunks[i].content,
           token_count: chunks[i].tokenCount,
@@ -200,13 +178,13 @@ export class KnowledgeService {
   // ─── Query (RAG) ────────────────────────────────────
 
   async query(
-    organizationId: string,
     baseId: string,
     query: string,
     topK = 5,
     meta: { traceId?: string; agentId?: string } = {},
   ): Promise<RagContext> {
-    const base = await this.findBase(organizationId, baseId);
+    const base = await this.repository.findBaseById(baseId);
+    if (!base) throw new NotFoundException('Base de conhecimento não encontrada.');
     if (!query.trim()) throw new BadRequestException('Informe uma consulta.');
     const results = await this.embeddings.search(base, query, topK);
     const topScore = results.length > 0 ? results[0].score : 0;
@@ -214,7 +192,6 @@ export class KnowledgeService {
     await this.repository
       .createQueryLog({
         base_id: base.id,
-        organization_id: organizationId,
         trace_id: meta.traceId ?? randomUUID(),
         agent_id: meta.agentId ?? null,
         query: query.slice(0, 2000),
@@ -231,7 +208,6 @@ export class KnowledgeService {
 
   /** RAG multi-base (usado pelo AgentRunner com knowledge_base_ids). */
   async queryMulti(
-    organizationId: string,
     baseIds: string[],
     query: string,
     topK = 5,
@@ -240,7 +216,7 @@ export class KnowledgeService {
     const all: RagContext['chunks'] = [];
     for (const baseId of baseIds) {
       try {
-        const res = await this.query(organizationId, baseId, query, topK, meta);
+        const res = await this.query(baseId, query, topK, meta);
         all.push(...res.chunks);
       } catch (e) {
         this.logger.warn(`RAG na base ${baseId} falhou: ${(e as Error).message}`);

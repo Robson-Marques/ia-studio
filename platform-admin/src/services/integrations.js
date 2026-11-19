@@ -1,27 +1,13 @@
 import api, { extractErrorMessage } from '../lib/api';
 import { normalizeList } from './users';
 
-// ─── Marketplace ─────────────────────────────────────────────
+// ─── Providers disponíveis para novas conexões ─────────────────
 
-export async function getMarketplace({ category, search } = {}) {
+export async function listConnectionProviders() {
   try {
-    const { data } = await api.get('/marketplace', { params: { category: category || undefined, search: search || undefined } });
+    const { data } = await api.get('/connections/providers');
     return normalizeList(data);
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar o marketplace')); }
-}
-
-export async function installProvider(key) {
-  try {
-    const { data } = await api.post(`/marketplace/${key}/install`);
-    return data;
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao instalar conector')); }
-}
-
-export async function uninstallProvider(key) {
-  try {
-    const { data } = await api.post(`/marketplace/${key}/uninstall`);
-    return data;
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao desinstalar conector')); }
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar conectores disponíveis')); }
 }
 
 // ─── Conexões ────────────────────────────────────────────────

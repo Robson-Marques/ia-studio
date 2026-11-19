@@ -1,4 +1,4 @@
-// Leitura de conectividade Altarede (conectividade/listar/com_status) — usada
+// Leitura de conectividade IXC (conectividade/listar/com_status) — usada
 // para resolver afetados de um incidente e para a deteccao de outage. A IA/
 // servicos NUNCA chamam a API direto: tudo via ConnectionsService.execute.
 import { Injectable, Logger } from '@nestjs/common';
@@ -39,17 +39,11 @@ export class IspConnectivityService {
 
   /** Consulta a conectividade no escopo e agrega % offline + linhas normalizadas. */
   async query(
-    organizationId: string,
     connectionId: string,
     scope: Record<string, unknown>,
   ): Promise<ConnectivitySummary> {
     const params = this.sanitizeScope(scope);
-    const raw = await this.connections.execute(
-      organizationId,
-      connectionId,
-      'conectividade.listar_com_status',
-      params,
-    );
+    const raw = await this.connections.execute(connectionId, 'conectividade.listar_com_status', params);
     const rows = this.extractRows(raw);
     const offline = rows.filter((r) => !r.online).length;
     const total = rows.length;

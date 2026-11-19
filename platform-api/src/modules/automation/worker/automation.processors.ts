@@ -80,7 +80,7 @@ export class AutomationProcessors implements OnApplicationBootstrap {
 
   private async handleEvent(job: BrokerJob<EventEnvelope>): Promise<void> {
     const envelope = job.data;
-    if (!envelope?.event || !envelope.organization_id) return;
+    if (!envelope?.event) return;
 
     // Agrupa a rajada de mensagens da mesma conversa num único disparo.
     const chatId =
@@ -107,12 +107,8 @@ export class AutomationProcessors implements OnApplicationBootstrap {
 
   // Casa o evento com os fluxos publicados de gatilho 'event' e vira execução.
   private async dispatchEvent(envelope: EventEnvelope): Promise<void> {
-    const published = await this.workflowsRepository.findPublishedByOrg(envelope.organization_id);
+    const published = await this.workflowsRepository.findPublished();
     for (const workflow of published) {
-      // Escopo (diretriz 4): evento com ambiente so dispara fluxo do MESMO ambiente.
-      if (envelope.environment_id && workflow.environment_id !== envelope.environment_id) continue;
-      if (envelope.workspace_id && workflow.workspace_id !== envelope.workspace_id) continue;
-
       const version = await this.workflowsRepository.findVersion(workflow.id, workflow.current_version);
       if (!version) continue;
       const trigger = parseTrigger(version.trigger);
@@ -137,7 +133,7 @@ export class AutomationProcessors implements OnApplicationBootstrap {
   // ─── Notificacoes ───────────────────────────────────
 
   private async handleNotification(job: BrokerJob<NotifyArgs>): Promise<void> {
-    if (!job.data?.organizationId) return;
+    if (!job.data) return;
     await this.notifications.deliver(job.data);
   }
 }

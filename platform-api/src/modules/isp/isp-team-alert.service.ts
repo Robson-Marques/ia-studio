@@ -30,6 +30,7 @@ export interface TeamAlertResult {
   channel: 'whatsapp' | 'in-app';
   recipients: number;
   sent: number;
+  queued: number;
   failed: number;
   skipped: number;
   reason?: string;
@@ -52,14 +53,14 @@ export class IspTeamAlertService {
    * sao responsabilidade do chamador (IspIncidentsService.registerDetectedAnomaly).
    */
   async alert(incident: IspIncident, opts: { stats?: TeamAlertStats } = {}): Promise<TeamAlertResult> {
-    const cfg = await this.osConfig.getPlantaoConfig(incident.organization_id);
+    const cfg = await this.osConfig.getPlantaoConfig();
     const body = this.buildBody(incident, opts.stats);
 
     if (!cfg.team_id) {
       return this.fallbackInApp(incident, body, 'Equipe de plantão não configurada.');
     }
 
-    const recipients = await this.repository.findPlantaoRecipients(incident.organization_id, cfg.team_id);
+    const recipients = await this.repository.findPlantaoRecipients(cfg.team_id);
     if (recipients.length === 0) {
       return this.fallbackInApp(incident, body, 'Nenhum membro elegível (telefone + opt-in) na equipe de plantão.');
     }
@@ -69,15 +70,12 @@ export class IspTeamAlertService {
       return this.fallbackInApp(incident, body, 'Template de alerta não configurado.');
     }
 
-    const result: TeamAlertResult = { channel: 'whatsapp', recipients: recipients.length, sent: 0, failed: 0, skipped: 0 };
+    const result: TeamAlertResult = { channel: 'whatsapp', recipients: recipients.length, sent: 0, queued: 0, failed: 0, skipped: 0 };
     const summaryLine = this.summaryLine(incident, opts.stats);
 
     for (const r of recipients) {
       try {
-        const { via } = await this.smartSend.send({
-          organizationId: incident.organization_id,
-          workspaceId: incident.workspace_id,
-          environmentId: incident.environment_id,
+        const { via, jobId } = await this.smartSend.send({
           phone: r.phone,
           text: body,
           template: cfg.template,
@@ -85,22 +83,22 @@ export class IspTeamAlertService {
           variables: { '1': summaryLine },
           sender: 'system',
         });
-        if (via === 'skipped') result.skipped += 1;
-        else result.sent += 1;
+        if (via === 'skipped' || !jobId) result.skipped += 1;
+        else result.queued += 1;
         await this.repository.createTeamAlert({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           user_id: r.user_id,
           phone: r.phone,
           via,
-          status: via === 'skipped' ? 'FAILED' : 'SENT',
-          error: via === 'skipped' ? 'Envio não concluído (janela/template).' : null,
-          sent_at: via === 'skipped' ? null : new Date(),
+          status: via === 'skipped' || !jobId ? 'FAILED' : 'PENDING',
+          job_id: jobId ?? null,
+          error: via === 'skipped' || !jobId ? 'Envio não aceito pela Central (janela/template).' : null,
+        }).catch((error) => {
+          this.logger.error(`Registro do alerta ${jobId ?? 'sem job'} falhou: ${(error as Error).message}`);
         });
       } catch (e) {
         result.failed += 1;
         await this.repository.createTeamAlert({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           user_id: r.user_id,
           phone: r.phone,
@@ -112,13 +110,13 @@ export class IspTeamAlertService {
     }
 
     // Se NINGUEM recebeu de fato, degrada pro in-app para o plantao nao ficar no escuro.
-    if (result.sent === 0) {
+    if (result.queued === 0) {
       const fb = await this.fallbackInApp(incident, body, 'Disparo ao plantão não concluído (janela/template).');
       return { ...fb, recipients: recipients.length };
     }
 
     this.logger.log(
-      `Alerta de incidente ${incident.id} ao plantão: ${result.sent} enviados, ${result.failed} falhas, ${result.skipped} pulados.`,
+      `Alerta de incidente ${incident.id} ao plantão: ${result.queued} aceitos pela Central, ${result.failed} falhas, ${result.skipped} pulados.`,
     );
     return result;
   }
@@ -126,17 +124,14 @@ export class IspTeamAlertService {
   private async fallbackInApp(incident: IspIncident, body: string, reason: string): Promise<TeamAlertResult> {
     try {
       await this.notifications.notify({
-        organizationId: incident.organization_id,
-        workspaceId: incident.workspace_id,
-        environmentId: incident.environment_id,
-        recipient: { user_id: '' }, // broadcast in-app pra org
+        recipient: { user_id: '' }, // broadcast in-app da instância
         title: 'Possível incidente de rede',
         body: `${body}\n\n(${reason})`,
       });
     } catch (e) {
       this.logger.warn(`Fallback in-app do alerta de incidente ${incident.id} falhou: ${(e as Error).message}`);
     }
-    return { channel: 'in-app', recipients: 0, sent: 0, failed: 0, skipped: 0, reason };
+    return { channel: 'in-app', recipients: 0, sent: 0, queued: 0, failed: 0, skipped: 0, reason };
   }
 
   private buildBody(incident: IspIncident, stats?: TeamAlertStats): string {

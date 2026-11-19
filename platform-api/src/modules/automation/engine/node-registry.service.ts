@@ -10,9 +10,6 @@ import { Injectable, Logger } from '@nestjs/common';
 // ─── Contexto de execucao de um no ──────────────────────────────────────
 
 export interface NodeExecutionContext {
-  organizationId: string;
-  workspaceId: string;
-  environmentId: string;
   /** Config do no com {{variaveis}} ja interpoladas. */
   config: Record<string, unknown>;
   /** Input da execucao (payload do gatilho). */

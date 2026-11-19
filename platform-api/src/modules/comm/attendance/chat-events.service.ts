@@ -16,10 +16,9 @@ export interface ChatSnapshot {
 }
 
 export interface RecordChatEventInput {
-  organizationId: string;
   chatId: string;
   eventType: 'CLAIMED' | 'RELEASED' | 'TRANSFERRED' | 'CLOSED' | 'REOPENED' | 'TAKEOVER';
-  actorType?: 'USER' | 'SYSTEM' | 'BOT';
+  actor_kind?: 'USER' | 'SYSTEM' | 'BOT';
   actorUserId?: string | null;
   reason?: string | null;
   before?: ChatSnapshot;
@@ -49,25 +48,24 @@ export class ChatEventsService {
     try {
       await this.prisma.whatsappChatEvent.create({
         data: {
-          organization_id: input.organizationId,
           chat_id: input.chatId,
           event_type: input.eventType,
-          actor_type: input.actorType ?? 'USER',
+          actor_type: input.actor_kind ?? 'USER',
           actor_user_id: input.actorUserId ?? null,
           reason: input.reason ?? null,
           before: (input.before ?? undefined) as Prisma.InputJsonValue | undefined,
           after: (input.after ?? undefined) as Prisma.InputJsonValue | undefined,
           metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
-        },
+        } as Prisma.WhatsappChatEventUncheckedCreateInput,
       });
     } catch (e) {
       this.logger.warn(`Falha ao gravar evento de atendimento: ${(e as Error).message}`);
     }
   }
 
-  timeline(organizationId: string, chatId: string, take = 100) {
+  timeline(chatId: string, take = 100) {
     return this.prisma.whatsappChatEvent.findMany({
-      where: { organization_id: organizationId, chat_id: chatId },
+      where: { chat_id: chatId },
       orderBy: { created_at: 'desc' },
       take,
     });

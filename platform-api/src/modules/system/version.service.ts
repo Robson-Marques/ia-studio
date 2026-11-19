@@ -24,7 +24,6 @@ import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { appDir } from './system.paths';
-import { SystemRepository } from './system.repository';
 
 const exec = promisify(execFile);
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -45,19 +44,27 @@ export class VersionService {
   private readonly logger = new Logger(VersionService.name);
   private cache: { info: VersionInfo; at: number } | null = null;
 
-  constructor(private readonly repository: SystemRepository) {}
-
   async getVersionInfo(force = false): Promise<VersionInfo> {
     if (!force && this.cache && Date.now() - this.cache.at < CACHE_TTL_MS) {
       return this.cache.info;
     }
     const expectedMajor = await this.readExpectedMajor();
-    const current = await this.readInstalledVersion(expectedMajor);
+    const current = await this.readCurrentVersion(expectedMajor);
     const remoteSynced = await this.fetchTags();
     const tags = await this.readTags(expectedMajor);
-    const available = tags
+    const newer = tags
       .filter((t) => (current ? this.compare(t, current) > 0 : true))
       .sort((a, b) => this.compare(b, a));
+    // Uma tag com número maior pode ter sido criada em outra branch. Só é uma
+    // atualização válida quando contém a versão atualmente instalada em sua
+    // própria ancestralidade; caso contrário o checkout pode reintroduzir um
+    // schema antigo e fazer o Prisma tentar desfazer a linha dedicada.
+    const available = current
+      ? (await Promise.all(newer.map(async (tag) => ({
+          tag,
+          valid: await this.isDescendantOfCurrent(current, tag),
+        })))).filter((item) => item.valid).map((item) => item.tag)
+      : newer;
 
     const info: VersionInfo = {
       current_version: current,
@@ -98,23 +105,6 @@ export class VersionService {
     return !!p && Number(p[1]) === expectedMajor;
   }
 
-  /**
-   * O checkout Git não prova que o deploy ocorreu: o build e o restart são feitos
-   * pelo upgrade.sh. Se existir histórico SUCCESS, ele é a fonte confiável.
-   * Instalações antigas sem histórico preservam o fallback anterior.
-   */
-  private async readInstalledVersion(expectedMajor: number | null): Promise<string | null> {
-    try {
-      const last = await this.repository.findLatestSuccessfulUpgrade();
-      if (last?.to_version && TAG_REGEX.test(last.to_version) && this.isOwnLine(last.to_version, expectedMajor)) {
-        return last.to_version;
-      }
-    } catch (error) {
-      this.logger.warn(`Falha ao consultar versão instalada no histórico: ${(error as Error).message}`);
-    }
-    return this.readCurrentVersion(expectedMajor);
-  }
-
   private async readCurrentVersion(expectedMajor: number | null): Promise<string | null> {
     // 1) Tag exata do HEAD (git describe). So aceita se casar com vX.Y.Z E for da
     //    linha de versao deste sistema — uma tag de outro sistema no HEAD e' ignorada.
@@ -124,6 +114,19 @@ export class VersionService {
       if (TAG_REGEX.test(tag) && this.isOwnLine(tag, expectedMajor)) return tag;
     } catch {
       // HEAD nao aponta exatamente numa tag — segue pro fallback.
+    }
+    // Pode existir mais de uma tag no mesmo commit (incluindo tags antigas
+    // fora do padrão). git describe --exact-match escolhe apenas uma delas.
+    // Consultar TODAS as tags do HEAD antes de recorrer ao CHANGELOG impede
+    // que uma tag não-semver faça a versão instalada regredir no painel.
+    try {
+      const { stdout } = await exec('git', ['tag', '--points-at', 'HEAD'], { cwd: appDir() });
+      const exactTags = stdout.split('\n').map((tag) => tag.trim())
+        .filter((tag) => TAG_REGEX.test(tag) && this.isOwnLine(tag, expectedMajor))
+        .sort((a, b) => this.compare(b, a));
+      if (exactTags[0]) return exactTags[0];
+    } catch (e) {
+      this.logger.warn(`Falha ao consultar tags do HEAD: ${(e as Error).message}`);
     }
     // 2) Fallback: primeiro "## vX.Y.Z" do CHANGELOG.md (sempre deste sistema).
     try {
@@ -164,6 +167,21 @@ export class VersionService {
     } catch (e) {
       this.logger.warn(`Falha ao listar tags git: ${(e as Error).message}`);
       return [];
+    }
+  }
+
+  private async isDescendantOfCurrent(current: string, candidate: string): Promise<boolean> {
+    try {
+      await exec('git', ['merge-base', '--is-ancestor', current, candidate], { cwd: appDir() });
+      return true;
+    } catch (e) {
+      const code = (e as { code?: number | string }).code;
+      if (code !== 1 && code !== '1') {
+        this.logger.warn(`Não foi possível validar a linhagem de ${candidate}: ${(e as Error).message}`);
+      } else {
+        this.logger.warn(`Tag ${candidate} ignorada: não descende da versão instalada ${current}.`);
+      }
+      return false;
     }
   }
 

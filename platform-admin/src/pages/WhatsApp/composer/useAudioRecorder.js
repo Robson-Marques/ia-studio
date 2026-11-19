@@ -14,14 +14,12 @@ export function pickAudioMime() {
   if (typeof MediaRecorder === 'undefined') return null;
   const candidates = [
     'audio/ogg;codecs=opus',
-    'audio/webm;codecs=opus',
-    'audio/webm',
     'audio/mp4',
   ];
   for (const m of candidates) {
     try { if (MediaRecorder.isTypeSupported(m)) return m; } catch { /* noop */ }
   }
-  return '';
+  return null;
 }
 
 export const fmtTime = (s) =>
@@ -62,7 +60,7 @@ export function useAudioRecorder({ onError } = {}) {
     }
     const mime = pickAudioMime();
     if (mime === null) {
-      onError?.('Este navegador não consegue gravar áudio.');
+      onError?.('Este navegador não grava em formato aceito pelo WhatsApp. Use outro navegador ou anexe um áudio compatível.');
       return;
     }
     try {
@@ -71,12 +69,11 @@ export function useAudioRecorder({ onError } = {}) {
       chunksRef.current = [];
       mimeRef.current = mime;
 
-      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const mr = new MediaRecorder(stream, { mimeType: mime });
       mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
-        // O blob leva o mime REAL do gravador. Renomear webm para ogg corrompe o
-        // arquivo — a Meta aceita o upload e o áudio não toca.
-        const b = new Blob(chunksRef.current, { type: mime || 'audio/webm' });
+        // Preserva o MIME real; renomear WebM para OGG não converte o arquivo.
+        const b = new Blob(chunksRef.current, { type: mime });
         setBlob(b);
         setUrl(URL.createObjectURL(b));
         setState('preview');
@@ -155,8 +152,8 @@ export function useAudioRecorder({ onError } = {}) {
   /** Arquivo pronto para upload, com extensão coerente com o mime gravado. */
   function toFile() {
     if (!blob) return null;
-    const mime = mimeRef.current || blob.type || 'audio/webm';
-    const ext = mime.includes('ogg') ? 'ogg' : mime.includes('mp4') ? 'm4a' : 'webm';
+    const mime = mimeRef.current || blob.type;
+    const ext = mime.includes('ogg') ? 'ogg' : 'm4a';
     return new File([blob], `audio-${Date.now()}.${ext}`, { type: blob.type });
   }
 

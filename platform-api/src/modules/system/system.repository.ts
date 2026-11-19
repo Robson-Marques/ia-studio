@@ -40,14 +40,6 @@ export class SystemRepository {
     });
   }
 
-  /** Versão efetivamente aplicada pelo atualizador (não apenas checkout Git). */
-  findLatestSuccessfulUpgrade() {
-    return this.prisma.systemUpgrade.findFirst({
-      where: { status: SystemJobStatus.SUCCESS },
-      orderBy: { finished_at: 'desc' },
-    });
-  }
-
   listUpgrades(take = 20) {
     return this.prisma.systemUpgrade.findMany({ orderBy: { created_at: 'desc' }, take });
   }
@@ -77,6 +69,18 @@ export class SystemRepository {
     });
   }
 
+  /** Última linha RUNNING sem processo responsável: libera o lock com erro visível. */
+  failStaleRunningRestore(cutoff: Date) {
+    return this.prisma.systemRestore.updateMany({
+      where: { status: SystemJobStatus.RUNNING, started_at: { lt: cutoff } },
+      data: {
+        status: SystemJobStatus.FAILED,
+        error: 'Operação interrompida antes de concluir; inicie um novo backup ou restauração.',
+        finished_at: new Date(),
+      },
+    });
+  }
+
   finishRestore(id: string, status: 'SUCCESS' | 'FAILED', error?: string) {
     return this.prisma.systemRestore.updateMany({
       where: { id, status: SystemJobStatus.RUNNING },
@@ -92,6 +96,6 @@ export class SystemRepository {
     return this.prisma.$executeRaw`
       UPDATE system_restores
       SET log_lines = array_append(log_lines, ${line})
-      WHERE id = ${id}::uuid`;
+      WHERE id = ${id}`;
   }
 }

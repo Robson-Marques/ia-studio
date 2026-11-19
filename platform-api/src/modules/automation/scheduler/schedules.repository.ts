@@ -7,12 +7,11 @@ import { PrismaService } from '../../../shared/prisma/prisma.service';
 export class SchedulesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  upsert(workflowId: string, organizationId: string, nextRunAt: Date | null, enabled: boolean) {
+  upsert(workflowId: string, nextRunAt: Date | null, enabled: boolean) {
     return this.prisma.automationSchedule.upsert({
       where: { workflow_id: workflowId },
       create: {
         workflow_id: workflowId,
-        organization_id: organizationId,
         next_run_at: nextRunAt,
         enabled,
       },
@@ -44,9 +43,8 @@ export class SchedulesRepository {
     return this.prisma.automationSchedule.update({ where: { id }, data });
   }
 
-  listByOrg(organizationId: string) {
+  list() {
     return this.prisma.automationSchedule.findMany({
-      where: { organization_id: organizationId },
       include: { workflow: { select: { id: true, name: true, status: true, current_version: true } } },
       orderBy: { next_run_at: 'asc' },
     });
@@ -54,9 +52,8 @@ export class SchedulesRepository {
 
   // ─── Calendarios ────────────────────────────────────
 
-  findCalendars(organizationId: string) {
+  findCalendars() {
     return this.prisma.automationCalendar.findMany({
-      where: { organization_id: organizationId },
       orderBy: { name: 'asc' },
     });
   }

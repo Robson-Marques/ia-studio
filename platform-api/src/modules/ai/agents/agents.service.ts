@@ -1,7 +1,6 @@
 // Ciclo de vida do agente: CRUD + versoes imutaveis (draft/publish/rollback,
 // estilo git — diretriz 3) + export/import JSON SEM secrets (diretriz 29).
-// Limite 'ai_agents' (Licensing) na criacao. Agente nunca e deletado — so
-// is_active=false.
+// Agente nunca e deletado — so is_active=false.
 import {
   BadRequestException,
   ForbiddenException,
@@ -13,11 +12,8 @@ import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { AiAgent, Prisma } from '@prisma/client';
 import { AgentsRepository } from './agents.repository';
-import { LimitsService } from '../../licensing/limits.service';
-import { UsageService } from '../../licensing/usage.service';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { assertSameOrg, validateWorkspaceScope } from '../../../shared/auth/tenant.util';
 import {
   CreateAgentDto,
   ImportAgentDto,
@@ -33,42 +29,39 @@ export class AgentsService {
 
   constructor(
     private readonly repository: AgentsRepository,
-    private readonly limits: LimitsService,
-    private readonly usage: UsageService,
     private readonly audit: AuditLogService,
     private readonly prisma: PrismaService,
   ) {}
 
   // ─── Leitura ────────────────────────────────────────
 
-  findAll(organizationId: string, filters: { workspaceId?: string; environmentId?: string }) {
-    return this.repository.findAll(organizationId, filters);
+  findAll() {
+    return this.repository.findAll();
   }
 
-  findActive(organizationId: string, filters: { workspaceId?: string; environmentId?: string }) {
-    return this.repository.findActive(organizationId, filters);
+  findActive() {
+    return this.repository.findActive();
   }
 
-  async findById(organizationId: string, id: string): Promise<AiAgent> {
+  async findById(id: string): Promise<AiAgent> {
     const agent = await this.repository.findById(id);
     if (!agent) throw new NotFoundException('Agente não encontrado.');
-    assertSameOrg(agent.organization_id, organizationId);
     return agent;
   }
 
-  async findDetail(organizationId: string, id: string) {
-    const agent = await this.findById(organizationId, id);
+  async findDetail(id: string) {
+    const agent = await this.findById(id);
     const versions = await this.repository.listVersions(id);
     const runs = await this.repository.listRuns(id, 20);
     return { ...agent, versions, recent_runs: runs };
   }
 
-  listVersions(organizationId: string, id: string) {
-    return this.findById(organizationId, id).then(() => this.repository.listVersions(id));
+  listVersions(id: string) {
+    return this.findById(id).then(() => this.repository.listVersions(id));
   }
 
-  listRuns(organizationId: string, id: string) {
-    return this.findById(organizationId, id).then(() => this.repository.listRuns(id, 50));
+  listRuns(id: string) {
+    return this.findById(id).then(() => this.repository.listRuns(id, 50));
   }
 
   // ─── Anti-escalada de ações da IA ───────────────────
@@ -81,17 +74,16 @@ export class AgentsService {
    * poder da IA além do próprio. (No runtime, a ação ainda passa por aprovação.)
    */
   private async assertActionGrant(
-    organizationId: string,
     allowedTools: string[] | undefined,
     actor?: AuthenticatedUser,
   ): Promise<void> {
     if (!allowedTools || allowedTools.length === 0) return;
     const perms = actor?.permissions ?? [];
-    const canGrant = actor?.is_platform_admin || perms.includes('*') || perms.includes(PERMISSIONS.AI_AGENTS_ACTIONS);
+    const canGrant = perms.includes('*') || perms.includes(PERMISSIONS.AI_AGENTS_ACTIONS);
     if (canGrant) return;
 
     const writeTools = await this.prisma.aiTool.findMany({
-      where: { organization_id: organizationId, key: { in: allowedTools }, requires_approval: true },
+      where: { key: { in: allowedTools }, requires_approval: true },
       select: { name: true },
     });
     if (writeTools.length > 0) {
@@ -104,16 +96,10 @@ export class AgentsService {
 
   // ─── CRUD ───────────────────────────────────────────
 
-  async create(organizationId: string, dto: CreateAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
-    await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
-    await this.assertActionGrant(organizationId, dto.allowed_tools, actor);
-    const count = await this.repository.countByOrg(organizationId);
-    await this.limits.assertCountWithin(organizationId, 'ai_agents', count);
+  async create(dto: CreateAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
+    await this.assertActionGrant(dto.allowed_tools, actor);
 
     const agent = await this.repository.create({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       name: dto.name,
       description: dto.description,
       connection_id: dto.connection_id,
@@ -132,24 +118,21 @@ export class AgentsService {
       guardrails: dto.guardrails === undefined ? undefined : (dto.guardrails as Prisma.InputJsonValue),
       conversation: dto.conversation === undefined ? undefined : (dto.conversation as Prisma.InputJsonValue),
       created_by: createdBy,
-    });
-    await this.usage.increment(organizationId, dto.workspace_id, 'ai_agents');
+    } as Prisma.AiAgentUncheckedCreateInput);
     await this.audit.record({
       action: 'ai.agent.create',
       entityType: 'AiAgent',
       entityId: agent.id,
-      organizationId,
-      workspaceId: dto.workspace_id,
       newValue: { name: agent.name, model: agent.model },
     });
     return agent;
   }
 
-  async update(organizationId: string, id: string, dto: UpdateAgentDto, actor?: AuthenticatedUser) {
-    const before = await this.findById(organizationId, id);
+  async update(id: string, dto: UpdateAgentDto, actor?: AuthenticatedUser) {
+    const before = await this.findById(id);
     // Só valida quando o próprio update mexe em allowed_tools.
     if (dto.allowed_tools !== undefined) {
-      await this.assertActionGrant(organizationId, dto.allowed_tools, actor);
+      await this.assertActionGrant(dto.allowed_tools, actor);
     }
     const data: Prisma.AiAgentUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
@@ -175,7 +158,6 @@ export class AgentsService {
       action: 'ai.agent.update',
       entityType: 'AiAgent',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name, model: before.model, is_active: before.is_active },
       newValue: { name: agent.name, model: agent.model, is_active: agent.is_active },
     });
@@ -185,8 +167,8 @@ export class AgentsService {
   // ─── Versoes (diretriz 3) ───────────────────────────
 
   /** Salvar = nova versao imutavel (snapshot do estado corrente do agente). */
-  async saveVersion(organizationId: string, id: string, dto: SaveAgentVersionDto, createdBy: string | null) {
-    const agent = await this.findById(organizationId, id);
+  async saveVersion(id: string, dto: SaveAgentVersionDto, createdBy: string | null) {
+    const agent = await this.findById(id);
     const next = (await this.repository.latestVersionNumber(id)) + 1;
     const version = await this.repository.createVersion({
       agent_id: id,
@@ -199,15 +181,14 @@ export class AgentsService {
       action: 'ai.agent.save_version',
       entityType: 'AiAgent',
       entityId: id,
-      organizationId,
       newValue: { version: next, note: dto.note ?? null },
     });
     return version;
   }
 
   /** Publicar/rollback: aponta current_version pra uma versao existente. */
-  async publish(organizationId: string, id: string, versionNumber: number, actorId: string | null) {
-    const agent = await this.findById(organizationId, id);
+  async publish(id: string, versionNumber: number, actorId: string | null) {
+    const agent = await this.findById(id);
     const version = await this.repository.findVersion(id, versionNumber);
     if (!version) throw new NotFoundException(`Versão v${versionNumber} não existe neste agente.`);
 
@@ -219,7 +200,6 @@ export class AgentsService {
       action: isRollback ? 'ai.agent.rollback' : 'ai.agent.publish',
       entityType: 'AiAgent',
       entityId: id,
-      organizationId,
       oldValue: { current_version: agent.current_version },
       newValue: { current_version: versionNumber },
     });
@@ -229,8 +209,8 @@ export class AgentsService {
 
   // ─── Export / Import (SEM secrets — diretriz 29) ────
 
-  async exportAgent(organizationId: string, id: string) {
-    const agent = await this.findById(organizationId, id);
+  async exportAgent(id: string) {
+    const agent = await this.findById(id);
     return {
       schema_version: AGENT_EXPORT_SCHEMA_VERSION,
       kind: 'iastudio.agent',
@@ -239,7 +219,7 @@ export class AgentsService {
     };
   }
 
-  async importAgent(organizationId: string, dto: ImportAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
+  async importAgent(dto: ImportAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
     const data = dto.data as {
       kind?: string;
       schema_version?: number;
@@ -254,8 +234,6 @@ export class AgentsService {
     const snap = data.agent;
     const createDto: CreateAgentDto = {
       name: dto.name ?? (typeof snap['name'] === 'string' ? (snap['name'] as string) : 'Agente importado'),
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       description: typeof snap['description'] === 'string' ? (snap['description'] as string) : undefined,
       model: typeof snap['model'] === 'string' ? (snap['model'] as string) : 'gpt-4o-mini',
       system_prompt: typeof snap['system_prompt'] === 'string' ? (snap['system_prompt'] as string) : undefined,
@@ -270,12 +248,11 @@ export class AgentsService {
       guardrails: this.asObject(snap['guardrails']),
       conversation: this.asObject(snap['conversation']),
     };
-    const agent = await this.create(organizationId, createDto, createdBy, actor);
+    const agent = await this.create(createDto, createdBy, actor);
     await this.audit.record({
       action: 'ai.agent.import',
       entityType: 'AiAgent',
       entityId: agent.id,
-      organizationId,
       newValue: { name: agent.name },
     });
     return agent;

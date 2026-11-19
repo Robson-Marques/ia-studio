@@ -1,13 +1,12 @@
 // Scheduler (diretriz 12): sincroniza o agendamento persistido com o trigger
 // da versao PUBLICADA + preview das proximas execucoes + calendarios
-// (feriados/dias uteis) por organization.
+// (feriados/dias úteis) da instância.
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, Workflow } from '@prisma/client';
 import { SchedulesRepository } from './schedules.repository';
 import { CalendarDef, computeNextRuns, describeSchedule, validateScheduleDef } from './schedule.util';
 import { ScheduleDef, TriggerDef } from '../engine/workflow-graph';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { assertSameOrg } from '../../../shared/auth/tenant.util';
 
 @Injectable()
 export class SchedulerService {
@@ -29,9 +28,9 @@ export class SchedulerService {
     if (errors.length > 0) {
       throw new BadRequestException(`Agendamento inválido: ${errors.join(' | ')}`);
     }
-    const calendar = await this.loadCalendar(workflow.organization_id, trigger.schedule.calendar_id);
+    const calendar = await this.loadCalendar(trigger.schedule.calendar_id);
     const [next] = computeNextRuns(trigger.schedule, calendar, 1);
-    await this.repository.upsert(workflow.id, workflow.organization_id, next ?? null, true);
+    await this.repository.upsert(workflow.id, next ?? null, true);
     this.logger.log(
       `Agendamento do fluxo ${workflow.id}: ${describeSchedule(trigger.schedule)} — próximo: ${next?.toISOString() ?? 'n/d'}.`,
     );
@@ -44,7 +43,6 @@ export class SchedulerService {
   /** Recalcula o proximo disparo (usado pelo cron apos disparar). */
   async advanceSchedule(
     scheduleId: string,
-    organizationId: string,
     trigger: TriggerDef | null,
     firedAt: Date,
   ): Promise<void> {
@@ -52,39 +50,37 @@ export class SchedulerService {
       await this.repository.update(scheduleId, { enabled: false, next_run_at: null });
       return;
     }
-    const calendar = await this.loadCalendar(organizationId, trigger.schedule.calendar_id);
+    const calendar = await this.loadCalendar(trigger.schedule.calendar_id);
     const [next] = computeNextRuns(trigger.schedule, calendar, 1, firedAt);
     await this.repository.update(scheduleId, { next_run_at: next ?? null, last_run_at: firedAt });
   }
 
   // ─── Preview / listagem ─────────────────────────────
 
-  async preview(organizationId: string, def: ScheduleDef, n = 5) {
+  async preview(def: ScheduleDef, n = 5) {
     const errors = validateScheduleDef(def);
     if (errors.length > 0) throw new BadRequestException(`Agendamento inválido: ${errors.join(' | ')}`);
-    const calendar = await this.loadCalendar(organizationId, def.calendar_id);
+    const calendar = await this.loadCalendar(def.calendar_id);
     return {
       description: describeSchedule(def),
       next_runs: computeNextRuns(def, calendar, n).map((d) => d.toISOString()),
     };
   }
 
-  listSchedules(organizationId: string) {
-    return this.repository.listByOrg(organizationId);
+  listSchedules() {
+    return this.repository.list();
   }
 
   // ─── Calendarios ────────────────────────────────────
 
-  listCalendars(organizationId: string) {
-    return this.repository.findCalendars(organizationId);
+  listCalendars() {
+    return this.repository.findCalendars();
   }
 
   async createCalendar(
-    organizationId: string,
     dto: { name: string; holidays?: string[]; workdays?: number[] },
   ) {
     const calendar = await this.repository.createCalendar({
-      organization_id: organizationId,
       name: dto.name,
       holidays: (dto.holidays ?? []) as Prisma.InputJsonValue,
       workdays: (dto.workdays ?? [1, 2, 3, 4, 5]) as Prisma.InputJsonValue,
@@ -93,18 +89,16 @@ export class SchedulerService {
       action: 'automation.calendar.create',
       entityType: 'AutomationCalendar',
       entityId: calendar.id,
-      organizationId,
       newValue: { name: calendar.name },
     });
     return calendar;
   }
 
   async updateCalendar(
-    organizationId: string,
     id: string,
     dto: { name?: string; holidays?: string[]; workdays?: number[] },
   ) {
-    const before = await this.getCalendar(organizationId, id);
+    const before = await this.getCalendar(id);
     const calendar = await this.repository.updateCalendar(id, {
       name: dto.name ?? undefined,
       holidays: dto.holidays === undefined ? undefined : (dto.holidays as Prisma.InputJsonValue),
@@ -114,21 +108,19 @@ export class SchedulerService {
       action: 'automation.calendar.update',
       entityType: 'AutomationCalendar',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name },
       newValue: { name: calendar.name },
     });
     return calendar;
   }
 
-  async deleteCalendar(organizationId: string, id: string) {
-    const before = await this.getCalendar(organizationId, id);
+  async deleteCalendar(id: string) {
+    const before = await this.getCalendar(id);
     await this.repository.deleteCalendar(id);
     await this.audit.record({
       action: 'automation.calendar.delete',
       entityType: 'AutomationCalendar',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name },
     });
     return { deleted: true };
@@ -136,17 +128,16 @@ export class SchedulerService {
 
   // ─── Privados ───────────────────────────────────────
 
-  private async getCalendar(organizationId: string, id: string) {
+  private async getCalendar(id: string) {
     const calendar = await this.repository.findCalendarById(id);
     if (!calendar) throw new NotFoundException('Calendário não encontrado.');
-    assertSameOrg(calendar.organization_id, organizationId);
     return calendar;
   }
 
-  private async loadCalendar(organizationId: string, calendarId?: string): Promise<CalendarDef | null> {
+  private async loadCalendar(calendarId?: string): Promise<CalendarDef | null> {
     if (!calendarId) return null;
     const calendar = await this.repository.findCalendarById(calendarId);
-    if (!calendar || calendar.organization_id !== organizationId) return null;
+    if (!calendar) return null;
     return {
       holidays: Array.isArray(calendar.holidays) ? (calendar.holidays as string[]) : [],
       workdays: Array.isArray(calendar.workdays) ? (calendar.workdays as number[]) : [1, 2, 3, 4, 5],

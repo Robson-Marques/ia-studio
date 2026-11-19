@@ -1,5 +1,5 @@
 // DTOs do modulo ISP (class-validator — sem any). O escopo e um mapa de
-// filtros de conectividade Altarede; validamos apenas as chaves conhecidas.
+// filtros de conectividade IXC; validamos apenas as chaves conhecidas.
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -39,11 +39,7 @@ export class CreateIncidentDto {
 
   @IsOptional() @IsString() @MaxLength(240) forecast?: string;
 
-  @IsString() workspace_id!: string;
-
-  @IsString() environment_id!: string;
-
-  /** Conexao Altarede que resolve os afetados. */
+  /** Conexão IXC que resolve os afetados. */
   @IsString() connection_id!: string;
 
   @IsOptional() @IsEnum(IspIncidentCommMode) comm_mode?: IspIncidentCommMode;

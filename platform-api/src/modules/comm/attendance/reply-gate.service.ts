@@ -18,7 +18,6 @@ export class ReplyGateService {
    * implicito ou takeover confirmado quando necessario. Lanca 403/409.
    */
   async assertCanReply(
-    organizationId: string,
     chat: WhatsappChat,
     scope: AttendanceScope,
     confirmTakeover = false,
@@ -46,7 +45,7 @@ export class ReplyGateService {
       if (!scope.can.claim && !scope.reply.all) {
         throw new ForbiddenException('Sem permissão para assumir conversas do pool.');
       }
-      await this.assignment.claim(organizationId, chat.id, scope);
+      await this.assignment.claim(chat.id, scope);
       return;
     }
 
@@ -61,6 +60,6 @@ export class ReplyGateService {
         error: 'NEEDS_TAKEOVER_CONFIRMATION',
       });
     }
-    await this.assignment.takeover(organizationId, chat.id, scope);
+    await this.assignment.takeover(chat.id, scope);
   }
 }

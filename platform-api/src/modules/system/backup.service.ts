@@ -1,4 +1,4 @@
-// Backup e Restauracao (Fase 8). Lista/gera/baixa/sobe/exclui pacotes e dispara
+// Backup e restauração locais. Lista/gera/baixa/sobe/exclui pacotes e dispara
 // a restauracao completa. 1 operacao por vez (lock via system_restores RUNNING).
 // Guarda anti path-traversal em TODO nome de arquivo (resolveBackupPath).
 // Restauracao roda via systemd-run (fora da arvore do PM2 — evita treekill).
@@ -15,7 +15,9 @@ import type { ReadStream } from 'node:fs';
 import * as path from 'node:path';
 import { SystemRepository } from './system.repository';
 import { AuditLogService } from '../../shared/audit/audit-log.service';
-import { backupDir, resolveBackupPath, scriptsDir } from './system.paths';
+import { appId, backupDir, resolveBackupPath, scriptsDir } from './system.paths';
+
+const STALE_OPERATION_MS = 30 * 60 * 1000;
 
 export interface BackupFileInfo {
   file: string;
@@ -156,14 +158,25 @@ export class BackupService {
 
   // ─── Status ─────────────────────────────────────────────────────────
 
-  async currentOperation() {
+  async currentOperation(operationId?: string) {
+    await this.reapStaleOperation();
+    // Uma tela que iniciou uma operação acompanha explicitamente a sua própria
+    // row. Nunca substitua esse resultado por uma falha histórica de outro
+    // backup/restauração: isso gerava mensagens falsas após um restore.
+    if (operationId) {
+      return { operation: await this.repository.findRestoreById(operationId) };
+    }
     const running = await this.repository.findRunningRestore();
-    return { operation: running ?? null };
+    // Sem id a superfície "current" é somente o lock vivo da instalação. O
+    // histórico pertence à auditoria; uma operação terminal antiga não é
+    // estado atual e não deve ocupar o painel ao abrir a página.
+    return { operation: running };
   }
 
   // ─── infra ──────────────────────────────────────────────────────────
 
   private async assertNoOperationRunning(): Promise<void> {
+    await this.reapStaleOperation();
     const running = await this.repository.findRunningRestore();
     if (running) {
       throw new ConflictException('Já existe uma operação de backup/restauração em andamento.');
@@ -172,31 +185,44 @@ export class BackupService {
 
   private spawnBackup(restoreId: string): void {
     const script = path.join(scriptsDir(), 'backup-full.sh');
-    // O backup-full.sh imprime o caminho do arquivo no stdout; capturamos para
-    // registrar o file_name e fechar a row.
-    let out = '';
+    // O script roda fora da árvore do PM2 e atualiza a própria row no banco.
+    // Isso sobrevive a restart da API depois que o pacote já foi criado.
     try {
-      const child = spawn('bash', [script], { detached: true, cwd: scriptsDir() });
-      child.stdout?.on('data', (d: Buffer) => {
-        out += d.toString();
+      const processPath = process.env.PATH ?? '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+      const child = spawn('systemd-run', [
+        '--quiet',
+        '--collect',
+        '--unit', `iastudio-${appId()}-backup-${restoreId}`,
+        `--setenv=PATH=${processPath}`,
+        'bash', script, '--operation-id', restoreId,
+      ], {
+        detached: true,
+        cwd: scriptsDir(),
+        stdio: 'ignore',
       });
       child.on('error', (err) => {
-        this.logger.error(`Falha ao iniciar backup-full.sh: ${err.message}`);
+        this.logger.error(`Falha ao iniciar backup via systemd-run: ${err.message}`);
         void this.repository.finishRestore(restoreId, 'FAILED', err.message);
       });
-      child.on('close', (code) => {
-        if (code === 0) {
-          const file = path.basename(out.trim());
-          void this.repository.appendRestoreLog(restoreId, `Backup gerado: ${file}`);
-          void this.repository.finishRestore(restoreId, 'SUCCESS');
-        } else {
-          void this.repository.finishRestore(restoreId, 'FAILED', `backup-full.sh saiu com código ${code}`);
+      child.on('exit', (code) => {
+        if (code && code !== 0) {
+          void this.repository.finishRestore(restoreId, 'FAILED', `systemd-run não iniciou o backup (código ${code})`);
         }
       });
       child.unref();
+      this.logger.log(`backup-full.sh disparado via systemd-run (row ${restoreId}).`);
     } catch (e) {
-      this.logger.error(`Erro ao spawnar backup-full.sh: ${(e as Error).message}`);
+      this.logger.error(`Erro ao iniciar backup via systemd-run: ${(e as Error).message}`);
       void this.repository.finishRestore(restoreId, 'FAILED', (e as Error).message);
+    }
+  }
+
+  private async reapStaleOperation(): Promise<void> {
+    try {
+      const result = await this.repository.failStaleRunningRestore(new Date(Date.now() - STALE_OPERATION_MS));
+      if (result.count) this.logger.warn(`Operação(ões) de backup/restauração órfã(s) marcada(s) como FAILED: ${result.count}.`);
+    } catch (error) {
+      this.logger.warn(`Não foi possível liberar operação órfã: ${(error as Error).message}`);
     }
   }
 
@@ -208,7 +234,11 @@ export class BackupService {
     try {
       const child = spawn(
         'systemd-run',
-        ['--unit', `iastudio-restore-${restoreId}`, '--collect', 'bash', script, archivePath, restoreId],
+        [
+          '--unit', `iastudio-${appId()}-restore-${restoreId}`,
+          '--collect',
+          'bash', script, archivePath, restoreId,
+        ],
         { detached: true, stdio: 'ignore', cwd: scriptsDir() },
       );
       child.on('error', (err) => {

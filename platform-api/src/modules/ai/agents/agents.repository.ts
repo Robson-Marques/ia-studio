@@ -10,26 +10,16 @@ export class AgentsRepository {
 
   // ─── Agentes ────────────────────────────────────────
 
-  findAll(organizationId: string, filters: { workspaceId?: string; environmentId?: string } = {}) {
-    const where: Prisma.AiAgentWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
-    return this.prisma.aiAgent.findMany({ where, orderBy: { updated_at: 'desc' } });
+  findAll() {
+    return this.prisma.aiAgent.findMany({ where: {}, orderBy: { updated_at: 'desc' } });
   }
 
-  findActive(organizationId: string, filters: { workspaceId?: string; environmentId?: string } = {}) {
-    const where: Prisma.AiAgentWhereInput = { organization_id: organizationId, is_active: true };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
-    return this.prisma.aiAgent.findMany({ where, orderBy: { name: 'asc' } });
+  findActive() {
+    return this.prisma.aiAgent.findMany({ where: { is_active: true }, orderBy: { name: 'asc' } });
   }
 
   findById(id: string) {
     return this.prisma.aiAgent.findUnique({ where: { id } });
-  }
-
-  countByOrg(organizationId: string) {
-    return this.prisma.aiAgent.count({ where: { organization_id: organizationId } });
   }
 
   create(data: Prisma.AiAgentUncheckedCreateInput) {

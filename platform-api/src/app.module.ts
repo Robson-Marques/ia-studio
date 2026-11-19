@@ -12,12 +12,9 @@ import { BrokerModule } from './shared/broker/broker.module';
 import { EventsModule } from './shared/events/events.module';
 import { HealthModule } from './shared/health/health.module';
 import { JwtAuthGuard } from './shared/auth/jwt-auth.guard';
-import { PlatformAdminGuard } from './shared/auth/platform-admin.guard';
 import { PermissionsGuard } from './shared/auth/permissions.guard';
 
 import { CoreAuthModule } from './modules/core/auth/core-auth.module';
-import { OrganizationsModule } from './modules/core/organizations/organizations.module';
-import { WorkspacesModule } from './modules/core/workspaces/workspaces.module';
 import { UsersModule } from './modules/core/users/users.module';
 import { InvitesModule } from './modules/core/invites/invites.module';
 import { ProfilesModule } from './modules/core/profiles/profiles.module';
@@ -25,14 +22,11 @@ import { FlagsModule } from './modules/core/flags/flags.module';
 import { SettingsModule } from './modules/core/settings/settings.module';
 import { AuditQueryModule } from './modules/core/audit/audit-query.module';
 import { SeedModule } from './modules/core/seed/seed.module';
-import { LicensingModule } from './modules/licensing/licensing.module';
-import { BillingModule } from './modules/billing/billing.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { CommModule } from './modules/comm/comm.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { AiModule } from './modules/ai/ai.module';
 import { IspModule } from './modules/isp/isp.module';
-import { ResourceModule } from './modules/resource/resource.module';
 import { DevtoolsModule } from './modules/devtools/devtools.module';
 import { DeveloperModule } from './modules/developer/developer.module';
 import { SystemModule } from './modules/system/system.module';
@@ -60,37 +54,29 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
     BrokerModule,
     EventsModule,
     CoreAuthModule,
-    OrganizationsModule,
-    WorkspacesModule,
     UsersModule,
     InvitesModule,
     ProfilesModule,
     FlagsModule,
     SettingsModule,
     AuditQueryModule,
-    LicensingModule,
-    BillingModule,
     IntegrationModule,
     CommModule,
     AutomationModule,
     AiModule,
     IspModule,
-    // Fase 7 (diretrizes 9/23/24/25/28/57): Resource Model + Mapper + Explorer,
     // Console do Desenvolvedor e Developer Center (Public API + API Keys).
-    ResourceModule,
     DevtoolsModule,
     DeveloperModule,
-    // Fase 8 (FINAL): Atualizacao/Backup/Restauracao (infra global do Console)
-    // e Dashboards consolidados read-only (diretriz 34).
+    // Administração local: atualização/backup/restauração e resumo dedicado.
     SystemModule,
     DashboardsModule,
     SeedModule,
   ],
   providers: [
-    // Ordem importa: throttling → autenticacao → ator de plataforma → ACL granular.
+    // Ordem importa: throttling → autenticacao → ACL granular local.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: PlatformAdminGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })

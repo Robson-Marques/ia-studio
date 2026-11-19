@@ -6,7 +6,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { WorkflowsService } from './workflows.service';
 import { NodeRegistryService } from '../engine/node-registry.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
@@ -35,32 +34,24 @@ export class WorkflowsController {
   @Get()
   @RequirePermissions(PERMISSIONS.AUTOMATION_WORKFLOWS_READ)
   findAll(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('workspace_id') workspaceId?: string,
-    @Query('environment_id') environmentId?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.findAll(resolveOrganizationId(user, orgQuery), { workspaceId, environmentId });
+    return this.workflows.findAll();
   }
 
   @Get(':id')
   @RequirePermissions(PERMISSIONS.AUTOMATION_WORKFLOWS_READ)
   findById(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.findDetail(resolveOrganizationId(user, orgQuery), id);
+    return this.workflows.findDetail(id);
   }
 
   @Get(':id/versions')
   @RequirePermissions(PERMISSIONS.AUTOMATION_WORKFLOWS_READ)
   listVersions(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.listVersions(resolveOrganizationId(user, orgQuery), id);
+    return this.workflows.listVersions(id);
   }
 
   @Post()
@@ -68,9 +59,8 @@ export class WorkflowsController {
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateWorkflowDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.create(resolveOrganizationId(user, orgQuery), dto, user.sub);
+    return this.workflows.create(dto, user.sub);
   }
 
   @Patch(':id')
@@ -79,9 +69,8 @@ export class WorkflowsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateWorkflowDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.update(resolveOrganizationId(user, orgQuery), id, dto);
+    return this.workflows.update(id, dto);
   }
 
   /** Salvar edicao = SEMPRE nova versao imutavel (diretriz 3). */
@@ -91,9 +80,8 @@ export class WorkflowsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: SaveVersionDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.saveVersion(resolveOrganizationId(user, orgQuery), id, dto, user.sub);
+    return this.workflows.saveVersion(id, dto, user.sub);
   }
 
   /** Publicar OU rollback: aponta current_version pra versao indicada. */
@@ -103,9 +91,8 @@ export class WorkflowsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: PublishWorkflowDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.publish(resolveOrganizationId(user, orgQuery), id, dto.version, user.sub);
+    return this.workflows.publish(id, dto.version, user.sub);
   }
 
   @Post(':id/archive')
@@ -113,9 +100,8 @@ export class WorkflowsController {
   archive(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.archive(resolveOrganizationId(user, orgQuery), id);
+    return this.workflows.archive(id);
   }
 
   /** Despublicar: volta a DRAFT (para os gatilhos) mantendo o fluxo visível.
@@ -125,9 +111,8 @@ export class WorkflowsController {
   unpublish(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.unpublish(resolveOrganizationId(user, orgQuery), id, user.sub);
+    return this.workflows.unpublish(id, user.sub);
   }
 
   /** Exclusão definitiva (arquivar guarda; excluir remove de vez). */
@@ -136,9 +121,8 @@ export class WorkflowsController {
   remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.remove(resolveOrganizationId(user, orgQuery), id);
+    return this.workflows.remove(id);
   }
 
   @Post(':id/webhook-token/rotate')
@@ -146,9 +130,8 @@ export class WorkflowsController {
   rotateWebhookToken(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.rotateWebhookToken(resolveOrganizationId(user, orgQuery), id);
+    return this.workflows.rotateWebhookToken(id);
   }
 
   /** Execucao manual (input JSON + dry-run). A API so enfileira. */
@@ -158,10 +141,8 @@ export class WorkflowsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: ExecuteWorkflowDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
     return this.workflows.executeManual(
-      resolveOrganizationId(user, orgQuery),
       id,
       dto.input ?? {},
       dto.dry_run ?? false,
@@ -176,13 +157,8 @@ export class WorkflowsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Query('version') version?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.exportWorkflow(
-      resolveOrganizationId(user, orgQuery),
-      id,
-      version ? Number(version) : undefined,
-    );
+    return this.workflows.exportWorkflow(id, version ? Number(version) : undefined);
   }
 
   @Post('import')
@@ -190,8 +166,7 @@ export class WorkflowsController {
   importWorkflow(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ImportWorkflowDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.workflows.importWorkflow(resolveOrganizationId(user, orgQuery), dto, user.sub);
+    return this.workflows.importWorkflow(dto, user.sub);
   }
 }

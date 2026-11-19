@@ -2,15 +2,35 @@
 import { Injectable } from '@nestjs/common';
 import { CommTemplateStatus, Prisma, WhatsappTemplate } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { SEED_CATALOG } from './template-catalog/catalog.seed';
 
 @Injectable()
 export class WhatsappTemplatesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(organizationId: string, connectionId?: string): Promise<WhatsappTemplate[]> {
+  async seedCatalog(connectionId: string): Promise<void> {
+    for (const item of SEED_CATALOG) {
+      await this.prisma.whatsappTemplate.upsert({
+        where: { connection_id_name_language: { connection_id: connectionId, name: item.name, language: item.language } },
+        create: {
+          connection_id: connectionId,
+          name: item.name,
+          language: item.language,
+          category: item.category,
+          status: 'DRAFT',
+          components: item.components as unknown as Prisma.InputJsonValue,
+          event: item.event,
+          is_system_template: true,
+          variable_map_json: item.variableMap as unknown as Prisma.InputJsonValue,
+        },
+        update: {},
+      });
+    }
+  }
+
+  list(connectionId?: string): Promise<WhatsappTemplate[]> {
     return this.prisma.whatsappTemplate.findMany({
       where: {
-        organization_id: organizationId,
         ...(connectionId ? { connection_id: connectionId } : {}),
       },
       orderBy: [{ name: 'asc' }, { language: 'asc' }],
@@ -41,9 +61,6 @@ export class WhatsappTemplatesRepository {
 
   /** Upsert usado pelo sync (Meta → IA Studio). */
   upsertFromMeta(input: {
-    organizationId: string;
-    workspaceId: string;
-    environmentId: string;
     connectionId: string;
     name: string;
     language: string;
@@ -63,9 +80,6 @@ export class WhatsappTemplatesRepository {
         },
       },
       create: {
-        organization_id: input.organizationId,
-        workspace_id: input.workspaceId,
-        environment_id: input.environmentId,
         connection_id: input.connectionId,
         name: input.name,
         language: input.language,

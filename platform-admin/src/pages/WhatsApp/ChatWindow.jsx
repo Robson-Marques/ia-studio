@@ -1,13 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Badge, Button, IconButton, Avatar, ConfirmDialog, Modal, Field, Select, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Badge, Button, IconButton, Avatar, ConfirmDialog, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   claimChat, releaseChat, closeChat, reopenChat, downloadChatMedia, unlinkCustomer,
-  listManualChannels, setManualChannel,
 } from '../../services/whatsapp';
-import { ATTENDANCE_STATUS, formatPhone } from './whatsapp.constants';
+import { ATTENDANCE_STATUS, contactInitials, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
 import AudioPlayer from './AudioPlayer';
+import PdfThumbnail from './PdfThumbnail';
 import { statusToTone } from '../../lib/tone';
 
 // WhatsApp/ChatWindow — a conversa aberta. Migrada pro DS na v0.10.9.
@@ -32,49 +32,73 @@ function StatusTicks({ status }) {
   return <DSIcon name="clock" size="sm" style={{ color: '#8696a0' }} />;
 }
 
-// Mídia (recebida ou enviada): baixa da Meta sob demanda via proxy do backend.
+// Mídia da Central: baixa sob demanda pelo proxy autenticado do backend.
 function ChatMedia({ chatId, message }) {
   const toast = useToast();
   const media = message.media || {};
-  const [data, setData] = useState(!media.media_id && media.url ? { src: media.url, mime: media.mime_type } : null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const loadTriggerRef = useRef(null);
+  const [error, setError] = useState(null);
+  const [pageCount, setPageCount] = useState(null);
+  const targetRef = useRef(null);
+  // WAHA nem sempre envia filename/mimetype no eco ou no recebimento.
+  // Não exigir metadados para baixar documentos visíveis: detectar o PDF
+  // pelo cabeçalho do próprio arquivo, nos dois sentidos da conversa.
+  const filenameHint = String(media.filename || message.content || '').trim();
+  const isDocument = message.type === 'document'
+    || String(media.mime_type || '').toLowerCase().includes('pdf')
+    || /\.pdf(?:$|[?#\s])/i.test(filenameHint);
+
+  useEffect(() => () => {
+    if (data?.src) URL.revokeObjectURL(data.src);
+  }, [data?.src]);
 
   async function load() {
-    if (!media.media_id) return;
+    if (!media.media_id || loading || data) return;
     setLoading(true);
+    setError(null);
+    setPageCount(null);
     try {
-      const r = await downloadChatMedia(chatId, media.media_id);
-      setData({ src: `data:${r.mime};base64,${r.base64}`, mime: r.mime });
+      const blob = await downloadChatMedia(chatId, media.media_id);
+      // PDFs às vezes são servidos como octet-stream; verificar os bytes antes
+      // de corrigir o MIME para que o visualizador nativo possa renderizar.
+      const signature = isDocument ? await blob.slice(0, 5).text() : '';
+      const pdf = signature === '%PDF-';
+      const displayBlob = pdf && blob.type.split(';')[0] !== 'application/pdf'
+        ? new Blob([blob], { type: 'application/pdf' })
+        : blob;
+      setData({ src: URL.createObjectURL(displayBlob), mime: displayBlob.type, file: displayBlob });
     } catch (err) {
+      setError(err.message);
       toast.error(err.message);
     } finally {
       setLoading(false);
     }
   }
 
-  // Imagens apenas quando entram perto da tela; outros arquivos sob demanda.
+  // Imagens, áudios e PDFs visíveis carregam automaticamente. Outros arquivos
+  // continuam sob demanda para evitar downloads de documentos grandes.
   useEffect(() => {
-    if (message.type !== 'image' || !media.media_id || data) return;
-    const el = loadTriggerRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
+    if (data || loading || error || !media.media_id || !(['image', 'sticker', 'audio'].includes(message.type) || isDocument)) return undefined;
+    const element = targetRef.current;
+    if (!element) return undefined;
+    if (typeof IntersectionObserver === 'undefined') { load(); return undefined; }
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         observer.disconnect();
         load();
       }
-    }, { rootMargin: '160px' });
-    observer.observe(el);
+    }, { rootMargin: '120px' });
+    observer.observe(element);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId, media.media_id]);
+  }, [chatId, media.media_id, message.type, isDocument, data, loading, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const NOME_TIPO = { image: 'imagem', audio: 'áudio', video: 'vídeo' };
 
   if (!data) {
     return (
       <button
-        ref={loadTriggerRef}
+        ref={targetRef}
         type="button"
         onClick={load}
         disabled={loading}
@@ -82,13 +106,13 @@ function ChatMedia({ chatId, message }) {
         style={{ fontSize: 12, color: '#027eb5', minHeight: 32, background: 'none', border: 0, padding: 0, font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
       >
         {loading ? <Spinner size="sm" /> : <DSIcon name="download" size="sm" />}
-        Carregar {NOME_TIPO[message.type] || 'arquivo'}
+        {error ? 'Tentar novamente' : message.media_state === 'UNAVAILABLE' ? 'Tentar carregar mídia indisponível' : `Carregar ${NOME_TIPO[message.type] || 'arquivo'}`}
       </button>
     );
   }
 
   const mime = data.mime || media.mime_type || '';
-  if (message.type === 'image' || mime.startsWith('image/')) {
+  if (message.type === 'image' || message.type === 'sticker' || mime.startsWith('image/')) {
     return <img src={data.src} alt="Imagem recebida na conversa" className="rounded-lg max-w-full max-h-64" />;
   }
   if (message.type === 'audio' || mime.startsWith('audio/')) {
@@ -99,28 +123,53 @@ function ChatMedia({ chatId, message }) {
   if (message.type === 'video' || mime.startsWith('video/')) {
     return <video controls src={data.src} className="rounded-lg max-w-full max-h-64" />;
   }
+  const filename = filenameHint || 'Documento';
+  const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf';
   return (
-    <a
-      href={data.src}
-      download={media.filename || 'arquivo'}
-      className="inline-flex items-center gap-1.5"
-      style={{ fontSize: 12, color: '#027eb5', textDecoration: 'underline' }}
-    >
-      <DSIcon name="download" size="sm" /> {media.filename || 'Baixar arquivo'}
-    </a>
+    <div className="w-[260px] max-w-full overflow-hidden rounded-lg border border-black/10 bg-white/80">
+      {isPdf && <PdfThumbnail file={data.file} onPageCount={setPageCount} />}
+      <div className="flex items-center gap-2 p-2.5">
+        <DSIcon name="file-text" size="sm" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium" title={filename}>{filename}</div>
+          <div className="text-[10px] text-gray-500">
+            {[
+              pageCount ? `${pageCount} ${pageCount === 1 ? 'página' : 'páginas'}` : null,
+              isPdf ? 'PDF' : (mime.split('/')[1] || 'arquivo').toUpperCase(),
+              data.file?.size != null ? `${(data.file.size / (1024 * 1024)).toFixed(1).replace('.', ',')} MB` : null,
+            ].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+        {isPdf && (
+          <a href={data.src} target="_blank" rel="noreferrer" title="Abrir documento" aria-label={`Abrir ${filename}`} style={{ color: '#027eb5' }}>
+            <DSIcon name="external-link" size="sm" />
+          </a>
+        )}
+        <a
+          href={data.src}
+          download={filename}
+          aria-label={`Baixar ${filename}`}
+          title="Baixar documento"
+          style={{ color: '#027eb5' }}
+        >
+          <DSIcon name="download" size="sm" />
+        </a>
+      </div>
+    </div>
   );
 }
 
-function Bubble({ chatId, message }) {
+function Bubble({ chatId, message, reactions }) {
   const outgoing = message.direction === 'OUTGOING';
   return (
     <div className={outgoing ? 'flex justify-end' : 'flex justify-start'}>
       <div
-        className="max-w-[80%] md:max-w-[65%] rounded-lg px-2.5 py-1.5 text-sm space-y-1"
+        className="relative max-w-[80%] md:max-w-[65%] rounded-lg px-2.5 py-1.5 text-sm space-y-1"
         style={{
           backgroundColor: outgoing ? '#d9fdd3' : '#ffffff',
           color: '#111b21',
           boxShadow: '0 1px 0.5px rgba(11,20,26,.13)',
+          marginBottom: reactions?.length ? 13 : 0,
         }}
       >
         {(message.media && (message.media.media_id || message.media.url)) && (
@@ -138,10 +187,35 @@ function Bubble({ chatId, message }) {
               </a>
             ))
         )}
-        {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+        {message.reply_to_message_id && <p className="text-xs opacity-70">↳ Resposta a {message.reply_to_from || 'outra mensagem'}</p>}
+        {/* O nome do arquivo já está no cartão de documento: não repetir
+            o mesmo título abaixo da miniatura. Legendas diferentes continuam. */}
+        {message.content && !(message.type === 'document'
+          && message.media?.filename
+          && message.content.trim() === message.media.filename.trim()) && (
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        )}
+        {message.type === 'reaction' && message.reaction_emoji && <p>{message.reaction_emoji} · reação a uma mensagem anterior</p>}
+        {message.interactive_reply && <p className="text-xs">Opção: {message.interactive_reply.title || message.interactive_reply.id || 'resposta interativa'}{message.interactive_reply.description ? ` · ${message.interactive_reply.description}` : ''}</p>}
+        {message.referral && <p className="text-xs">Origem: {message.referral.headline || message.referral.source_url || 'anúncio'}{!message.referral.source_id && ' · identificação de origem indisponível'}</p>}
+        {message.template?.name && <p className="text-xs">Modelo: {message.template.name}</p>}
+        {message.media_metadata && <p className="text-xs opacity-70">
+          {[
+            message.media_metadata.size_bytes != null ? `${Math.round(message.media_metadata.size_bytes / 1024)} KB` : null,
+            message.media_metadata.width_px && message.media_metadata.height_px ? `${message.media_metadata.width_px}×${message.media_metadata.height_px}` : null,
+            message.media_metadata.duration_ms != null ? `${Math.round(message.media_metadata.duration_ms / 1000)} s` : null,
+          ].filter(Boolean).join(' · ')}
+        </p>}
+        {reactions?.length > 0 && <div
+          aria-label={`Reações: ${reactions.join(' ')}`}
+          className={`absolute -bottom-3 z-10 flex items-center gap-0.5 rounded-full border border-black/10 bg-white px-1.5 py-0.5 shadow-sm ${outgoing ? 'right-2' : 'left-2'}`}
+          style={{ fontSize: 13, lineHeight: '16px', whiteSpace: 'nowrap' }}
+        >
+          {reactions.map((emoji, index) => <span key={index}>{emoji}</span>)}
+        </div>}
         <div className="flex items-center gap-1 justify-end" style={{ fontSize: 10, color: '#667781' }}>
           {message.type === 'template' && <span>(modelo)</span>}
-          <span>{new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>{new Date(message.occurred_at || message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           {outgoing && <StatusTicks status={message.status} />}
         </div>
         {message.status === 'failed' && message.error_detail && (
@@ -159,51 +233,83 @@ export default function ChatWindow({
   const toast = useToast();
   const { can } = usePermissions();
   const scrollRef = useRef(null);
+  const contentRef = useRef(null);
+  const pinnedRef = useRef(true);
+  const userScrollRef = useRef(false);
+  const frameRef = useRef(null);
+  const lastChatRef = useRef(null);
+  const lastMessageRef = useRef(null);
+  const scrollToLatest = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
+  const scheduleBottom = () => {
+    cancelAnimationFrame(frameRef.current);
+    scrollToLatest();
+    frameRef.current = requestAnimationFrame(() => {
+      scrollToLatest();
+      frameRef.current = requestAnimationFrame(scrollToLatest);
+    });
+  };
   const [acting, setActing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
 
-  // Coexistência: canais Baileys manuais elegíveis para esta conversa + escolha
-  // no seletor (quando há mais de um). O estado atual do modo vem do próprio
-  // chat (chat.manual_connection_id).
-  const [manualChannels, setManualChannels] = useState(null);
-  const [manualPickerOpen, setManualPickerOpen] = useState(false);
-  const [pickChannelId, setPickChannelId] = useState('');
+  // Na abertura ou numa mensagem nova, acompanhar o final do histórico.
+  // Não retirar o usuário do ponto onde ele está lendo mensagens antigas.
+  useLayoutEffect(() => {
+    const chatId = chat?.id ?? null;
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    const changedChat = chatId !== lastChatRef.current;
+    const appended = lastId && lastId !== lastMessageRef.current;
+    if (changedChat || (appended && pinnedRef.current)) {
+      pinnedRef.current = true;
+      userScrollRef.current = false;
+      scheduleBottom();
+    }
+    lastChatRef.current = chatId;
+    lastMessageRef.current = lastId;
+  }, [chat?.id, messages.length, messages[messages.length - 1]?.id]);
 
+  // Depois da abertura, imagens e PDFs aumentam a altura do conteúdo.
+  // Manter a última mensagem visível durante esse carregamento assíncrono.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [chat?.id, messages.length]);
-
-  // Busca os canais manuais elegíveis ao abrir a conversa. Sem eles (e fora do
-  // modo manual), o controle nem aparece — quem não configurou coexistência não
-  // vê ruído. Best-effort: falha silenciosa.
-  useEffect(() => {
-    if (!chat?.id) return;
-    let vivo = true;
-    setManualChannels(null);
-    listManualChannels(chat.id).then((cs) => { if (vivo) setManualChannels(cs); }).catch(() => { if (vivo) setManualChannels([]); });
-    return () => { vivo = false; };
+    const content = contentRef.current;
+    if (!content || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => {
+      if (pinnedRef.current) scheduleBottom();
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
   }, [chat?.id]);
+
+  // Scroll disparado pelo navegador, imagens ou PDFs não é intenção do
+  // atendente. Só deixa de acompanhar o final após interação humana real.
+  function onChatScroll(event) {
+    if (!userScrollRef.current) return;
+    const el = event.currentTarget;
+    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    userScrollRef.current = false;
+  }
+
+  useEffect(() => () => cancelAnimationFrame(frameRef.current), []);
 
   if (!chat) return null;
   const st = ATTENDANCE_STATUS[chat.attendance_status] || ATTENDANCE_STATUS.OPEN;
   const isMine = chat.current_handler_type === 'USER' && chat.current_handler_id === meId;
   const closed = chat.attendance_status === 'CLOSED';
   const nome = chat.contact_name || formatPhone(chat.phone);
-
-  const manualOn = !!chat.manual_connection_id;
-  const canais = manualChannels || [];
-  const manualName = canais.find((c) => c.id === chat.manual_connection_id)?.name || 'canal manual';
-
-  async function ligarManual(connectionId) {
-    await run(() => setManualChannel(chat.id, connectionId), 'Conversa em modo manual — respondida pelo número Baileys.');
+  const reactions = new Map();
+  const knownMessageIds = new Set(messages.flatMap((m) => [m.remote_message_id, m.external_id].filter(Boolean)));
+  for (const message of messages) {
+    if (!message.reaction_emoji || !message.reaction_to_message_id) continue;
+    const target = message.reaction_to_message_id;
+    reactions.set(target, [...(reactions.get(target) || []), message.reaction_emoji]);
   }
-
-  function abrirModoManual() {
-    if (canais.length === 1) { ligarManual(canais[0].id); return; }
-    setPickChannelId(canais[0]?.id || '');
-    setManualPickerOpen(true);
-  }
+  const visibleMessages = messages.filter((m) => m.type !== 'reaction' || !knownMessageIds.has(m.reaction_to_message_id));
+  const messageDate = (m) => {
+    const date = new Date(m.occurred_at || m.created_at);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
   async function run(fn, okMsg) {
     setActing(true);
@@ -224,7 +330,7 @@ export default function ChatWindow({
         className="flex items-center gap-2 flex-wrap"
         style={{ padding: 'var(--su-space-2) var(--su-space-3)', borderBottom: '1px solid var(--su-border-default)' }}
       >
-        <Avatar initials={(nome || '?').slice(0, 1).toUpperCase()} size="sm" alt="" />
+        <Avatar initials={contactInitials(chat.contact_name, chat.phone)} size="sm" alt="" />
 
         <div className="min-w-0 flex-1">
           <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">
@@ -256,7 +362,6 @@ export default function ChatWindow({
         </div>
 
         <Badge tone={statusToTone(st.variant)}>{st.label}</Badge>
-        {manualOn && <Badge tone="warning">Modo manual</Badge>}
 
         <div className="flex items-center gap-1">
           {!closed && !isMine && can('comm.whatsapp.claim') && (
@@ -304,27 +409,6 @@ export default function ChatWindow({
               Reabrir
             </Button>
           )}
-          {/* Coexistência: passa a conversa para um número Baileys (modo manual)
-              ou volta ao oficial. Só aparece quando há canal manual elegível
-              (ou já está ligado, para poder desligar). */}
-          {!closed && manualOn && (
-            <Button
-              variant="secondary" size="sm" icon="refresh" disabled={acting}
-              title={`Voltar ao número oficial (hoje respondendo por ${manualName})`}
-              onClick={() => ligarManual(null)}
-            >
-              Voltar ao oficial
-            </Button>
-          )}
-          {!closed && !manualOn && canais.length > 0 && (
-            <Button
-              variant="secondary" size="sm" disabled={acting}
-              title="Passar esta conversa para um número Baileys — IA, automações e modelos ficam de fora até você voltar ao oficial"
-              onClick={abrirModoManual}
-            >
-              Modo manual
-            </Button>
-          )}
           <IconButton
             icon="history"
             aria-label="Ver o histórico de atendimento"
@@ -338,37 +422,45 @@ export default function ChatWindow({
           comentário no topo do arquivo). */}
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2"
+        onScroll={onChatScroll}
+        onWheel={() => { userScrollRef.current = true; }}
+        onTouchMove={() => { userScrollRef.current = true; }}
+        onKeyDown={(event) => {
+          if (['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' '].includes(event.key)) {
+            userScrollRef.current = true;
+          }
+        }}
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-3"
         style={{
           backgroundColor: '#efeae2',
           backgroundImage: 'radial-gradient(rgba(11,20,26,0.045) 1px, transparent 0)',
           backgroundSize: '22px 22px',
         }}
       >
-        {messages.map((m) => <Bubble key={m.id} chatId={chat.id} message={m} />)}
-        {messages.length === 0 && (
-          <p className="text-center py-8" style={{ fontSize: 12, color: '#667781' }}>
-            Nenhuma mensagem nesta conversa ainda.
-          </p>
-        )}
-      </div>
-
-      {manualOn && (
-        <div
-          className="flex items-center gap-2"
-          style={{
-            fontSize: 12, padding: '8px 12px',
-            borderTop: '1px solid var(--su-border-default)',
-            background: 'var(--su-warning-bg)', color: 'var(--su-warning-fg)',
-          }}
-        >
-          <DSIcon name="alert-triangle" size="sm" className="shrink-0" />
-          <span style={{ flex: 1 }}>
-            Modo manual — respondendo por <strong>{manualName}</strong>. IA, automações e modelos ficam fora desta conversa,
-            e o envio sai pelo número Baileys (sem janela de 24h). Volte ao oficial para usar modelos ou mídia gravada.
-          </span>
+        <div ref={contentRef} className="space-y-2">
+          {visibleMessages.map((m, index) => {
+            const date = messageDate(m);
+            const showDate = date && (index === 0 || date !== messageDate(visibleMessages[index - 1]));
+            return (
+              <React.Fragment key={m.id}>
+                {showDate && (
+                  <div className="flex justify-center py-2">
+                    <span className="rounded-lg bg-white/95 px-3 py-1.5 text-xs font-medium shadow-sm" style={{ color: '#54656f' }}>
+                      {date}
+                    </span>
+                  </div>
+                )}
+                <Bubble chatId={chat.id} message={m} reactions={reactions.get(m.remote_message_id) || reactions.get(m.external_id) || []} />
+              </React.Fragment>
+            );
+          })}
+          {messages.length === 0 && (
+            <p className="text-center py-8" style={{ fontSize: 12, color: '#667781' }}>
+              Nenhuma mensagem nesta conversa ainda.
+            </p>
+          )}
         </div>
-      )}
+      </div>
 
       <MessageComposer chat={chat} windowInfo={windowInfo} templates={templates} scope={scope} onSent={onSent} />
 
@@ -382,38 +474,6 @@ export default function ChatWindow({
         onClose={() => setConfirmClose(false)}
         onConfirm={() => run(() => closeChat(chat.id), 'Conversa encerrada.').then(() => setConfirmClose(false))}
       />
-
-      {/* Seletor de canal manual — só aparece quando há mais de um elegível. */}
-      <Modal
-        open={manualPickerOpen}
-        onClose={acting ? undefined : () => setManualPickerOpen(false)}
-        title="Passar para modo manual"
-        maxWidth={480}
-        footer={
-          <>
-            <Button variant="secondary" disabled={acting} onClick={() => setManualPickerOpen(false)}>Cancelar</Button>
-            <Button
-              variant="primary" loading={acting} disabled={!pickChannelId}
-              onClick={() => ligarManual(pickChannelId).then(() => setManualPickerOpen(false))}
-            >
-              Ativar modo manual
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
-            A conversa passa a ser respondida por um número Baileys. Enquanto estiver em modo manual, IA, automações e
-            modelos não enviam por ela — e o atendente responde sem a janela de 24h da Meta.
-          </p>
-          <Field label="Número Baileys" required>
-            <Select value={pickChannelId} onChange={(e) => setPickChannelId(e.target.value)}>
-              <option value="">Escolha…</option>
-              {canais.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </Field>
-        </div>
-      </Modal>
     </div>
   );
 }

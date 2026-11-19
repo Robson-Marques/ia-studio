@@ -1,20 +1,37 @@
 // Caminhos de infra e guarda anti path-traversal do modulo system (Fase 8).
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import * as path from 'node:path';
+
+function installationEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new InternalServerErrorException(`Configuração obrigatória da aplicação ausente: ${name}.`);
+  }
+  return value;
+}
 
 /** Pasta onde vivem os scripts de operacao (install/upgrade/backup). */
 export function scriptsDir(): string {
-  return process.env['IASTUDIO_SCRIPTS_DIR'] ?? '/opt/iastudio/scripts';
+  return installationEnv('IASTUDIO_SCRIPTS_DIR');
 }
 
 /** Pasta onde ficam os backups/dumps. */
 export function backupDir(): string {
-  return process.env['IASTUDIO_BACKUP_DIR'] ?? '/opt/iastudio-backups';
+  return installationEnv('IASTUDIO_BACKUP_DIR');
 }
 
 /** Raiz do monorepo em producao (para ler CHANGELOG.md e rodar git). */
 export function appDir(): string {
-  return process.env['IASTUDIO_APP_DIR'] ?? '/opt/iastudio';
+  return installationEnv('IASTUDIO_APP_DIR');
+}
+
+/** Identificador validado da aplicação, seguro para compor uma unidade systemd. */
+export function appId(): string {
+  const value = installationEnv('IASTUDIO_APP_ID');
+  if (!/^[a-z][a-z0-9-]{2,31}$/.test(value)) {
+    throw new InternalServerErrorException('IASTUDIO_APP_ID inválido.');
+  }
+  return value;
 }
 
 // Nome de arquivo de backup: so letras/numeros/._- e extensoes conhecidas.

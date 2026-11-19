@@ -1,6 +1,6 @@
 // Servico de Incidentes/Manutencao (Fase 6). Regras:
 //   * CRUD de incidentes (nasce DRAFT);
-//   * resolver afetados via conectividade Altarede no escopo → grava targets;
+//   * resolve afetados via conectividade IXC no escopo → grava targets;
 //   * vinculos manuais (incluir/excluir cliente);
 //   * ativar (DRAFT/RESOLVED → ACTIVE): se modo PROACTIVE/COMBINED, dispara em
 //     massa COM confirmacao (rate limit + log); reativo nao dispara;
@@ -27,8 +27,6 @@ import { IspTeamAlertService, TeamAlertStats } from './isp-team-alert.service';
 import { IspOsConfigService } from './isp-os-config.service';
 import { scopeHash, scopeLabel } from './isp-scope.util';
 import { AuditLogService } from '../../shared/audit/audit-log.service';
-import { assertSameOrg, validateWorkspaceScope } from '../../shared/auth/tenant.util';
-import { PrismaService } from '../../shared/prisma/prisma.service';
 import {
   CreateIncidentDto,
   UpdateIncidentDto,
@@ -48,52 +46,43 @@ export class IspIncidentsService {
     private readonly teamAlert: IspTeamAlertService,
     private readonly osConfig: IspOsConfigService,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // ─── Leitura ────────────────────────────────────────
 
-  findAll(organizationId: string, filters: { workspaceId?: string; environmentId?: string; status?: IspIncidentStatus }) {
-    return this.repository.findAll(organizationId, filters);
+  findAll(filters: { status?: IspIncidentStatus }) {
+    return this.repository.findAll(filters);
   }
 
-  async findOne(organizationId: string, id: string): Promise<IspIncident> {
+  async findOne(id: string): Promise<IspIncident> {
     const incident = await this.repository.findById(id);
     if (!incident) throw new NotFoundException('Incidente não encontrado.');
-    assertSameOrg(incident.organization_id, organizationId);
     return incident;
   }
 
-  async findTargets(organizationId: string, id: string) {
-    await this.findOne(organizationId, id);
+  async findTargets(id: string) {
+    await this.findOne(id);
     return this.repository.findTargets(id);
   }
 
-  async findDispatches(organizationId: string, id: string) {
-    await this.findOne(organizationId, id);
+  async findDispatches(id: string) {
+    await this.findOne(id);
     return this.repository.findDispatches(id);
   }
 
-  async findTeamAlerts(organizationId: string, id: string) {
-    await this.findOne(organizationId, id);
+  async findTeamAlerts(id: string) {
+    await this.findOne(id);
     return this.repository.findTeamAlerts(id);
   }
 
   // ─── CRUD ───────────────────────────────────────────
 
-  async create(organizationId: string, dto: CreateIncidentDto, createdBy: string | null) {
-    await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
-    // Valida que a conexao Altarede existe/ativa no escopo (nao resolve aqui).
+  async create(dto: CreateIncidentDto, createdBy: string | null) {
+    // Valida que a conexão IXC existe/ativa na instalação (não resolve aqui).
     await this.resolver.resolve({
-      organizationId,
-      workspaceId: dto.workspace_id,
-      environmentId: dto.environment_id,
       connectionId: dto.connection_id,
     });
     const incident = await this.repository.createIncident({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       title: dto.title,
       message: dto.message ?? null,
       forecast: dto.forecast ?? null,
@@ -110,15 +99,13 @@ export class IspIncidentsService {
       action: 'isp.incident.create',
       entityType: 'IspIncident',
       entityId: incident.id,
-      organizationId,
-      workspaceId: dto.workspace_id,
       newValue: { title: incident.title, comm_mode: incident.comm_mode, status: incident.status },
     });
     return incident;
   }
 
-  async update(organizationId: string, id: string, dto: UpdateIncidentDto) {
-    const before = await this.findOne(organizationId, id);
+  async update(id: string, dto: UpdateIncidentDto) {
+    const before = await this.findOne(id);
     const data: Prisma.IspIncidentUpdateInput = {};
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.message !== undefined) data.message = dto.message;
@@ -135,25 +122,20 @@ export class IspIncidentsService {
       action: 'isp.incident.update',
       entityType: 'IspIncident',
       entityId: id,
-      organizationId,
       oldValue: { title: before.title, comm_mode: before.comm_mode },
       newValue: { title: incident.title, comm_mode: incident.comm_mode },
     });
     return incident;
   }
 
-  // ─── Resolver afetados (conectividade Altarede no escopo) ───────────
+  // ─── Resolver afetados (conectividade IXC no escopo) ───────────
 
-  async resolveAffected(organizationId: string, id: string) {
-    const incident = await this.findOne(organizationId, id);
+  async resolveAffected(id: string) {
+    const incident = await this.findOne(id);
     const connection = await this.resolver.resolve({
-      organizationId,
-      workspaceId: incident.workspace_id,
-      environmentId: incident.environment_id,
       connectionId: incident.connection_id,
     });
     const summary = await this.connectivity.query(
-      organizationId,
       connection.id,
       (incident.scope ?? {}) as Record<string, unknown>,
     );
@@ -162,7 +144,6 @@ export class IspIncidentsService {
     const affected = summary.offline > 0 ? summary.rows.filter((r) => !r.online) : summary.rows;
     const targets = await this.repository.replaceScopeTargets(
       id,
-      organizationId,
       affected
         .filter((r) => r.customer_ref)
         .map((r) => ({ customer_ref: r.customer_ref, name: r.name, phone: r.phone, last_status: r.status })),
@@ -172,20 +153,20 @@ export class IspIncidentsService {
 
   // ─── Targets (checkbox include/exclude + vinculos manuais) ──────────
 
-  async updateTargets(organizationId: string, id: string, dto: UpdateTargetsDto) {
-    await this.findOne(organizationId, id);
+  async updateTargets(id: string, dto: UpdateTargetsDto) {
+    await this.findOne(id);
     if (dto.included_ids?.length) await this.repository.setIncluded(id, dto.included_ids, true);
     if (dto.excluded_ids?.length) await this.repository.setIncluded(id, dto.excluded_ids, false);
     for (const m of dto.manual ?? []) {
-      await this.repository.upsertManualTarget(id, organizationId, m);
+      await this.repository.upsertManualTarget(id, m);
     }
     return this.repository.findTargets(id);
   }
 
   // ─── Ativar / Encerrar (sensiveis) ──────────────────
 
-  async activate(organizationId: string, id: string, dispatchDto?: DispatchIncidentDto) {
-    const incident = await this.findOne(organizationId, id);
+  async activate(id: string, dispatchDto?: DispatchIncidentDto) {
+    const incident = await this.findOne(id);
     if (incident.status === IspIncidentStatus.ACTIVE) {
       throw new ConflictException('Incidente já está ativo.');
     }
@@ -198,7 +179,6 @@ export class IspIncidentsService {
       action: 'isp.incident.activate',
       entityType: 'IspIncident',
       entityId: id,
-      organizationId,
       oldValue: { status: incident.status },
       newValue: { status: updated.status, comm_mode: updated.comm_mode },
     });
@@ -211,13 +191,13 @@ export class IspIncidentsService {
           'Modo proativo/combinado exige confirmação explícita do disparo em massa na ativação.',
         );
       }
-      dispatch = await this.runDispatch(organizationId, updated, dispatchDto);
+      dispatch = await this.runDispatch(updated, dispatchDto);
     }
     return { incident: updated, dispatch };
   }
 
-  async resolveIncident(organizationId: string, id: string, dispatchDto?: DispatchIncidentDto) {
-    const incident = await this.findOne(organizationId, id);
+  async resolveIncident(id: string, dispatchDto?: DispatchIncidentDto) {
+    const incident = await this.findOne(id);
     if (incident.status === IspIncidentStatus.RESOLVED) {
       throw new ConflictException('Incidente já está encerrado.');
     }
@@ -229,7 +209,6 @@ export class IspIncidentsService {
       action: 'isp.incident.resolve',
       entityType: 'IspIncident',
       entityId: id,
-      organizationId,
       oldValue: { status: incident.status },
       newValue: { status: updated.status },
     });
@@ -249,15 +228,15 @@ export class IspIncidentsService {
 
   // ─── Disparo proativo manual (endpoint dedicado) ────
 
-  async dispatchIncident(organizationId: string, id: string, dto: DispatchIncidentDto) {
-    const incident = await this.findOne(organizationId, id);
+  async dispatchIncident(id: string, dto: DispatchIncidentDto) {
+    const incident = await this.findOne(id);
     if (incident.comm_mode === IspIncidentCommMode.REACTIVE) {
       throw new BadRequestException('Incidente em modo reativo não dispara em massa. Troque para proativo/combinado.');
     }
     if (incident.status !== IspIncidentStatus.ACTIVE) {
       throw new ConflictException('Só é possível disparar em massa para incidentes ativos.');
     }
-    return this.runDispatch(organizationId, incident, dto);
+    return this.runDispatch(incident, dto);
   }
 
   // ─── Deteccao de anomalia → alerta a equipe (frente 6) ──────────────
@@ -268,10 +247,7 @@ export class IspIncidentsService {
   // nasce DRAFT (inerte: nao dispara nada ao cliente); a equipe promove na tela.
 
   async registerDetectedAnomaly(
-    organizationId: string,
     params: {
-      workspaceId: string;
-      environmentId: string;
       connectionId: string;
       scope: Record<string, unknown>;
       stats?: TeamAlertStats;
@@ -282,16 +258,13 @@ export class IspIncidentsService {
     // Sem escopo nao ha dedup possivel (seria a base inteira) — nao registra.
     if (!hash) return { incident_id: '', created: false, alerted: false, reason: 'Escopo vazio.' };
 
-    const cfg = await this.osConfig.getPlantaoConfig(organizationId);
-    let incident = await this.repository.findOpenByScopeHash(organizationId, params.connectionId, hash);
+    const cfg = await this.osConfig.getPlantaoConfig();
+    let incident = await this.repository.findOpenByScopeHash(params.connectionId, hash);
     let created = false;
 
     if (!incident) {
       const label = scopeLabel(params.scope);
       incident = await this.repository.createIncident({
-        organization_id: organizationId,
-        workspace_id: params.workspaceId,
-        environment_id: params.environmentId,
         title: label ? `Anomalia detectada — ${label}` : 'Anomalia de rede detectada',
         message: null,
         forecast: params.forecast ?? null,
@@ -309,13 +282,11 @@ export class IspIncidentsService {
         action: 'isp.incident.auto_detected',
         entityType: 'IspIncident',
         entityId: incident.id,
-        organizationId,
-        workspaceId: params.workspaceId,
         newValue: { title: incident.title, scope_hash: hash, stats: params.stats ?? null },
       });
     }
 
-    const fired = await this.fireTeamAlert(organizationId, incident, cfg.cooldown_min, params.stats, created);
+    const fired = await this.fireTeamAlert(incident, cfg.cooldown_min, params.stats, created);
     return { incident_id: incident.id, created, ...fired };
   }
 
@@ -325,19 +296,17 @@ export class IspIncidentsService {
    * reativo — reusa o IspTeamAlertService (nao reinventa o disparo).
    */
   async alertTeamForIncident(
-    organizationId: string,
     incidentId: string,
     stats?: TeamAlertStats,
   ): Promise<{ alerted: boolean; channel?: string; reason?: string }> {
     const incident = await this.repository.findById(incidentId);
-    if (!incident || incident.organization_id !== organizationId) return { alerted: false, reason: 'Incidente inválido.' };
-    const cfg = await this.osConfig.getPlantaoConfig(organizationId);
-    return this.fireTeamAlert(organizationId, incident, cfg.cooldown_min, stats, false);
+    if (!incident) return { alerted: false, reason: 'Incidente inválido.' };
+    const cfg = await this.osConfig.getPlantaoConfig();
+    return this.fireTeamAlert(incident, cfg.cooldown_min, stats, false);
   }
 
   /** Cooldown anti-spam + disparo ao plantao + touch + auditoria. */
   private async fireTeamAlert(
-    organizationId: string,
     incident: IspIncident,
     cooldownMin: number,
     stats: TeamAlertStats | undefined,
@@ -355,19 +324,18 @@ export class IspIncidentsService {
       action: 'isp.incident.team_alerted',
       entityType: 'IspIncident',
       entityId: incident.id,
-      organizationId,
-      workspaceId: incident.workspace_id,
       newValue: {
         channel: alertResult.channel,
         recipients: alertResult.recipients,
         sent: alertResult.sent,
+        queued: alertResult.queued,
         failed: alertResult.failed,
       },
     });
     return { alerted: true, channel: alertResult.channel };
   }
 
-  private async runDispatch(organizationId: string, incident: IspIncident, dto: DispatchIncidentDto): Promise<DispatchResult> {
+  private async runDispatch(incident: IspIncident, dto: DispatchIncidentDto): Promise<DispatchResult> {
     const result = await this.dispatch.dispatch(incident, {
       confirm: dto.confirm,
       ratePerSec: dto.rate_per_sec,
@@ -377,8 +345,7 @@ export class IspIncidentsService {
       action: 'isp.incident.dispatch',
       entityType: 'IspIncident',
       entityId: incident.id,
-      organizationId,
-      newValue: { sent: result.sent, failed: result.failed, skipped: result.skipped, total: result.total },
+      newValue: { sent: result.sent, queued: result.queued, failed: result.failed, skipped: result.skipped, total: result.total },
     });
     return result;
   }

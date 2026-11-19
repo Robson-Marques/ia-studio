@@ -9,11 +9,8 @@ export class MemoryRepository {
 
   // ─── Perfis ─────────────────────────────────────────
 
-  findProfiles(organizationId: string, filters: { workspaceId?: string; environmentId?: string } = {}) {
-    const where: Prisma.AiMemoryProfileWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
-    return this.prisma.aiMemoryProfile.findMany({ where, orderBy: { created_at: 'desc' } });
+  findProfiles() {
+    return this.prisma.aiMemoryProfile.findMany({ orderBy: { created_at: 'desc' } });
   }
 
   findProfileById(id: string) {
@@ -48,7 +45,6 @@ export class MemoryRepository {
 
   upsertEntry(data: {
     profile_id: string;
-    organization_id: string;
     scope_key: string;
     key: string;
     value: Prisma.InputJsonValue;

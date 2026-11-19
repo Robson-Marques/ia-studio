@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { listApprovals, listApprovalPolicies } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import {
   APPROVAL_STATUS, APPROVAL_TARGET_TYPES, formatDateTime,
   friendlyTarget,
@@ -32,14 +31,13 @@ export default function Aprovacoes() {
 function QueueTab({ seg }) {
   const toast = useToast();
   const navigate = useNavigate();
-  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
     try {
-      const { items: list } = await listApprovals({ status: 'PENDING', environment_id: environmentId || undefined });
+      const { items: list } = await listApprovals({ status: 'PENDING' });
       setItems(list);
     } catch (err) {
       toast.error(err.message);
@@ -48,7 +46,7 @@ function QueueTab({ seg }) {
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const columns = [
     { key: 'target', header: 'Ação', render: (a) => (
@@ -88,7 +86,6 @@ function PoliciesTab({ seg }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -97,7 +94,7 @@ function PoliciesTab({ seg }) {
   async function load() {
     setLoading(true);
     try {
-      const { items: list } = await listApprovalPolicies({ environment_id: environmentId || undefined });
+      const { items: list } = await listApprovalPolicies();
       setItems(list);
     } catch (err) {
       toast.error(err.message);
@@ -106,7 +103,7 @@ function PoliciesTab({ seg }) {
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const targetLabel = (t) => APPROVAL_TARGET_TYPES.find((x) => x.value === t)?.label || t;
 

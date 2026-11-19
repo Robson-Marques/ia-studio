@@ -9,14 +9,11 @@ import { SecretsRepository } from './secrets.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import { decrypt, encrypt } from '../../../shared/crypto/crypto.util';
 import { OAuthMeta, SecretsAccessor } from '../../../shared/integration/provider.interface';
-import { assertSameOrg } from '../../../shared/auth/tenant.util';
 
 export interface SecretView {
   id: string;
   name: string;
   kind: SecretKind;
-  workspace_id: string | null;
-  environment_id: string | null;
   fields: string[];
   rotated_at: Date | null;
   created_at: Date;
@@ -24,9 +21,6 @@ export interface SecretView {
 }
 
 export interface CreateSecretInput {
-  organizationId: string;
-  workspaceId?: string | null;
-  environmentId?: string | null;
   name: string;
   kind: SecretKind;
   /** Campo → valor em claro (cifrado aqui dentro, nunca persiste em claro). */
@@ -44,22 +38,19 @@ export class SecretsService {
   ) {}
 
   // ─── Leitura (metadados apenas) ─────────────────────
-  async findAll(organizationId: string): Promise<SecretView[]> {
-    const rows = await this.repository.findAllByOrg(organizationId);
+  async findAll(): Promise<SecretView[]> {
+    const rows = await this.repository.findAll();
     return rows.map((row) => this.toView(row));
   }
 
-  async findViewById(organizationId: string, id: string): Promise<SecretView> {
-    const row = await this.getOwned(organizationId, id);
+  async findViewById(id: string): Promise<SecretView> {
+    const row = await this.getById(id);
     return this.toView(row);
   }
 
   // ─── Escrita ────────────────────────────────────────
   async create(input: CreateSecretInput): Promise<SecretView> {
     const row = await this.repository.create({
-      organizationId: input.organizationId,
-      workspaceId: input.workspaceId,
-      environmentId: input.environmentId,
       name: input.name,
       kind: input.kind,
       encryptedValue: encrypt(JSON.stringify(input.values)),
@@ -69,7 +60,6 @@ export class SecretsService {
       action: 'integration.secret.create',
       entityType: 'Secret',
       entityId: row.id,
-      organizationId: input.organizationId,
       newValue: { name: row.name, kind: row.kind, fields: Object.keys(input.values) },
     });
     return this.toView(row);
@@ -89,8 +79,8 @@ export class SecretsService {
   }
 
   /** Rotacao: substitui o valor cifrado inteiro e marca rotated_at. */
-  async rotate(organizationId: string, id: string, values: Record<string, string>): Promise<SecretView> {
-    const before = await this.getOwned(organizationId, id);
+  async rotate(id: string, values: Record<string, string>): Promise<SecretView> {
+    const before = await this.getById(id);
     if (!Object.keys(values).length) {
       throw new ConflictException('Informe ao menos um campo para rotacionar o segredo.');
     }
@@ -99,7 +89,6 @@ export class SecretsService {
       action: 'integration.secret.rotate',
       entityType: 'Secret',
       entityId: id,
-      organizationId,
       oldValue: { rotated_at: before.rotated_at },
       newValue: { rotated_at: row.rotated_at, fields: Object.keys(values) },
     });
@@ -160,10 +149,9 @@ export class SecretsService {
   }
 
   // ─── Helpers ────────────────────────────────────────
-  private async getOwned(organizationId: string, id: string): Promise<Secret> {
+  private async getById(id: string): Promise<Secret> {
     const row = await this.repository.findById(id);
     if (!row) throw new NotFoundException('Segredo não encontrado.');
-    assertSameOrg(row.organization_id, organizationId);
     return row;
   }
 
@@ -204,8 +192,6 @@ export class SecretsService {
       id: row.id,
       name: row.name,
       kind: row.kind,
-      workspace_id: row.workspace_id,
-      environment_id: row.environment_id,
       fields,
       rotated_at: row.rotated_at,
       created_at: row.created_at,

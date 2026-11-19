@@ -5,9 +5,6 @@ import { IspPaymentLink, Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 
 export interface CreatePaymentLinkInput {
-  organizationId: string;
-  workspaceId?: string | null;
-  environmentId?: string | null;
   connectionId: string;
   token: string;
   customerRef?: string | null;
@@ -24,9 +21,6 @@ export class IspPaymentLinkRepository {
   create(input: CreatePaymentLinkInput): Promise<IspPaymentLink> {
     return this.prisma.ispPaymentLink.create({
       data: {
-        organization_id: input.organizationId,
-        workspace_id: input.workspaceId ?? null,
-        environment_id: input.environmentId ?? null,
         connection_id: input.connectionId,
         token: input.token,
         customer_ref: input.customerRef ?? null,
@@ -34,7 +28,7 @@ export class IspPaymentLinkRepository {
         snapshot: input.snapshot,
         expires_at: input.expiresAt,
         created_by: input.createdBy ?? null,
-      },
+      } as Prisma.IspPaymentLinkUncheckedCreateInput,
     });
   }
 
