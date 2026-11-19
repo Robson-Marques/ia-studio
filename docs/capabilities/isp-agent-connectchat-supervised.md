@@ -43,9 +43,12 @@ clica **Testar IA nesta conversa**:
    o backend consulta **até cinco** `su_ticket` diretamente pelo ID do cliente
    vinculado, usando `atendimento.listar_chamados_recentes` da Connection
    IXC e `projectChamado` para minimizar dados.
-5. O AgentRunner recebe o histórico da conversa e a evidência IXC como contexto
+5. O backend também conta, quando as datas são válidas, os chamados dos
+   últimos 7 e 30 dias para sinalizar possível reincidência, sem afirmar que
+   repetição de chamados comprova uma mesma causa técnica.
+6. O AgentRunner recebe o histórico da conversa e a evidência IXC como contexto
    histórico não confiável. **Não recebe nenhuma tool executável** no preview.
-6. O resultado aparece como **rascunho** e só vai para o campo da mensagem
+7. O resultado aparece como **rascunho** e só vai para o campo da mensagem
    quando o operador clicar em **Usar como rascunho**. O envio permanece ação
    manual separada pelo endpoint ConnectChat já existente.
 
