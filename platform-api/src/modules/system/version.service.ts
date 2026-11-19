@@ -121,7 +121,7 @@ export class VersionService {
     // que uma tag não-semver faça a versão instalada regredir no painel.
     try {
       const { stdout } = await exec('git', ['tag', '--points-at', 'HEAD'], { cwd: appDir() });
-      const exactTags = stdout.split('\\n').map((tag) => tag.trim())
+      const exactTags = stdout.split('\n').map((tag) => tag.trim())
         .filter((tag) => TAG_REGEX.test(tag) && this.isOwnLine(tag, expectedMajor))
         .sort((a, b) => this.compare(b, a));
       if (exactTags[0]) return exactTags[0];
