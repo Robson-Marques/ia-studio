@@ -17,6 +17,7 @@ import { AiAgent, AiProviderKind, AiRunStatus, Prisma } from '@prisma/client';
 import { AgentsRepository } from './agents.repository';
 import { compilePersona } from './agent-persona';
 import { compileRoteiro, hasRoteiro } from './agent-roteiro';
+import { ISP_DEFAULT_ATTENDANCE_POLICY } from './isp-agent-defaults';
 import { PromptSecurityService } from './prompt-security.service';
 import { LlmProviderService, ResolvedLlmConnection } from '../providers/llm-provider.service';
 import { AiOrchestratorService } from '../orchestrator/ai-orchestrator.service';
@@ -357,6 +358,11 @@ export class AgentRunnerService {
       parts.push(`\n\n## Objetivo\n${agent.goal}`);
     }
     parts.push(compilePersona(agent.persona));
+    // Conexão IXC já ativa: incluir procedimento mínimo no agente novo,
+    // sem conceder ações adicionais nem exigir prompt manual do operador.
+    if (agent.allowed_tools.includes('identificar_cliente')) {
+      parts.push('\n\n' + ISP_DEFAULT_ATTENDANCE_POLICY);
+    }
 
     // Contexto RAG: consulta as bases habilitadas com o input do usuario.
     if (agent.knowledge_base_ids.length > 0) {
