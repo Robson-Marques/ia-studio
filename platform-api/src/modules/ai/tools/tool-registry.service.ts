@@ -13,6 +13,7 @@ export interface ToolExecutionContext {
   /** Preview ConnectChat: somente leitura e documento vinculado ao canal. */
   previewMode?: boolean;
   previewCustomerDocument?: string;
+  previewIxcConnectionId?: string;
   traceId: string;
   executionId?: string | null;
   /** Escopos de memoria (contact_id/session_id/...). */
