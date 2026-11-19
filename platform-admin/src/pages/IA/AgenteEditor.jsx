@@ -160,7 +160,7 @@ export default function AgenteEditor() {
           && c.status === 'ACTIVE' && c.is_active !== false).length === 1) {
           const readKeys = new Set([
             'identificar_cliente', 'consultar_chamados_recentes',
-            'diagnosticar_conexao', 'consultar_contrato', 'status_conexao',
+            'consultar_os_recentes', 'diagnosticar_conexao', 'consultar_contrato', 'status_conexao',
             'conversation_history', 'current_datetime',
           ]);
           const selected = (tls || []).filter((t) => readKeys.has(t.key)
