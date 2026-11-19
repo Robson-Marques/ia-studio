@@ -323,6 +323,42 @@ async function limitedMediaBody(response: Response): Promise<Buffer> {
   return Buffer.concat(chunks, size);
 }
 
+/**
+ * Consome o arquivo que a WAHA disponibiliza diretamente no webhook.
+ * Usa apenas /api/files/ no host da WAHA configurado; nunca acessa um
+ * domínio/porta escolhido pelo evento (proteção contra SSRF).
+ */
+export async function downloadWahaWebhookFile(
+  refs: WahaRefs,
+  mediaUrl: string,
+): Promise<{ data: Buffer; contentType: string }> {
+  const source = new URL(mediaUrl, `${baseUrl(refs.apiUrl)}/`);
+  if (!source.pathname.startsWith('/api/files/')) {
+    throw new Error('URL de mídia WAHA fora do caminho permitido.');
+  }
+  const target = `${baseUrl(refs.apiUrl)}${source.pathname}${source.search}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch(target, {
+      redirect: 'error',
+      signal: controller.signal,
+      headers: { 'X-Api-Key': refs.apiKey, Accept: '*/*' },
+    });
+    if (!response.ok) throw new Error(`WAHA: mídia do webhook HTTP ${response.status}.`);
+    const declaredSize = Number(response.headers.get('content-length'));
+    if (Number.isFinite(declaredSize) && declaredSize > MAX_MEDIA_BYTES) {
+      throw new Error('Mídia WAHA excede o limite de 32 MB.');
+    }
+    return {
+      data: await limitedMediaBody(response),
+      contentType: response.headers.get('content-type') || 'application/octet-stream',
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function downloadWahaMedia(
   refs: WahaRefs,
   encodedRef: string,
