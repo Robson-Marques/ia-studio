@@ -247,6 +247,14 @@ export class ConnectionsService {
     if (connection.provider_key === 'whatsapp-nivoo') {
       throw new ConflictException('Gerencie este número em WhatsApp → Números. A desconexão precisa ser confirmada pela Central.');
     }
+    // Não permitir "Ativar" a conta Codex só mudando o rótulo no banco:
+    // antes o botão criava conexão aparentemente ACTIVE sem login real.
+    if (connection.provider_key === 'codex-cli' && action === 'enable') {
+      const health = await this.safeHealth(connection);
+      if (!health.ok) {
+        throw new ConflictException(health.detail || 'Faça login com ChatGPT e valide a conexão antes de ativar.');
+      }
+    }
     const target = STATE_ACTION_TARGET[action];
     assertConnectionTransition(connection.status, target);
 
