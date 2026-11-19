@@ -189,7 +189,7 @@ export class ConnectchatPilotController {
     const tools: string[] = ['current_datetime', 'consultar_faq'];
     if (linked) {
       tools.push('identificar_cliente', 'consultar_contrato');
-      if (rules.ticketHistory) tools.push('consultar_chamados_recentes');
+      if (rules.ticketHistory) tools.push('consultar_chamados_recentes', 'consultar_os_recentes');
       if (rules.networkDiagnosis) tools.push('diagnosticar_conexao', 'status_conexao');
       if (rules.financialRead) tools.push('consultar_debitos');
     }
