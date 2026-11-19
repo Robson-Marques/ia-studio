@@ -108,7 +108,7 @@ function ChatMedia({ chatId, message }) {
   }
   const filename = media.filename || 'Documento';
   const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf'
-    || (/\\.pdf$/i.test(filename) && (!mime || mime === 'application/octet-stream'));
+    || (/\.pdf$/i.test(filename) && (!mime || mime === 'application/octet-stream'));
   return (
     <div className="w-[260px] max-w-full overflow-hidden rounded-lg border border-black/10 bg-white/80">
       {isPdf && (
