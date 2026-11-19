@@ -106,15 +106,37 @@ function ChatMedia({ chatId, message }) {
   if (message.type === 'video' || mime.startsWith('video/')) {
     return <video controls src={data.src} className="rounded-lg max-w-full max-h-64" />;
   }
+  const filename = media.filename || 'Documento';
+  const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf'
+    || (/\.pdf$/i.test(filename) && (!mime || mime === 'application/octet-stream'));
   return (
-    <a
-      href={data.src}
-      download={media.filename || 'arquivo'}
-      className="inline-flex items-center gap-1.5"
-      style={{ fontSize: 12, color: '#027eb5', textDecoration: 'underline' }}
-    >
-      <DSIcon name="download" size="sm" /> {media.filename || 'Baixar arquivo'}
-    </a>
+    <div className="w-[260px] max-w-full overflow-hidden rounded-lg border border-black/10 bg-white/80">
+      {isPdf && (
+        <div className="relative h-[180px] overflow-hidden bg-white" title="Prévia da primeira página do PDF">
+          <iframe
+            title={`Prévia de ${filename}`}
+            src={`${data.src}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+            className="h-full w-full border-0"
+            style={{ pointerEvents: 'none' }}
+            tabIndex={-1}
+            loading="lazy"
+          />
+        </div>
+      )}
+      <div className="flex items-center gap-2 p-2.5">
+        <DSIcon name="file-text" size="sm" />
+        <span className="min-w-0 flex-1 truncate text-xs" title={filename}>{filename}</span>
+        <a
+          href={data.src}
+          download={filename}
+          aria-label={`Baixar ${filename}`}
+          title="Baixar documento"
+          style={{ color: '#027eb5' }}
+        >
+          <DSIcon name="download" size="sm" />
+        </a>
+      </div>
+    </div>
   );
 }
 
@@ -123,11 +145,12 @@ function Bubble({ chatId, message, reactions }) {
   return (
     <div className={outgoing ? 'flex justify-end' : 'flex justify-start'}>
       <div
-        className="max-w-[80%] md:max-w-[65%] rounded-lg px-2.5 py-1.5 text-sm space-y-1"
+        className="relative max-w-[80%] md:max-w-[65%] rounded-lg px-2.5 py-1.5 text-sm space-y-1"
         style={{
           backgroundColor: outgoing ? '#d9fdd3' : '#ffffff',
           color: '#111b21',
           boxShadow: '0 1px 0.5px rgba(11,20,26,.13)',
+          marginBottom: reactions?.length ? 13 : 0,
         }}
       >
         {(message.media && (message.media.media_id || message.media.url)) && (
@@ -158,7 +181,13 @@ function Bubble({ chatId, message, reactions }) {
             message.media_metadata.duration_ms != null ? `${Math.round(message.media_metadata.duration_ms / 1000)} s` : null,
           ].filter(Boolean).join(' · ')}
         </p>}
-        {reactions?.length > 0 && <p className="text-xs" aria-label="Reações">{reactions.join(' ')}</p>}
+        {reactions?.length > 0 && <div
+          aria-label={`Reações: ${reactions.join(' ')}`}
+          className={`absolute -bottom-3 z-10 flex items-center gap-0.5 rounded-full border border-black/10 bg-white px-1.5 py-0.5 shadow-sm ${outgoing ? 'right-2' : 'left-2'}`}
+          style={{ fontSize: 13, lineHeight: '16px', whiteSpace: 'nowrap' }}
+        >
+          {reactions.map((emoji, index) => <span key={index}>{emoji}</span>)}
+        </div>}
         <div className="flex items-center gap-1 justify-end" style={{ fontSize: 10, color: '#667781' }}>
           {message.type === 'template' && <span>(modelo)</span>}
           <span>{new Date(message.occurred_at || message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
