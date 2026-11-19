@@ -41,6 +41,7 @@ export default function ConexaoNova() {
   const [resultado, setResultado] = useState(null);
   const [codexExistentes, setCodexExistentes] = useState([]);
   const [removendo, setRemovendo] = useState(false);
+  const [confirmarDesfazer, setConfirmarDesfazer] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -170,16 +171,7 @@ export default function ConexaoNova() {
                 Abrir a conexão
               </Button>
               {resultado.provider_key === 'codex-cli' && (
-                <Button variant="secondary" disabled={removendo} onClick={async () => {
-                  if (!window.confirm('Remover esta conexão da lista? O histórico será preservado.')) return;
-                  setRemovendo(true);
-                  try {
-                    await archiveCodexConnection(resultado.id);
-                    toast.success('Conexão removida da lista.');
-                    navigate('/integracoes/conexoes');
-                  } catch (err) { toast.error(err.message); }
-                  finally { setRemovendo(false); }
-                }}>
+                <Button variant="secondary" disabled={removendo} onClick={() => setConfirmarDesfazer(true)}>
                   Desfazer cadastro
                 </Button>
               )}
@@ -187,6 +179,29 @@ export default function ConexaoNova() {
                 Ver todas
               </Button>
             </div>
+            {confirmarDesfazer && resultado.provider_key === 'codex-cli' && (
+              <div className="space-y-2" style={{
+                padding: 12, border: '1px solid var(--su-border-default)', borderRadius: 8,
+              }}>
+                <p style={{ fontSize: 13, margin: 0 }}>
+                  Remover este cadastro da lista? O histórico será preservado e a conexão ficará desativada.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="primary" disabled={removendo} loading={removendo} onClick={async () => {
+                    setRemovendo(true);
+                    try {
+                      await archiveCodexConnection(resultado.id);
+                      toast.success('Conexão removida da lista.');
+                      navigate('/integracoes/conexoes');
+                    } catch (err) { toast.error(err.message); }
+                    finally { setRemovendo(false); }
+                  }}>Confirmar remoção</Button>
+                  <Button variant="secondary" disabled={removendo} onClick={() => setConfirmarDesfazer(false)}>
+                    Manter conexão
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
       </Screen>
