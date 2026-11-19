@@ -109,7 +109,7 @@ export async function uploadChatMedia(chatId, file, kind, opts = {}) {
 
 export async function downloadChatMedia(chatId, mediaId) {
   try {
-    const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media/${mediaId}`);
+    const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media`, { params: { ref: mediaId } });
     return data; // { base64, mime }
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao baixar mídia')); }
 }
