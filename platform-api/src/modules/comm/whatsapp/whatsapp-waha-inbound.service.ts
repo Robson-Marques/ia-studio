@@ -39,6 +39,7 @@ export class WhatsappWahaInboundService {
     if (event.event === 'message' || event.event === 'message.any') {
       return this.message(connection, event.payload ?? {}, event.me);
     }
+    if (event.event === 'message.reaction') return this.reaction(connection, event.payload ?? {});
     if (event.event === 'message.ack') return this.ack(connection, event.payload ?? {});
     if (event.event === 'session.status') return this.sessionStatus(connection, event.payload ?? {}, event.me);
     await this.logs.record({
@@ -212,6 +213,31 @@ export class WhatsappWahaInboundService {
       throw new Error(`Evento da mensagem WAHA ${externalId} não foi persistido.`);
     }
     await this.chats.markInboundEventPublished(connection.id, externalId);
+  }
+
+  private async reaction(connection: Connection, payload: Record<string, unknown>): Promise<void> {
+    const reaction = payload['reaction'];
+    if (!reaction || typeof reaction !== 'object' || Array.isArray(reaction)) return;
+    const details = reaction as Record<string, unknown>;
+    const targetMessageId = String(details['messageId'] ?? '');
+    if (!targetMessageId) return;
+    const emoji = typeof details['text'] === 'string' ? details['text'] : '';
+    const rawId = payload['id'];
+    const eventId = typeof rawId === 'string'
+      ? rawId
+      : String((rawId as Record<string, unknown> | undefined)?.['_serialized'] ?? randomUUID());
+    const rawTs = Number(payload['timestamp'] ?? 0);
+    const occurredAt = rawTs > 0
+      ? new Date(rawTs < 10_000_000_000 ? rawTs * 1000 : rawTs)
+      : new Date();
+    await this.chats.upsertWahaReaction({
+      connectionId: connection.id,
+      targetMessageId,
+      fromMe: payload['fromMe'] === true,
+      emoji,
+      eventId,
+      occurredAt,
+    });
   }
 
   private async ack(connection: Connection, payload: Record<string, unknown>): Promise<void> {
