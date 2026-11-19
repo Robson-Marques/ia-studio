@@ -52,7 +52,7 @@ export class ConnectionsController {
   }
 
   @Post(':id/codex-repair')
-  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  @RequirePermissions(PERMISSIONS.SYSTEM_MAINTAIN)
   async codexRepair(@Param('id') id: string) {
     await this.checkCodexConnection(id);
     return this.codexCli.repair(id);
