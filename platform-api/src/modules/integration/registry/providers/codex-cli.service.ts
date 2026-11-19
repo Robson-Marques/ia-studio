@@ -78,31 +78,71 @@ export class CodexCliService implements OnModuleDestroy {
     return { command: '/usr/sbin/runuser', args: ['-u', this.user, '--', ...env, this.bin, ...args] };
   }
 
+  /**
+   * Health deve SEMPRE devolver estado, inclusive quando a conta Unix,
+   * o diretório ou o binário não foram provisionados durante o upgrade.
+   * Antes, home() lançava erro fora do try e o painel recebia HTTP 500.
+   */
   async status(id: string) {
-    const home = await this.home(id);
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      throw new BadRequestException('Identificador da conexão inválido.');
+    }
     let installed = false;
+    let provisioned = false;
     let version: string | null = null;
     let authenticated = false;
     let detail = '';
+    let code = 'UNAVAILABLE';
     try {
+      const home = await this.home(id);
+      provisioned = true;
       const check = this.command(['--version'], home);
       const result = await execFileAsync(check.command, check.args, { timeout: 10000 });
       version = result.stdout.trim();
       installed = true;
-      const checkLogin = this.command(['login', 'status'], home);
-      const login = await execFileAsync(checkLogin.command, checkLogin.args, { timeout: 10000 });
-      // Não aceitar sessão por API key como autenticação com ChatGPT.
-      authenticated = !/api key/i.test(login.stdout + login.stderr);
-      detail = authenticated ? 'Conta ChatGPT autenticada no Codex CLI.' : 'Login de conta ChatGPT necessário.';
+      code = 'LOGIN_REQUIRED';
+      try {
+        const checkLogin = this.command(['login', 'status'], home);
+        const login = await execFileAsync(checkLogin.command, checkLogin.args, { timeout: 10000 });
+        // Uma sessão autenticada por API key não equivale a login ChatGPT.
+        authenticated = !/api key/i.test(login.stdout + login.stderr);
+        code = authenticated ? 'CONNECTED' : 'LOGIN_REQUIRED';
+      } catch {
+        authenticated = false;
+      }
+      detail = authenticated
+        ? 'Conta ChatGPT autenticada no Codex CLI.'
+        : 'Codex instalado e pronto. Clique em Entrar com ChatGPT para autorizar a conta.';
     } catch (e) {
-      detail = installed ? 'Conta ainda não autenticada pelo Codex CLI.' : 'Codex CLI não está instalado no servidor.';
+      const error = e as NodeJS.ErrnoException & { stderr?: string };
+      const message = String(error?.stderr || error?.message || '');
+      this.logger.warn(`Codex preflight indisponível: ${error?.code || 'error'}`);
+      if (!/^[a-z][a-z0-9-]{2,31}$/.test(this.appId)) {
+        code = 'CONFIGURATION_MISSING';
+        detail = 'IASTUDIO_APP_ID ausente ou inválido no processo da API.';
+      } else if (process.getuid?.() !== 0) {
+        code = 'EXECUTOR_UNAVAILABLE';
+        detail = 'O executor isolado não está disponível para o usuário do processo da API.';
+      } else if (/unknown user|user .* does not exist|invalid user|unknown group|does not exist|cannot find name/i.test(message)) {
+        code = 'USER_NOT_PROVISIONED';
+        detail = 'Usuário isolado do Codex não foi criado. Execute a etapa de provisionamento do Codex no servidor.';
+      } else if (/permission denied|EACCES|operation not permitted/i.test(message)) {
+        code = 'ACCESS_DENIED';
+        detail = 'Permissões do diretório ou do executor Codex impedem o acesso. Verifique o provisionamento.';
+      } else if (/ENOENT|no such file|not found/i.test(message)) {
+        code = 'CLI_NOT_INSTALLED';
+        detail = 'Binário do Codex CLI não encontrado. A instalação automática precisa ser reparada no servidor.';
+      } else {
+        code = 'PROVISIONING_FAILED';
+        detail = 'Não foi possível inicializar o executor Codex. Consulte a etapa CODEX_CLI da atualização e os logs da API.';
+      }
     }
     const session = this.sessions.get(id);
     return {
-      installed, authenticated, version, detail,
+      installed, provisioned, authenticated, version, detail, code,
       login: session ? {
         stage: session.stage,
-        deviceCode: session.deviceCode,
+        deviceCode: session.stage === 'waiting' ? session.deviceCode : undefined,
         detail: session.detail,
         startedAt: new Date(session.startedAt).toISOString(),
       } : null,
@@ -110,8 +150,14 @@ export class CodexCliService implements OnModuleDestroy {
   }
 
   async beginLogin(id: string) {
+    // Nunca tentar spawn quando o binário ou a identidade Unix estão ausentes:
+    // a interface recebe mensagem de diagnóstico em vez de Internal server error.
+    const preflight = await this.status(id);
+    if (!preflight.installed || !preflight.provisioned) {
+      throw new BadRequestException(preflight.detail);
+    }
+    if (this.sessions.get(id)?.stage === 'waiting') return preflight;
     const home = await this.home(id);
-    if (this.sessions.get(id)?.stage === 'waiting') return this.status(id);
     const command = this.command(['login', '--device-auth'], home);
     const child = spawn(command.command, command.args, {
       cwd: this.root, stdio: ['ignore', 'pipe', 'pipe'],

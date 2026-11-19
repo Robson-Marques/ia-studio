@@ -142,7 +142,9 @@ export class ConnectionsService {
       connection = await this.runConnectAndHealth(connection);
     } else if (this.registry.has(dto.provider_key)) {
       connection = await this.repository.update(connection.id, {
-        status_detail: 'Aguardando autenticação — conclua o fluxo de autorização (ex.: “Entrar com Google”).',
+        status_detail: dto.provider_key === 'codex-cli'
+          ? 'Aguardando autorização — clique em “Entrar com ChatGPT” na conexão e conclua o código no site oficial da OpenAI.'
+          : 'Aguardando autenticação — conclua o fluxo de autorização (ex.: “Entrar com Google”).',
       });
     } else {
       connection = await this.repository.update(connection.id, {
