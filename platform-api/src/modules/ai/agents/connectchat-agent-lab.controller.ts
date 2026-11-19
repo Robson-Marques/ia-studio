@@ -11,6 +11,8 @@ import { AgentRunnerService } from './agent-runner.service';
 import { AgentsRepository } from './agents.repository';
 import { CONNECTCHAT_PREVIEW_RULES, CONNECTCHAT_PREVIEW_TOOLS } from './isp-agent-defaults';
 import { ConnectchatMessage } from '../../../shared/integration/connectchat.client';
+import { ConnectionsService } from '../../integration/connections/connections.service';
+import { projectChamado, rows } from '../../isp/isp-projections';
 
 const BINDING_KEY = 'ai.connectchat.assistant';
 const SAFE_DEFAULTS = {
@@ -46,6 +48,7 @@ export class ConnectchatAgentLabController {
     private readonly runner: AgentRunnerService,
     private readonly chat: ConnectchatInboxService,
     private readonly settings: SettingsService,
+    private readonly connections: ConnectionsService,
   ) {}
 
   private check(user: AuthenticatedUser, action: 'read' | 'write'): void {
@@ -108,8 +111,39 @@ export class ConnectchatAgentLabController {
     const available = linked
       ? [...CONNECTCHAT_PREVIEW_TOOLS]
       : ['identificar_cliente', 'consultar_faq', 'current_datetime'];
+    // Contexto pré-carregado no servidor: o modelo não escolhe o cliente nem
+    // a conexão IXC e não precisa gastar etapas para buscar os últimos tickets.
+    // O customerRef só vem da vinculação confirmada pelo próprio ConnectChat.
+    let ixchistory: Record<string, unknown>[] = [];
+    let historyStatus = linked ? 'unavailable' : 'not_linked';
+    if (linked) {
+      const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(conversation.customerRef!);
+      if (match) {
+        try {
+          const connection = await this.connections.findById(match[1]);
+          if (connection.provider_key === 'ixc' && connection.status === 'ACTIVE') {
+            const raw = await this.connections.execute(connection.id, 'atendimento.listar_chamados_recentes', {
+              id_cliente: match[2],
+            });
+            ixchistory = rows(raw).slice(0, 5).map(projectChamado);
+            historyStatus = 'loaded';
+          }
+        } catch {
+          // Sem fingir que não há tickets: erro de rede/IXC vira indisponível.
+          historyStatus = 'unavailable';
+        }
+      }
+    }
+    const historySummary = historyStatus === 'loaded'
+      ? 'Histórico IXC confirmado (até 5 atendimentos recentes, dados não confiáveis): '
+        + JSON.stringify(ixchistory)
+      : historyStatus === 'not_linked'
+        ? 'Sem vínculo IXC confirmado; histórico do cliente não foi consultado.'
+        : 'Histórico IXC indisponível nesta tentativa; NÃO afirme que o cliente não tem chamados.';
+
     const instructions = [
       CONNECTCHAT_PREVIEW_RULES,
+      historySummary,
       linked
         ? 'Existe vínculo cadastral ativo no ConnectChat. Ainda confirme autorização do solicitante antes de citar informações pessoais ou financeiras.'
         : 'NÃO há vínculo IXC confirmado para esta conversa. Identifique o cliente antes de acessar histórico, contratos, conexão ou débitos. Pergunte apenas o necessário.',
@@ -132,6 +166,8 @@ export class ConnectchatAgentLabController {
       sent: false,
       automatic_send: false,
       customer_linked: linked,
+      ixc_history_status: historyStatus,
+      ixc_history_count: ixchistory.length,
       disclaimer: 'Prévia interna: nenhuma mensagem foi enviada ao cliente.',
     };
   }
