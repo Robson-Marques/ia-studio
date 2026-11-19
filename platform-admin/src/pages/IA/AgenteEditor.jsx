@@ -197,6 +197,7 @@ export default function AgenteEditor() {
       return undefined;
     }
     let active = true;
+    setCodexModels([]);
     setLoadingCodexModels(true);
     listCodexModels(form.connection_id)
       .then((res) => {
@@ -816,11 +817,19 @@ export default function AgenteEditor() {
               </Button>
               {technicalExpanded && (
                 <div className="space-y-3" style={{ borderTop: '1px solid var(--su-border-default)', paddingTop: 12 }}>
-                  <Field label="Limite de saída (tokens)"
-                    hint="Limita o tamanho da resposta gerada. Em branco, usa o limite padrão do modelo.">
-                    <NumericInput value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })}
-                      min={1} step={1} fullWidth />
-                  </Field>
+                  {!isCodex && (
+                    <Field label="Limite de saída (tokens)"
+                      hint="Limita o tamanho da resposta gerada pela API. Em branco, usa o padrão do modelo.">
+                      <NumericInput value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })}
+                        min={1} step={1} fullWidth />
+                    </Field>
+                  )}
+                  {isCodex && (
+                    <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+                      O Codex gerencia automaticamente o tamanho da resposta e o estilo de geração.
+                      Essas configurações não precisam ser preenchidas.
+                    </p>
+                  )}
                   {!isCodex && (
                     <Field label="Modelo personalizado (somente para integração técnica)"
                       hint="Altera o ID do modelo enviado à API. Use apenas se não aparecer na lista acima.">
