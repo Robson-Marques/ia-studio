@@ -36,6 +36,8 @@ export interface RunAgentParams {
   scopeKeys?: Record<string, string>;
   dryRun?: boolean;
   createdBy?: string | null;
+  /** Modo de ensaio: apenas estas tools de leitura podem ser propostas/executadas. */
+  toolAllowlist?: readonly string[];
   /** Histórico da conversa (turnos anteriores) — dá CONTINUIDADE ao assistente:
    *  sem isto cada mensagem recebida vira um run stateless e ele "esquece" o
    *  que já foi dito. O nó AGENT carrega do chat quando há sessão. */
@@ -88,7 +90,8 @@ export class AgentRunnerService {
     this.promptSecurity.inspect(params.input);
 
     const systemPrompt = await this.buildSystemPrompt(agent, params.input, traceId);
-    const llmTools = await this.buildTools(agent);
+    const llmTools = (await this.buildTools(agent))
+      .filter((t) => !params.toolAllowlist || params.toolAllowlist.includes(t.name));
 
     const messages: LlmMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -219,6 +222,12 @@ export class AgentRunnerService {
 
         // Executa cada tool call.
         for (const call of result.toolCalls) {
+          // Defesa adicional contra chamadas não anunciadas pelo modelo.
+          // No ensaio ConnectChat, impedir executar ferramentas fora da lista
+          // permitida, mesmo se o LLM inventar uma chamada de tool.
+          if (!llmTools.some((t) => t.name === call.name)) {
+            throw new BadRequestException('Ferramenta não autorizada nesta execução.');
+          }
           const toolCtx = this.buildToolContext(agent, runId, ctx);
           const exec = await this.toolRuntime.executeTool(call.name, call.arguments, toolCtx);
 
