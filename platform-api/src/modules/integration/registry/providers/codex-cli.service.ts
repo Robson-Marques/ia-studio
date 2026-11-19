@@ -166,6 +166,54 @@ export class CodexCliService implements OnModuleDestroy {
     };
   }
 
+  /**
+   * Catálogo de modelos exibidos ao operador: obtido pelo CLI autenticado,
+   * usando a identidade Unix e CODEX_HOME desta Connection. O comando de debug
+   * é experimental, então uma versão que não o suporte retorna apenas "Padrão".
+   * Nunca devolvemos a saída bruta, metadados privados ou credenciais.
+   */
+  async models(id: string): Promise<{ models: Array<{ value: string; label: string }>; source: string }> {
+    const defaults = [{ value: 'default', label: 'Padrão da conta ChatGPT (recomendado)' }];
+    const status = await this.status(id);
+    if (!status.installed || !status.authenticated) {
+      return { models: defaults, source: 'login_required' };
+    }
+    try {
+      const home = await this.home(id);
+      const cmd = this.command(['debug', 'models'], home);
+      const { stdout } = await execFileAsync(cmd.command, cmd.args, {
+        cwd: this.root, timeout: 12_000, maxBuffer: 2_000_000,
+      });
+      const raw: unknown = JSON.parse(stdout);
+      const root = raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? raw as Record<string, unknown> : {};
+      const list = Array.isArray(raw) ? raw
+        : Array.isArray(root.models) ? root.models
+          : Array.isArray(root.data) ? root.data
+            : Array.isArray(root.items) ? root.items : [];
+      const seen = new Set<string>();
+      const options: Array<{ value: string; label: string }> = [];
+      for (const item of list) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const row = item as Record<string, unknown>;
+        if (row.hidden === true || row.show_in_picker === false || row.showInPicker === false) continue;
+        const value = [row.slug, row.model, row.id, row.model_slug]
+          .find((v): v is string => typeof v === 'string' && /^[a-zA-Z0-9._:-]{1,120}$/.test(v));
+        if (!value || value === 'default' || seen.has(value)) continue;
+        seen.add(value);
+        const name = [row.displayName, row.display_name, row.name]
+          .find((v): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 100);
+        options.push({ value, label: name || value });
+        if (options.length >= 40) break;
+      }
+      return { models: [...defaults, ...options], source: options.length ? 'codex' : 'default' };
+    } catch {
+      // Endpoint de leitura opcional: jamais bloquear a edição do assistente.
+      this.logger.debug('Catálogo de modelos Codex indisponível; usando modelo padrão.');
+      return { models: defaults, source: 'default' };
+    }
+  }
+
   async beginLogin(id: string) {
     // Nunca tentar spawn quando o binário ou a identidade Unix estão ausentes:
     // a interface recebe mensagem de diagnóstico em vez de Internal server error.
