@@ -17,15 +17,6 @@ import { AgentRunnerService } from '../agents/agent-runner.service';
 const SETTING = 'ai.connectchat.agent.binding';
 // As habilidades de gravação, pagamento e automação de WhatsApp são
 // deliberadamente EXCLUÍDAS do teste de atendimento ConnectChat.
-const READ_ONLY_ISP = [
-  'identificar_cliente',
-  'consultar_chamados_recentes',
-  'diagnosticar_conexao',
-  'consultar_contrato',
-  'status_conexao',
-  'status_regiao',
-] as const;
-
 interface Binding {
   agentId: string | null;
   enabled: boolean;
@@ -134,7 +125,7 @@ export class ConnectchatAgentController {
     // modelo. O histórico é preparado pelo servidor e a saída é só prévia.
     let chamados: Record<string, unknown>[] = [];
     if (context.verified && context.conversation.customerRef) {
-      const match = /^ixc:([0-9a-f-]{36}):([1-9]\\d*)$/i.exec(context.conversation.customerRef);
+      const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(context.conversation.customerRef);
       if (match) {
         try {
           const found = await this.connections.execute(match[1], 'atendimento.listar_chamados_recentes', {
