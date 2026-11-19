@@ -197,6 +197,84 @@ export class CodexCliService implements OnModuleDestroy {
     return this.status(id);
   }
 
+  /**
+   * Repara somente a instalação Codex da aplicação corrente. O caminho, os
+   * argumentos e o app-id vêm da configuração do servidor, nunca do request.
+   * Não modifica banco, WAHA, PM2 ou GitHub.
+   */
+  async repair(id: string) {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new BadRequestException('Conexão inválida.');
+    if (process.getuid?.() !== 0) {
+      throw new BadRequestException('Reparo requer o serviço de provisionamento do servidor.');
+    }
+    if (!/^[a-z][a-z0-9-]{2,31}$/.test(this.appId)) {
+      throw new BadRequestException('IASTUDIO_APP_ID não está configurado.');
+    }
+    const appDir = process.env.IASTUDIO_APP_DIR;
+    if (!appDir || path.resolve(appDir) !== path.join('/opt', this.appId)) {
+      throw new BadRequestException('Diretório da instalação não corresponde ao identificador da aplicação.');
+    }
+    const script = path.join(appDir, 'scripts', 'install-codex-cli.sh');
+    try {
+      // Execução delimitada e sem shell interpolado ou parâmetros do usuário.
+      await execFileAsync('/bin/bash', [script, this.appId], {
+        timeout: 180_000,
+        maxBuffer: 32_000,
+        env: {
+          PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+          HOME: '/root',
+          IASTUDIO_CODEX_PACKAGE_VERSION: process.env.IASTUDIO_CODEX_PACKAGE_VERSION || 'latest',
+        },
+      });
+    } catch (e) {
+      this.logger.warn('Falha ao reparar a instalação isolada do Codex CLI.');
+      throw new BadRequestException('Não foi possível instalar/reparar o Codex CLI. Confira a conexão de rede e os registros do servidor.');
+    }
+    return this.status(id);
+  }
+
+  /** Inicia um novo login oficial sem reutilizar a autorização antiga. */
+  async reconnect(id: string) {
+    const current = this.sessions.get(id);
+    if (current?.stage === 'waiting') {
+      clearTimeout(current.timer);
+      current.stage = 'error';
+      current.child.kill('SIGTERM');
+    }
+    const preflight = await this.status(id);
+    if (!preflight.installed) throw new BadRequestException(preflight.detail);
+    const home = await this.home(id);
+    const cmd = this.command(['logout'], home);
+    try {
+      await execFileAsync(cmd.command, cmd.args, { timeout: 15000 });
+    } catch {
+      // A conta pode estar sem login anterior; continua com device login.
+    }
+    this.sessions.delete(id);
+    return this.beginLogin(id);
+  }
+
+  /**
+   * Remoção solicitada pelo administrador: encerra login em andamento e
+   * apaga apenas a HOME isolada desta Connection, não outras contas.
+   */
+  async forget(id: string): Promise<void> {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new BadRequestException('Conexão inválida.');
+    const current = this.sessions.get(id);
+    if (current) {
+      clearTimeout(current.timer);
+      if (current.stage === 'waiting') current.child.kill('SIGTERM');
+      this.sessions.delete(id);
+    }
+    // Limite estrito ao namespace Codex da aplicação para evitar qualquer
+    // remoção arbitrária pelo endpoint.
+    if (!/^[a-z][a-z0-9-]{2,31}$/.test(this.appId)) {
+      throw new BadRequestException('Instância Codex sem identificação válida.');
+    }
+    const dir = path.join(this.root, id);
+    await rm(dir, { recursive: true, force: true });
+  }
+
   async cancelLogin(id: string) {
     const session = this.sessions.get(id);
     if (session?.stage === 'waiting') {

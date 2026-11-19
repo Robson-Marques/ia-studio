@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Screen, WizardScreen, PageHeader, Card, Field, Input, Select, Button, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
-import { listConnectionProviders, createConnection } from '../../services/integrations';
+import { listConnectionProviders, listConnections, createConnection, archiveCodexConnection } from '../../services/integrations';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
 import { statusMeta } from './integration.constants';
 import GoogleOAuthButton from './GoogleOAuthButton';
@@ -39,6 +39,9 @@ export default function ConexaoNova() {
   const [passo, setPasso] = useState(0);
   const [salvando, setSalvando] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const [codexExistentes, setCodexExistentes] = useState([]);
+  const [removendo, setRemovendo] = useState(false);
+  const [confirmarDesfazer, setConfirmarDesfazer] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -52,6 +55,13 @@ export default function ConexaoNova() {
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (providerKey !== 'codex-cli') return;
+    listConnections().then(({ items }) => {
+      setCodexExistentes((items || []).filter((c) => c.provider_key === 'codex-cli'));
+    }).catch((err) => toast.error(err.message));
+  }, [providerKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const provider = useMemo(() => providers.find((p) => p.key === providerKey) || null, [providers, providerKey]);
   const schema = provider?.wizard_schema || { steps: [] };
@@ -160,9 +170,83 @@ export default function ConexaoNova() {
               <Button variant="primary" onClick={() => navigate(`/integracoes/conexoes/${resultado.id}`)}>
                 Abrir a conexão
               </Button>
+              {resultado.provider_key === 'codex-cli' && (
+                <Button variant="secondary" disabled={removendo} onClick={() => setConfirmarDesfazer(true)}>
+                  Desfazer cadastro
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => navigate('/integracoes/conexoes')}>
                 Ver todas
               </Button>
+            </div>
+            {confirmarDesfazer && resultado.provider_key === 'codex-cli' && (
+              <div className="space-y-2" style={{
+                padding: 12, border: '1px solid var(--su-border-default)', borderRadius: 8,
+              }}>
+                <p style={{ fontSize: 13, margin: 0 }}>
+                  Remover este cadastro da lista? O histórico será preservado e a conexão ficará desativada.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="primary" disabled={removendo} loading={removendo} onClick={async () => {
+                    setRemovendo(true);
+                    try {
+                      await archiveCodexConnection(resultado.id);
+                      toast.success('Conexão removida da lista.');
+                      navigate('/integracoes/conexoes');
+                    } catch (err) { toast.error(err.message); }
+                    finally { setRemovendo(false); }
+                  }}>Confirmar remoção</Button>
+                  <Button variant="secondary" disabled={removendo} onClick={() => setConfirmarDesfazer(false)}>
+                    Manter conexão
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      </Screen>
+    );
+  }
+
+  // O Codex não usa campos de credenciais e não deve ter etapas vazias.
+  // Uma única tela: selecionar/reutilizar conexão, criar se necessário e
+  // passar direto à autenticação oficial exibida no resultado.
+  if (providerKey === 'codex-cli' && passo === 0 && !resultado) {
+    return (
+      <Screen as="div" className="space-y-6">
+        <PageHeader title="Conectar conta ChatGPT" subtitle="Codex CLI — autenticação oficial sem chave de API"
+          back={{ label: 'Voltar às conexões', onClick: () => navigate('/integracoes/conexoes') }} />
+        <Card>
+          <div style={{ padding: 20 }} className="space-y-4">
+            <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
+              Crie uma conexão ou abra uma existente para continuar o login. Não é necessário repetir o cadastro.
+            </p>
+            {codexExistentes.length > 0 && (
+              <div className="space-y-2">
+                <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Conexões ChatGPT existentes</h2>
+                {codexExistentes.map((c) => (
+                  <div key={c.id} className="flex flex-wrap items-center justify-between gap-2"
+                    style={{ padding: 12, border: '1px solid var(--su-border-default)', borderRadius: 8 }}>
+                    <div className="space-y-1">
+                      <strong style={{ fontSize: 13 }}>{c.name}</strong>
+                      <div><Badge tone={statusMeta(c.status).tone}>{statusMeta(c.status).label}</Badge></div>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => navigate(`/integracoes/conexoes/${c.id}`)}>
+                      Abrir / reconectar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Field label="Nome da nova conexão" required hint="Crie uma nova conta somente se precisar de uma conexão separada.">
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} autoComplete="off"
+                placeholder="Ex.: Minha conta ChatGPT" />
+            </Field>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="primary" loading={salvando} disabled={!nome.trim() || salvando} onClick={salvar}>
+                Criar e conectar
+              </Button>
+              <Button variant="secondary" onClick={() => navigate('/integracoes/conexoes')}>Cancelar</Button>
             </div>
           </div>
         </Card>

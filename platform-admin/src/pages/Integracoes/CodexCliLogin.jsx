@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Card, Badge, Button, DescriptionList, CopyButton, useToast } from '@studio-ux-ds/react';
 import {
   getCodexLoginStatus, startCodexLogin, cancelCodexLogin, testConnection,
+  repairCodex, reconnectCodex,
 } from '../../services/integrations';
 
 /**
@@ -48,6 +49,7 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
   const logged = state?.authenticated === true;
   const stage = statusError ? 'Falha ao consultar' : !state ? 'Verificando' : logged ? 'Conectado' : waiting ? 'Aguardando autorização' : !state?.provisioned ? 'Configuração pendente' : state?.installed === false ? 'Não instalado' : 'Não conectado';
   const tone = logged ? 'success' : waiting ? 'warning' : 'neutral';
+  const canRepair = state && (!state.provisioned || !state.installed);
 
   return (
     <Card>
@@ -70,7 +72,7 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
 
         {state && (!state.provisioned || state.installed === false) && (
           <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
-            {state.detail} Confira a etapa CODEX_CLI da atualização; o cadastro da conexão foi preservado.
+            {state.detail} Você pode tentar reparar a instalação aqui, sem criar outra conexão.
           </p>
         )}
 
@@ -107,6 +109,15 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
           </p>
         )}
         <div className="flex flex-wrap gap-2">
+          {canRepair && (
+            <Button size="sm" disabled={working} onClick={() => act(async () => {
+              const result = await repairCodex(connectionId);
+              setState(result);
+              toast.success('Instalação do Codex verificada. Continue com o login.');
+            })}>
+              Reparar instalação
+            </Button>
+          )}
           {!logged && !waiting && state?.installed === true && state?.provisioned === true && (
             <Button size="sm" disabled={working}
               onClick={() => act(async () => setState(await startCodexLogin(connectionId)))}>
@@ -122,6 +133,15 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
               onActivated?.();
             })}>
               Testar e ativar
+            </Button>
+          )}
+          {state?.installed === true && !waiting && (
+            <Button size="sm" variant="secondary" disabled={working}
+              onClick={() => act(async () => {
+                setState(await reconnectCodex(connectionId));
+                toast.info('Nova autorização iniciada. Use o código apresentado.');
+              })}>
+              Reconectar conta
             </Button>
           )}
           <Button size="sm" variant="secondary" disabled={working}

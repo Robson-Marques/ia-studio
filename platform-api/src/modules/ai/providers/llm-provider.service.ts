@@ -77,6 +77,9 @@ export class LlmProviderService {
   /** Resolve uma Connection AI local: le estado, base_url e api_key. */
   async resolveConnection(connectionId: string): Promise<ResolvedLlmConnection> {
     const connection = await this.connections.findById(connectionId);
+    if (connection.tags.includes('__archived_codex__') || connection.status !== 'ACTIVE') {
+      throw new BadRequestException('Conexão de IA inativa ou arquivada; selecione uma conexão ativa no agente.');
+    }
     const kind = this.kindForProviderKey(connection.provider_key);
     const config = (connection.config ?? {}) as Record<string, unknown>;
     const accessor = this.secrets.accessorFor(connection.secret_id);

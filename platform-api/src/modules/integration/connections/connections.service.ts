@@ -26,6 +26,7 @@ import { assertConnectionTransition } from './connection-state.machine';
 import { SecretsService } from '../secrets/secrets.service';
 import { ProviderCatalogService } from '../catalog/provider-catalog.service';
 import { ProviderRegistryService } from '../registry/provider-registry.service';
+import { CodexCliService } from '../registry/providers/codex-cli.service';
 import { AuditLogService, redactSensitive } from '../../../shared/audit/audit-log.service';
 import { getRequestStore } from '../../../shared/audit/request-context';
 import {
@@ -55,6 +56,7 @@ export class ConnectionsService {
     private readonly secrets: SecretsService,
     private readonly providerCatalog: ProviderCatalogService,
     private readonly registry: ProviderRegistryService,
+    private readonly codexCli: CodexCliService,
     private readonly audit: AuditLogService,
   ) {}
 
@@ -65,7 +67,7 @@ export class ConnectionsService {
     // Eles continuam preservados (sem apagar segredo/log), mas não reaparecem na
     // superfície operacional nem podem ser selecionados por fluxos atuais.
     return connections.filter((connection) =>
-      this.registry.has(connection.provider_key) && connection.provider_key !== 'whatsapp-nivoo');
+      !connection.tags.includes('__archived_codex__') && this.registry.has(connection.provider_key) && connection.provider_key !== 'whatsapp-nivoo');
   }
 
   listAvailableProviders() {
@@ -77,8 +79,26 @@ export class ConnectionsService {
 
   async findById(id: string): Promise<Connection> {
     const connection = await this.repository.findById(id);
-    if (!connection || !this.registry.has(connection.provider_key)) throw new NotFoundException('Conexão não encontrada.');
+    if (!connection || connection.tags.includes('__archived_codex__') || !this.registry.has(connection.provider_key)) throw new NotFoundException('Conexão não encontrada.');
     return connection;
+  }
+
+  /** Oculta apenas conexões Codex; mantém logs, vínculo e ID no banco. */
+  async archiveCodex(id: string) {
+    const connection = await this.findById(id);
+    if (connection.provider_key !== 'codex-cli') {
+      throw new BadRequestException('Arquivamento pela interface permitido apenas para conexões Codex CLI.');
+    }
+    await this.codexCli.forget(id);
+    const result = await this.repository.archive(id);
+    await this.audit.record({
+      action: 'integration.connection.archive',
+      entityType: 'Connection',
+      entityId: id,
+      oldValue: { status: connection.status, is_active: connection.is_active },
+      newValue: { status: result.status, is_active: result.is_active },
+    });
+    return { archived: true, id };
   }
 
   async findLogs(id: string, take = 50) {
@@ -229,6 +249,14 @@ export class ConnectionsService {
     const connection = await this.findById(id);
     if (connection.provider_key === 'whatsapp-nivoo') {
       throw new ConflictException('Gerencie este número em WhatsApp → Números. A desconexão precisa ser confirmada pela Central.');
+    }
+    // Não permitir "Ativar" a conta Codex só mudando o rótulo no banco:
+    // antes o botão criava conexão aparentemente ACTIVE sem login real.
+    if (connection.provider_key === 'codex-cli' && action === 'enable') {
+      const health = await this.safeHealth(connection);
+      if (!health.ok) {
+        throw new ConflictException(health.detail || 'Faça login com ChatGPT e valide a conexão antes de ativar.');
+      }
     }
     const target = STATE_ACTION_TARGET[action];
     assertConnectionTransition(connection.status, target);

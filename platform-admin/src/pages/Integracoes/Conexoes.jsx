@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ListScreen, Badge, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import {
-  listConnections, changeConnectionState, testConnection, listConnectionProviders,
+  listConnections, changeConnectionState, testConnection, listConnectionProviders, archiveCodexConnection,
 } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
@@ -46,6 +46,7 @@ export default function Conexoes() {
   const [testing, setTesting] = useState(false);
   const [stateAction, setStateAction] = useState(null); // { ids, action, clear }
   const [acting, setActing] = useState(false);
+  const [removeCodex, setRemoveCodex] = useState(null);
   const [providerNames, setProviderNames] = useState({});
   const [q, setQ] = useState('');
 
@@ -199,6 +200,20 @@ export default function Conexoes() {
             Testar
           </Button>
         )}
+        {podeEscrever && uma?.provider_key === 'codex-cli' && (
+          <Button variant="ghost" icon="refresh-cw"
+            title="Abrir a autorização ou reconectar esta conta ChatGPT"
+            onClick={() => navigate(`/integracoes/conexoes/${uma.id}`)}>
+            Conectar / reconectar
+          </Button>
+        )}
+        {podeEscrever && todos((c) => c.provider_key === 'codex-cli') && (
+          <Button variant="ghost" icon="trash-2"
+            title="Remover conexões Codex selecionadas mantendo o histórico"
+            onClick={() => setRemoveCodex({ ids, clear })}>
+            Remover
+          </Button>
+        )}
         {podeEscrever && uma && (
           <Button
             variant="ghost"
@@ -235,7 +250,7 @@ export default function Conexoes() {
     <>
       <ListScreen
         title="Conexões"
-        subtitle="Cada conexão é um acesso nomeado a um sistema de fora. Conexões nunca são excluídas — só mudam de estado, para o histórico não sumir junto."
+        subtitle="Gerencie, teste, reconecte e remova conexões da lista. O histórico é preservado para auditoria."
         primaryAction={novaConexao}
         search={q}
         onSearch={setQ}
@@ -255,6 +270,32 @@ export default function Conexoes() {
           action: novaConexao,
         }}
         emptyFiltered={{ title: 'Nenhuma conexão encontrada', description: 'Nenhuma conexão com esse nome, conector ou etiqueta.', onClear: () => setQ('') }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(removeCodex)}
+        danger
+        loading={acting}
+        title="Remover conexões Codex CLI"
+        message="Retirar as conexões selecionadas da lista? O histórico será mantido, mas agentes vinculados a elas precisarão escolher outra conexão ativa."
+        confirmLabel="Remover"
+        onClose={() => setRemoveCodex(null)}
+        onConfirm={async () => {
+          if (!removeCodex) return;
+          setActing(true);
+          let count = 0;
+          const errors = [];
+          for (const id of removeCodex.ids) {
+            try { await archiveCodexConnection(id); count += 1; }
+            catch (err) { errors.push(err.message); }
+          }
+          removeCodex.clear?.();
+          setRemoveCodex(null);
+          setActing(false);
+          if (count) toast.success(`${count} conexão(ões) removida(s) da lista.`);
+          if (errors.length) toast.error(errors[0]);
+          load();
+        }}
       />
 
       {/* Os 5 patrasques: confirmação + a consequência escrita + tooltip no botão
