@@ -110,7 +110,7 @@ export async function uploadChatMedia(chatId, file, kind, opts = {}) {
 
 export async function downloadChatMedia(chatId, mediaId) {
   try {
-    const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media/${mediaId}`, { responseType: 'blob', timeout: 120000 });
+    const { data } = await api.get(`/comm/whatsapp/chats/${chatId}/media`, { params: { ref: mediaId }, responseType: 'blob', timeout: 120000 });
     return data;
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao baixar mídia')); }
 }
