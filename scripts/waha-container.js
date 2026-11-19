@@ -104,8 +104,8 @@ function expectedEnvironment(env) {
     'WAHA_PRINT_QR=False',
     'WAHA_DASHBOARD_ENABLED=False',
     'WHATSAPP_SWAGGER_ENABLED=False',
-    'WAHA_EVENTS_DOWNLOAD_MEDIA=False',
-    'WAHA_API_DOWNLOAD_MEDIA=False',
+    'WAHA_EVENTS_DOWNLOAD_MEDIA=True',
+    'WAHA_API_DOWNLOAD_MEDIA=True',
     'WAHA_WORKER_RESTART_SESSIONS=True',
   ];
 }
