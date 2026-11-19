@@ -93,3 +93,25 @@ export async function completeConnectchatCustomerLink(conversationId, requestId)
     return data;
   } catch (err) { throw new Error(extractErrorMessage(err, 'O cliente ainda não confirmou o vínculo')); }
 }
+
+/** Liga um agente ao laboratório ConnectChat; não habilita envio automático. */
+export async function getConnectchatAgentBinding() {
+  try {
+    const { data } = await api.get('/ai/connectchat-lab/binding');
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível consultar o agente vinculado')); }
+}
+
+export async function setConnectchatAgentBinding(agentId) {
+  try {
+    const { data } = await api.put('/ai/connectchat-lab/binding', { agentId });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível vincular o agente ao ConnectChat')); }
+}
+
+export async function previewConnectchatAgent(conversationId) {
+  try {
+    const { data } = await api.post('/ai/connectchat-lab/preview', { conversationId }, { timeout: 120000 });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível gerar a prévia do agente')); }
+}
