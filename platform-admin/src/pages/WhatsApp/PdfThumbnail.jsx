@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 // Renderiza apenas a primeira página. O iframe de PDF não fornece miniatura
 // confiável em Firefox/iOS e pode mostrar a barra completa do visualizador.
 // PDF.js fica em chunk lazy, só carregado para documentos PDF visíveis.
-export default function PdfThumbnail({ file }) {
+export default function PdfThumbnail({ file, onPageCount }) {
   const canvasRef = useRef(null);
   const [preview, setPreview] = useState('loading');
 
@@ -34,6 +34,7 @@ export default function PdfThumbnail({ file }) {
         task = pdfjs.getDocument({ data: bytes, useSystemFonts: true });
         pdf = await task.promise;
         if (disposed) return;
+        if (!disposed) onPageCount(pdf.numPages);
         const page = await pdf.getPage(1);
         if (disposed) return;
         const canvas = canvasRef.current;
@@ -60,7 +61,7 @@ export default function PdfThumbnail({ file }) {
       try { renderTask?.cancel(); } catch { /* task cancelável */ }
       void task?.destroy();
     };
-  }, [file]);
+  }, [file, onPageCount]);
 
   return (
     <div className="relative flex h-[180px] w-full items-center justify-center overflow-hidden bg-[#f5f5f5]">
