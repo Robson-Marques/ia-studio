@@ -78,6 +78,7 @@ function MessageAttachment({ attachment }) {
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
+  const canReadAgents = can('ai.agents.read');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -137,14 +138,14 @@ export default function ConnectchatConversas() {
     } catch (error) {
       if (!silent) toast.error(error.message);
     }
-  }, [can, toast]);
+  }, [canReadAgents, toast]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
   // Vínculo do assistente é configuração desta instalação, nunca um webhook
   // automático: nenhuma mensagem enviada pela IA sem ação humana.
   useEffect(() => {
-    if (!can('ai.agents.read')) return;
+    if (!canReadAgents) return;
     let active = true;
     Promise.all([listAgents(), getConnectchatAgentBinding()])
       .then(([list, binding]) => {
