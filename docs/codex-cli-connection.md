@@ -50,6 +50,25 @@ arquivos de autenticação para o banco nem para o frontend.
 - Duas execuções simultâneas no máximo por instância da API, timeout de
   três minutos; não há fallback silencioso para API paga.
 
+## Fluxo de gerenciamento da conta (atualizado)
+
+- Ao escolher **ChatGPT — Codex CLI** em Nova conexão, a interface abandona
+  as etapas vazias do wizard declarativo e apresenta **Criar e conectar**.
+- Conexões já cadastradas ficam visíveis nessa tela, com link
+  **Abrir / reconectar**, para evitar duplicações acidentais.
+- Após criar, o formulário abre a área de login por dispositivo na mesma tela.
+- Se o provisionamento não ocorreu, a ação **Reparar instalação** executa
+  `scripts/install-codex-cli.sh` do produto atual sob permissão
+  `system.maintain`; não troca de serviço, banco ou branch.
+- **Reconectar conta** revoga a sessão CLI anterior (quando existir) e reinicia
+  o login oficial com código. A ação nunca coleta senha no painel.
+- **Remover conexão** na listagem ou no detalhe desativa e arquiva apenas a
+  conexão Codex escolhida, exclui sua pasta isolada de autenticação e mantém
+  registro, ID e histórico para auditoria. Agentes devem apontar para outra
+  conexão antes de voltar a executar. Outras integrações não são afetadas.
+- **Ativar** não pode declarar uma conexão Codex conectada se o health não
+  confirmar o login oficial.
+
 ## Segurança e implantação
 
 - Na instalação atual, o PM2 executa como root, mas o processo Codex é sempre
