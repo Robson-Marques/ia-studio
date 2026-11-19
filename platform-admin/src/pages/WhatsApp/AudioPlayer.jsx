@@ -4,7 +4,6 @@
 // Portado do Aquapark. Os glifos de tocar/pausar vêm do DS (v1.2.41) — antes
 // vinham de outra biblioteca, com traço e grade diferentes dos do resto da tela.
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { DSIcon } from '@studio-ux-ds/react';
 
 async function resolveAudioDuration(src) {
   try {
@@ -146,7 +145,7 @@ export default function AudioPlayer({ src, light = false }) {
   }
 
   const btnCls = light
-    ? 'w-7 h-7 rounded-full bg-white shadow-sm hover:bg-gray-50 text-gray-600 flex items-center justify-center shrink-0 transition border border-gray-200'
+    ? 'w-7 h-7 rounded-full bg-white shadow-sm hover:bg-gray-50 text-[#111b21] flex items-center justify-center shrink-0 transition border border-gray-200'
     : 'w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center shrink-0 transition';
   const trackCls = light
     ? 'flex-1 h-1.5 bg-gray-300 rounded-full overflow-hidden cursor-pointer'
@@ -165,8 +164,8 @@ export default function AudioPlayer({ src, light = false }) {
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
       <button onClick={togglePlay} className={btnCls} type="button">
         {playing
-          ? <DSIcon name="pause" size="sm" className="shrink-0" />
-          : <DSIcon name="play" size="sm" className="shrink-0 ml-0.5" />}
+          ? <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+          : <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ marginLeft: 2 }}><path d="M7 4.5c0-.8.9-1.3 1.6-.8l12 7.5a1 1 0 0 1 0 1.6l-12 7.5c-.7.5-1.6 0-1.6-.8v-15Z" /></svg>}
       </button>
       <div className={trackCls} onClick={seek}>
         <div className={fillCls} style={{ width: `${progress}%` }} />
