@@ -71,6 +71,6 @@ import { AttendanceAdminController } from './attendance/attendance-admin.control
   ],
   // Orchestrator + smart-send + email sao a porta de envio das Fases 4-7
   // (automacao/IA/notificacoes).
-  exports: [WhatsappOrchestratorService, WhatsappSmartSendService, WhatsappInboxService, ChatAssignmentService, EmailOrchestratorService, WhatsappAssistantService],
+  exports: [WhatsappOrchestratorService, WhatsappSmartSendService, WhatsappInboxService, ChatAssignmentService, EmailOrchestratorService, WhatsappAssistantService, ConnectchatInboxService],
 })
 export class CommModule {}

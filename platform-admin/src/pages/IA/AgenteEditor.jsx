@@ -311,6 +311,12 @@ export default function AgenteEditor() {
       else saved = await createAgent(body);
 
       const id = saved?.id || savedId;
+      // O backend pode habilitar automaticamente as habilidades de consulta
+      // do IXC para um novo agente. Refletir isso imediatamente na interface,
+      // evitando exibir "nenhuma habilidade" após salvar.
+      if (!savedId && Array.isArray(saved?.allowed_tools) && saved.allowed_tools.length) {
+        patch({ allowed_tools: saved.allowed_tools });
+      }
       setSavedId(id);
       setAgentName(saved?.name || form.name.trim());
 
@@ -743,6 +749,14 @@ export default function AgenteEditor() {
               Marque as habilidades do assistente. As marcadas com <Badge tone="warning">grava dados</Badge> mudam ou
               registram algo no sistema.
             </p>
+            {can('isp.tools.use') && (
+              <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+                <strong>IXC conectado?</strong> Os assistentes novos recebem automaticamente
+                as habilidades básicas de consulta ISP ao salvar. Você pode revisar
+                e desmarcar cada habilidade depois. Ações que alteram o IXC nunca
+                são liberadas automaticamente.
+              </p>
+            )}
             {!canActions && (
               <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12, margin: 0 }}>
                 Você só pode marcar habilidades de <strong>consulta</strong>. As que <em>gravam dados</em> exigem a

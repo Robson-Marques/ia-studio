@@ -40,6 +40,11 @@ export interface RunAgentParams {
    *  sem isto cada mensagem recebida vira um run stateless e ele "esquece" o
    *  que já foi dito. O nó AGENT carrega do chat quando há sessão. */
   history?: { role: 'user' | 'assistant'; content: string }[];
+  /** Limita as ferramentas de um teste supervisionado, independentemente do
+   *  catálogo normal do agente. Só pode REDUZIR, nunca ampliar permissões. */
+  allowedToolsOverride?: string[];
+  /** Instruções do canal (não substituem regras de segurança do agente). */
+  channelInstructions?: string;
 }
 
 export interface RunAgentOutput {
@@ -87,8 +92,10 @@ export class AgentRunnerService {
     // Seguranca: inspeciona o input do usuario (loga alerta; nao bloqueia).
     this.promptSecurity.inspect(params.input);
 
-    const systemPrompt = await this.buildSystemPrompt(agent, params.input, traceId);
-    const llmTools = await this.buildTools(agent);
+    const systemPrompt = await this.buildSystemPrompt(agent, params.input, traceId)
+      + (params.channelInstructions ? '\n\n## Restrições deste teste supervisionado\n' + params.channelInstructions : '');
+    const llmTools = await this.buildTools(agent, params.allowedToolsOverride);
+    const permittedTools = llmTools.map((tool) => tool.name);
 
     const messages: LlmMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -113,6 +120,7 @@ export class AgentRunnerService {
       traceId,
       dryRun,
       scopeKeys: params.scopeKeys,
+      permittedTools,
       executionId: params.executionId ?? null,
     });
   }
@@ -162,7 +170,7 @@ export class AgentRunnerService {
     messages: LlmMessage[],
     llmTools: LlmTool[],
     guardrails: Guardrails,
-    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; permittedTools?: string[]; executionId: string | null },
   ): Promise<RunAgentOutput> {
     let promptTokens = 0;
     let completionTokens = 0;
@@ -219,6 +227,15 @@ export class AgentRunnerService {
 
         // Executa cada tool call.
         for (const call of result.toolCalls) {
+          // Não confiar em uma chamada inventada pelo LLM: somente nomes que
+          // foram efetivamente enviados ao modelo podem executar.
+          if (!llmTools.some((tool) => tool.name === call.name)) {
+            messages.push({
+              role: 'tool', tool_call_id: call.id, name: call.name,
+              content: JSON.stringify({ error: 'Habilidade não autorizada neste atendimento.' }),
+            });
+            continue;
+          }
           const toolCtx = this.buildToolContext(agent, runId, ctx);
           const exec = await this.toolRuntime.executeTool(call.name, call.arguments, toolCtx);
 
@@ -366,9 +383,12 @@ export class AgentRunnerService {
     return parts.filter(Boolean).join('');
   }
 
-  private async buildTools(agent: AiAgent): Promise<LlmTool[]> {
-    if (agent.allowed_tools.length === 0) return [];
-    const catalog = await this.tools.resolveForAgent(agent.allowed_tools);
+  private async buildTools(agent: AiAgent, allowOverride?: string[]): Promise<LlmTool[]> {
+    const keys = allowOverride
+      ? agent.allowed_tools.filter((key) => allowOverride.includes(key))
+      : agent.allowed_tools;
+    if (keys.length === 0) return [];
+    const catalog = await this.tools.resolveForAgent(keys);
     return catalog.map((t) => ({
       name: t.key,
       description: t.description,
@@ -379,7 +399,7 @@ export class AgentRunnerService {
   private buildToolContext(
     agent: AiAgent,
     runId: string,
-    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; permittedTools?: string[]; executionId: string | null },
   ): ToolExecutionContext {
     return {
       agentId: agent.id,
@@ -390,6 +410,7 @@ export class AgentRunnerService {
       knowledgeBaseIds: agent.knowledge_base_ids,
       memoryProfileIds: agent.memory_profile_ids,
       dryRun: ctx.dryRun,
+      permittedTools: ctx.permittedTools,
       runAgent: async (a) => {
         const res = await this.collaboration.consult({
           principalAgentId: agent.id,

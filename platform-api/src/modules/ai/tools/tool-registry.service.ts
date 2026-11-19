@@ -18,6 +18,8 @@ export interface ToolExecutionContext {
   memoryProfileIds?: string[];
   /** Callback pro runner rodar um agente colaborador (evita ciclo de DI). */
   runAgent?: (args: { agentId: string; input: string; traceId: string; executionId?: string }) => Promise<{ output: string }>;
+  /** Restrição adicional do canal: o runtime nunca executa uma chave fora dela. */
+  permittedTools?: string[];
   dryRun?: boolean;
 }
 

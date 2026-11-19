@@ -9,6 +9,8 @@ import { Module } from '@nestjs/common';
 import { IntegrationModule } from '../integration/integration.module';
 import { CommModule } from '../comm/comm.module';
 import { AutomationModule } from '../automation/automation.module';
+import { SettingsModule } from '../core/settings/settings.module';
+import { ConnectchatAgentController } from './connectchat/connectchat-agent.controller';
 
 // Providers (LLM)
 import { LlmProviderRegistryService } from './providers/llm-provider-registry.service';
@@ -81,7 +83,7 @@ import { AiSeedRepository } from './seed/ai-seed.repository';
 import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
 
 @Module({
-  imports: [IntegrationModule, CommModule, AutomationModule],
+  imports: [IntegrationModule, CommModule, AutomationModule, SettingsModule],
   controllers: [
     MemoryController,
     KnowledgeController,
@@ -90,6 +92,7 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     CollaborationController,
     McpController,
     AgentsController,
+    ConnectchatAgentController,
     AttendanceAnalysisController,
     ContentReviewController,
   ],

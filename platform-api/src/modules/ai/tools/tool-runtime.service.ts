@@ -42,6 +42,9 @@ export class ToolRuntimeService {
     ctx: ToolExecutionContext,
   ): Promise<ToolExecutionResult> {
     const started = Date.now();
+    if (ctx.permittedTools && !ctx.permittedTools.includes(toolKey)) {
+      return this.fail('Esta habilidade não está autorizada no teste supervisionado.', started, ctx, toolKey, args);
+    }
     const tool = await this.repository.findByKey(toolKey);
     if (!tool || !tool.is_active) {
       return this.fail(`Ferramenta "${toolKey}" não encontrada ou inativa.`, started, ctx, toolKey, args);
@@ -102,6 +105,9 @@ export class ToolRuntimeService {
     ctx: ToolExecutionContext,
   ): Promise<ToolExecutionResult> {
     const started = Date.now();
+    if (ctx.permittedTools && !ctx.permittedTools.includes(toolKey)) {
+      return this.fail('Esta habilidade não está autorizada no teste supervisionado.', started, ctx, toolKey, args);
+    }
     const tool = await this.repository.findByKey(toolKey);
     if (!tool || !tool.is_active) {
       return this.fail(`Ferramenta "${toolKey}" não encontrada.`, started, ctx, toolKey, args);
