@@ -62,7 +62,7 @@ export class ConnectchatPilotController {
       const agent = await this.agents.findById(body.agentId);
       if (!agent?.is_active) throw new BadRequestException('Escolha um agente ativo.');
     }
-    await this.settings.set(BINDING_KEY, body.agentId || null);
+    await this.settings.set(BINDING_KEY, body.agentId || '');
     return { agentId: body.agentId || null, automaticReplies: false, whatsappEnabled: false };
   }
 
