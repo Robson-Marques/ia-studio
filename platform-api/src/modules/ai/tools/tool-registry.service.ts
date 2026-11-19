@@ -10,6 +10,9 @@ export interface ToolExecutionContext {
   agentRunId: string;
   /** Permitidas nesta execução; o runtime valida antes de despachar. */
   allowedToolKeys?: string[];
+  /** Preview ConnectChat: somente leitura e documento vinculado ao canal. */
+  previewMode?: boolean;
+  previewCustomerDocument?: string;
   traceId: string;
   executionId?: string | null;
   /** Escopos de memoria (contact_id/session_id/...). */
