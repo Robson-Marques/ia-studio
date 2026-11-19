@@ -26,6 +26,7 @@ import { assertConnectionTransition } from './connection-state.machine';
 import { SecretsService } from '../secrets/secrets.service';
 import { ProviderCatalogService } from '../catalog/provider-catalog.service';
 import { ProviderRegistryService } from '../registry/provider-registry.service';
+import { CodexCliService } from '../registry/providers/codex-cli.service';
 import { AuditLogService, redactSensitive } from '../../../shared/audit/audit-log.service';
 import { getRequestStore } from '../../../shared/audit/request-context';
 import {
@@ -55,6 +56,7 @@ export class ConnectionsService {
     private readonly secrets: SecretsService,
     private readonly providerCatalog: ProviderCatalogService,
     private readonly registry: ProviderRegistryService,
+    private readonly codexCli: CodexCliService,
     private readonly audit: AuditLogService,
   ) {}
 
@@ -87,6 +89,7 @@ export class ConnectionsService {
     if (connection.provider_key !== 'codex-cli') {
       throw new BadRequestException('Arquivamento pela interface permitido apenas para conexões Codex CLI.');
     }
+    await this.codexCli.forget(id);
     const result = await this.repository.archive(id);
     await this.audit.record({
       action: 'integration.connection.archive',
