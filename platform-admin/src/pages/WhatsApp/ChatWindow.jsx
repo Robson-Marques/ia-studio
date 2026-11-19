@@ -7,6 +7,7 @@ import {
 import { ATTENDANCE_STATUS, contactInitials, formatPhone } from './whatsapp.constants';
 import MessageComposer from './MessageComposer';
 import AudioPlayer from './AudioPlayer';
+import PdfThumbnail from './PdfThumbnail';
 import { statusToTone } from '../../lib/tone';
 
 // WhatsApp/ChatWindow — a conversa aberta. Migrada pro DS na v0.10.9.
@@ -62,7 +63,7 @@ function ChatMedia({ chatId, message }) {
       const displayBlob = pdf && blob.type !== 'application/pdf'
         ? new Blob([blob], { type: 'application/pdf' })
         : blob;
-      setData({ src: URL.createObjectURL(displayBlob), mime: displayBlob.type });
+      setData({ src: URL.createObjectURL(displayBlob), mime: displayBlob.type, file: displayBlob });
     } catch (err) {
       setError(err.message);
       toast.error(err.message);
@@ -122,21 +123,15 @@ function ChatMedia({ chatId, message }) {
   const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf';
   return (
     <div className="w-[260px] max-w-full overflow-hidden rounded-lg border border-black/10 bg-white/80">
-      {isPdf && (
-        <div className="relative h-[180px] overflow-hidden bg-white" title="Prévia da primeira página do PDF">
-          <iframe
-            title={`Prévia de ${filename}`}
-            src={`${data.src}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-            className="h-full w-full border-0"
-            style={{ pointerEvents: 'none' }}
-            tabIndex={-1}
-            loading="lazy"
-          />
-        </div>
-      )}
+      {isPdf && <PdfThumbnail file={data.file} />}
       <div className="flex items-center gap-2 p-2.5">
         <DSIcon name="file-text" size="sm" />
         <span className="min-w-0 flex-1 truncate text-xs" title={filename}>{filename}</span>
+        {isPdf && (
+          <a href={data.src} target="_blank" rel="noreferrer" title="Abrir documento" aria-label={`Abrir ${filename}`} style={{ color: '#027eb5' }}>
+            <DSIcon name="external-link" size="sm" />
+          </a>
+        )}
         <a
           href={data.src}
           download={filename}
