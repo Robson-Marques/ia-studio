@@ -97,7 +97,23 @@ export class AgentsService {
   // ─── CRUD ───────────────────────────────────────────
 
   async create(dto: CreateAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
-    await this.assertActionGrant(dto.allowed_tools, actor);
+    // A conexão IXC ativa habilita automaticamente apenas capacidades de
+    // CONSULTA nos agentes novos. Ferramentas que enviam dados, desbloqueiam
+    // ou abrem OS continuam explícitas e sujeitas a políticas. O usuário pode
+    // alterar/desmarcar habilidades posteriormente, sem reativação forçada.
+    const ixcActive = await this.prisma.connection.count({
+      where: { provider_key: 'ixc', status: 'ACTIVE' },
+    });
+    const defaults = ixcActive > 0 ? [
+      'identificar_cliente',
+      'consultar_chamados_recentes',
+      'diagnosticar_conexao',
+      'consultar_contrato',
+      'status_conexao',
+      'status_regiao',
+    ] : [];
+    const selectedTools = dto.allowed_tools?.length ? dto.allowed_tools : defaults;
+    await this.assertActionGrant(selectedTools, actor);
 
     const agent = await this.repository.create({
       name: dto.name,
@@ -111,7 +127,7 @@ export class AgentsService {
       temperature: dto.temperature ?? 0.3,
       max_steps: dto.max_steps ?? 6,
       max_tokens: dto.max_tokens,
-      allowed_tools: dto.allowed_tools ?? [],
+      allowed_tools: selectedTools,
       knowledge_base_ids: dto.knowledge_base_ids ?? [],
       memory_profile_ids: dto.memory_profile_ids ?? [],
       action_permissions: dto.action_permissions ?? [],
