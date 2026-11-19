@@ -183,7 +183,7 @@ export class ConnectchatAgentController {
       'Chamados consultados no IXC são registros históricos, não prova de que uma falha atual foi resolvida.',
       readTickets
         ? 'Últimos chamados IXC conhecidos (até cinco): ' + JSON.stringify(chamados)
-          + '\\nÚltimas ordens de serviço reais IXC (até cinco): ' + JSON.stringify(ordens)
+          + '\nÚltimas ordens de serviço reais IXC (até cinco): ' + JSON.stringify(ordens)
         : 'Nenhum histórico IXC foi disponibilizado (identidade não validada ou leitura desligada pelo operador).',
       evidence ? 'Contagem determinística de chamados: ' + JSON.stringify(evidence) : '',
       context.verified
