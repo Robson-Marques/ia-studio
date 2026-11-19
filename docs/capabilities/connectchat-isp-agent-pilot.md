@@ -34,8 +34,9 @@ de leitura já existentes e ativas:
 
 Nenhum acesso SQL, chamadas HTTP livres, alteração de registro, nova OS,
 desbloqueio, disparo de mensagem ou cobrança são habilitados por padrão.
-O operador pode ajustar as habilidades no editor. Assistentes existentes não
-são alterados silenciosamente; podem ser editados manualmente.
+O editor marca as mesmas habilidades automaticamente e mostra um aviso antes
+de salvar. O operador pode ajustá-las em “O que faz”. Assistentes existentes
+não são alterados silenciosamente; podem ser editados manualmente.
 
 Para múltiplas conexões IXC, a configuração deve ser definida pelo operador,
 para evitar confundir clientes de empresas/filiais diferentes.
@@ -57,10 +58,14 @@ agente ativo. O vínculo da bancada é persistido em
    `requireCustomerLink=true`.
 5. Sem vínculo ativo de cliente, só oferece FAQ e hora atual. Mesmo que o usuário
    desmarque controles na UI, a consulta de dados pessoais exige vínculo ativo.
-6. Ensaia o AgentRunner com ferramentas explicitamente autorizadas. Nunca
+6. Com o vínculo IXC ativo, o backend lê deterministicamente os **cinco últimos
+   chamados** do titular pelo ID armazenado no vínculo, reduz os campos pela
+   projeção `projectChamado` e anexa as evidências ao contexto antes da IA
+   responder. Se o IXC falhar, informa indisponibilidade, nunca ausência.
+7. Ensaia o AgentRunner com ferramentas explicitamente autorizadas. Nunca
    disponibiliza no ensaio ferramentas de escrita, boleto em PDF, WhatsApp,
    desbloqueio, criação de OS ou alteração em conexão.
-7. Mostra o **rascunho não enviado**, com botão **Revisar na mensagem**. Apenas
+8. Mostra o **rascunho não enviado**, com botão **Revisar na mensagem**. Apenas
    um operador com permissão de envio pode copiar o rascunho para o composer e
    clicar manualmente em Enviar.
 
@@ -79,8 +84,9 @@ alterado. Não existe mudança de esquema Prisma nem migração de banco.
 - Titularidade confirmada via vínculo é condição mínima, não substitui as
   regras reais de identidade para envio de faturas e ações financeiras; essas
   operações continuam sob revisão humana.
-- A leitura de títulos é uma opção de teste desligada por padrão, não autorização
-  para cobrar, negociar, desbloquear acesso ou emitir segunda via.
+- A leitura de títulos é uma opção de teste desligada por padrão e depende
+  também de habilitar `consultar_debitos` nas habilidades do agente.
+  Não autoriza cobrar, negociar, desbloquear acesso ou emitir segunda via.
 - A bancada é restrita à revisão por operadores. Antes de habilitar resposta
   automática no WhatsApp, ainda é necessária uma política explícita de alçada,
   identidade, privacidade, antifraude e escalonamento humano, com testes reais.
