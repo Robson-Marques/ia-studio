@@ -113,7 +113,11 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
             <Button size="sm" disabled={working} onClick={() => act(async () => {
               const result = await repairCodex(connectionId);
               setState(result);
-              toast.success('Instalação do Codex verificada. Continue com o login.');
+              if (!result?.installed || !result?.provisioned) {
+                toast.error(result?.detail || 'O executor Codex ainda não está disponível.');
+                return;
+              }
+              toast.success('Executor Codex confirmado. Continue com o login.');
             })}>
               Reparar instalação
             </Button>
