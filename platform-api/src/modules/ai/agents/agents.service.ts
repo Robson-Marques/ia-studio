@@ -14,6 +14,7 @@ import { AiAgent, Prisma } from '@prisma/client';
 import { AgentsRepository } from './agents.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { ISP_AUTO_READ_TOOLS } from './isp-agent-defaults';
 import {
   CreateAgentDto,
   ImportAgentDto,
@@ -94,10 +95,32 @@ export class AgentsService {
     }
   }
 
+  /** Auto-habilita apenas consultas ISP quando já existe IXC conectado.
+   * O catálogo local é fonte de verdade: não conceder ferramenta desativada
+   * nem cadastro personalizado com chave semelhante.
+   */
+  private async withIspReadTools(keys: string[]): Promise<string[]> {
+    const ixcActive = await this.prisma.connection.count({
+      where: { provider_key: 'ixc', status: 'ACTIVE' },
+    });
+    if (!ixcActive) return keys;
+    const existing = await this.prisma.aiTool.findMany({
+      where: {
+        key: { in: [...ISP_AUTO_READ_TOOLS] },
+        builtin: true,
+        is_active: true,
+        requires_approval: false,
+      },
+      select: { key: true },
+    });
+    return [...new Set([...keys, ...existing.map((tool) => tool.key)])];
+  }
+
   // ─── CRUD ───────────────────────────────────────────
 
   async create(dto: CreateAgentDto, createdBy: string | null, actor?: AuthenticatedUser) {
     await this.assertActionGrant(dto.allowed_tools, actor);
+    const allowedTools = await this.withIspReadTools(dto.allowed_tools ?? []);
 
     const agent = await this.repository.create({
       name: dto.name,
@@ -111,7 +134,7 @@ export class AgentsService {
       temperature: dto.temperature ?? 0.3,
       max_steps: dto.max_steps ?? 6,
       max_tokens: dto.max_tokens,
-      allowed_tools: dto.allowed_tools ?? [],
+      allowed_tools: allowedTools,
       knowledge_base_ids: dto.knowledge_base_ids ?? [],
       memory_profile_ids: dto.memory_profile_ids ?? [],
       action_permissions: dto.action_permissions ?? [],
@@ -146,7 +169,7 @@ export class AgentsService {
     if (dto.temperature !== undefined) data.temperature = dto.temperature;
     if (dto.max_steps !== undefined) data.max_steps = dto.max_steps;
     if (dto.max_tokens !== undefined) data.max_tokens = dto.max_tokens;
-    if (dto.allowed_tools !== undefined) data.allowed_tools = dto.allowed_tools;
+    if (dto.allowed_tools !== undefined) data.allowed_tools = await this.withIspReadTools(dto.allowed_tools);
     if (dto.knowledge_base_ids !== undefined) data.knowledge_base_ids = dto.knowledge_base_ids;
     if (dto.memory_profile_ids !== undefined) data.memory_profile_ids = dto.memory_profile_ids;
     if (dto.action_permissions !== undefined) data.action_permissions = dto.action_permissions;

@@ -9,6 +9,7 @@ import { Module } from '@nestjs/common';
 import { IntegrationModule } from '../integration/integration.module';
 import { CommModule } from '../comm/comm.module';
 import { AutomationModule } from '../automation/automation.module';
+import { SettingsModule } from '../core/settings/settings.module';
 
 // Providers (LLM)
 import { LlmProviderRegistryService } from './providers/llm-provider-registry.service';
@@ -61,6 +62,7 @@ import { AgentsService } from './agents/agents.service';
 import { AgentRunnerService } from './agents/agent-runner.service';
 import { PromptSecurityService } from './agents/prompt-security.service';
 import { AgentsController } from './agents/agents.controller';
+import { ConnectchatAgentLabController } from './agents/connectchat-agent-lab.controller';
 
 // Análise de atendimento (Checkpoint 1a)
 import { AttendanceAnalysisRepository } from './analysis/attendance-analysis.repository';
@@ -81,7 +83,7 @@ import { AiSeedRepository } from './seed/ai-seed.repository';
 import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
 
 @Module({
-  imports: [IntegrationModule, CommModule, AutomationModule],
+  imports: [IntegrationModule, CommModule, AutomationModule, SettingsModule],
   controllers: [
     MemoryController,
     KnowledgeController,
@@ -90,6 +92,7 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     CollaborationController,
     McpController,
     AgentsController,
+    ConnectchatAgentLabController,
     AttendanceAnalysisController,
     ContentReviewController,
   ],

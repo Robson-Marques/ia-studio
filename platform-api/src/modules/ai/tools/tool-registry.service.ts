@@ -8,6 +8,12 @@ import { Injectable, Logger } from '@nestjs/common';
 export interface ToolExecutionContext {
   agentId: string;
   agentRunId: string;
+  /** Permitidas nesta execução; o runtime valida antes de despachar. */
+  allowedToolKeys?: string[];
+  /** Preview ConnectChat: somente leitura e documento vinculado ao canal. */
+  previewMode?: boolean;
+  previewCustomerDocument?: string;
+  previewIxcConnectionId?: string;
   traceId: string;
   executionId?: string | null;
   /** Escopos de memoria (contact_id/session_id/...). */

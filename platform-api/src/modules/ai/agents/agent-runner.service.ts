@@ -17,6 +17,7 @@ import { AiAgent, AiProviderKind, AiRunStatus, Prisma } from '@prisma/client';
 import { AgentsRepository } from './agents.repository';
 import { compilePersona } from './agent-persona';
 import { compileRoteiro, hasRoteiro } from './agent-roteiro';
+import { ISP_DEFAULT_ATTENDANCE_POLICY } from './isp-agent-defaults';
 import { PromptSecurityService } from './prompt-security.service';
 import { LlmProviderService, ResolvedLlmConnection } from '../providers/llm-provider.service';
 import { AiOrchestratorService } from '../orchestrator/ai-orchestrator.service';
@@ -40,6 +41,14 @@ export interface RunAgentParams {
    *  sem isto cada mensagem recebida vira um run stateless e ele "esquece" o
    *  que já foi dito. O nó AGENT carrega do chat quando há sessão. */
   history?: { role: 'user' | 'assistant'; content: string }[];
+  /** Ambiente ConnectChat: restringe ferramentas sem depender do prompt. */
+  previewAllowedTools?: string[];
+  /** Regras de testes adicionadas pelo servidor, nunca pelo cliente. */
+  previewInstructions?: string;
+  /** Somente em memória: CPF/CNPJ obtido de vínculo IXC validado pelo servidor. */
+  previewCustomerDocument?: string;
+  /** Vínculo IXC extraído do ConnectChat, não escolhido pelo modelo. */
+  previewIxcConnectionId?: string;
 }
 
 export interface RunAgentOutput {
@@ -87,8 +96,9 @@ export class AgentRunnerService {
     // Seguranca: inspeciona o input do usuario (loga alerta; nao bloqueia).
     this.promptSecurity.inspect(params.input);
 
-    const systemPrompt = await this.buildSystemPrompt(agent, params.input, traceId);
-    const llmTools = await this.buildTools(agent);
+    const systemPrompt = (await this.buildSystemPrompt(agent, params.input, traceId))
+      + (params.previewInstructions ? '\n\n' + params.previewInstructions : '');
+    const llmTools = await this.buildTools(agent, params.previewAllowedTools);
 
     const messages: LlmMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -114,6 +124,9 @@ export class AgentRunnerService {
       dryRun,
       scopeKeys: params.scopeKeys,
       executionId: params.executionId ?? null,
+      previewMode: !!params.previewAllowedTools,
+      previewCustomerDocument: params.previewCustomerDocument,
+      previewIxcConnectionId: params.previewIxcConnectionId,
     });
   }
 
@@ -162,7 +175,7 @@ export class AgentRunnerService {
     messages: LlmMessage[],
     llmTools: LlmTool[],
     guardrails: Guardrails,
-    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null; previewMode?: boolean; previewCustomerDocument?: string; previewIxcConnectionId?: string },
   ): Promise<RunAgentOutput> {
     let promptTokens = 0;
     let completionTokens = 0;
@@ -219,7 +232,7 @@ export class AgentRunnerService {
 
         // Executa cada tool call.
         for (const call of result.toolCalls) {
-          const toolCtx = this.buildToolContext(agent, runId, ctx);
+          const toolCtx = this.buildToolContext(agent, runId, ctx, llmTools.map((tool) => tool.name));
           const exec = await this.toolRuntime.executeTool(call.name, call.arguments, toolCtx);
 
           if (exec.status === 'awaiting_approval') {
@@ -345,6 +358,11 @@ export class AgentRunnerService {
       parts.push(`\n\n## Objetivo\n${agent.goal}`);
     }
     parts.push(compilePersona(agent.persona));
+    // Conexão IXC já ativa: incluir procedimento mínimo no agente novo,
+    // sem conceder ações adicionais nem exigir prompt manual do operador.
+    if (agent.allowed_tools.includes('identificar_cliente')) {
+      parts.push('\n\n' + ISP_DEFAULT_ATTENDANCE_POLICY);
+    }
 
     // Contexto RAG: consulta as bases habilitadas com o input do usuario.
     if (agent.knowledge_base_ids.length > 0) {
@@ -366,10 +384,21 @@ export class AgentRunnerService {
     return parts.filter(Boolean).join('');
   }
 
-  private async buildTools(agent: AiAgent): Promise<LlmTool[]> {
-    if (agent.allowed_tools.length === 0) return [];
-    const catalog = await this.tools.resolveForAgent(agent.allowed_tools);
-    return catalog.map((t) => ({
+  private async buildTools(agent: AiAgent, previewAllowed?: string[]): Promise<LlmTool[]> {
+    // A lista de teste vem EXCLUSIVAMENTE do servidor, nunca do request.
+    // Ela permite experimentar agentes antigos sem obrigar a regravar sua
+    // configuração. O runtime também valida cada chamada individualmente.
+    const allowed = previewAllowed
+      ? [...new Set(previewAllowed)]
+      : agent.allowed_tools;
+    if (allowed.length === 0) return [];
+    const catalog = await this.tools.resolveForAgent(allowed);
+    // No laboratório jamais carregar tools personalizadas ou de aprovação,
+    // mesmo que alguém tenha reutilizado uma chave do catálogo.
+    const visible = previewAllowed
+      ? catalog.filter((tool) => tool.builtin && tool.builtin_handler === tool.key && !tool.requires_approval)
+      : catalog;
+    return visible.map((t) => ({
       name: t.key,
       description: t.description,
       parameters: (t.input_schema ?? { type: 'object', properties: {} }) as Record<string, unknown>,
@@ -379,11 +408,16 @@ export class AgentRunnerService {
   private buildToolContext(
     agent: AiAgent,
     runId: string,
-    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null; previewMode?: boolean; previewCustomerDocument?: string; previewIxcConnectionId?: string },
+    allowedToolKeys: string[],
   ): ToolExecutionContext {
     return {
       agentId: agent.id,
       agentRunId: runId,
+      allowedToolKeys,
+      previewMode: ctx.previewMode,
+      previewCustomerDocument: ctx.previewCustomerDocument,
+      previewIxcConnectionId: ctx.previewIxcConnectionId,
       traceId: ctx.traceId,
       executionId: ctx.executionId,
       scopeKeys: ctx.scopeKeys,

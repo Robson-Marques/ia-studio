@@ -313,6 +313,11 @@ export default function AgenteEditor() {
       const id = saved?.id || savedId;
       setSavedId(id);
       setAgentName(saved?.name || form.name.trim());
+      // O backend anexa automaticamente as consultas IXC de leitura quando
+      // houver conexão ativa; refletir as permissões reais após salvar.
+      if (Array.isArray(saved?.allowed_tools)) {
+        setForm((current) => ({ ...current, allowed_tools: saved.allowed_tools }));
+      }
 
       if (saveVersion && id) {
         const res = await saveAgentVersion(id, { note: note.trim() || undefined });
@@ -740,7 +745,12 @@ export default function AgenteEditor() {
               O que pode fazer
             </h2>
             <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
-              Marque as habilidades do assistente. As marcadas com <Badge tone="warning">grava dados</Badge> mudam ou
+              As consultas ISP de identificação, histórico e diagnóstico são vinculadas
+              automaticamente ao salvar, se o IXC estiver conectado. Ações que alteram
+              dados continuam sob controle e aprovação da empresa.
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
+              Marque outras habilidades quando necessário. As marcadas com <Badge tone="warning">grava dados</Badge> mudam ou
               registram algo no sistema.
             </p>
             {!canActions && (
@@ -772,7 +782,25 @@ export default function AgenteEditor() {
 
       {tab === 'revisao' && <ContentReviewTab agentId={savedId} canReview={canWrite} />}
 
-      {tab === 'testar' && <TestTab agentId={savedId} canExecute={canExecute} />}
+      {tab === 'testar' && (
+        <div className="space-y-3">
+          <Card>
+            <div style={{ padding: 16 }} className="space-y-2">
+              <strong style={{ fontSize: 13, color: 'var(--su-text-primary)' }}>
+                Testar com uma conversa real do ConnectChat
+              </strong>
+              <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+                Vincule este assistente ao laboratório do ConnectChat. A IA gera
+                uma resposta para revisão, sem enviar mensagens automaticamente.
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => navigate('/connectchat/conversas')}>
+                Abrir laboratório ConnectChat
+              </Button>
+            </div>
+          </Card>
+          <TestTab agentId={savedId} canExecute={canExecute} />
+        </div>
+      )}
 
       {tab === 'visao' && advExpanded && (
         <div className="space-y-4">

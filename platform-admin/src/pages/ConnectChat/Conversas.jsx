@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
 import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
+import { listAgents } from '../../services/ai';
+import { getConnectchatAgentBinding, setConnectchatAgentBinding, previewConnectchatAgent, setConnectchatLabRules } from '../../services/connectchat';
 
 const POLL_MS = 5000;
 const TYPING_POLL_MS = 1500;
@@ -77,6 +79,7 @@ function MessageAttachment({ attachment }) {
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
+  const canUseLab = can('ai.agents.read') && can('comm.connectchat.read');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -88,6 +91,17 @@ export default function ConnectchatConversas() {
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [customerActivity, setCustomerActivity] = useState(null);
+  const [labOpen, setLabOpen] = useState(false);
+  const [agentOptions, setAgentOptions] = useState([]);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
+  const [boundAgentId, setBoundAgentId] = useState('');
+  const [labBusy, setLabBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [labRules, setLabRules] = useState({
+    inspect_recent_tickets: true, recurrence_days: 30,
+    recurrence_min_tickets: 2, handoff_if_uncertain: true,
+  });
+  const [rulesOpen, setRulesOpen] = useState(false);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
   const typingTimerRef = useRef(null);
@@ -133,6 +147,21 @@ export default function ConnectchatConversas() {
   }, [can, toast]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  useEffect(() => {
+    if (!canUseLab) return undefined;
+    let live = true;
+    Promise.all([listAgents(), getConnectchatAgentBinding()])
+      .then(([agents, binding]) => {
+        if (!live) return;
+        setAgentOptions((agents.items || []).filter((agent) => agent.is_active !== false));
+        setSelectedAgentId(binding.agentId || '');
+        setBoundAgentId(binding.agentId || '');
+        if (binding.rules) setLabRules(binding.rules);
+      })
+      .catch(() => { /* Conexão comum continua disponível sem o laboratório. */ });
+    return () => { live = false; };
+  }, [canUseLab]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -196,12 +225,49 @@ export default function ConnectchatConversas() {
   }, []);
 
   async function selectConversation(conversation) {
+    setPreview(null);
     stopTyping();
     setSelected(conversation);
     setMessages([]);
     setCustomerActivity(null);
     setCustomerId('');
     await loadMessages(conversation, true);
+  }
+
+  async function linkAgent() {
+    if (!selectedAgentId || !can('ai.agents.write')) return;
+    setLabBusy(true);
+    try {
+      const binding = await setConnectchatAgentBinding(selectedAgentId);
+      setBoundAgentId(binding.agentId);
+      setPreview(null);
+      toast.success('Assistente vinculado ao laboratório do ConnectChat. Envios automáticos continuam desligados.');
+    } catch (err) { toast.error(err.message); }
+    finally { setLabBusy(false); }
+  }
+
+  async function saveLabRules() {
+    if (!can('ai.agents.write')) return;
+    setLabBusy(true);
+    try {
+      const result = await setConnectchatLabRules(labRules);
+      setLabRules(result.rules);
+      setPreview(null);
+      toast.success('Regras do laboratório salvas. O envio automático continua bloqueado.');
+    } catch (err) { toast.error(err.message); }
+    finally { setLabBusy(false); }
+  }
+
+  async function testAgent() {
+    if (!selected || !boundAgentId || selectedAgentId !== boundAgentId) return;
+    setLabBusy(true);
+    setPreview(null);
+    try {
+      const data = await previewConnectchatAgent(selected.id);
+      setPreview(data);
+      if (data.status !== 'COMPLETED') toast.warn('A execução não terminou normalmente; consulte a execução do assistente.');
+    } catch (err) { toast.error(err.message); }
+    finally { setLabBusy(false); }
   }
 
   async function send() {
@@ -350,6 +416,121 @@ export default function ConnectchatConversas() {
                 );
               })}
             </div>
+            {can('ai.agents.execute') && can('ai.agents.read') && can('comm.connectchat.read') && (
+              <section style={{ borderTop: '1px solid var(--su-border-default)', padding: 'var(--su-space-3) var(--su-space-4)', background: 'var(--su-surface-raised)' }}>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <strong style={{ fontSize: 13, color: 'var(--su-text-primary)' }}>Laboratório de IA — ConnectChat</strong>
+                    <div style={{ fontSize: 11, color: 'var(--su-text-secondary)' }}>
+                      Respostas para revisão. Nada é enviado automaticamente.
+                    </div>
+                  </div>
+                  <Button variant="secondary" size="sm" onClick={() => setLabOpen((value) => !value)}>
+                    {labOpen ? 'Fechar' : 'Testar agente'}
+                  </Button>
+                </div>
+                {labOpen && (
+                  <div className="space-y-2" style={{ marginTop: 12 }}>
+                    <label htmlFor="connectchat-lab-agent" style={{ display: 'block', fontSize: 12, color: 'var(--su-text-secondary)' }}>
+                      Assistente vinculado ao ConnectChat
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <select id="connectchat-lab-agent" className="su-input" style={{ flex: 1, minWidth: 180 }}
+                        value={selectedAgentId} onChange={(event) => { setSelectedAgentId(event.target.value); setPreview(null); }}>
+                        <option value="">Escolha um agente ativo</option>
+                        {agentOptions.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+                      </select>
+                      {can('ai.agents.write') && selectedAgentId !== boundAgentId && (
+                        <Button variant="secondary" size="sm" loading={labBusy} onClick={linkAgent}>
+                          Vincular ao canal
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="warning">Modo supervisionado</Badge>
+                      <span style={{ fontSize: 11, color: 'var(--su-text-muted)' }}>
+                        IXC: consultas autorizadas · Cobrança e alterações: bloqueadas no teste
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <Button variant="ghost" size="sm" onClick={() => setRulesOpen((value) => !value)}>
+                        {rulesOpen ? 'Ocultar regras' : 'Regras de atendimento'}
+                      </Button>
+                      {rulesOpen && (
+                        <div className="space-y-3" style={{ border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12 }}>
+                          <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-secondary)' }}>
+                            Identidade confirmada é obrigatória para consultar dados pessoais.
+                            O envio automático, a cobrança e ações no IXC permanecem bloqueados neste laboratório.
+                          </p>
+                          <label className="flex items-center gap-2" style={{ fontSize: 12 }}>
+                            <input type="checkbox" checked={labRules.inspect_recent_tickets}
+                              onChange={(e) => setLabRules((r) => ({ ...r, inspect_recent_tickets: e.target.checked }))} />
+                            Consultar automaticamente os últimos chamados do cliente vinculado
+                          </label>
+                          <div className="flex flex-wrap gap-3">
+                            <label style={{ fontSize: 12 }}>
+                              Período para avaliar reincidência (dias)
+                              <input className="su-input" type="number" min="1" max="180"
+                                style={{ width: 120, display: 'block', marginTop: 4 }}
+                                value={labRules.recurrence_days}
+                                onChange={(e) => setLabRules((r) => ({ ...r, recurrence_days: Number(e.target.value) }))} />
+                            </label>
+                            <label style={{ fontSize: 12 }}>
+                              Chamados no período para sinalizar reincidência
+                              <select className="su-input" value={labRules.recurrence_min_tickets}
+                                style={{ display: 'block', marginTop: 4 }}
+                                onChange={(e) => setLabRules((r) => ({ ...r, recurrence_min_tickets: Number(e.target.value) }))}>
+                                <option value="2">2 ou mais</option>
+                                <option value="3">3 ou mais</option>
+                                <option value="4">4 ou mais</option>
+                                <option value="5">5 ou mais</option>
+                              </select>
+                            </label>
+                          </div>
+                          <label className="flex items-center gap-2" style={{ fontSize: 12 }}>
+                            <input type="checkbox" checked={labRules.handoff_if_uncertain}
+                              onChange={(e) => setLabRules((r) => ({ ...r, handoff_if_uncertain: e.target.checked }))} />
+                            Recomendar atendimento humano quando não houver diagnóstico seguro
+                          </label>
+                          {can('ai.agents.write') && (
+                            <Button variant="secondary" size="sm" loading={labBusy} onClick={saveLabRules}>
+                              Salvar regras
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button variant="primary" size="sm" loading={labBusy}
+                      disabled={!boundAgentId || selectedAgentId !== boundAgentId || labBusy}
+                      onClick={testAgent}>
+                      Gerar resposta de teste
+                    </Button>
+                    {preview && (
+                      <div className="space-y-2" style={{ border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12 }}>
+                        <strong style={{ fontSize: 12, color: 'var(--su-text-primary)' }}>
+                          Prévia privada do assistente
+                        </strong>
+                        <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--su-text-primary)' }}>
+                          {preview.preview || 'O agente não retornou uma resposta utilizável.'}
+                        </p>
+                        <p style={{ fontSize: 11, color: 'var(--su-text-muted)', margin: 0 }}>
+                          Nenhuma mensagem foi enviada. Histórico IXC: {preview.ixc_history_status === 'loaded'
+                            ? `${preview.ixc_history_count} chamado(s) consultado(s)`
+                            : preview.ixc_history_status === 'unavailable' ? 'indisponível' : 'não consultado'}.
+                          {preview.recurrence_detected === true ? ' Possível reincidência sinalizada.' : ''}
+                          Verifique os dados e a identidade antes de responder.
+                        </p>
+                        {preview.preview && can('comm.connectchat.write') && (
+                          <Button variant="secondary" size="sm" onClick={() => { setText(preview.preview); setPreview(null); }}>
+                            Usar como rascunho (revisar antes de enviar)
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
             {selected.status === 'OPEN' && can('comm.connectchat.write') ? (
               <>
               {customerActivity ? <p style={{ margin: 0, padding: 'var(--su-space-2) var(--su-space-3) 0', color: 'var(--su-text-muted)', fontSize: 12 }}>{presenceCopy(customerActivity)}</p> : null}
