@@ -140,7 +140,7 @@ export default function ConnectchatConversas() {
     } catch (error) {
       if (!silent) toast.error(error.message);
     }
-  }, [canPilotRead]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [can, toast]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
@@ -156,7 +156,7 @@ export default function ConnectchatConversas() {
       })
       .catch((err) => { if (alive) toast.error(err.message); });
     return () => { alive = false; };
-  }, [can, toast]);
+  }, [canPilotRead]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const timer = setInterval(() => {
