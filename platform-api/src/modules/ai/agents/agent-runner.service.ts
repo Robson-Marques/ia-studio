@@ -372,8 +372,11 @@ export class AgentRunnerService {
   }
 
   private async buildTools(agent: AiAgent, previewAllowed?: string[]): Promise<LlmTool[]> {
+    // A lista de teste vem EXCLUSIVAMENTE do servidor, nunca do request.
+    // Ela permite experimentar agentes antigos sem obrigar a regravar sua
+    // configuração. O runtime também valida cada chamada individualmente.
     const allowed = previewAllowed
-      ? agent.allowed_tools.filter((key) => previewAllowed.includes(key))
+      ? [...new Set(previewAllowed)]
       : agent.allowed_tools;
     if (allowed.length === 0) return [];
     const catalog = await this.tools.resolveForAgent(allowed);
