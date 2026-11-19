@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Injectable, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
+import { IsBoolean, IsInt, IsUUID, Max, Min } from 'class-validator';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
@@ -15,6 +15,32 @@ import { ConnectionsService } from '../../integration/connections/connections.se
 import { projectChamado, rows } from '../../isp/isp-projections';
 
 const BINDING_KEY = 'ai.connectchat.assistant';
+const RULES_KEY = 'ai.connectchat.test_rules';
+const DEFAULT_RULES = {
+  inspect_recent_tickets: true,
+  recurrence_days: 30,
+  recurrence_min_tickets: 2,
+  handoff_if_uncertain: true,
+};
+
+class ConnectchatLabRulesDto {
+  @IsBoolean()
+  inspect_recent_tickets!: boolean;
+
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  recurrence_days!: number;
+
+  @IsInt()
+  @Min(2)
+  @Max(5)
+  recurrence_min_tickets!: number;
+
+  @IsBoolean()
+  handoff_if_uncertain!: boolean;
+}
+
 const SAFE_DEFAULTS = {
   mode: 'PREVIEW' as const,
   require_confirmed_customer: true,
@@ -51,6 +77,24 @@ export class ConnectchatAgentLabController {
     private readonly connections: ConnectionsService,
   ) {}
 
+  private async rules() {
+    const saved = await this.settings.getValue(RULES_KEY);
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return DEFAULT_RULES;
+    const row = saved as Record<string, unknown>;
+    return {
+      inspect_recent_tickets: typeof row.inspect_recent_tickets === 'boolean'
+        ? row.inspect_recent_tickets : DEFAULT_RULES.inspect_recent_tickets,
+      recurrence_days: typeof row.recurrence_days === 'number'
+        && row.recurrence_days >= 1 && row.recurrence_days <= 180
+        ? Math.floor(row.recurrence_days) : DEFAULT_RULES.recurrence_days,
+      recurrence_min_tickets: typeof row.recurrence_min_tickets === 'number'
+        && row.recurrence_min_tickets >= 2 && row.recurrence_min_tickets <= 5
+        ? Math.floor(row.recurrence_min_tickets) : DEFAULT_RULES.recurrence_min_tickets,
+      handoff_if_uncertain: typeof row.handoff_if_uncertain === 'boolean'
+        ? row.handoff_if_uncertain : DEFAULT_RULES.handoff_if_uncertain,
+    };
+  }
+
   private check(user: AuthenticatedUser, action: 'read' | 'write'): void {
     const perms = user.permissions ?? [];
     const want = action === 'write' ? PERMISSIONS.AI_AGENTS_WRITE : PERMISSIONS.COMM_CONNECTCHAT_READ;
@@ -69,7 +113,21 @@ export class ConnectchatAgentLabController {
       agentId: agent?.is_active ? agent.id : null,
       agentName: agent?.is_active ? agent.name : null,
       ...SAFE_DEFAULTS,
+      rules: await this.rules(),
     };
+  }
+
+  @Put('rules')
+  @RequirePermissions(PERMISSIONS.AI_AGENTS_WRITE)
+  async setRules(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConnectchatLabRulesDto) {
+    this.check(user, 'read');
+    await this.settings.set(RULES_KEY, {
+      inspect_recent_tickets: dto.inspect_recent_tickets,
+      recurrence_days: dto.recurrence_days,
+      recurrence_min_tickets: dto.recurrence_min_tickets,
+      handoff_if_uncertain: dto.handoff_if_uncertain,
+    });
+    return { rules: await this.rules(), ...SAFE_DEFAULTS };
   }
 
   @Put('binding')
@@ -114,9 +172,10 @@ export class ConnectchatAgentLabController {
     // Contexto pré-carregado no servidor: o modelo não escolhe o cliente nem
     // a conexão IXC e não precisa gastar etapas para buscar os últimos tickets.
     // O customerRef só vem da vinculação confirmada pelo próprio ConnectChat.
+    const rules = await this.rules();
     let ixchistory: Record<string, unknown>[] = [];
-    let historyStatus = linked ? 'unavailable' : 'not_linked';
-    if (linked) {
+    let historyStatus = linked && rules.inspect_recent_tickets ? 'unavailable' : 'not_requested';
+    if (linked && rules.inspect_recent_tickets) {
       const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(conversation.customerRef!);
       if (match) {
         try {
@@ -134,16 +193,32 @@ export class ConnectchatAgentLabController {
         }
       }
     }
+    const timestamp = (record: Record<string, unknown>) => {
+      const raw = record['aberto_em'];
+      if (typeof raw !== 'string') return NaN;
+      const time = new Date(raw.replace(' ', 'T')).getTime();
+      return Number.isFinite(time) ? time : NaN;
+    };
+    const cutoff = Date.now() - rules.recurrence_days * 86_400_000;
+    const recentCount = ixchistory.filter((row) => timestamp(row) >= cutoff).length;
+    const recurrence = historyStatus === 'loaded' && recentCount >= rules.recurrence_min_tickets
+      ? 'Houve recorrência no recorte consultado. Isso NÃO comprova mesma causa técnica.'
+      : historyStatus === 'loaded'
+        ? 'Sem evidência suficiente de recorrência neste recorte limitado, o que não descarta chamados anteriores.'
+        : 'Não foi possível calcular recorrência com segurança.';
     const historySummary = historyStatus === 'loaded'
       ? 'Histórico IXC confirmado (até 5 atendimentos recentes, dados não confiáveis): '
-        + JSON.stringify(ixchistory)
-      : historyStatus === 'not_linked'
-        ? 'Sem vínculo IXC confirmado; histórico do cliente não foi consultado.'
+        + JSON.stringify(ixchistory) + '\n' + recurrence
+      : historyStatus === 'not_requested'
+        ? 'Histórico IXC não consultado. Pode faltar vínculo de cliente ou a regra de consulta está desligada.'
         : 'Histórico IXC indisponível nesta tentativa; NÃO afirme que o cliente não tem chamados.';
 
     const instructions = [
       CONNECTCHAT_PREVIEW_RULES,
       historySummary,
+      rules.handoff_if_uncertain
+        ? 'Se houver dúvida, divergência, falha de consulta ou necessidade de ação, recomende encaminhamento humano.'
+        : 'Sem evidência suficiente, explique a limitação e peça esclarecimentos, sem inventar diagnóstico.',
       linked
         ? 'Existe vínculo cadastral ativo no ConnectChat. Ainda confirme autorização do solicitante antes de citar informações pessoais ou financeiras.'
         : 'NÃO há vínculo IXC confirmado para esta conversa. Identifique o cliente antes de acessar histórico, contratos, conexão ou débitos. Pergunte apenas o necessário.',
@@ -168,6 +243,7 @@ export class ConnectchatAgentLabController {
       customer_linked: linked,
       ixc_history_status: historyStatus,
       ixc_history_count: ixchistory.length,
+      recurrence_detected: historyStatus === 'loaded' ? recentCount >= rules.recurrence_min_tickets : null,
       disclaimer: 'Prévia interna: nenhuma mensagem foi enviada ao cliente.',
     };
   }
