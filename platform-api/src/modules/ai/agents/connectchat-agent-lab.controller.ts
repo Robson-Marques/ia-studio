@@ -177,7 +177,7 @@ export class ConnectchatAgentLabController {
     let historyStatus = linked && rules.inspect_recent_tickets ? 'unavailable' : 'not_requested';
     let verifiedDocument: string | undefined;
     let verifiedConnectionId: string | undefined;
-    if (linked && rules.inspect_recent_tickets) {
+    if (linked) {
       const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(conversation.customerRef!);
       if (match) {
         try {
@@ -199,11 +199,13 @@ export class ConnectchatAgentLabController {
               verifiedConnectionId = connection.id;
               available = [...CONNECTCHAT_PREVIEW_TOOLS];
             }
-            const raw = await this.connections.execute(connection.id, 'atendimento.listar_chamados_recentes', {
-              id_cliente: match[2],
-            });
-            ixchistory = rows(raw).slice(0, 5).map(projectChamado);
-            historyStatus = 'loaded';
+            if (rules.inspect_recent_tickets) {
+              const raw = await this.connections.execute(connection.id, 'atendimento.listar_chamados_recentes', {
+                id_cliente: match[2],
+              });
+              ixchistory = rows(raw).slice(0, 5).map(projectChamado);
+              historyStatus = 'loaded';
+            }
           }
         } catch {
           // Sem fingir que não há tickets: erro de rede/IXC vira indisponível.
