@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, useToast } from '@studio-ux-ds/react';
+import { Card, Badge, Button, DescriptionList, CopyButton, useToast } from '@studio-ux-ds/react';
 import {
   getCodexLoginStatus, startCodexLogin, cancelCodexLogin, testConnection,
 } from '../../services/integrations';
 
-// Login oficial por dispositivo. Nenhuma credencial, cookie ou token é recebido
-// pelo navegador: só o código temporário oferecido pelo Codex CLI.
+/**
+ * Mesmo padrão de cartões, estado, tipografia e ações das outras conexões.
+ * O navegador recebe só o código temporário do login oficial; nunca tokens.
+ */
 export default function CodexCliLogin({ connectionId, onActivated }) {
   const toast = useToast();
   const [state, setState] = useState(null);
@@ -19,9 +21,9 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
 
   useEffect(() => {
     let active = true;
-    getCodexLoginStatus(connectionId).then((data) => {
-      if (active) setState(data);
-    }).catch((err) => { if (active) toast.error(err.message); });
+    getCodexLoginStatus(connectionId)
+      .then((data) => { if (active) setState(data); })
+      .catch((err) => { if (active) toast.error(err.message); });
     return () => { active = false; };
   }, [connectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -33,71 +35,100 @@ export default function CodexCliLogin({ connectionId, onActivated }) {
     return () => clearInterval(interval);
   }, [state?.login?.stage, refresh]);
 
-  async function begin() {
+  async function act(fn) {
     setWorking(true);
-    try {
-      setState(await startCodexLogin(connectionId));
-    } catch (err) {
-      toast.error(err.message);
-    } finally { setWorking(false); }
-  }
-
-  async function cancel() {
-    setWorking(true);
-    try { setState(await cancelCodexLogin(connectionId)); }
+    try { await fn(); }
     catch (err) { toast.error(err.message); }
     finally { setWorking(false); }
   }
 
-  async function activate() {
-    setWorking(true);
-    try {
-      const { health } = await testConnection(connectionId);
-      await refresh();
-      if (health?.ok) {
-        toast.success('Conta ChatGPT conectada e pronta para os agentes.');
-        onActivated?.();
-      } else toast.warn(health?.detail || 'O Codex ainda não confirmou o login.');
-    } catch (err) {
-      toast.error(err.message);
-    } finally { setWorking(false); }
-  }
-
   const waiting = state?.login?.stage === 'waiting';
+  const logged = state?.authenticated === true;
+  const stage = !state ? 'Verificando' : logged ? 'Conectado' : waiting ? 'Aguardando autorização' : state?.installed === false ? 'Não instalado' : 'Não conectado';
+  const tone = logged ? 'success' : waiting ? 'warning' : 'neutral';
+
   return (
-    <section className="space-y-3 rounded-lg border p-4" style={{ borderColor: 'var(--su-border-default)' }}>
-      <div>
-        <h3 className="font-semibold text-sm">Conectar com a conta ChatGPT — Codex CLI</h3>
-        <p className="text-xs mt-1" style={{ color: 'var(--su-text-muted)' }}>
-          Utiliza sua autenticação oficial do Codex, sem API Key. Sujeito aos limites da conta.
-          A autenticação e o histórico do Codex ficam no servidor da instalação.
-        </p>
-      </div>
-      <p className="text-sm">{state?.detail || 'Verificando instalação do Codex CLI…'}</p>
-      {state?.version && <p className="text-xs" style={{ color: 'var(--su-text-muted)' }}>Instalado: {state.version}</p>}
-      {state?.installed === false && (
-        <p className="text-xs">Instale o Codex CLI no servidor da API com o comando oficial <code>npm install -g @openai/codex</code>.</p>
-      )}
-      {waiting && (
-        <div className="space-y-2">
-          <p className="text-sm">Abra <a href="https://auth.openai.com/codex/device" target="_blank" rel="noreferrer" className="underline">auth.openai.com/codex/device</a> e digite o código:</p>
-          <p className="text-xl font-mono font-bold tracking-widest" aria-live="polite">{state.login.deviceCode || 'Aguardando código…'}</p>
-          <Button size="sm" variant="secondary" disabled={working} onClick={cancel}>Cancelar login</Button>
+    <Card>
+      <div style={{ padding: 20 }} className="space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+            Conta ChatGPT — Codex CLI
+          </h2>
+          <Badge tone={tone}>{stage}</Badge>
         </div>
-      )}
-      {state?.login?.stage === 'error' && <p className="text-xs">{state.login.detail}</p>}
-      {state?.login?.stage === 'authenticated' && <p className="text-xs">{state.login.detail}</p>}
-      <div className="flex flex-wrap gap-2">
-        {!waiting && !state?.authenticated && state?.installed !== false && (
-          <Button size="sm" onClick={begin} disabled={working}>Entrar com ChatGPT</Button>
+        <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+          Conexão pela conta ChatGPT com autenticação oficial, sem API Key.
+          A autorização acontece no site da OpenAI; a sessão fica isolada no servidor.
+        </p>
+        <DescriptionList items={[
+          { key: 'Estado', value: state?.detail || 'Consultando o Codex CLI…' },
+          { key: 'Versão instalada', value: state?.version || '—' },
+          { key: 'Autenticação', value: logged ? 'Autenticada' : 'Pendente' },
+        ]} />
+
+        {state?.installed === false && (
+          <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+            O instalador automático do Codex CLI não concluiu a configuração.
+            Confira o registro CODEX_CLI da atualização antes de conectar.
+          </p>
         )}
-        {state?.authenticated && (
-          <Button size="sm" onClick={activate} disabled={working}>Testar e ativar</Button>
+
+        {waiting && (
+          <div className="space-y-3" aria-live="polite">
+            <p style={{ fontSize: 13, margin: 0 }}>
+              Abra a página oficial e informe o código de dispositivo abaixo:
+            </p>
+            <a href="https://auth.openai.com/codex/device" target="_blank" rel="noreferrer"
+              style={{ color: 'var(--su-link, var(--su-text-primary))', textDecoration: 'underline', fontSize: 13 }}>
+              Abrir autorização da OpenAI
+            </a>
+            <div className="flex items-center gap-3 flex-wrap">
+              <code style={{
+                fontFamily: 'var(--su-font-mono, monospace)',
+                fontSize: 18, fontWeight: 600, letterSpacing: 1,
+                color: 'var(--su-text-primary)',
+              }}>
+                {state.login.deviceCode || 'Aguardando código…'}
+              </code>
+              {state.login.deviceCode && (
+                <CopyButton value={state.login.deviceCode} title="Copiar código de dispositivo" />
+              )}
+            </div>
+            <Button variant="secondary" size="sm" disabled={working}
+              onClick={() => act(async () => setState(await cancelCodexLogin(connectionId)))}>
+              Cancelar autorização
+            </Button>
+          </div>
         )}
-        <Button size="sm" variant="secondary" disabled={working} onClick={() => refresh().catch(err => toast.error(err.message))}>
-          Atualizar status
-        </Button>
+        {state?.login?.stage === 'error' && (
+          <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-secondary)' }}>
+            {state.login.detail}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {!logged && !waiting && state?.installed !== false && (
+            <Button size="sm" disabled={working}
+              onClick={() => act(async () => setState(await startCodexLogin(connectionId)))}>
+              Entrar com ChatGPT
+            </Button>
+          )}
+          {logged && (
+            <Button size="sm" disabled={working} onClick={() => act(async () => {
+              const { health } = await testConnection(connectionId);
+              await refresh();
+              if (!health?.ok) { toast.warn(health?.detail || 'Autenticação não confirmada.'); return; }
+              toast.success('Conta ChatGPT conectada.');
+              onActivated?.();
+            })}>
+              Testar e ativar
+            </Button>
+          )}
+          <Button size="sm" variant="secondary" disabled={working}
+            onClick={() => act(refresh)}>
+            Atualizar status
+          </Button>
+        </div>
       </div>
-    </section>
+    </Card>
   );
 }
