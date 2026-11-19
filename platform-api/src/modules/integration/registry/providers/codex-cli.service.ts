@@ -55,6 +55,16 @@ export class CodexCliService implements OnModuleDestroy {
     : '';
   private running = 0;
 
+  /** O login usa PTY (script); encerrar todo o grupo evita processos órfãos. */
+  private stopLogin(session: LoginSession) {
+    try {
+      if (session.child.pid) process.kill(-session.child.pid, 'SIGTERM');
+      else session.child.kill('SIGTERM');
+    } catch {
+      try { session.child.kill('SIGTERM'); } catch { /* já terminou */ }
+    }
+  }
+
   private async home(id: string): Promise<string> {
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new BadRequestException('Identificador da conexão inválido.');
     if (!/^[a-z][a-z0-9-]{2,31}$/.test(this.appId)) throw new Error('IASTUDIO_APP_ID ausente para isolamento do Codex.');
@@ -288,7 +298,7 @@ export class CodexCliService implements OnModuleDestroy {
     if (current?.stage === 'waiting') {
       clearTimeout(current.timer);
       current.stage = 'error';
-      current.child.kill('SIGTERM');
+      this.stopLogin(current);
     }
     const preflight = await this.status(id);
     if (!preflight.installed) throw new BadRequestException(preflight.detail);
@@ -312,7 +322,7 @@ export class CodexCliService implements OnModuleDestroy {
     const current = this.sessions.get(id);
     if (current) {
       clearTimeout(current.timer);
-      if (current.stage === 'waiting') current.child.kill('SIGTERM');
+      if (current.stage === 'waiting') this.stopLogin(current);
       this.sessions.delete(id);
     }
     // Limite estrito ao namespace Codex da aplicação para evitar qualquer
@@ -330,7 +340,7 @@ export class CodexCliService implements OnModuleDestroy {
       session.stage = 'error';
       session.detail = 'Login cancelado.';
       clearTimeout(session.timer);
-      session.child.kill('SIGTERM');
+      this.stopLogin(session);
     }
     return this.status(id);
   }
@@ -454,7 +464,7 @@ export class CodexCliService implements OnModuleDestroy {
   onModuleDestroy() {
     for (const session of this.sessions.values()) {
       clearTimeout(session.timer);
-      if (session.stage === 'waiting') session.child.kill('SIGTERM');
+      if (session.stage === 'waiting') this.stopLogin(session);
     }
   }
 }
