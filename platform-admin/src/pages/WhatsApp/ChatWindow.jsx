@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Badge, Button, IconButton, Avatar, ConfirmDialog, useToast, Spinner, DSIcon } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
@@ -39,6 +39,9 @@ function ChatMedia({ chatId, message }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const targetRef = useRef(null);
+  const filenameHint = String(media.filename || (message.type === 'document' ? message.content : '') || '');
+  const isPdfHint = filenameHint.toLowerCase().endsWith('.pdf')
+    || String(media.mime_type || '').split(';')[0].trim().toLowerCase() === 'application/pdf';
 
   useEffect(() => () => {
     if (data?.src) URL.revokeObjectURL(data.src);
@@ -50,7 +53,16 @@ function ChatMedia({ chatId, message }) {
     setError(null);
     try {
       const blob = await downloadChatMedia(chatId, media.media_id);
-      setData({ src: URL.createObjectURL(blob), mime: blob.type });
+      // PDFs às vezes são servidos como octet-stream; verificar os bytes antes
+      // de corrigir o MIME para que o visualizador nativo possa renderizar.
+      const signature = message.type === 'document' && isPdfHint
+        ? await blob.slice(0, 5).text()
+        : '';
+      const pdf = signature === '%PDF-';
+      const displayBlob = pdf && blob.type !== 'application/pdf'
+        ? new Blob([blob], { type: 'application/pdf' })
+        : blob;
+      setData({ src: URL.createObjectURL(displayBlob), mime: displayBlob.type });
     } catch (err) {
       setError(err.message);
       toast.error(err.message);
@@ -59,10 +71,10 @@ function ChatMedia({ chatId, message }) {
     }
   }
 
-  // Porte do comportamento validado no Control Leads: imagem/figurinha/áudio
-  // carregam sob demanda assim que entram na área visível, sem exigir clique.
+  // Imagens, áudios e PDFs visíveis carregam automaticamente. Outros arquivos
+  // continuam sob demanda para evitar downloads de documentos grandes.
   useEffect(() => {
-    if (data || loading || error || !media.media_id || !['image', 'sticker', 'audio'].includes(message.type)) return undefined;
+    if (data || loading || error || !media.media_id || !(['image', 'sticker', 'audio'].includes(message.type) || (message.type === 'document' && isPdfHint))) return undefined;
     const element = targetRef.current;
     if (!element) return undefined;
     if (typeof IntersectionObserver === 'undefined') { load(); return undefined; }
@@ -74,7 +86,7 @@ function ChatMedia({ chatId, message }) {
     }, { rootMargin: '120px' });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [chatId, media.media_id, message.type, data, loading, error]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chatId, media.media_id, message.type, isPdfHint, data, loading, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const NOME_TIPO = { image: 'imagem', audio: 'áudio', video: 'vídeo' };
 
@@ -106,9 +118,8 @@ function ChatMedia({ chatId, message }) {
   if (message.type === 'video' || mime.startsWith('video/')) {
     return <video controls src={data.src} className="rounded-lg max-w-full max-h-64" />;
   }
-  const filename = media.filename || 'Documento';
-  const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf'
-    || (/\.pdf$/i.test(filename) && (!mime || mime === 'application/octet-stream'));
+  const filename = filenameHint || 'Documento';
+  const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf';
   return (
     <div className="w-[260px] max-w-full overflow-hidden rounded-lg border border-black/10 bg-white/80">
       {isPdf && (
@@ -208,13 +219,49 @@ export default function ChatWindow({
   const toast = useToast();
   const { can } = usePermissions();
   const scrollRef = useRef(null);
+  const contentRef = useRef(null);
+  const pinnedRef = useRef(true);
+  const lastChatRef = useRef(null);
+  const lastMessageRef = useRef(null);
+  const scrollToLatest = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
   const [acting, setActing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
 
+  // Na abertura ou numa mensagem nova, acompanhar o final do histórico.
+  // Não retirar o usuário do ponto onde ele está lendo mensagens antigas.
+  useLayoutEffect(() => {
+    const chatId = chat?.id ?? null;
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    const changedChat = chatId !== lastChatRef.current;
+    const appended = lastId && lastId !== lastMessageRef.current;
+    if (changedChat || (appended && pinnedRef.current)) {
+      pinnedRef.current = true;
+      scrollToLatest();
+      requestAnimationFrame(scrollToLatest);
+    }
+    lastChatRef.current = chatId;
+    lastMessageRef.current = lastId;
+  }, [chat?.id, messages.length, messages[messages.length - 1]?.id]);
+
+  // Depois da abertura, imagens e PDFs aumentam a altura do conteúdo.
+  // Manter a última mensagem visível durante esse carregamento assíncrono.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [chat?.id, messages.length]);
+    const content = contentRef.current;
+    if (!content || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => {
+      if (pinnedRef.current) scrollToLatest();
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [chat?.id]);
+
+  function onChatScroll(event) {
+    const el = event.currentTarget;
+    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }
 
   if (!chat) return null;
   const st = ATTENDANCE_STATUS[chat.attendance_status] || ATTENDANCE_STATUS.OPEN;
@@ -228,6 +275,11 @@ export default function ChatWindow({
     const target = message.reaction_to_message_id;
     reactions.set(target, [...(reactions.get(target) || []), message.reaction_emoji]);
   }
+  const visibleMessages = messages.filter((m) => m.type !== 'reaction' || !knownMessageIds.has(m.reaction_to_message_id));
+  const messageDate = (m) => {
+    const date = new Date(m.occurred_at || m.created_at);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
   async function run(fn, okMsg) {
     setActing(true);
@@ -340,21 +392,37 @@ export default function ChatWindow({
           comentário no topo do arquivo). */}
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2"
+        onScroll={onChatScroll}
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-3"
         style={{
           backgroundColor: '#efeae2',
           backgroundImage: 'radial-gradient(rgba(11,20,26,0.045) 1px, transparent 0)',
           backgroundSize: '22px 22px',
         }}
       >
-        {messages.filter((m) => m.type !== 'reaction' || !knownMessageIds.has(m.reaction_to_message_id)).map((m) => (
-          <Bubble key={m.id} chatId={chat.id} message={m} reactions={reactions.get(m.remote_message_id) || reactions.get(m.external_id) || []} />
-        ))}
-        {messages.length === 0 && (
-          <p className="text-center py-8" style={{ fontSize: 12, color: '#667781' }}>
-            Nenhuma mensagem nesta conversa ainda.
-          </p>
-        )}
+        <div ref={contentRef} className="space-y-2">
+          {visibleMessages.map((m, index) => {
+            const date = messageDate(m);
+            const showDate = date && (index === 0 || date !== messageDate(visibleMessages[index - 1]));
+            return (
+              <React.Fragment key={m.id}>
+                {showDate && (
+                  <div className="flex justify-center py-2">
+                    <span className="rounded-lg bg-white/95 px-3 py-1.5 text-xs font-medium shadow-sm" style={{ color: '#54656f' }}>
+                      {date}
+                    </span>
+                  </div>
+                )}
+                <Bubble chatId={chat.id} message={m} reactions={reactions.get(m.remote_message_id) || reactions.get(m.external_id) || []} />
+              </React.Fragment>
+            );
+          })}
+          {messages.length === 0 && (
+            <p className="text-center py-8" style={{ fontSize: 12, color: '#667781' }}>
+              Nenhuma mensagem nesta conversa ainda.
+            </p>
+          )}
+        </div>
       </div>
 
       <MessageComposer chat={chat} windowInfo={windowInfo} templates={templates} scope={scope} onSent={onSent} />
