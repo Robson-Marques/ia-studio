@@ -114,10 +114,11 @@ export class AgentsService {
     await this.assertActionGrant(dto.allowed_tools, actor);
 
     // Conectou o IXC? O assistente já conhece as ferramentas ISP de leitura,
-    // sem configurar IDs, schemas ou endpoints. Quem informou allowed_tools
-    // explicitamente (inclusive []) tem sua decisão preservada.
+    // sem configurar IDs, schemas ou endpoints. A tela envia [] na criação;
+    // o catálogo aplica os padrões somente nesse momento. Editar o agente
+    // depois pode remover cada habilidade normalmente.
     let allowedTools = dto.allowed_tools;
-    if (allowedTools === undefined) {
+    if (!allowedTools?.length) {
       const ixc = await this.prisma.connection.findMany({
         where: { provider_key: 'ixc', is_active: true, status: 'ACTIVE' },
         select: { id: true },
