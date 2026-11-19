@@ -20,6 +20,7 @@ import { WhatsappNivooProvider } from './providers/whatsapp-nivoo.provider';
 import { WhatsappWahaProvider } from './providers/whatsapp-waha.provider';
 import { GoogleWorkspaceProvider } from './providers/google-workspace.provider';
 import { ConnectchatProvider } from './providers/connectchat.provider';
+import { CodexCliIntegrationProvider } from './providers/codex-cli.provider';
 
 // Providers cuja definicao deve ser atualizada no boot (ganhou implementacao).
 // smtp: virou envio real (email.send) na Fase 7 — wizard/capabilities mudaram.
@@ -44,11 +45,12 @@ export class ProviderSeedService implements OnApplicationBootstrap {
     private readonly whatsappWaha: WhatsappWahaProvider,
     private readonly googleWorkspace: GoogleWorkspaceProvider,
     private readonly connectchat: ConnectchatProvider,
+    private readonly codexCli: CodexCliIntegrationProvider,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     // 1) Registro em memoria das implementacoes (diretriz 2).
-    for (const provider of [this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappNivoo, this.whatsappWaha, this.googleWorkspace, this.connectchat]) {
+    for (const provider of [this.ixc, this.openai, this.anthropic, this.postgresql, this.sqlserver, this.smtp, this.s3, this.whatsappNivoo, this.whatsappWaha, this.googleWorkspace, this.connectchat, this.codexCli]) {
       this.registry.register(provider);
     }
 
