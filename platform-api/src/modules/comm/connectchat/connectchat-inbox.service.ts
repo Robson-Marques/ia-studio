@@ -117,7 +117,7 @@ export class ConnectchatInboxService {
     const verified = conversation.businessContact?.status === 'CUSTOMER'
       && conversation.businessContact?.linkStatus === 'ACTIVE'
       && typeof conversation.customerRef === 'string'
-      && /^ixc:[0-9a-f-]{36}:[1-9]\\d*$/i.test(conversation.customerRef);
+      && /^ixc:[0-9a-f-]{36}:[1-9]\d*$/i.test(conversation.customerRef);
     return { conversation, messages, verified };
   }
 
