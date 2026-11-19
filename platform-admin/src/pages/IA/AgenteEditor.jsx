@@ -311,6 +311,12 @@ export default function AgenteEditor() {
       else saved = await createAgent(body);
 
       const id = saved?.id || savedId;
+      // O backend pode habilitar automaticamente as habilidades de consulta
+      // do IXC para um novo agente. Refletir isso imediatamente na interface,
+      // evitando exibir "nenhuma habilidade" após salvar.
+      if (!savedId && Array.isArray(saved?.allowed_tools) && saved.allowed_tools.length) {
+        patch({ allowed_tools: saved.allowed_tools });
+      }
       setSavedId(id);
       setAgentName(saved?.name || form.name.trim());
 
