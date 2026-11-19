@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { homedir, tmpdir } from 'node:os';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
+
 import { LlmChatRequest, LlmChatResult, LlmMessage, LlmToolCall } from '../../../ai/providers/llm.interface';
 
 const execFileAsync = promisify(execFile);
@@ -47,28 +47,35 @@ interface LoginSession {
 export class CodexCliService implements OnModuleDestroy {
   private readonly logger = new Logger(CodexCliService.name);
   private readonly sessions = new Map<string, LoginSession>();
-  private readonly bin = process.env.IASTUDIO_CODEX_BIN || 'codex';
-  private readonly root = process.env.IASTUDIO_CODEX_HOME_ROOT
-    || path.join(homedir(), '.iastudio-codex-connections');
+  private readonly appId = process.env.IASTUDIO_APP_ID || '';
+  private readonly bin = process.env.IASTUDIO_CODEX_BIN || '/opt/iastudio-codex/bin/codex';
+  private readonly root = path.join('/var/lib/iastudio-codex', this.appId);
+  private readonly user = this.appId
+    ? 'icx-' + createHash('sha256').update(this.appId).digest('hex').slice(0, 16)
+    : '';
   private running = 0;
 
   private async home(id: string): Promise<string> {
-    // Nunca aceitar IDs como fragmentos de caminhos.
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new BadRequestException('Identificador da conexão inválido.');
-    await mkdir(this.root, { recursive: true, mode: 0o700 });
+    if (!/^[a-z][a-z0-9-]{2,31}$/.test(this.appId)) throw new Error('IASTUDIO_APP_ID ausente para isolamento do Codex.');
+    // Falha fechada: nunca executar o Codex como o usuário root do PM2.
+    if (process.getuid?.() !== 0) throw new Error('Provisionamento do executor restrito indisponível; não usar execução direta.');
     const dir = path.join(this.root, id);
-    await mkdir(dir, { recursive: true, mode: 0o700 });
+    await execFileAsync('install', ['-d', '-o', this.user, '-g', this.user, '-m', '0700', dir], { timeout: 10000 });
     return dir;
   }
 
-  private environment(home: string): NodeJS.ProcessEnv {
-    // Ambiente mínimo; NÃO transmitir chaves de API do processo NestJS.
-    const names = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TERM', 'SSL_CERT_FILE',
-      'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY', 'https_proxy', 'http_proxy', 'no_proxy'];
-    const env: NodeJS.ProcessEnv = {};
-    for (const name of names) if (process.env[name]) env[name] = process.env[name];
-    env.CODEX_HOME = home;
-    return env;
+  private command(args: string[], home: string) {
+    const env = [
+      'env', '-i',
+      'HOME=' + this.root,
+      'CODEX_HOME=' + home,
+      'PATH=/opt/iastudio-codex/bin:/usr/local/bin:/usr/bin:/bin',
+      'LANG=C.UTF-8',
+    ];
+    // runuser efetua a troca real de identidade Unix; prompt não recebe
+    // DATABASE_URL, JWT_SECRET, credenciais de API nem dados do processo PM2.
+    return { command: '/usr/sbin/runuser', args: ['-u', this.user, '--', ...env, this.bin, ...args] };
   }
 
   async status(id: string) {
@@ -78,14 +85,12 @@ export class CodexCliService implements OnModuleDestroy {
     let authenticated = false;
     let detail = '';
     try {
-      const result = await execFileAsync(this.bin, ['--version'], {
-        timeout: 10_000, env: this.environment(home),
-      });
+      const check = this.command(['--version'], home);
+      const result = await execFileAsync(check.command, check.args, { timeout: 10000 });
       version = result.stdout.trim();
       installed = true;
-      const login = await execFileAsync(this.bin, ['login', 'status'], {
-        timeout: 10_000, env: this.environment(home),
-      });
+      const checkLogin = this.command(['login', 'status'], home);
+      const login = await execFileAsync(checkLogin.command, checkLogin.args, { timeout: 10000 });
       // Não aceitar sessão por API key como autenticação com ChatGPT.
       authenticated = !/api key/i.test(login.stdout + login.stderr);
       detail = authenticated ? 'Conta ChatGPT autenticada no Codex CLI.' : 'Login de conta ChatGPT necessário.';
@@ -107,8 +112,9 @@ export class CodexCliService implements OnModuleDestroy {
   async beginLogin(id: string) {
     const home = await this.home(id);
     if (this.sessions.get(id)?.stage === 'waiting') return this.status(id);
-    const child = spawn(this.bin, ['login', '--device-auth'], {
-      cwd: home, env: this.environment(home), stdio: ['ignore', 'pipe', 'pipe'],
+    const command = this.command(['login', '--device-auth'], home);
+    const child = spawn(command.command, command.args, {
+      cwd: this.root, stdio: ['ignore', 'pipe', 'pipe'],
     });
     const session: LoginSession = {
       child, startedAt: Date.now(), stage: 'waiting',
@@ -164,9 +170,11 @@ export class CodexCliService implements OnModuleDestroy {
       const status = await this.status(id);
       if (!status.authenticated) throw new Error(status.detail);
       const home = await this.home(id);
-      workspace = await mkdtemp(path.join(tmpdir(), 'iastudio-codex-'));
+      workspace = await mkdtemp(path.join(this.root, 'run-'));
+      await execFileAsync('chown', [this.user + ':' + this.user, workspace], { timeout: 10000 });
       const schemaFile = path.join(workspace, 'response-schema.json');
       await writeFile(schemaFile, JSON.stringify(OUTPUT_SCHEMA), { mode: 0o600 });
+      await execFileAsync('chown', [this.user + ':' + this.user, schemaFile], { timeout: 10000 });
       const tools = request.tools ?? [];
       const safeMessages = request.messages.map((m: LlmMessage) => ({
         role: m.role, content: m.content, tool_call_id: m.tool_call_id,
@@ -190,8 +198,9 @@ export class CodexCliService implements OnModuleDestroy {
       if (request.model && request.model !== 'default') args.push('--model', request.model);
       args.push('-');
       const result = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve, reject) => {
-        const child = spawn(this.bin, args, {
-          cwd: workspace, env: this.environment(home), stdio: ['pipe', 'pipe', 'pipe'],
+        const cmd = this.command(args, home);
+        const child = spawn(cmd.command, cmd.args, {
+          cwd: workspace, stdio: ['pipe', 'pipe', 'pipe'],
         });
         let stdout = '';
         let stderr = '';
