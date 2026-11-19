@@ -6,7 +6,7 @@ import {
   exportAgent, listAgentVersions, listAgentRuns,
   listTools, listKnowledgeBases, listMemoryProfiles,
 } from '../../services/ai';
-import { listConnections } from '../../services/integrations';
+import { listConnections, listCodexModels } from '../../services/integrations';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   AGENT_MODELS, PERSONA_TONES, PERSONA_EMOJIS, PERSONA_BREVITY,
@@ -90,6 +90,8 @@ export default function AgenteEditor() {
   const [note, setNote] = useState('');
 
   const [connections, setConnections] = useState([]);
+  const [codexModels, setCodexModels] = useState([]);
+  const [loadingCodexModels, setLoadingCodexModels] = useState(false);
   const [tools, setTools] = useState([]);
   const [bases, setBases] = useState([]);
   const [profiles, setProfiles] = useState([]);
@@ -184,7 +186,26 @@ export default function AgenteEditor() {
   // Todos os provedores suportados apresentam opções selecionáveis.
   // Conexões OpenAI-compatible sem catálogo próprio reutilizam as sugestões
   // OpenAI; nunca misturar IDs de API na conexão da conta ChatGPT (Codex CLI).
-  const modelSuggestions = AGENT_MODELS[providerKey] || AGENT_MODELS.openai;
+  const modelSuggestions = providerKey === 'codex-cli'
+    ? (codexModels.length ? codexModels : AGENT_MODELS['codex-cli'])
+    : (AGENT_MODELS[providerKey] || AGENT_MODELS.openai);
+
+  useEffect(() => {
+    if (providerKey !== 'codex-cli' || !form.connection_id) {
+      setCodexModels([]);
+      setLoadingCodexModels(false);
+      return undefined;
+    }
+    let active = true;
+    setLoadingCodexModels(true);
+    listCodexModels(form.connection_id)
+      .then((res) => {
+        if (active) setCodexModels(Array.isArray(res?.models) ? res.models : []);
+      })
+      .catch(() => { if (active) setCodexModels([]); })
+      .finally(() => { if (active) setLoadingCodexModels(false); });
+    return () => { active = false; };
+  }, [providerKey, form.connection_id]);
   const currentConnection = connections.find((c) => c.id === form.connection_id);
   const isCodex = providerKey === 'codex-cli';
   const currentModelKnown = modelSuggestions.some((m) => m.value === form.model);
@@ -457,6 +478,17 @@ export default function AgenteEditor() {
                     )}
                   </Select>
                 </Field>
+                {isCodex && loadingCodexModels && (
+                  <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
+                    Consultando modelos disponíveis nesta conta…
+                  </p>
+                )}
+                {isCodex && !loadingCodexModels && modelSuggestions.length === 1 && (
+                  <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
+                    O catálogo de modelos não está disponível nesta instalação.
+                    A opção “Padrão da conta” continua funcionando sem configurar um ID manualmente.
+                  </p>
+                )}
                 {isCodex && form.model && form.model !== 'default' && (
                   <p style={{ fontSize: 12, color: 'var(--su-warning, var(--su-text-secondary))', margin: 0 }}>
                     Este assistente ainda usa um identificador de modelo antigo. Selecione
