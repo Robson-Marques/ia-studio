@@ -230,6 +230,20 @@ log_db "ADMIN_BUILD" "npm install + vite build (platform-admin)"
 build_front "$ADMIN_DIR" "$ADMIN_API" "$ADMIN_BASE" "ADMIN_BUILD"
 log_db "ADMIN_BUILD" "painel do cliente publicado"
 
+# ---------- OPCIONAL: CODEX CLI ----------
+# Provisionamento da conta ChatGPT via CLI é isolado por app-id.
+# Um registry indisponível NÃO deve cancelar um upgrade da aplicação
+# que já compilou, nem tocar nos processos de outras instalações.
+if [ -f "$REPO_PATH/scripts/install-codex-cli.sh" ]; then
+  log_db "CODEX_CLI" "verificando Codex CLI e usuário restrito da aplicação"
+  if bash "$REPO_PATH/scripts/install-codex-cli.sh" "$IASTUDIO_APP_ID" \
+    >/tmp/iastudio_codex_install.out 2>/tmp/iastudio_codex_install.err; then
+    log_db "CODEX_CLI" "Codex CLI disponível: $(tail -n 1 /tmp/iastudio_codex_install.out | cut -c1-220)"
+  else
+    log_db "CODEX_CLI" "AVISO: instalação opcional do Codex não concluída (status $(tail -n 1 /tmp/iastudio_codex_install.err | cut -c1-220)); API e painel continuam disponíveis"
+  fi
+fi
+
 # O index.html é a única peça estável da SPA: ele referencia bundles com hash
 # produzidos pelo Vite. Revalidá-lo sempre impede que uma aba aberta continue
 # no painel anterior depois de uma atualização. Aplicamos a política também em
