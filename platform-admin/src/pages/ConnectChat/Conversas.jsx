@@ -89,6 +89,7 @@ export default function ConnectchatConversas() {
   const [agents, setAgents] = useState([]);
   const [agentBinding, setAgentBinding] = useState({ agentId: null, enabled: false, mode: 'SUPERVISED' });
   const [agentSelection, setAgentSelection] = useState('');
+  const [includeTicketHistory, setIncludeTicketHistory] = useState(true);
   const [savingAgent, setSavingAgent] = useState(false);
   const [testingAgent, setTestingAgent] = useState(false);
   const [agentPreview, setAgentPreview] = useState(null);
@@ -153,6 +154,7 @@ export default function ConnectchatConversas() {
         setAgents((list.items || []).filter((agent) => agent.is_active));
         setAgentBinding(binding);
         setAgentSelection(binding.agentId || '');
+        setIncludeTicketHistory(binding.includeTicketHistory !== false);
       })
       .catch((error) => { if (active) toast.error(error.message); });
     return () => { active = false; };
@@ -232,7 +234,7 @@ export default function ConnectchatConversas() {
   async function saveAgentBinding() {
     setSavingAgent(true);
     try {
-      const updated = await setConnectchatAgentBinding(agentSelection, !!agentSelection);
+      const updated = await setConnectchatAgentBinding(agentSelection, !!agentSelection, includeTicketHistory);
       setAgentBinding(updated);
       setAgentPreview(null);
       toast.success(agentSelection
@@ -406,7 +408,9 @@ export default function ConnectchatConversas() {
                   </select>
                   {can('ai.agents.write') && (
                     <Button variant="secondary" size="sm" loading={savingAgent}
-                      disabled={savingAgent || (agentSelection === (agentBinding.agentId || '') && agentBinding.enabled === !!agentSelection)}
+                      disabled={savingAgent || (agentSelection === (agentBinding.agentId || '')
+                        && agentBinding.enabled === !!agentSelection
+                        && (agentBinding.includeTicketHistory !== false) === includeTicketHistory)}
                       onClick={saveAgentBinding}>Salvar vínculo</Button>
                   )}
                   {can('ai.agents.execute') && (
@@ -416,6 +420,15 @@ export default function ConnectchatConversas() {
                       Testar IA nesta conversa
                     </Button>
                   )}
+                </div>
+                <div className="flex flex-wrap items-center gap-3" style={{ fontSize: 12, color: 'var(--su-text-secondary)' }}>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={includeTicketHistory}
+                      onChange={(event) => setIncludeTicketHistory(event.target.checked)}
+                      disabled={!can('ai.agents.write')} />
+                    Consultar até 5 chamados IXC do cliente confirmado
+                  </label>
+                  <span>Regras fixas: confirmar vínculo · sem financeiro · sem alterar IXC · revisão humana obrigatória · WhatsApp desligado</span>
                 </div>
                 <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>
                   O assistente analisa a conversa e sugere uma resposta. Nunca envia automaticamente.
