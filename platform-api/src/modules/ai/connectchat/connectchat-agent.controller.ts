@@ -144,6 +144,26 @@ export class ConnectchatAgentController {
         }
       }
     }
+    // Indício de reincidência ≠ diagnóstico de mesma causa. Contar somente
+    // chamados com data de abertura válida: ausência de data não significa zero.
+    const nowMs = Date.now();
+    const openedAt = chamados
+      .map((ticket) => typeof ticket['aberto_em'] === 'string'
+        ? Date.parse(ticket['aberto_em'] as string) : NaN)
+      .filter((time) => Number.isFinite(time) && time <= nowMs);
+    const recent7 = openedAt.filter((time) => nowMs - time <= 7 * 86400000).length;
+    const recent30 = openedAt.filter((time) => nowMs - time <= 30 * 86400000).length;
+    const evidence = readTickets
+      ? {
+          amostra: chamados.length,
+          chamados_com_data_valida: openedAt.length,
+          ultimos_7_dias: recent7,
+          ultimos_30_dias: recent30,
+          indicio_reincidencia: recent30 >= 2,
+          aviso: 'Repetição de chamados não comprova que a causa técnica é a mesma.',
+        }
+      : null;
+
     const instructions = [
       'Você está em uma SIMULAÇÃO supervisionada do ConnectChat.',
       'Produza somente uma sugestão de resposta para revisão humana.',
@@ -154,8 +174,9 @@ export class ConnectchatAgentController {
       readTickets
         ? 'Últimos chamados IXC conhecidos (até cinco): ' + JSON.stringify(chamados)
         : 'Nenhum histórico IXC foi disponibilizado (identidade não validada ou leitura desligada pelo operador).',
+      evidence ? 'Contagem determinística de chamados: ' + JSON.stringify(evidence) : '',
       context.verified
-        ? 'O ConnectChat confirmou um vínculo ativo de cliente. Use apenas habilidades de leitura explicitamente autorizadas ao agente.'
+        ? 'O ConnectChat confirmou um vínculo ativo de cliente. Não invente consultas ou ações externas.'
         : 'Cliente ainda NÃO possui vínculo ativo confirmado. Não consulte nem revele faturas, CPF, contrato, tickets ou dados pessoais. Solicite validação de identidade.',
       'Se a investigação não tiver evidências suficientes, indique a necessidade de atendimento humano.',
     ].join('\n');
