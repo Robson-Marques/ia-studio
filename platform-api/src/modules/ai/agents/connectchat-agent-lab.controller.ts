@@ -222,7 +222,11 @@ export class ConnectchatAgentLabController {
     const timestamp = (record: Record<string, unknown>) => {
       const raw = record['aberto_em'];
       if (typeof raw !== 'string') return NaN;
-      const time = new Date(raw.replace(' ', 'T')).getTime();
+      const br = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(raw);
+      const iso = br
+        ? `${br[3]}-${br[2]}-${br[1]}`
+        : raw.replace(' ', 'T');
+      const time = new Date(iso).getTime();
       return Number.isFinite(time) ? time : NaN;
     };
     const cutoff = Date.now() - rules.recurrence_days * 86_400_000;
