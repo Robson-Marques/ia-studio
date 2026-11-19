@@ -393,7 +393,12 @@ export class AgentRunnerService {
       : agent.allowed_tools;
     if (allowed.length === 0) return [];
     const catalog = await this.tools.resolveForAgent(allowed);
-    return catalog.map((t) => ({
+    // No laboratório jamais carregar tools personalizadas ou de aprovação,
+    // mesmo que alguém tenha reutilizado uma chave do catálogo.
+    const visible = previewAllowed
+      ? catalog.filter((tool) => tool.builtin && tool.builtin_handler === tool.key && !tool.requires_approval)
+      : catalog;
+    return visible.map((t) => ({
       name: t.key,
       description: t.description,
       parameters: (t.input_schema ?? { type: 'object', properties: {} }) as Record<string, unknown>,
