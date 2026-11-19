@@ -82,6 +82,7 @@ export default function AgenteEditor() {
   const [currentVersion, setCurrentVersion] = useState(0);
   const [tab, setTab] = useState('visao');
   const [advExpanded, setAdvExpanded] = useState(false);
+  const [technicalExpanded, setTechnicalExpanded] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -180,7 +181,26 @@ export default function AgenteEditor() {
     const conn = connections.find((c) => c.id === form.connection_id);
     return (conn?.provider_key || '').toLowerCase();
   }, [connections, form.connection_id]);
-  const modelSuggestions = AGENT_MODELS[providerKey] || [];
+  // Todos os provedores suportados apresentam opções selecionáveis.
+  // Conexões OpenAI-compatible sem catálogo próprio reutilizam as sugestões
+  // OpenAI; nunca misturar IDs de API na conexão da conta ChatGPT (Codex CLI).
+  const modelSuggestions = AGENT_MODELS[providerKey] || AGENT_MODELS.openai;
+  const currentConnection = connections.find((c) => c.id === form.connection_id);
+  const isCodex = providerKey === 'codex-cli';
+  const currentModelKnown = modelSuggestions.some((m) => m.value === form.model);
+
+  function selectAiConnection(id) {
+    const selected = connections.find((c) => c.id === id);
+    const key = selected?.provider_key?.toLowerCase() || '';
+    const choices = AGENT_MODELS[key] || AGENT_MODELS.openai;
+    // Trocar de API OpenAI para conta Codex precisa remover o ID de modelo
+    // da API, pois o Codex CLI aceita "default" sem --model.
+    const model = key === 'codex-cli'
+      ? 'default'
+      : (choices.some((item) => item.value === form.model)
+        ? form.model : (choices[0]?.value || ''));
+    patch({ connection_id: id, model });
+  }
 
   // Checklist "pronto para publicar?" — derivado do form, sem estado novo.
   const readiness = useMemo(() => {
@@ -228,7 +248,12 @@ export default function AgenteEditor() {
   async function handleSave() {
     if (!canWrite) { toast.error('Sem permissão.'); return; }
     if (!form.name.trim()) { toast.error('Dê um nome ao assistente (aba "Visão geral").'); setTab('visao'); return; }
-    if (!form.model.trim()) { toast.error('Escolha o modelo em "Ajustes avançados" (dentro de Visão geral).'); setTab('visao'); setAdvExpanded(true); return; }
+    if (!form.model.trim()) { toast.error('Selecione o modelo na Visão geral.'); setTab('visao'); return; }
+    if (form.connection_id && currentConnection?.status !== 'ACTIVE') {
+      toast.error('A conexão escolhida ainda não está ativa. Conecte ou teste a conta antes de salvar.');
+      setTab('visao');
+      return;
+    }
     setSaving(true);
     try {
       const body = {
@@ -395,6 +420,50 @@ export default function AgenteEditor() {
               <Field label="Descrição" hint="Para que serve este assistente.">
                 <TextArea rows={3} value={form.description} onChange={(e) => patch({ description: e.target.value })} />
               </Field>
+
+              <div className="space-y-3" style={{ borderTop: '1px solid var(--su-border-default)', paddingTop: 16 }}>
+                <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+                  Inteligência artificial
+                </h2>
+                <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+                  Escolha a conta que vai responder e qual modelo ela utilizará.
+                  Você não precisa preencher códigos ou parâmetros técnicos.
+                </p>
+                <Field label="Conta de IA" hint="Selecione uma conexão ativa em Integrações.">
+                  <Select value={form.connection_id} onChange={(e) => selectAiConnection(e.target.value)}>
+                    <option value="">Selecionar automaticamente uma conexão de API</option>
+                    {connections
+                      .filter((c) => c.status === 'ACTIVE' || c.id === form.connection_id)
+                      .map((c) => (
+                        <option key={c.id} value={c.id} disabled={c.status !== 'ACTIVE'}>
+                          {c.name}{c.status !== 'ACTIVE' ? ' — precisa conectar' : ''}
+                        </option>
+                      ))}
+                  </Select>
+                </Field>
+                {isCodex && (
+                  <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+                    Esta conexão usa a conta ChatGPT autenticada pelo Codex CLI, sem chave de API.
+                  </p>
+                )}
+                <Field label="Modelo de IA" hint={isCodex
+                  ? 'O Codex usa o modelo padrão disponível para a conta conectada.'
+                  : 'Escolha uma opção da lista. A disponibilidade depende da conexão contratada.'}>
+                  <Select value={form.model || ''} onChange={(e) => patch({ model: e.target.value })}>
+                    <option value="" disabled>Selecione um modelo</option>
+                    {modelSuggestions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    {form.model && !currentModelKnown && (
+                      <option value={form.model}>{form.model} — configuração atual</option>
+                    )}
+                  </Select>
+                </Field>
+                {isCodex && form.model && form.model !== 'default' && (
+                  <p style={{ fontSize: 12, color: 'var(--su-warning, var(--su-text-secondary))', margin: 0 }}>
+                    Este assistente ainda usa um identificador de modelo antigo. Selecione
+                    “Padrão da conta ChatGPT” para evitar incompatibilidade com o Codex CLI.
+                  </p>
+                )}
+              </div>
 
               <Checkbox
                 id="agent-save-version"
@@ -676,37 +745,59 @@ export default function AgenteEditor() {
         <div className="space-y-4">
           <Card>
             <div style={{ padding: 20 }} className="space-y-4">
-              <Field label="Conexão de IA" hint="Vazio = a plataforma escolhe pelo menor custo.">
-                <Select value={form.connection_id} onChange={(e) => patch({ connection_id: e.target.value })}>
-                  <option value="">— automático —</option>
-                  {connections.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.provider_key})</option>)}
-                </Select>
-              </Field>
-              <Field label="Modelo" hint="Escolha o modelo do assistente.">
-                {modelSuggestions.length > 0 ? (
-                  <Select value={form.model || ''} onChange={(e) => patch({ model: e.target.value })}>
-                    <option value="" disabled>— escolher um modelo —</option>
-                    {modelSuggestions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    {form.model && !modelSuggestions.some((m) => m.value === form.model) && (
-                      <option value={form.model}>{form.model} (atual)</option>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+                Preferências de atendimento
+              </h2>
+              <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+                Os padrões já funcionam para a maioria dos assistentes. Ajuste somente se necessário.
+              </p>
+              <FormGrid columns={isCodex ? 1 : 2}>
+                <Field label="Profundidade do atendimento"
+                  hint="Controla quantas etapas de análise e uso de ferramentas o assistente pode realizar antes de responder.">
+                  <Select value={String(form.max_steps)} onChange={(e) => patch({ max_steps: Number(e.target.value) })}>
+                    <option value="4">Simples — até 4 etapas</option>
+                    <option value="6">Equilibrado — até 6 etapas (padrão)</option>
+                    <option value="10">Detalhado — até 10 etapas</option>
+                    <option value="15">Investigação extensa — até 15 etapas</option>
+                    {![4, 6, 10, 15].includes(Number(form.max_steps)) && (
+                      <option value={String(form.max_steps)}>Personalizado — {form.max_steps} etapas</option>
                     )}
                   </Select>
-                ) : (
-                  // Provider sem lista curada: cai no identificador livre (raro).
-                  <Input value={form.model} onChange={(e) => patch({ model: e.target.value })} placeholder="gpt-4o-mini" />
+                </Field>
+                {!isCodex && (
+                  <Field label="Estilo das respostas" hint="Define o equilíbrio entre respostas objetivas e variedade de linguagem.">
+                    <Select value={String(form.temperature)} onChange={(e) => patch({ temperature: Number(e.target.value) })}>
+                      <option value="0.2">Objetivo e consistente</option>
+                      <option value="0.3">Equilibrado (padrão)</option>
+                      <option value="0.6">Mais flexível</option>
+                      <option value="1">Mais criativo</option>
+                      {![0.2, 0.3, 0.6, 1].includes(Number(form.temperature)) && (
+                        <option value={String(form.temperature)}>Personalizado — {form.temperature}</option>
+                      )}
+                    </Select>
+                  </Field>
                 )}
-              </Field>
-              <FormGrid columns={3}>
-                <Field label="Criatividade" hint="0 = direto ao ponto; 2 = mais criativo.">
-                  <NumericInput value={form.temperature} onChange={(v) => patch({ temperature: v })} min={0} max={2} step={0.1} fullWidth />
-                </Field>
-                <Field label="Máx. de passos" hint="Quantas ações o assistente encadeia por resposta.">
-                  <NumericInput value={form.max_steps} onChange={(v) => patch({ max_steps: v })} min={1} max={20} step={1} fullWidth />
-                </Field>
-                <Field label="Máx. de tokens" hint="Vazio = sem limite próprio.">
-                  <NumericInput value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })} min={1} step={1} fullWidth />
-                </Field>
               </FormGrid>
+              <Button variant="ghost" size="sm" icon={technicalExpanded ? 'chevron-down' : 'chevron-right'}
+                onClick={() => setTechnicalExpanded((v) => !v)}>
+                Opções técnicas (uso avançado)
+              </Button>
+              {technicalExpanded && (
+                <div className="space-y-3" style={{ borderTop: '1px solid var(--su-border-default)', paddingTop: 12 }}>
+                  <Field label="Limite de saída (tokens)"
+                    hint="Limita o tamanho da resposta gerada. Em branco, usa o limite padrão do modelo.">
+                    <NumericInput value={form.max_tokens} onChange={(v) => patch({ max_tokens: v })}
+                      min={1} step={1} fullWidth />
+                  </Field>
+                  {!isCodex && (
+                    <Field label="Modelo personalizado (somente para integração técnica)"
+                      hint="Altera o ID do modelo enviado à API. Use apenas se não aparecer na lista acima.">
+                      <Input value={form.model} onChange={(e) => patch({ model: e.target.value })}
+                        placeholder="ID fornecido pelo provedor" />
+                    </Field>
+                  )}
+                </div>
+              )}
             </div>
           </Card>
 
