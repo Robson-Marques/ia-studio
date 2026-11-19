@@ -46,6 +46,8 @@ export interface RunAgentParams {
   previewInstructions?: string;
   /** Somente em memória: CPF/CNPJ obtido de vínculo IXC validado pelo servidor. */
   previewCustomerDocument?: string;
+  /** Vínculo IXC extraído do ConnectChat, não escolhido pelo modelo. */
+  previewIxcConnectionId?: string;
 }
 
 export interface RunAgentOutput {
@@ -123,6 +125,7 @@ export class AgentRunnerService {
       executionId: params.executionId ?? null,
       previewMode: !!params.previewAllowedTools,
       previewCustomerDocument: params.previewCustomerDocument,
+      previewIxcConnectionId: params.previewIxcConnectionId,
     });
   }
 
@@ -171,7 +174,7 @@ export class AgentRunnerService {
     messages: LlmMessage[],
     llmTools: LlmTool[],
     guardrails: Guardrails,
-    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null; previewMode?: boolean; previewCustomerDocument?: string },
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null; previewMode?: boolean; previewCustomerDocument?: string; previewIxcConnectionId?: string },
   ): Promise<RunAgentOutput> {
     let promptTokens = 0;
     let completionTokens = 0;
@@ -394,7 +397,7 @@ export class AgentRunnerService {
   private buildToolContext(
     agent: AiAgent,
     runId: string,
-    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null; previewMode?: boolean; previewCustomerDocument?: string },
+    ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null; previewMode?: boolean; previewCustomerDocument?: string; previewIxcConnectionId?: string },
     allowedToolKeys: string[],
   ): ToolExecutionContext {
     return {
@@ -403,6 +406,7 @@ export class AgentRunnerService {
       allowedToolKeys,
       previewMode: ctx.previewMode,
       previewCustomerDocument: ctx.previewCustomerDocument,
+      previewIxcConnectionId: ctx.previewIxcConnectionId,
       traceId: ctx.traceId,
       executionId: ctx.executionId,
       scopeKeys: ctx.scopeKeys,
