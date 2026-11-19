@@ -127,7 +127,7 @@ function ChatMedia({ chatId, message }) {
   const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf';
   return (
     <div className="w-[260px] max-w-full overflow-hidden rounded-lg border border-black/10 bg-white/80">
-      {isPdf && <PdfThumbnail file={data.file} url={data.src} onPageCount={setPageCount} />}
+      {isPdf && <PdfThumbnail file={data.file} onPageCount={setPageCount} />}
       <div className="flex items-center gap-2 p-2.5">
         <DSIcon name="file-text" size="sm" />
         <div className="min-w-0 flex-1">
@@ -188,7 +188,13 @@ function Bubble({ chatId, message, reactions }) {
             ))
         )}
         {message.reply_to_message_id && <p className="text-xs opacity-70">↳ Resposta a {message.reply_to_from || 'outra mensagem'}</p>}
-        {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+        {/* O nome do arquivo já está no cartão de documento: não repetir
+            o mesmo título abaixo da miniatura. Legendas diferentes continuam. */}
+        {message.content && !(message.type === 'document'
+          && message.media?.filename
+          && message.content.trim() === message.media.filename.trim()) && (
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        )}
         {message.type === 'reaction' && message.reaction_emoji && <p>{message.reaction_emoji} · reação a uma mensagem anterior</p>}
         {message.interactive_reply && <p className="text-xs">Opção: {message.interactive_reply.title || message.interactive_reply.id || 'resposta interativa'}{message.interactive_reply.description ? ` · ${message.interactive_reply.description}` : ''}</p>}
         {message.referral && <p className="text-xs">Origem: {message.referral.headline || message.referral.source_url || 'anúncio'}{!message.referral.source_id && ' · identificação de origem indisponível'}</p>}
