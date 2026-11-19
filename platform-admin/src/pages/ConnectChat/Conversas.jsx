@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer, getConnectchatPilotBinding, setConnectchatPilotBinding, previewConnectchatAgent } from '../../services/connectchat';
+import { listAgents } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -88,6 +89,11 @@ export default function ConnectchatConversas() {
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [customerActivity, setCustomerActivity] = useState(null);
+  const [pilotAgents, setPilotAgents] = useState([]);
+  const [pilotAgentId, setPilotAgentId] = useState('');
+  const [pilotSaving, setPilotSaving] = useState(false);
+  const [pilotRunning, setPilotRunning] = useState(false);
+  const [pilotDraft, setPilotDraft] = useState(null);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
   const typingTimerRef = useRef(null);
@@ -133,6 +139,19 @@ export default function ConnectchatConversas() {
   }, [can, toast]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  useEffect(() => {
+    if (!can('ai.agents.read') || !can('comm.connectchat.read')) return undefined;
+    let alive = true;
+    Promise.all([listAgents(), getConnectchatPilotBinding()])
+      .then(([result, binding]) => {
+        if (!alive) return;
+        setPilotAgents((result.items || []).filter((agent) => agent.is_active));
+        setPilotAgentId(binding.agentId || '');
+      })
+      .catch((err) => { if (alive) toast.error(err.message); });
+    return () => { alive = false; };
+  }, [can, toast]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -201,7 +220,35 @@ export default function ConnectchatConversas() {
     setMessages([]);
     setCustomerActivity(null);
     setCustomerId('');
+    setPilotDraft(null);
     await loadMessages(conversation, true);
+  }
+
+  async function choosePilotAgent(id) {
+    setPilotSaving(true);
+    setPilotDraft(null);
+    try {
+      await setConnectchatPilotBinding(id || null);
+      setPilotAgentId(id);
+      toast.success(id ? 'Agente vinculado à bancada de testes.' : 'Vínculo de testes removido.');
+    } catch (err) {
+      toast.error(err.message);
+    } finally { setPilotSaving(false); }
+  }
+
+  async function runPilot() {
+    if (!selected?.id || !pilotAgentId) return;
+    setPilotRunning(true);
+    setPilotDraft(null);
+    try {
+      const result = await previewConnectchatAgent(selected.id);
+      if (result.status !== 'COMPLETED' || !result.preview?.trim()) {
+        toast.error('O agente não gerou uma resposta. Consulte o histórico de execução dele.');
+      } else {
+        setPilotDraft({ conversationId: selected.id, text: result.preview, linked: result.customerLinked });
+      }
+    } catch (err) { toast.error(err.message); }
+    finally { setPilotRunning(false); }
   }
 
   async function send() {
@@ -332,6 +379,43 @@ export default function ConnectchatConversas() {
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>
             </header>
+            {can('ai.agents.read') && can('ai.agents.execute') && can('comm.connectchat.read') && (
+              <div className="space-y-2" style={{ padding: 'var(--su-space-3) var(--su-space-4)', borderBottom: '1px solid var(--su-border-default)' }}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong style={{ fontSize: 12, color: 'var(--su-text-primary)' }}>Bancada de testes da IA</strong>
+                  <Badge tone="info">Somente simulação</Badge>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select className="su-input" aria-label="Agente para testar no ConnectChat"
+                    value={pilotAgentId} disabled={pilotSaving || !can('ai.agents.write')}
+                    onChange={(event) => choosePilotAgent(event.target.value)}
+                    style={{ flex: 1, minWidth: 160, maxWidth: 350 }}>
+                    <option value="">Escolha um assistente</option>
+                    {pilotAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+                  </select>
+                  <Button variant="secondary" size="sm" disabled={!pilotAgentId || pilotRunning || pilotSaving}
+                    loading={pilotRunning} onClick={runPilot}>Simular resposta</Button>
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--su-text-muted)', margin: 0 }}>
+                  O assistente lê a conversa e sugere uma resposta. Nada é enviado automaticamente
+                  ao cliente e o WhatsApp continua desligado nesta bancada.
+                </p>
+                {pilotDraft?.conversationId === selected.id && (
+                  <div className="space-y-2" style={{ padding: 12, borderRadius: 8, background: 'var(--su-surface-raised)', border: '1px solid var(--su-border-default)' }}>
+                    <strong style={{ fontSize: 12 }}>Sugestão do agente — não enviada</strong>
+                    <p style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: 13 }}>{pilotDraft.text}</p>
+                    <Button size="sm" variant="secondary" disabled={!can('comm.connectchat.write')}
+                      onClick={() => {
+                        setText(pilotDraft.text);
+                        setPilotDraft(null);
+                        toast.success('Sugestão copiada para a mensagem. Revise e clique em Enviar.');
+                      }}>
+                      Revisar na mensagem
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2" style={{ padding: 'var(--su-space-4)', background: 'var(--su-surface-subtle)' }}>
               {messages.length === 0 ? <EmptyState icon="message" title="Sem mensagens" description="Ainda não há mensagens para mostrar nesta conversa." /> : messages.map((message) => {
                 const outgoing = message.senderKind === 'BUSINESS';
