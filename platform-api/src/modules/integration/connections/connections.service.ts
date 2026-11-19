@@ -65,7 +65,7 @@ export class ConnectionsService {
     // Eles continuam preservados (sem apagar segredo/log), mas não reaparecem na
     // superfície operacional nem podem ser selecionados por fluxos atuais.
     return connections.filter((connection) =>
-      connection.is_active && this.registry.has(connection.provider_key) && connection.provider_key !== 'whatsapp-nivoo');
+      !connection.tags.includes('__archived_codex__') && this.registry.has(connection.provider_key) && connection.provider_key !== 'whatsapp-nivoo');
   }
 
   listAvailableProviders() {
@@ -77,7 +77,7 @@ export class ConnectionsService {
 
   async findById(id: string): Promise<Connection> {
     const connection = await this.repository.findById(id);
-    if (!connection || !connection.is_active || !this.registry.has(connection.provider_key)) throw new NotFoundException('Conexão não encontrada.');
+    if (!connection || connection.tags.includes('__archived_codex__') || !this.registry.has(connection.provider_key)) throw new NotFoundException('Conexão não encontrada.');
     return connection;
   }
 
