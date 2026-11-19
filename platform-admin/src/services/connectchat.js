@@ -7,9 +7,9 @@ export async function getConnectchatAgentBinding() {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível carregar o agente do ConnectChat')); }
 }
 
-export async function setConnectchatAgentBinding(agentId, enabled) {
+export async function setConnectchatAgentBinding(agentId, enabled, includeTicketHistory = true) {
   try {
-    const { data } = await api.put('/ai/connectchat/agent', { agentId: agentId || null, enabled: !!enabled });
+    const { data } = await api.put('/ai/connectchat/agent', { agentId: agentId || null, enabled: !!enabled, includeTicketHistory: !!includeTicketHistory });
     return data;
   } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível vincular o assistente ao ConnectChat')); }
 }
