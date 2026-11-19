@@ -81,7 +81,7 @@ export class AgentsService {
     const perms = actor?.permissions ?? [];
     const canUseIsp = perms.includes('*') || perms.includes(PERMISSIONS.ISP_TOOLS_USE);
     const ispKeys = new Set([
-      'identificar_cliente', 'consultar_chamados_recentes', 'diagnosticar_conexao',
+      'identificar_cliente', 'consultar_chamados_recentes', 'consultar_os_recentes', 'diagnosticar_conexao',
       'consultar_debitos', 'consultar_contrato', 'status_conexao', 'status_regiao',
       'segunda_via_boleto', 'gerar_link_pagamento', 'desbloqueio_confianca',
       'abrir_os', 'encaminhar_para_fila',
@@ -119,6 +119,7 @@ export class AgentsService {
     const defaults = ixcActive > 0 && canUseIsp ? [
       'identificar_cliente',
       'consultar_chamados_recentes',
+      'consultar_os_recentes',
       'diagnosticar_conexao',
       'consultar_contrato',
       'status_conexao',
