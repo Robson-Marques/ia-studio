@@ -146,7 +146,10 @@ export class ConnectchatAgentLabController {
     this.check(user, 'read');
     const binding = await this.bindingForPreview();
     const conversation = await this.chat.conversationForAgent(dto.conversationId);
-    const history = await this.chat.getMessages(dto.conversationId, '0', 100) as ConnectchatMessage[];
+    // Buscar o final da conversa, não as primeiras 100 mensagens históricas.
+    const lastSequence = BigInt(/^\d+$/.test(conversation.lastSequence) ? conversation.lastSequence : '0');
+    const afterSequence = lastSequence > 100n ? String(lastSequence - 100n) : '0';
+    const history = await this.chat.getMessages(dto.conversationId, afterSequence, 100) as ConnectchatMessage[];
     const transcript = history
       .filter((m) => typeof m.body === 'string' && m.body.trim())
       .sort((a, b) => Number(a.serverSequence) - Number(b.serverSequence))
@@ -154,6 +157,9 @@ export class ConnectchatAgentLabController {
     const lastCustomer = [...transcript].reverse().find((m) => m.senderKind === 'CUSTOMER');
     if (!lastCustomer) {
       throw new BadRequestException('Envie uma mensagem de teste pelo ConnectChat antes de gerar a prévia.');
+    }
+    if (transcript.at(-1)?.senderKind !== 'CUSTOMER') {
+      throw new BadRequestException('A última mensagem já é da empresa. Envie uma nova mensagem de teste pelo ConnectChat para avaliar a IA.');
     }
     const lastIdx = transcript.findIndex((m) => m.id === lastCustomer.id);
     const previous = transcript.slice(0, lastIdx)
