@@ -147,9 +147,6 @@ export default function ConexaoDetalhe() {
           {podeEscrever && precisaAutorizar && (
             <GoogleOAuthButton connectionId={conexao.id} onActivated={() => load()} />
           )}
-          {podeEscrever && conexao.provider_key === 'codex-cli' && (
-            <CodexCliLogin connectionId={conexao.id} onActivated={() => load()} />
-          )
           {podeEscrever && (
             <Button variant="primary" icon="edit" onClick={() => navigate(`/integracoes/conexoes/${id}/editar`)}>
               Editar
@@ -166,6 +163,9 @@ export default function ConexaoDetalhe() {
     >
       {aba === 'dados' && (
         <>
+          {podeEscrever && conexao.provider_key === 'codex-cli' && (
+            <CodexCliLogin connectionId={conexao.id} onActivated={() => load()} />
+          )}
           <Card>
             <div style={{ padding: 20 }}>
               <DescriptionList
