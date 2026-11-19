@@ -40,6 +40,10 @@ export interface RunAgentParams {
    *  sem isto cada mensagem recebida vira um run stateless e ele "esquece" o
    *  que já foi dito. O nó AGENT carrega do chat quando há sessão. */
   history?: { role: 'user' | 'assistant'; content: string }[];
+  /** Ambiente ConnectChat: restringe ferramentas sem depender do prompt. */
+  previewAllowedTools?: string[];
+  /** Regras de testes adicionadas pelo servidor, nunca pelo cliente. */
+  previewInstructions?: string;
 }
 
 export interface RunAgentOutput {
@@ -87,8 +91,9 @@ export class AgentRunnerService {
     // Seguranca: inspeciona o input do usuario (loga alerta; nao bloqueia).
     this.promptSecurity.inspect(params.input);
 
-    const systemPrompt = await this.buildSystemPrompt(agent, params.input, traceId);
-    const llmTools = await this.buildTools(agent);
+    const systemPrompt = (await this.buildSystemPrompt(agent, params.input, traceId))
+      + (params.previewInstructions ? '\n\n' + params.previewInstructions : '');
+    const llmTools = await this.buildTools(agent, params.previewAllowedTools);
 
     const messages: LlmMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -219,7 +224,7 @@ export class AgentRunnerService {
 
         // Executa cada tool call.
         for (const call of result.toolCalls) {
-          const toolCtx = this.buildToolContext(agent, runId, ctx);
+          const toolCtx = this.buildToolContext(agent, runId, ctx, llmTools.map((tool) => tool.name));
           const exec = await this.toolRuntime.executeTool(call.name, call.arguments, toolCtx);
 
           if (exec.status === 'awaiting_approval') {
@@ -366,9 +371,12 @@ export class AgentRunnerService {
     return parts.filter(Boolean).join('');
   }
 
-  private async buildTools(agent: AiAgent): Promise<LlmTool[]> {
-    if (agent.allowed_tools.length === 0) return [];
-    const catalog = await this.tools.resolveForAgent(agent.allowed_tools);
+  private async buildTools(agent: AiAgent, previewAllowed?: string[]): Promise<LlmTool[]> {
+    const allowed = previewAllowed
+      ? agent.allowed_tools.filter((key) => previewAllowed.includes(key))
+      : agent.allowed_tools;
+    if (allowed.length === 0) return [];
+    const catalog = await this.tools.resolveForAgent(allowed);
     return catalog.map((t) => ({
       name: t.key,
       description: t.description,
@@ -380,10 +388,12 @@ export class AgentRunnerService {
     agent: AiAgent,
     runId: string,
     ctx: { traceId: string; dryRun: boolean; scopeKeys?: Record<string, string>; executionId: string | null },
+    allowedToolKeys: string[],
   ): ToolExecutionContext {
     return {
       agentId: agent.id,
       agentRunId: runId,
+      allowedToolKeys,
       traceId: ctx.traceId,
       executionId: ctx.executionId,
       scopeKeys: ctx.scopeKeys,
