@@ -254,6 +254,27 @@ export class CodexCliService implements OnModuleDestroy {
     return this.beginLogin(id);
   }
 
+  /**
+   * Remoção solicitada pelo administrador: encerra login em andamento e
+   * apaga apenas a HOME isolada desta Connection, não outras contas.
+   */
+  async forget(id: string): Promise<void> {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new BadRequestException('Conexão inválida.');
+    const current = this.sessions.get(id);
+    if (current) {
+      clearTimeout(current.timer);
+      if (current.stage === 'waiting') current.child.kill('SIGTERM');
+      this.sessions.delete(id);
+    }
+    // Limite estrito ao namespace Codex da aplicação para evitar qualquer
+    // remoção arbitrária pelo endpoint.
+    if (!/^[a-z][a-z0-9-]{2,31}$/.test(this.appId)) {
+      throw new BadRequestException('Instância Codex sem identificação válida.');
+    }
+    const dir = path.join(this.root, id);
+    await rm(dir, { recursive: true, force: true });
+  }
+
   async cancelLogin(id: string) {
     const session = this.sessions.get(id);
     if (session?.stage === 'waiting') {
