@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer, getConnectchatPilotBinding, setConnectchatPilotBinding, previewConnectchatAgent } from '../../services/connectchat';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer, getConnectchatPilotBinding, setConnectchatPilotBinding, previewConnectchatAgent, getConnectchatPilotRules, setConnectchatPilotRules } from '../../services/connectchat';
 import { listAgents } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -95,6 +95,9 @@ export default function ConnectchatConversas() {
   const [pilotSaving, setPilotSaving] = useState(false);
   const [pilotRunning, setPilotRunning] = useState(false);
   const [pilotDraft, setPilotDraft] = useState(null);
+  const [pilotRules, setPilotRules] = useState(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [rulesSaving, setRulesSaving] = useState(false);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
   const typingTimerRef = useRef(null);
@@ -144,11 +147,12 @@ export default function ConnectchatConversas() {
   useEffect(() => {
     if (!canPilotRead) return undefined;
     let alive = true;
-    Promise.all([listAgents(), getConnectchatPilotBinding()])
-      .then(([result, binding]) => {
+    Promise.all([listAgents(), getConnectchatPilotBinding(), getConnectchatPilotRules()])
+      .then(([result, binding, rules]) => {
         if (!alive) return;
         setPilotAgents((result.items || []).filter((agent) => agent.is_active));
         setPilotAgentId(binding.agentId || '');
+        setPilotRules(rules);
       })
       .catch((err) => { if (alive) toast.error(err.message); });
     return () => { alive = false; };
@@ -235,6 +239,28 @@ export default function ConnectchatConversas() {
     } catch (err) {
       toast.error(err.message);
     } finally { setPilotSaving(false); }
+  }
+
+  async function changePilotRule(key, checked) {
+    if (!pilotRules) return;
+    const previous = pilotRules;
+    const next = { ...pilotRules, [key]: checked };
+    setPilotRules(next);
+    setRulesSaving(true);
+    try {
+      const saved = await setConnectchatPilotRules({
+        ticketHistory: next.ticketHistory,
+        networkDiagnosis: next.networkDiagnosis,
+        financialRead: next.financialRead,
+        requireCustomerLink: true,
+      });
+      setPilotRules(saved);
+      setPilotDraft(null); // rascunhos ficam inválidos quando as regras mudam
+      toast.success('Regras da bancada atualizadas.');
+    } catch (err) {
+      setPilotRules(previous);
+      toast.error(err.message);
+    } finally { setRulesSaving(false); }
   }
 
   async function runPilot() {
@@ -385,6 +411,10 @@ export default function ConnectchatConversas() {
                 <div className="flex flex-wrap items-center gap-2">
                   <strong style={{ fontSize: 12, color: 'var(--su-text-primary)' }}>Bancada de testes da IA</strong>
                   <Badge tone="info">Somente simulação</Badge>
+                  <Button variant="ghost" size="sm" disabled={rulesSaving}
+                    onClick={() => setRulesOpen((value) => !value)}>
+                    {rulesOpen ? 'Fechar regras' : 'Regras de teste'}
+                  </Button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <select className="su-input" aria-label="Agente para testar no ConnectChat"
@@ -397,6 +427,27 @@ export default function ConnectchatConversas() {
                   <Button variant="secondary" size="sm" disabled={!pilotAgentId || pilotRunning || pilotSaving}
                     loading={pilotRunning} onClick={runPilot}>Simular resposta</Button>
                 </div>
+                {rulesOpen && pilotRules && (
+                  <div className="space-y-2" style={{ padding: 12, borderRadius: 8, border: '1px solid var(--su-border-default)' }}>
+                    <strong style={{ fontSize: 12 }}>O que o agente pode consultar no teste</strong>
+                    {[
+                      { key: 'ticketHistory', label: 'Últimos chamados e ordens de serviço' },
+                      { key: 'networkDiagnosis', label: 'Diagnóstico da conexão e contrato' },
+                      { key: 'financialRead', label: 'Débitos e faturas (restrito)' },
+                    ].map((rule) => (
+                      <label key={rule.key} className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--su-text-primary)' }}>
+                        <input type="checkbox" checked={Boolean(pilotRules[rule.key])}
+                          disabled={rulesSaving || !can('ai.agents.write')}
+                          onChange={(event) => changePilotRule(rule.key, event.target.checked)} />
+                        {rule.label}
+                      </label>
+                    ))}
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--su-text-muted)' }}>
+                      Sempre exige vínculo de cliente para consultar dados pessoais.
+                      Abrir OS, desbloquear acesso, enviar mensagens e responder automaticamente continuam bloqueados.
+                    </p>
+                  </div>
+                )}
                 <p style={{ fontSize: 11, color: 'var(--su-text-muted)', margin: 0 }}>
                   O assistente lê a conversa e sugere uma resposta. Nada é enviado automaticamente
                   ao cliente e o WhatsApp continua desligado nesta bancada.
