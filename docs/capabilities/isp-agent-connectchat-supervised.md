@@ -9,7 +9,8 @@ provedor IXC e não usa SQL direto nem credenciais no navegador.
 
 ## Automação do cadastro
 
-Quando há uma Connection IXC `ACTIVE`, **agentes novos** recebem por padrão as
+Quando há uma Connection IXC `ACTIVE` e o operador tem a permissão
+`isp.tools.use`, **agentes novos** recebem por padrão as
 ferramentas ISP de leitura: identificação, chamados recentes, diagnóstico,
 contratos, status do acesso e status da região. Esse provisionamento ocorre
 no cadastro do agente; **agentes existentes não são modificados
