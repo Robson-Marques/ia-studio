@@ -65,6 +65,13 @@ export async function listConnectionLogs(id, take = 50) {
 
 // ─── Codex CLI: login oficial por código de dispositivo ───────────
 
+export async function listCodexModels(connectionId) {
+  try {
+    const { data } = await api.get(`/connections/${connectionId}/codex-models`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível consultar modelos Codex')); }
+}
+
 export async function getCodexLoginStatus(connectionId) {
   try {
     const { data } = await api.get(`/connections/${connectionId}/codex-login`);
