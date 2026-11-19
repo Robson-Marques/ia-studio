@@ -11,7 +11,7 @@ provedor IXC e não usa SQL direto nem credenciais no navegador.
 
 Quando há uma Connection IXC `ACTIVE` e o operador tem a permissão
 `isp.tools.use`, **agentes novos** recebem por padrão as
-ferramentas ISP de leitura: identificação, chamados recentes, diagnóstico,
+ferramentas ISP de leitura: identificação, chamados recentes, ordens de serviço recentes, diagnóstico,
 contratos, status do acesso e status da região. Esse provisionamento ocorre
 no cadastro do agente; **agentes existentes não são modificados
 silenciosamente**, e o operador pode revisar e remover habilidades.
@@ -39,10 +39,12 @@ clica **Testar IA nesta conversa**:
    no máximo 25 mensagens de texto ao modelo).
 3. Só considera cliente confirmado quando a conversa traz `CUSTOMER`,
    `linkStatus=ACTIVE` e `customerRef=ixc:<connection-id>:<id-cliente>`.
-4. Se autorizado e se a regra **Consultar chamados IXC** estiver ligada,
-   o backend consulta **até cinco** `su_ticket` diretamente pelo ID do cliente
-   vinculado, usando `atendimento.listar_chamados_recentes` da Connection
-   IXC e `projectChamado` para minimizar dados.
+4. Se autorizado e se a regra **Consultar histórico IXC** estiver ligada,
+   o backend consulta **até cinco** `su_ticket` e **até cinco**
+   `su_oss_chamado`, separadamente, pelo ID do cliente vinculado.
+   Usa as operações limitadas `atendimento.listar_chamados_recentes` e
+   `os.listar_recentes` do IXC, com `projectChamado` e
+   `projectOrdemServico` para minimizar dados.
 5. O backend também conta, quando as datas são válidas, os chamados dos
    últimos 7 e 30 dias para sinalizar possível reincidência, sem afirmar que
    repetição de chamados comprova uma mesma causa técnica.
@@ -69,14 +71,15 @@ O ConnectChat não chama ferramentas que dependem de sessões WhatsApp.
   `AiAgentRun`; não persistimos um novo dossiê do cliente.
 
 A única regra alterável neste primeiro fluxo é **incluir ou não o histórico
-de até cinco chamados**. Isso permite testar a qualidade das respostas antes
+de até cinco chamados e até cinco ordens de serviço reais**. Isso permite testar a qualidade das respostas antes
 de definir novas permissões de cobrança e suporte com a diretoria.
 
 ## Fora do escopo / pendências antes de produção automática
 
 - Não há publicação automática de respostas no ConnectChat ou WhatsApp.
-- A consulta atual limita-se a chamados `su_ticket`; não equivale a consultar
-  todas as OS `su_oss_chamado` nem garante diagnóstico da rede em tempo real.
+- As consultas atuais limitam-se aos cinco últimos chamados `su_ticket` e
+  cinco últimas OS `su_oss_chamado`; não abrangem todo o histórico nem
+  garantem diagnóstico da rede em tempo real.
 - Rotinas de segunda via, cobrança, incidentes, abertura de OS,
   validação de identidade para ações sensíveis, escalação e aprovações precisam
   de política operacional específica antes da automação.
