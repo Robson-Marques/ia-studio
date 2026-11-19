@@ -79,6 +79,7 @@ function MessageAttachment({ attachment }) {
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
+  const canUseLab = can('ai.agents.read') && can('comm.connectchat.read');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -148,7 +149,7 @@ export default function ConnectchatConversas() {
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
   useEffect(() => {
-    if (!can('ai.agents.read') || !can('comm.connectchat.read')) return undefined;
+    if (!canUseLab) return undefined;
     let live = true;
     Promise.all([listAgents(), getConnectchatAgentBinding()])
       .then(([agents, binding]) => {
@@ -160,7 +161,7 @@ export default function ConnectchatConversas() {
       })
       .catch(() => { /* Conexão comum continua disponível sem o laboratório. */ });
     return () => { live = false; };
-  }, [can]);
+  }, [canUseLab]);
 
   useEffect(() => {
     const timer = setInterval(() => {
