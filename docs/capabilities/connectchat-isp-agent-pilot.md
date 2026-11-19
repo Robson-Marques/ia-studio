@@ -35,8 +35,10 @@ de leitura já existentes e ativas:
 
 Nenhum acesso SQL, chamadas HTTP livres, alteração de registro, nova OS,
 desbloqueio, disparo de mensagem ou cobrança são habilitados por padrão.
-O editor marca as mesmas habilidades automaticamente e mostra um aviso antes
-de salvar. O operador pode ajustá-las em “O que faz”. Assistentes existentes
+O editor marca as mesmas habilidades automaticamente, preenche um
+**roteiro inicial editável** (identificação, histórico, classificação, suporte,
+financeiro somente com autorização e encaminhamento humano) e mostra um aviso
+antes de salvar. O operador pode ajustar tudo em “O que faz”. Assistentes existentes
 não são alterados silenciosamente; podem ser editados manualmente.
 
 Para múltiplas conexões IXC, a configuração deve ser definida pelo operador,
