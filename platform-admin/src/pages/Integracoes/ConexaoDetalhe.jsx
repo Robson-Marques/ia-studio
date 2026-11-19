@@ -129,6 +129,7 @@ export default function ConexaoDetalhe() {
   ];
 
   return (
+    <>
     <DetailScreen
       back={{ label: 'Voltar para conexões', onClick: () => navigate('/integracoes/conexoes') }}
       title={conexao.name}
@@ -336,5 +337,6 @@ export default function ConexaoDetalhe() {
           finally { setRemovendo(false); setConfirmarRemocao(false); }
         }}
       />
+    </>
   );
 }
