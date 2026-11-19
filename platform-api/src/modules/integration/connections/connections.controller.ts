@@ -7,6 +7,8 @@ import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { ConnectionsService } from './connections.service';
+import { CodexCliService } from '../registry/providers/codex-cli.service';
+import { BadRequestException } from '@nestjs/common';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { UpdateConnectionStateDto } from './dto/update-connection-state.dto';
@@ -16,7 +18,38 @@ import { ExecuteOperationDto } from './dto/execute-operation.dto';
 @ApiBearerAuth()
 @Controller('connections')
 export class ConnectionsController {
-  constructor(private readonly connections: ConnectionsService) {}
+  constructor(
+    private readonly connections: ConnectionsService,
+    private readonly codexCli: CodexCliService,
+  ) {}
+
+  private async checkCodexConnection(id: string) {
+    const connection = await this.connections.findById(id);
+    if (connection.provider_key !== 'codex-cli') {
+      throw new BadRequestException('Esta conexão não é do Codex CLI.');
+    }
+  }
+
+  @Get(':id/codex-login')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  async codexLoginStatus(@Param('id') id: string) {
+    await this.checkCodexConnection(id);
+    return this.codexCli.status(id);
+  }
+
+  @Post(':id/codex-login')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  async codexLoginStart(@Param('id') id: string) {
+    await this.checkCodexConnection(id);
+    return this.codexCli.beginLogin(id);
+  }
+
+  @Post(':id/codex-login/cancel')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
+  async codexLoginCancel(@Param('id') id: string) {
+    await this.checkCodexConnection(id);
+    return this.codexCli.cancelLogin(id);
+  }
 
   @Get()
   @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ)
