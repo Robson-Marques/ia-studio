@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
 import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
+import { listAgents } from '../../services/ai';
+import { getConnectchatAgentBinding, setConnectchatAgentBinding, previewConnectchatAgent } from '../../services/connectchat';
 
 const POLL_MS = 5000;
 const TYPING_POLL_MS = 1500;
@@ -88,6 +90,12 @@ export default function ConnectchatConversas() {
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [customerActivity, setCustomerActivity] = useState(null);
+  const [labOpen, setLabOpen] = useState(false);
+  const [agentOptions, setAgentOptions] = useState([]);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
+  const [boundAgentId, setBoundAgentId] = useState('');
+  const [labBusy, setLabBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
   const typingTimerRef = useRef(null);
@@ -133,6 +141,20 @@ export default function ConnectchatConversas() {
   }, [can, toast]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  useEffect(() => {
+    if (!can('ai.agents.read') || !can('comm.connectchat.read')) return undefined;
+    let live = true;
+    Promise.all([listAgents(), getConnectchatAgentBinding()])
+      .then(([agents, binding]) => {
+        if (!live) return;
+        setAgentOptions((agents.items || []).filter((agent) => agent.is_active !== false));
+        setSelectedAgentId(binding.agentId || '');
+        setBoundAgentId(binding.agentId || '');
+      })
+      .catch(() => { /* Conexão comum continua disponível sem o laboratório. */ });
+    return () => { live = false; };
+  }, [can]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -196,12 +218,37 @@ export default function ConnectchatConversas() {
   }, []);
 
   async function selectConversation(conversation) {
+    setPreview(null);
     stopTyping();
     setSelected(conversation);
     setMessages([]);
     setCustomerActivity(null);
     setCustomerId('');
     await loadMessages(conversation, true);
+  }
+
+  async function linkAgent() {
+    if (!selectedAgentId || !can('ai.agents.write')) return;
+    setLabBusy(true);
+    try {
+      const binding = await setConnectchatAgentBinding(selectedAgentId);
+      setBoundAgentId(binding.agentId);
+      setPreview(null);
+      toast.success('Assistente vinculado ao laboratório do ConnectChat. Envios automáticos continuam desligados.');
+    } catch (err) { toast.error(err.message); }
+    finally { setLabBusy(false); }
+  }
+
+  async function testAgent() {
+    if (!selected || !boundAgentId || selectedAgentId !== boundAgentId) return;
+    setLabBusy(true);
+    setPreview(null);
+    try {
+      const data = await previewConnectchatAgent(selected.id);
+      setPreview(data);
+      if (data.status !== 'COMPLETED') toast.warn('A execução não terminou normalmente; consulte a execução do assistente.');
+    } catch (err) { toast.error(err.message); }
+    finally { setLabBusy(false); }
   }
 
   async function send() {
@@ -350,6 +397,69 @@ export default function ConnectchatConversas() {
                 );
               })}
             </div>
+            {can('ai.agents.execute') && can('ai.agents.read') && can('comm.connectchat.read') && (
+              <section style={{ borderTop: '1px solid var(--su-border-default)', padding: 'var(--su-space-3) var(--su-space-4)', background: 'var(--su-surface-raised)' }}>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <strong style={{ fontSize: 13, color: 'var(--su-text-primary)' }}>Laboratório de IA — ConnectChat</strong>
+                    <div style={{ fontSize: 11, color: 'var(--su-text-secondary)' }}>
+                      Respostas para revisão. Nada é enviado automaticamente.
+                    </div>
+                  </div>
+                  <Button variant="secondary" size="sm" onClick={() => setLabOpen((value) => !value)}>
+                    {labOpen ? 'Fechar' : 'Testar agente'}
+                  </Button>
+                </div>
+                {labOpen && (
+                  <div className="space-y-2" style={{ marginTop: 12 }}>
+                    <label htmlFor="connectchat-lab-agent" style={{ display: 'block', fontSize: 12, color: 'var(--su-text-secondary)' }}>
+                      Assistente vinculado ao ConnectChat
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <select id="connectchat-lab-agent" className="su-input" style={{ flex: 1, minWidth: 180 }}
+                        value={selectedAgentId} onChange={(event) => { setSelectedAgentId(event.target.value); setPreview(null); }}>
+                        <option value="">Escolha um agente ativo</option>
+                        {agentOptions.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+                      </select>
+                      {can('ai.agents.write') && selectedAgentId !== boundAgentId && (
+                        <Button variant="secondary" size="sm" loading={labBusy} onClick={linkAgent}>
+                          Vincular ao canal
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="warning">Modo supervisionado</Badge>
+                      <span style={{ fontSize: 11, color: 'var(--su-text-muted)' }}>
+                        IXC: consultas autorizadas · Cobrança e alterações: bloqueadas no teste
+                      </span>
+                    </div>
+                    <Button variant="primary" size="sm" loading={labBusy}
+                      disabled={!boundAgentId || selectedAgentId !== boundAgentId || labBusy}
+                      onClick={testAgent}>
+                      Gerar resposta de teste
+                    </Button>
+                    {preview && (
+                      <div className="space-y-2" style={{ border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12 }}>
+                        <strong style={{ fontSize: 12, color: 'var(--su-text-primary)' }}>
+                          Prévia privada do assistente
+                        </strong>
+                        <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--su-text-primary)' }}>
+                          {preview.preview || 'O agente não retornou uma resposta utilizável.'}
+                        </p>
+                        <p style={{ fontSize: 11, color: 'var(--su-text-muted)', margin: 0 }}>
+                          Nenhuma mensagem foi enviada. Verifique os dados e a identidade antes de responder.
+                        </p>
+                        {preview.preview && can('comm.connectchat.write') && (
+                          <Button variant="secondary" size="sm" onClick={() => { setText(preview.preview); setPreview(null); }}>
+                            Usar como rascunho (revisar antes de enviar)
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
             {selected.status === 'OPEN' && can('comm.connectchat.write') ? (
               <>
               {customerActivity ? <p style={{ margin: 0, padding: 'var(--su-space-2) var(--su-space-3) 0', color: 'var(--su-text-muted)', fontSize: 12 }}>{presenceCopy(customerActivity)}</p> : null}
