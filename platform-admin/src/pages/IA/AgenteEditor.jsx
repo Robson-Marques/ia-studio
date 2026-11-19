@@ -782,7 +782,25 @@ export default function AgenteEditor() {
 
       {tab === 'revisao' && <ContentReviewTab agentId={savedId} canReview={canWrite} />}
 
-      {tab === 'testar' && <TestTab agentId={savedId} canExecute={canExecute} />}
+      {tab === 'testar' && (
+        <div className="space-y-3">
+          <Card>
+            <div style={{ padding: 16 }} className="space-y-2">
+              <strong style={{ fontSize: 13, color: 'var(--su-text-primary)' }}>
+                Testar com uma conversa real do ConnectChat
+              </strong>
+              <p style={{ fontSize: 12, color: 'var(--su-text-secondary)', margin: 0 }}>
+                Vincule este assistente ao laboratório do ConnectChat. A IA gera
+                uma resposta para revisão, sem enviar mensagens automaticamente.
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => navigate('/connectchat/conversas')}>
+                Abrir laboratório ConnectChat
+              </Button>
+            </div>
+          </Card>
+          <TestTab agentId={savedId} canExecute={canExecute} />
+        </div>
+      )}
 
       {tab === 'visao' && advExpanded && (
         <div className="space-y-4">
