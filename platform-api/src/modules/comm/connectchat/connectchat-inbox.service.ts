@@ -100,6 +100,26 @@ export class ConnectchatInboxService {
     }
   }
 
+  /**
+   * Uso interno da bancada: retorna apenas o vínculo IXC autenticado que a
+   * Central já registrou. Nunca expõe customerRef ou ID de conexão ao browser.
+   * O nome/status de interface não substitui o customerRef validado.
+   */
+  async pilotIxcCustomer(conversationId: string): Promise<{
+    connectionId: string; customerId: string;
+  } | null> {
+    const conversations = await this.execute('listConversations') as ConnectchatConversation[];
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (!conversation) throw new BadRequestException('Conversa não encontrada.');
+    if (conversation.businessContact?.status !== 'CUSTOMER'
+      || conversation.businessContact.linkStatus !== 'ACTIVE') return null;
+    const match = /^ixc:([0-9a-f-]{36}):([1-9]\\d*)$/i.exec(conversation.customerRef || '');
+    if (!match) return null;
+    const connection = await this.connections.findById(match[1]).catch(() => null);
+    if (!connection || connection.provider_key !== 'ixc' || connection.status !== 'ACTIVE') return null;
+    return { connectionId: connection.id, customerId: match[2] };
+  }
+
   getMessages(conversationId: string, afterSequence?: string, limit?: number) {
     if (afterSequence !== undefined && !/^\d+$/.test(afterSequence)) {
       throw new BadRequestException('A sequência de mensagens é inválida.');
