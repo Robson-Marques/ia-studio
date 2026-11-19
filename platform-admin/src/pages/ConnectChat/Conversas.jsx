@@ -415,7 +415,8 @@ export default function ConnectchatConversas() {
                   )}
                   {can('ai.agents.execute') && (
                     <Button variant="primary" size="sm" loading={testingAgent}
-                      disabled={testingAgent || !agentBinding.enabled || agentSelection !== agentBinding.agentId}
+                      disabled={testingAgent || !agentBinding.enabled || agentSelection !== agentBinding.agentId
+                        || includeTicketHistory !== (agentBinding.includeTicketHistory !== false)}
                       onClick={testAgent}>
                       Testar IA nesta conversa
                     </Button>
