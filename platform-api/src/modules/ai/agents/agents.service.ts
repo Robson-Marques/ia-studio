@@ -109,6 +109,7 @@ export class AgentsService {
         key: { in: [...ISP_AUTO_READ_TOOLS] },
         builtin: true,
         is_active: true,
+        requires_approval: false,
       },
       select: { key: true },
     });
