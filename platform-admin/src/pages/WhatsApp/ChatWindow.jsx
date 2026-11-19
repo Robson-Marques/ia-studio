@@ -41,8 +41,14 @@ function ChatMedia({ chatId, message }) {
   const [error, setError] = useState(null);
   const [pageCount, setPageCount] = useState(null);
   const targetRef = useRef(null);
-  const filenameHint = String(media.filename || (message.type === 'document' ? message.content : '') || '');
-  const isPdfHint = filenameHint.toLowerCase().endsWith('.pdf')
+  // WAHA nem sempre envia filename/mimetype no eco ou no recebimento.
+  // Não exigir metadados para baixar documentos visíveis: detectar o PDF
+  // pelo cabeçalho do próprio arquivo, nos dois sentidos da conversa.
+  const filenameHint = String(media.filename || message.content || '').trim();
+  const isDocument = message.type === 'document'
+    || String(media.mime_type || '').toLowerCase().includes('pdf')
+    || /\.pdf(?:$|[?#\s])/i.test(filenameHint);
+  const isPdfHint = /\.pdf(?:$|[?#\s])/i.test(filenameHint)
     || String(media.mime_type || '').split(';')[0].trim().toLowerCase() === 'application/pdf';
 
   useEffect(() => () => {
@@ -58,11 +64,9 @@ function ChatMedia({ chatId, message }) {
       const blob = await downloadChatMedia(chatId, media.media_id);
       // PDFs às vezes são servidos como octet-stream; verificar os bytes antes
       // de corrigir o MIME para que o visualizador nativo possa renderizar.
-      const signature = message.type === 'document' && isPdfHint
-        ? await blob.slice(0, 5).text()
-        : '';
+      const signature = isDocument ? await blob.slice(0, 5).text() : '';
       const pdf = signature === '%PDF-';
-      const displayBlob = pdf && blob.type !== 'application/pdf'
+      const displayBlob = pdf && blob.type.split(';')[0] !== 'application/pdf'
         ? new Blob([blob], { type: 'application/pdf' })
         : blob;
       setData({ src: URL.createObjectURL(displayBlob), mime: displayBlob.type, file: displayBlob });
@@ -77,7 +81,7 @@ function ChatMedia({ chatId, message }) {
   // Imagens, áudios e PDFs visíveis carregam automaticamente. Outros arquivos
   // continuam sob demanda para evitar downloads de documentos grandes.
   useEffect(() => {
-    if (data || loading || error || !media.media_id || !(['image', 'sticker', 'audio'].includes(message.type) || (message.type === 'document' && isPdfHint))) return undefined;
+    if (data || loading || error || !media.media_id || !(['image', 'sticker', 'audio'].includes(message.type) || isDocument)) return undefined;
     const element = targetRef.current;
     if (!element) return undefined;
     if (typeof IntersectionObserver === 'undefined') { load(); return undefined; }
@@ -89,7 +93,7 @@ function ChatMedia({ chatId, message }) {
     }, { rootMargin: '120px' });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [chatId, media.media_id, message.type, isPdfHint, data, loading, error]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chatId, media.media_id, message.type, isDocument, data, loading, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const NOME_TIPO = { image: 'imagem', audio: 'áudio', video: 'vídeo' };
 
@@ -125,7 +129,7 @@ function ChatMedia({ chatId, message }) {
   const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf';
   return (
     <div className="w-[260px] max-w-full overflow-hidden rounded-lg border border-black/10 bg-white/80">
-      {isPdf && <PdfThumbnail file={data.file} onPageCount={setPageCount} />}
+      {isPdf && <PdfThumbnail file={data.file} url={data.src} onPageCount={setPageCount} />}
       <div className="flex items-center gap-2 p-2.5">
         <DSIcon name="file-text" size="sm" />
         <div className="min-w-0 flex-1">
@@ -227,11 +231,21 @@ export default function ChatWindow({
   const scrollRef = useRef(null);
   const contentRef = useRef(null);
   const pinnedRef = useRef(true);
+  const userScrollRef = useRef(false);
+  const frameRef = useRef(null);
   const lastChatRef = useRef(null);
   const lastMessageRef = useRef(null);
   const scrollToLatest = () => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
+  };
+  const scheduleBottom = () => {
+    cancelAnimationFrame(frameRef.current);
+    scrollToLatest();
+    frameRef.current = requestAnimationFrame(() => {
+      scrollToLatest();
+      frameRef.current = requestAnimationFrame(scrollToLatest);
+    });
   };
   const [acting, setActing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -245,8 +259,8 @@ export default function ChatWindow({
     const appended = lastId && lastId !== lastMessageRef.current;
     if (changedChat || (appended && pinnedRef.current)) {
       pinnedRef.current = true;
-      scrollToLatest();
-      requestAnimationFrame(scrollToLatest);
+      userScrollRef.current = false;
+      scheduleBottom();
     }
     lastChatRef.current = chatId;
     lastMessageRef.current = lastId;
@@ -258,16 +272,22 @@ export default function ChatWindow({
     const content = contentRef.current;
     if (!content || typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(() => {
-      if (pinnedRef.current) scrollToLatest();
+      if (pinnedRef.current) scheduleBottom();
     });
     observer.observe(content);
     return () => observer.disconnect();
   }, [chat?.id]);
 
+  // Scroll disparado pelo navegador, imagens ou PDFs não é intenção do
+  // atendente. Só deixa de acompanhar o final após interação humana real.
   function onChatScroll(event) {
+    if (!userScrollRef.current) return;
     const el = event.currentTarget;
     pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    userScrollRef.current = false;
   }
+
+  useEffect(() => () => cancelAnimationFrame(frameRef.current), []);
 
   if (!chat) return null;
   const st = ATTENDANCE_STATUS[chat.attendance_status] || ATTENDANCE_STATUS.OPEN;
@@ -399,6 +419,14 @@ export default function ChatWindow({
       <div
         ref={scrollRef}
         onScroll={onChatScroll}
+        onWheel={() => { userScrollRef.current = true; }}
+        onTouchMove={() => { userScrollRef.current = true; }}
+        onPointerDown={() => { userScrollRef.current = true; }}
+        onKeyDown={(event) => {
+          if (['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' '].includes(event.key)) {
+            userScrollRef.current = true;
+          }
+        }}
         className="flex-1 min-h-0 overflow-y-auto px-3 py-3"
         style={{
           backgroundColor: '#efeae2',
