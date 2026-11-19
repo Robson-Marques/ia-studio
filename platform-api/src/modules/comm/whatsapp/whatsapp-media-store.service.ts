@@ -3,6 +3,9 @@ import { Prisma, WhatsappMessage } from '@prisma/client';
 import { StorageService } from '../../integration/storage/storage.service';
 import { ConnectionsService } from '../../integration/connections/connections.service';
 import { WhatsappChatsRepository } from './whatsapp-chats.repository';
+import { downloadWahaWebhookFile, resolveWahaRuntime } from '../../../shared/integration/waha.client';
+import { ConnectionsRepository } from '../../integration/connections/connections.repository';
+import { SecretsService } from '../../integration/secrets/secrets.service';
 
 /**
  * Guarda a mídia no StorageService da própria instalação, sem depender da
@@ -17,6 +20,8 @@ export class WhatsappMediaStoreService {
     private readonly storage: StorageService,
     private readonly connections: ConnectionsService,
     private readonly chats: WhatsappChatsRepository,
+    private readonly connectionRepo: ConnectionsRepository,
+    private readonly secrets: SecretsService,
   ) {}
 
   async stored(message: WhatsappMessage): Promise<{ bytes: Buffer; mime: string } | null> {
@@ -46,10 +51,33 @@ export class WhatsappMediaStoreService {
 
   /** Webhook WAHA: tenta salvar imediatamente; falhas podem ser recuperadas
    * pela rota de mídia quando o arquivo for acessado posteriormente. */
-  async persistWahaBestEffort(message: WhatsappMessage): Promise<void> {
+  async persistWahaBestEffort(
+    message: WhatsappMessage,
+    webhookMediaUrl?: string,
+  ): Promise<void> {
     const media = this.mediaOf(message);
     const mediaId = typeof media['media_id'] === 'string' ? media['media_id'] : '';
     if (!mediaId || media['storage_file_id']) return;
+    if (webhookMediaUrl) {
+      try {
+        const connection = await this.connectionRepo.findById(message.connection_id);
+        if (!connection) throw new Error('Conexão WAHA não encontrada.');
+        const config = (connection.config ?? {}) as Record<string, unknown>;
+        const legacyApiKey = connection.secret_id
+          ? (await this.secrets.accessorFor(connection.secret_id).get('api_key')) ?? ''
+          : '';
+        const runtime = resolveWahaRuntime(config, legacyApiKey);
+        if (!runtime) throw new Error('WAHA local não configurada.');
+        const file = await downloadWahaWebhookFile(
+          { apiUrl: runtime.apiUrl, apiKey: runtime.apiKey, session: `iastudio-${connection.id}` },
+          webhookMediaUrl,
+        );
+        await this.save(message, file.data, file.contentType);
+        return;
+      } catch (error) {
+        this.logger.warn(`Falha ao copiar arquivo do webhook WAHA para mensagem ${message.id}: ${(error as Error).message}`);
+      }
+    }
     try {
       const result = await this.connections.execute(message.connection_id, 'downloadMedia', {
         media_id: mediaId,
