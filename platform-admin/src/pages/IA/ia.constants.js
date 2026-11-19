@@ -33,6 +33,12 @@ export const MEMORY_SCOPES = [
 // qualquer valor livre; isto é só uma lista amigável). Chave = provider_key da
 // Connection AI (minúsculo). Vazio/desconhecido cai no input livre.
 export const AGENT_MODELS = {
+  // Codex CLI usa autenticação da conta ChatGPT. A opção default é
+  // interpretada no backend sem passar --model (respeita o modelo do CLI).
+  // Não listar IDs de API OpenAI como se fossem modelos da conta Codex.
+  'codex-cli': [
+    { value: 'default', label: 'Padrão da conta ChatGPT (recomendado)' },
+  ],
   openai: [
     { value: 'gpt-5.5',      label: 'GPT-5.5 (mais capaz)' },
     { value: 'gpt-5.4',      label: 'GPT-5.4' },

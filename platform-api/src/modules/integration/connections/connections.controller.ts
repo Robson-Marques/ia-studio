@@ -37,6 +37,13 @@ export class ConnectionsController {
     return this.codexCli.status(id);
   }
 
+  @Get(':id/codex-models')
+  @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ)
+  async codexModels(@Param('id') id: string) {
+    await this.checkCodexConnection(id);
+    return this.codexCli.models(id);
+  }
+
   @Post(':id/codex-login')
   @RequirePermissions(PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE)
   async codexLoginStart(@Param('id') id: string) {

@@ -22,10 +22,10 @@ import { MCP_TRANSPORTS, formatDateTime } from './ia.constants';
 // então a preferência de largura do Personalizar passa a valer aqui.
 const PAGE_SEGMENTS = [
   { id: 'catalog', label: 'Catálogo' },
-  { id: 'mcp',     label: 'Servidores MCP' },
+  { id: 'mcp',     label: 'Conectores externos' },
 ];
 const PAGE_TITLE = 'Habilidades';
-const PAGE_SUBTITLE = 'O que os assistentes podem fazer — habilidades da plataforma, personalizadas e importadas de servidores MCP.';
+const PAGE_SUBTITLE = 'Escolha as habilidades que seus assistentes podem usar. Configurações de integração ficam reservadas ao modo técnico.';
 
 export default function Ferramentas() {
   const [tab, setTab] = useState('catalog');
@@ -39,6 +39,7 @@ export function CatalogTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [technicalMode, setTechnicalMode] = useState(false);
   const canWrite = can('ai.tools.write');
 
   async function load() {
@@ -70,13 +71,13 @@ export function CatalogTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }
         </div>
       ),
     },
-    {
+    ...(technicalMode ? [{
       key: 'key',
-      header: 'Identificador',
+      header: 'Identificador técnico',
       render: (t) => (
         <span style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12, color: 'var(--su-text-muted)' }}>{t.key}</span>
       ),
-    },
+    }] : []),
     { key: 'category', header: 'Categoria', render: (t) => t.category || '—' },
     {
       key: 'origin',
@@ -107,15 +108,22 @@ export function CatalogTab({ seg, title = PAGE_TITLE, subtitle = PAGE_SUBTITLE }
       subtitle={subtitle}
       {...seg}
       primaryAction={canWrite && (
-        <Button variant="primary" icon="plus" onClick={() => navigate('/ia/ferramentas/tool/nova')}>
-          Nova habilidade
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon="settings" onClick={() => setTechnicalMode((v) => !v)}>
+            {technicalMode ? 'Fechar opções técnicas' : 'Opções técnicas'}
+          </Button>
+          {technicalMode && (
+            <Button variant="primary" icon="plus" onClick={() => navigate('/ia/ferramentas/tool/nova')}>
+              Criar ferramenta técnica
+            </Button>
+          )}
+        </div>
       )}
       loading={loading}
       columns={columns}
       rows={items}
       getRowId={(t) => t.id || t.key}
-      onRowClick={canWrite ? (t) => navigate(`/ia/ferramentas/tool/${t.id}/editar`, { state: { tool: t } }) : undefined}
+      onRowClick={canWrite && technicalMode ? (t) => navigate(`/ia/ferramentas/tool/${t.id}/editar`, { state: { tool: t } }) : undefined}
       getRowLabel={(t) => t.builtin ? `Ajustes de ${t.name}` : `Editar ${t.name}`}
       emptyNew={{
         icon: 'settings',
