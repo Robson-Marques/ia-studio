@@ -91,6 +91,7 @@ const OPERATIONS = [
   'conectividade.listar_com_status',
   'os.cadastrar',
   'os.listar_abertas',
+  'os.listar_recentes',
   // Extensão IXC: histórico limitado para análise assistida. Não é operação
   // do contrato comum de atendimento; a tool que a usa força uma conexão IXC.
   'atendimento.listar_chamados_recentes',
@@ -269,6 +270,9 @@ export class IxcProvider extends BaseProvider {
 
       case 'os.listar_abertas':
         return { data: await this.osAbertas(ctx, token, args) };
+
+      case 'os.listar_recentes':
+        return { data: await this.osRecentes(ctx, token, args) };
 
       case 'atendimento.listar_chamados_recentes':
         return { data: await this.chamadosRecentes(ctx, token, args) };
@@ -731,6 +735,30 @@ export class IxcProvider extends BaseProvider {
       if (IxcProvider.OS_CLOSED_STATUS.has(status)) return false;
       if (login && r['id_login'] && String(r['id_login']) !== login) return false;
       return true;
+    });
+  }
+
+  /**
+   * Últimas OS reais (su_oss_chamado), independente do status. Consulta
+   * separada dos tickets e limitada pelo servidor a 5 por cliente.
+   */
+  private async osRecentes(
+    ctx: ProviderContext,
+    token: string,
+    args: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
+    let idCliente = this.str(args, 'id_cliente');
+    if (!idCliente) {
+      const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true)!);
+      idCliente = String(cliente['id']);
+    }
+    return this.list(ctx, token, T.os, {
+      qtype: `${T.os}.id_cliente`,
+      query: String(idCliente),
+      oper: '=',
+      rp: '5',
+      sortname: `${T.os}.id`,
+      sortorder: 'desc',
     });
   }
 
