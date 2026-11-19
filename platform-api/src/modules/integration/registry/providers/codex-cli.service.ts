@@ -237,7 +237,7 @@ export class CodexCliService implements OnModuleDestroy {
       clearTimeout(session.timer);
       session.stage = 'error';
       session.detail = 'Não foi possível iniciar o terminal de autenticação Codex. Verifique a presença do util-linux script.';
-      this.logger.warn('Falha ao abrir PTY para Codex device auth: ' + error.code);
+      this.logger.warn('Falha ao abrir PTY para Codex device auth: ' + ((error as NodeJS.ErrnoException).code || 'unknown'));
     });
     child.on('close', (code) => {
       clearTimeout(codeWait);
