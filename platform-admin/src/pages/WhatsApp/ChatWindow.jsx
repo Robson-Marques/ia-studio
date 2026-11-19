@@ -48,8 +48,6 @@ function ChatMedia({ chatId, message }) {
   const isDocument = message.type === 'document'
     || String(media.mime_type || '').toLowerCase().includes('pdf')
     || /\.pdf(?:$|[?#\s])/i.test(filenameHint);
-  const isPdfHint = /\.pdf(?:$|[?#\s])/i.test(filenameHint)
-    || String(media.mime_type || '').split(';')[0].trim().toLowerCase() === 'application/pdf';
 
   useEffect(() => () => {
     if (data?.src) URL.revokeObjectURL(data.src);
@@ -421,7 +419,6 @@ export default function ChatWindow({
         onScroll={onChatScroll}
         onWheel={() => { userScrollRef.current = true; }}
         onTouchMove={() => { userScrollRef.current = true; }}
-        onPointerDown={() => { userScrollRef.current = true; }}
         onKeyDown={(event) => {
           if (['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' '].includes(event.key)) {
             userScrollRef.current = true;
