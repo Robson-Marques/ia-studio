@@ -1,5 +1,41 @@
 import api, { extractErrorMessage } from '../lib/api';
 
+// Bancada supervisionada de agentes: nenhuma destas rotas envia mensagem ao cliente.
+export async function getConnectchatPilotBinding() {
+  try {
+    const { data } = await api.get('/ai/connectchat-pilot');
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível consultar o agente de testes')); }
+}
+
+export async function getConnectchatPilotRules() {
+  try {
+    const { data } = await api.get('/ai/connectchat-pilot/rules');
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível consultar as regras da bancada')); }
+}
+
+export async function setConnectchatPilotRules(rules) {
+  try {
+    const { data } = await api.post('/ai/connectchat-pilot/rules', rules);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível salvar as regras da bancada')); }
+}
+
+export async function setConnectchatPilotBinding(agentId) {
+  try {
+    const { data } = await api.post('/ai/connectchat-pilot/binding', { agentId: agentId || undefined });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível vincular o agente de testes')); }
+}
+
+export async function previewConnectchatAgent(conversationId, guidance = '') {
+  try {
+    const { data } = await api.post(`/ai/connectchat-pilot/conversations/${conversationId}/preview`, { guidance });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Falha ao testar o agente nesta conversa')); }
+}
+
 export async function listConnectchatConversations() {
   try {
     const { data } = await api.get('/comm/connectchat/conversations');

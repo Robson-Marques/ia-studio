@@ -116,7 +116,7 @@ export class IspTools implements OnModuleInit {
         // achou EXATAMENTE 1 cliente e há uma conversa em contexto → grava o
         // vínculo CPF↔WhatsApp. Outro CPF depois re-identifica e re-vincula.
         const session = ctx.scopeKeys?.['session'];
-        if (clientes.length === 1 && session) {
+        if (clientes.length === 1 && session && ctx.scopeKeys?.['channel'] !== 'connectchat') {
           const c = clientes[0];
           await this.whatsappInbox
             .linkCustomer(session, {
@@ -167,6 +167,34 @@ export class IspTools implements OnModuleInit {
             ? { aviso: 'Não há chamados no recorte consultado.' }
             : {}),
           chamados,
+        };
+      },
+    });
+
+    // ─── consultar_os_recentes ────────────────────────
+    this.registry.register({
+      key: 'consultar_os_recentes',
+      name: 'Consultar últimas ordens de serviço (IXC)',
+      description: 'Lê até cinco OS recentes, abertas ou encerradas, do titular identificado no IXC. Use para reconhecer reincidência; status não demonstra por si só que o defeito foi resolvido.',
+      category: 'isp',
+      input_schema: {
+        type: 'object',
+        properties: {
+          cpf: { type: 'string', description: 'CPF/CNPJ do titular já identificado e confirmado.' },
+        },
+        required: ['cpf'],
+      },
+      handler: async (args, ctx) => {
+        const cpf = asString(args['cpf'], 'cpf');
+        if (ctx.dryRun) return { simulated: true, cpf, limite: 5 };
+        const connection = await this.resolver.resolve({ providerKey: 'ixc' });
+        const ordens = rows(await this.connections.execute(
+          connection.id, 'os.listar_recentes', { cpf },
+        )).slice(0, 5).map(projectChamado);
+        return {
+          fonte: 'IXC Soft', tipo: 'ordem_de_servico',
+          dados_historicos_nao_confiaveis: true,
+          ordem: 'identificador_decrescente', ordens,
         };
       },
     });
