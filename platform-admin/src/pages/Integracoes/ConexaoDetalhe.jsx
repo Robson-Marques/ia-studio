@@ -159,7 +159,7 @@ export default function ConexaoDetalhe() {
             <Button variant="secondary" onClick={() => setConfirmarRemocao(true)}>
               Remover conexão
             </Button>
-          )
+          )}
         </>
       }
       tabs={abas}
