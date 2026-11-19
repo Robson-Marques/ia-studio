@@ -83,6 +83,7 @@ export class WhatsappWahaInboundService {
       : String((idNode as Record<string, unknown> | undefined)?.['_serialized'] ?? randomUUID());
 
     const mediaNode = payload['media'] as Record<string, unknown> | undefined;
+    const webhookMediaUrl = typeof mediaNode?.['url'] === 'string' ? mediaNode['url'] : undefined;
     const rawNode = payload['_data'] as Record<string, unknown> | undefined;
     const mime = String(mediaNode?.['mimetype'] ?? rawNode?.['mimetype'] ?? 'application/octet-stream');
     const type = this.typeOf(payload, mime);
@@ -143,9 +144,9 @@ export class WhatsappWahaInboundService {
             ...(content ? { caption: content } : {}),
           } as Prisma.InputJsonValue,
         });
-        await this.mediaStore.persistWahaBestEffort(updated);
+        await this.mediaStore.persistWahaBestEffort(updated, webhookMediaUrl);
       }
-      if (hasMedia && !fromMe) await this.mediaStore.persistWahaBestEffort(existing);
+      if (hasMedia && !fromMe) await this.mediaStore.persistWahaBestEffort(existing, webhookMediaUrl);
       if (!fromMe && !existing.inbound_event_published) {
         await this.publishInbound(connection, existing.chat_id, phone, externalId, timestamp, type, content, notifyName);
       }
@@ -177,7 +178,7 @@ export class WhatsappWahaInboundService {
     if (!fromMe) {
       await this.publishInbound(connection, chat.id, phone, externalId, timestamp, type, content, notifyName);
     }
-    if (hasMedia) await this.mediaStore.persistWahaBestEffort(created);
+    if (hasMedia) await this.mediaStore.persistWahaBestEffort(created, webhookMediaUrl);
   }
 
   private async refs(connection: Connection): Promise<WahaRefs> {
