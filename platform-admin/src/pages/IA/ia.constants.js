@@ -45,10 +45,6 @@ export const AGENT_MODELS = {
     { value: 'claude-3-5-haiku',  label: 'Claude 3.5 Haiku (rápido)' },
     { value: 'claude-3-opus',     label: 'Claude 3 Opus (mais capaz)' },
   ],
-  gemini: [
-    { value: 'gemini-1.5-pro',   label: 'Gemini 1.5 Pro' },
-    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (rápido)' },
-  ],
 };
 
 // Persona guiada (porta do Aquapark). Compila no backend (agent-persona.ts):
@@ -80,8 +76,6 @@ export const PERSONA_BREVITY = [
 export const PROVIDER_KINDS = [
   { value: 'OPENAI',       label: 'OpenAI' },
   { value: 'ANTHROPIC',    label: 'Anthropic' },
-  { value: 'GEMINI',       label: 'Google Gemini' },
-  { value: 'OLLAMA',       label: 'Ollama' },
   { value: 'OPENROUTER',   label: 'OpenRouter' },
   { value: 'GROQ',         label: 'Groq' },
   { value: 'DEEPSEEK',     label: 'DeepSeek' },

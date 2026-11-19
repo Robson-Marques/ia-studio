@@ -1,6 +1,6 @@
 // Conversas WhatsApp — listagem/mensagens/envio/janela/midia + envio pelo
-// Meta Orchestrator (criterios; sem numero). ACL granular por endpoint.
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+// orquestrador da Central (critérios; sem número fixo). ACL granular por endpoint.
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { CommChatStatus } from '@prisma/client';
@@ -8,7 +8,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { WhatsappInboxService, ChatTab, MediaKind } from './whatsapp-inbox.service';
 import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
 import { SendChatMessageDto } from '../dto/send-chat-message.dto';
@@ -50,19 +49,15 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('tab') tab?: ChatTab,
     @Query('status') status?: CommChatStatus,
-    @Query('environment_id') environmentId?: string,
     @Query('connection_id') connectionId?: string,
     @Query('search') search?: string,
     @Query('take') take?: string,
     @Query('skip') skip?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     return this.inbox.listChats({
-      organizationId: resolveOrganizationId(user, orgQuery),
       user,
       tab,
       status,
-      environmentId,
       connectionId,
       search,
       take: take ? Number(take) : undefined,
@@ -77,50 +72,46 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: CommChatStatus,
     @Query('search') search?: string,
-    @Query('environment_id') environmentId?: string,
     @Query('connection_id') connectionId?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.countChatsByScope(resolveOrganizationId(user, orgQuery), user, {
+    return this.inbox.countChatsByScope(user, {
       status,
       search,
-      environmentId,
       connectionId,
     });
   }
 
   @Get('chats/:id')
   @RequirePermissions(...ANY_VIEW)
-  getChat(
+  async getChat(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.getChat(resolveOrganizationId(user, orgQuery), id);
+    await this.inbox.assertCanView(user, id);
+    return this.inbox.getChat(id);
   }
 
   /** Desvincula o cliente deste WhatsApp (ação do atendente). */
   @Post('chats/:id/unlink-customer')
   @RequirePermissions(PERMISSIONS.COMM_WHATSAPP_CLAIM)
-  unlinkCustomer(
+  async unlinkCustomer(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.unlinkCustomer(resolveOrganizationId(user, orgQuery), id);
+    await this.inbox.assertCanView(user, id);
+    return this.inbox.unlinkCustomer(id);
   }
 
   @Get('chats/:id/messages')
   @RequirePermissions(...ANY_VIEW)
-  listMessages(
+  async listMessages(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Query('take') take?: string,
     @Query('before') before?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     return this.inbox.listMessages(
-      resolveOrganizationId(user, orgQuery),
       id,
       take ? Number(take) : undefined,
       before,
@@ -129,49 +120,49 @@ export class WhatsappInboxController {
 
   @Get('chats/:id/window')
   @RequirePermissions(...ANY_VIEW)
-  windowState(
+  async windowState(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.windowState(resolveOrganizationId(user, orgQuery), id);
+    await this.inbox.assertCanView(user, id);
+    return this.inbox.windowState(id);
   }
 
   @Post('chats/:id/read')
   @RequirePermissions(...ANY_VIEW)
-  markRead(
+  async markRead(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.markRead(resolveOrganizationId(user, orgQuery), id);
+    await this.inbox.assertCanView(user, id);
+    return this.inbox.markRead(id);
   }
 
   @Post('chats/:id/typing')
   @RequirePermissions(...ANY_REPLY)
-  typing(
+  async typing(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.sendTyping(resolveOrganizationId(user, orgQuery), id);
+    await this.inbox.assertCanView(user, id);
+    return this.inbox.sendTyping(id);
   }
 
   @Post('chats/:id/send')
   @RequirePermissions(...ANY_REPLY)
-  send(
+  async send(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: SendChatMessageDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.send(resolveOrganizationId(user, orgQuery), user, id, dto);
+    await this.inbox.assertCanView(user, id);
+    return this.inbox.send(user, id, dto);
   }
 
   /**
    * Upload real de arquivo/audio gravado no aparelho (multipart/form-data):
    * campos `file` + `kind` (image|audio|video|document) + `caption?` +
-   * `confirm_takeover?`. O binario sobe pra Meta (media_id) e a mensagem sai
+   * `confirm_takeover?`. O binário sobe para a Central (media_id) e a mensagem sai
    * pela MESMA porta do /send (reply gate + janela de 24h + takeover 409).
    */
   @Post('chats/:id/media/upload')
@@ -181,8 +172,8 @@ export class WhatsappInboxController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Req() req: FastifyRequest,
-    @Query('organization_id') orgQuery?: string,
   ) {
+    await this.inbox.assertCanView(user, id);
     // @fastify/multipart registrado no bootstrap. Le o arquivo + campos anexos.
     const reqAny = req as FastifyRequest & {
       isMultipart?: () => boolean;
@@ -220,43 +211,43 @@ export class WhatsappInboxController {
     }
     const buffer = await data.toBuffer();
 
-    return this.inbox.uploadAndSendMedia(resolveOrganizationId(user, orgQuery), user, id, {
+    return this.inbox.uploadAndSendMedia(user, id, {
       kind: rawKind as MediaKind,
       data: buffer,
       mimeType: data.mimetype || 'application/octet-stream',
       filename: data.filename || 'arquivo',
       caption: readField('caption'),
+      voice: readField('voice') === 'true',
       confirmTakeover: readField('confirm_takeover') === 'true',
     });
   }
 
-  // Referências WAHA codificadas podem ultrapassar os 100 caracteres aceitos
-  // por padrão em parâmetros de rota do Fastify. A query string evita o 404
-  // antes da execução do controller, sem afrouxar o limite global do roteador.
+  // Referências WAHA codificadas podem exceder o limite de 100 caracteres
+  // de parâmetros de rota do Fastify. Usa query sem alterar o limite global.
   @Get('chats/:id/media')
   @RequirePermissions(...ANY_VIEW)
-  mediaFromQuery(
+  async mediaFromQuery(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Query('ref') mediaId: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.downloadMedia(resolveOrganizationId(user, orgQuery), id, mediaId);
+    return this.media(user, id, mediaId);
   }
 
   @Get('chats/:id/media/:mediaId')
   @RequirePermissions(...ANY_VIEW)
-  media(
+  async media(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.inbox.downloadMedia(resolveOrganizationId(user, orgQuery), id, mediaId);
+    await this.inbox.assertCanView(user, id);
+    const { bytes, mime } = await this.inbox.downloadMedia(id, mediaId);
+    return new StreamableFile(bytes, { type: mime, length: bytes.length });
   }
 
   /**
-   * Envio pelo Meta Orchestrator (sem conversa aberta): criterios de
+   * Envio pelo orquestrador da Central (sem conversa aberta): critérios de
    * tag/departamento resolvem a conexao — o chamador nunca indica numero.
    */
   @Post('send')
@@ -264,41 +255,20 @@ export class WhatsappInboxController {
   orchestratorSend(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: OrchestratorSendDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
+    const permissions = user.permissions ?? [];
+    if (!permissions.includes('*') &&
+      (!permissions.includes(PERMISSIONS.COMM_WHATSAPP_REPLY_ALL) ||
+       !permissions.includes(PERMISSIONS.INTEGRATIONS_CONNECTIONS_EXECUTE))) {
+      throw new ForbiddenException('Sem permissão para envio WhatsApp pelo orquestrador.');
+    }
     return this.orchestrator.send(
       {
-        organizationId: resolveOrganizationId(user, orgQuery),
-        workspaceId: dto.workspace_id,
-        environmentId: dto.environment_id,
         phone: dto.phone,
         criteria: dto.criteria,
         sender: `user:${user.sub}`,
       },
       dto.message as unknown as RichMessage,
     );
-  }
-
-  /** Liga/desliga o modo manual (Baileys) da conversa. body.connection_id null = volta ao oficial. */
-  @Post('chats/:id/manual-channel')
-  @RequirePermissions(...ANY_REPLY)
-  setManualChannel(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() body: { connection_id?: string | null },
-    @Query('organization_id') orgQuery?: string,
-  ) {
-    return this.inbox.setManualChannel(resolveOrganizationId(user, orgQuery), id, body?.connection_id ?? null);
-  }
-
-  /** Canais manuais elegíveis para esta conversa. */
-  @Get('chats/:id/manual-channels')
-  @RequirePermissions(...ANY_VIEW)
-  listManualChannels(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
-  ) {
-    return this.inbox.listManualChannels(resolveOrganizationId(user, orgQuery), id);
   }
 }

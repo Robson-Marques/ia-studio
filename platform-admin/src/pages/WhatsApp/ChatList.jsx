@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs, Input, Select, Badge, EmptyState, Avatar, DSIcon, Spinner } from '@studio-ux-ds/react';
-import { ATTENDANCE_STATUS, CHAT_TABS, formatPhone } from './whatsapp.constants';
+import { ATTENDANCE_STATUS, CHAT_TABS, contactInitials, formatPhone } from './whatsapp.constants';
 import { statusToTone } from '../../lib/tone';
 
 // WhatsApp/ChatList — a coluna de conversas. Migrada pro DS na v0.10.9.
@@ -122,7 +122,7 @@ export default function ChatList({
               }}
               aria-current={ativo ? 'true' : undefined}
             >
-              <Avatar initials={(nome || '?').slice(0, 1).toUpperCase()} size="sm" alt="" />
+              <Avatar initials={contactInitials(chat.contact_name, chat.phone)} size="sm" alt="" />
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">

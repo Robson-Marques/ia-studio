@@ -31,11 +31,10 @@ export class DevtoolsService {
   ) {}
 
   /** provider.execute com payload livre (via connection) — IntegrationLog no service. */
-  async runExecute(organizationId: string, dto: ExecuteTestDto): Promise<DevtoolsRunResult> {
+  async runExecute(dto: ExecuteTestDto): Promise<DevtoolsRunResult> {
     const started = Date.now();
     try {
       const result = await this.connections.execute(
-        organizationId,
         dto.connection_id,
         dto.operation,
         dto.params ?? {},
@@ -47,11 +46,10 @@ export class DevtoolsService {
   }
 
   /** SQL read-only via connection DATABASE (a validacao read-only mora no provider). */
-  async runSql(organizationId: string, dto: SqlTestDto): Promise<DevtoolsRunResult> {
+  async runSql(dto: SqlTestDto): Promise<DevtoolsRunResult> {
     const started = Date.now();
     try {
       const result = await this.connections.execute(
-        organizationId,
         dto.connection_id,
         'sql.query',
         { sql: dto.sql },
@@ -66,7 +64,7 @@ export class DevtoolsService {
    * HTTP livre (depuracao de integracoes). Nao passa por connection — e uma
    * chamada direta do desenvolvedor; segredos NUNCA sao injetados aqui.
    */
-  async runHttp(_organizationId: string, dto: HttpTestDto): Promise<DevtoolsRunResult> {
+  async runHttp(dto: HttpTestDto): Promise<DevtoolsRunResult> {
     const started = Date.now();
     const headers: Record<string, string> = {};
     for (const h of dto.headers ?? []) headers[h.key] = h.value;
@@ -88,10 +86,10 @@ export class DevtoolsService {
   }
 
   /** Chat de IA via connection AI (custo calculado pelo LlmProviderService). */
-  async runAi(organizationId: string, dto: AiTestDto): Promise<DevtoolsRunResult> {
+  async runAi(dto: AiTestDto): Promise<DevtoolsRunResult> {
     const started = Date.now();
     try {
-      const resolved = await this.llm.resolveConnection(organizationId, dto.connection_id);
+      const resolved = await this.llm.resolveConnection(dto.connection_id);
       const result = await this.llm.chat(resolved, {
         model: dto.model,
         messages: [
@@ -121,16 +119,11 @@ export class DevtoolsService {
    * (agentId/agentRunId sinteticos) — respeita o gate de aprovacao das tools.
    */
   async runTool(
-    organizationId: string,
     dto: ToolTestDto,
-    scope: { workspaceId?: string | null; environmentId?: string | null },
   ): Promise<DevtoolsRunResult> {
     const started = Date.now();
     try {
       const res = await this.tools.executeTool(dto.tool_key, dto.input, {
-        organizationId,
-        workspaceId: scope.workspaceId ?? null,
-        environmentId: scope.environmentId ?? null,
         agentId: 'devtools',
         agentRunId: `devtools-${randomUUID()}`,
         traceId: randomUUID(),

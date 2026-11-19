@@ -1,14 +1,11 @@
 // Acesso de dados da revisão de conteúdo (Checkpoint diffs de Assistentes).
-// Multi-tenant: agente e fontes filtrados por organização.
+// Instância dedicada: agente e fontes pertencem ao mesmo banco local.
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import type { ContentReviewResult, ContentReviewSource } from './content-review.helpers';
 
 export interface CreateReviewInput {
-  organizationId: string;
-  workspaceId: string;
-  environmentId: string;
   agentId: string;
   traceId: string;
   createdBy: string | null;
@@ -20,10 +17,6 @@ export interface CompleteReviewInput {
   result?: ContentReviewResult;
   providerKind?: string;
   model?: string;
-  promptTokens?: number;
-  completionTokens?: number;
-  totalTokens?: number;
-  costUsd?: number;
   error?: string;
 }
 
@@ -31,38 +24,36 @@ export interface CompleteReviewInput {
 export class ContentReviewRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAgent(organizationId: string, agentId: string) {
-    return this.prisma.aiAgent.findFirst({
-      where: { id: agentId, organization_id: organizationId },
+  findAgent(agentId: string) {
+    return this.prisma.aiAgent.findUnique({
+      where: { id: agentId },
       select: {
         id: true, name: true, is_active: true,
-        organization_id: true, workspace_id: true, environment_id: true,
         knowledge_base_ids: true,
       },
     });
   }
 
-  listReviews(organizationId: string, agentId: string, limit = 100) {
+  listReviews(agentId: string, limit = 100) {
     return this.prisma.aiAgentContentReview.findMany({
-      where: { organization_id: organizationId, agent_id: agentId },
+      where: { agent_id: agentId },
       orderBy: { created_at: 'desc' },
       take: limit,
     });
   }
 
-  findReview(organizationId: string, agentId: string, reviewId: string) {
+  findReview(agentId: string, reviewId: string) {
     return this.prisma.aiAgentContentReview.findFirst({
-      where: { id: reviewId, agent_id: agentId, organization_id: organizationId },
+      where: { id: reviewId, agent_id: agentId },
     });
   }
 
   // Documentos prontos (texto extraído) das bases indicadas, só de bases ativas
-  // e da própria organização. O rótulo do documento sai do source_ref/type.
-  async listReadyDocuments(organizationId: string, baseIds: string[]): Promise<ContentReviewSource[]> {
+  // da instância dedicada. O rótulo do documento sai do source_ref/type.
+  async listReadyDocuments(baseIds: string[]): Promise<ContentReviewSource[]> {
     if (!baseIds.length) return [];
     const rows = await this.prisma.aiKnowledgeDocument.findMany({
       where: {
-        organization_id: organizationId,
         base_id: { in: baseIds },
         status: 'READY',
         extracted_text: { not: null },
@@ -91,15 +82,12 @@ export class ContentReviewRepository {
   createReview(input: CreateReviewInput) {
     return this.prisma.aiAgentContentReview.create({
       data: {
-        organization_id: input.organizationId,
-        workspace_id: input.workspaceId,
-        environment_id: input.environmentId,
         agent_id: input.agentId,
         status: 'PENDING',
         source_snapshot: input.snapshot as unknown as Prisma.InputJsonValue,
         analysis_trace_id: input.traceId,
         created_by: input.createdBy,
-      },
+      } as Prisma.AiAgentContentReviewUncheckedCreateInput,
     });
   }
 
@@ -111,10 +99,6 @@ export class ContentReviewRepository {
         result_json: input.result ? (input.result as unknown as Prisma.InputJsonValue) : undefined,
         provider_kind: input.providerKind,
         model: input.model,
-        prompt_tokens: input.promptTokens,
-        completion_tokens: input.completionTokens,
-        total_tokens: input.totalTokens,
-        cost_usd: input.costUsd,
         error: input.error,
         finished_at: new Date(),
       },

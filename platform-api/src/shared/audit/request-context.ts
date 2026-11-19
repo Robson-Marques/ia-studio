@@ -2,13 +2,10 @@
 // Permite que AuditLogService/@Auditable saibam QUEM fez a operacao sem
 // carregar o request por parametro em todo service.
 import { AsyncLocalStorage } from 'async_hooks';
-import { ActorType } from '../auth/auth.types';
 
 export interface RequestActor {
   id?: string;
   email?: string;
-  actorType?: ActorType;
-  organizationId?: string | null;
   profileId?: string | null;
 }
 
@@ -16,8 +13,6 @@ export interface RequestStore {
   actor: RequestActor;
   ip?: string;
   userAgent?: string;
-  workspaceId?: string;
-  environmentId?: string;
   traceId?: string;
 }
 

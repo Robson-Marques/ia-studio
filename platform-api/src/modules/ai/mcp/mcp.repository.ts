@@ -1,22 +1,15 @@
-// Porta unica ao banco de servidores MCP (diretriz 3). Toda query filtra por
-// organization_id (tenant). Servidor MCP nasce OFF (is_active=false).
+// Porta única ao banco de servidores MCP da instância dedicada. Servidor nasce
+// OFF (is_active=false).
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-
-export interface McpServerFilters {
-  workspaceId?: string;
-  environmentId?: string;
-}
 
 @Injectable()
 export class McpRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(organizationId: string, filters: McpServerFilters = {}) {
-    const where: Prisma.AiMcpServerWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
+  findAll() {
+    const where: Prisma.AiMcpServerWhereInput = {};
     return this.prisma.aiMcpServer.findMany({
       where,
       orderBy: { updated_at: 'desc' },
@@ -27,9 +20,9 @@ export class McpRepository {
     return this.prisma.aiMcpServer.findUnique({ where: { id } });
   }
 
-  findActive(organizationId: string) {
+  findActive() {
     return this.prisma.aiMcpServer.findMany({
-      where: { organization_id: organizationId, is_active: true },
+      where: { is_active: true },
     });
   }
 

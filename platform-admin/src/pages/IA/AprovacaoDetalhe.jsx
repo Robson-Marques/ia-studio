@@ -3,7 +3,6 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { DetailScreen, Card, DescriptionList, Badge, Field, TextArea, Button, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { listApprovals, decideApproval } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { APPROVAL_STATUS, formatDateTime, friendlyTarget } from './ia.constants';
 import { statusToTone } from '../../lib/tone';
 
@@ -26,7 +25,6 @@ export default function AprovacaoDetalhe() {
   const location = useLocation();
   const toast = useToast();
   const { can } = usePermissions();
-  const { environmentId } = useWorkspace();
 
   const canDecide = can('ai.approvals.decide');
 
@@ -42,7 +40,7 @@ export default function AprovacaoDetalhe() {
     (async () => {
       setLoading(true);
       try {
-        const { items } = await listApprovals({ environment_id: environmentId || undefined });
+        const { items } = await listApprovals();
         const found = items.find((a) => a.id === id);
         if (!alive) return;
         if (!found) {

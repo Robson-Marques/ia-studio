@@ -10,14 +10,26 @@ export class SeedRepository {
     return this.prisma.user.count();
   }
 
-  createPlatformAdmin(input: { name: string; email: string; passwordHash: string }) {
+  ensureInstallationAdminProfile(permissions: string[]) {
+    return this.prisma.permissionProfile.upsert({
+      where: { name: 'Administrador' },
+      create: {
+        name: 'Administrador',
+        description: 'Acesso administrativo total à instalação.',
+        permissions,
+        is_system: true,
+      },
+      update: { permissions, is_system: true, deleted_at: null },
+    });
+  }
+
+  createInitialAdmin(input: { name: string; email: string; passwordHash: string; profileId: string }) {
     return this.prisma.user.create({
       data: {
         name: input.name,
         email: input.email,
         password_hash: input.passwordHash,
-        is_platform_admin: true,
-        organization_id: null, // admin de plataforma nao pertence a org
+        profile_id: input.profileId,
       },
     });
   }

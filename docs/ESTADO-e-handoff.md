@@ -6,7 +6,508 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-07-13.
+> Última atualização: 2026-11-18 (`v0.12.8` reconcilia e recupera mídia WAHA de todos os tipos).
+
+## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
+
+**Atualização de 2026-11-18 — WAHA por QR Code:** `WhatsApp → Números` mantém a Meta oficial pela Central Nivoo e passa a oferecer WAHA como segunda opção não oficial. A `v0.12.5` porta o modelo operacional já validado no Control Leads: instalação/upgrade provisionam um container WEBJS por aplicação, API restrita a localhost, segredo gerado e sessões em volume Docker. O usuário apenas confirma o risco e escaneia o QR; URL/chave não aparecem no painel. Cada Connection ganha sessão e HMAC próprios, mostra/renova o QR e compartilha inbox, atendimento e vínculo com assistente. Imagem, áudio, vídeo e documento são enviados e recuperados sob demanda, com referência opaca no histórico e sem base64 persistido. Automações ficam desligadas por padrão e YCloud continua fora do runtime. O build/deploy ocorre somente no servidor; falta validar o primeiro pareamento real após aplicar a tag.
+
+**Correção v0.12.6 — LID e mensagens próprias:** o primeiro pareamento real mostrou que o WEBJS entregava o contato como `@lid`. A versão resolve esse identificador pela API `/api/{session}/lids/{lid}`, mantém o JID técnico no `remote_history` e usa o telefone `pn` apenas na interface/chave da conversa. No boot, sessões antigas recebem via `PUT` a assinatura `message.any` e chats já gravados são reconciliados. Mensagens `fromMe` vindas do aparelho viram saída no histórico; envios do painel reutilizam o JID observado, inclusive para mídia, sem fabricar `@c.us` a partir do LID.
+
+**Refino v0.12.7 — mídia e identidade:** o componente de mídia porta o lazy-load visível do Control Leads: imagem/figurinha/áudio abrem automaticamente na bolha, mantendo bytes atrás do proxy autenticado e sem base64 no histórico. Nome considera o envelope e `_data` do webhook e, se ausente, consulta `GET /api/{session}/contacts/{id}`; a reconciliação de boot completa chats existentes. Avatar usa iniciais do nome e nunca mais o `(` da máscara do telefone.
+
+**Correção v0.12.8 — descritor canônico de mídia:** o envio pelo painel cria a bolha antes do webhook, mas o par definitivo aceito pelo endpoint de mídia pertence ao `message.any`. O eco agora reconcilia a mensagem existente e substitui o descritor provisório para imagem, figurinha, áudio, vídeo e documento. O proxy também reconstrói sob demanda as referências gravadas pela v0.12.7 usando `remote_history.waha_chat_id` e `external_id`, com fallback explícito para o descritor original. Não há migração nem persistência de base64.
+
+**Falha da v0.12.2 e correção da v0.12.3:** a tag `v0.12.2` foi criada em uma branch histórica que divergiu antes da conversão dedicada e ainda continha o schema SaaS. O `prisma db push` recusou adicionar `organization_id`/`workspace_id` obrigatórios em tabelas com dados; o rollback manteve a versão anterior e nenhum dado foi apagado. Não fazer backfill nem usar `--force-reset`. A `v0.12.3` parte da linha dedicada correta, não altera o schema em relação à `v0.12.01`, incorpora o relatório documental da tag divergente e filtra futuras tags que não descendam da versão instalada.
+
+**Falha de build da v0.12.3 e correção da v0.12.4:** o Prisma passou, mas o Nest encontrou duas falhas TypeScript introduzidas na integração WAHA: `isEnabled` fora do escopo em `WhatsappAssistantService.get()` e ausência da exportação `WhatsappMessageType`. A guarda foi movida para `set()`, onde o parâmetro existe, e o tipo inbound foi declarado/exportado. Sem alteração de schema; o rollback preservou a `v0.12.01`.
+
+O IA Studio Newnet está sendo migrado para o contrato remoto da Central WhatsApp v2.6.0. O código local já contém cliente autenticado, provider `whatsapp-nivoo`, onboarding, sincronização paginada de conversas/mensagens, reconciliação de jobs, mídia autenticada, templates e tela de números. O runtime Meta/YCloud e seus webhooks foram retirados; conexões antigas são desativadas no boot e seus registros relacionados são preservados para auditoria. Fonte técnica local: `platform-api/src/modules/comm/README.md`.
+
+A auditoria posterior ao rebase fechou o acesso por ID às conversas/mídias/ações de atendimento, ocultou dados de mensagem dos logs e incluiu três rascunhos HSM nativos para alertas e avisos ISP. A publicação do modelo do sistema é explícita; disparos ficam pendentes até a Central concluir o job. A atualização ainda precisa de build/migração e smoke test no servidor.
+
+**Ainda não ativado:** o consumidor Newnet, `installation_id` e origem HTTPS exata não foram cadastrados na Central. Não inventar identificadores. A chave interna deve ser cadastrada no cofre pelo painel/backend, nunca enviada em chat nem ao navegador. O Windows local não tem Node; build, migração Prisma, smoke test e eventual publicação ocorrem no servidor/CI, após o cadastro real. A documentação anterior abaixo registra o estado histórico da vertente e não comprova ativação desta frente.
+
+**Upgrade v0.11.95:** o painel fez backup e checkout, mas o `db push` recusou um aviso de perda de dados antes do build; o atualizador voltou o checkout para `v0.11.94` e manteve o dist em uso. O diff Prisma da release só acrescenta colunas e índices. A correção seguinte prepara as cinco colunas `UNIQUE` novas no hook SQL (todas anuláveis) e captura stdout/stderr completo do Prisma caso outro drift do banco ainda gere aviso. Não usar `--accept-data-loss`.
+
+**Upgrade v0.11.96:** o `db push` passou. O build Nest falhou na tipagem do corpo binário do `fetch` (`Buffer` não aceito como `BodyInit`); rollback manteve o servidor em `v0.11.94`. O cliente foi ajustado para copiar os bytes em `Uint8Array`, padrão já usado em `s3.driver.ts`, e o log dos builds agora captura stdout e stderr com trecho maior. Ainda não há validação de build bem-sucedido nem ativação do consumidor.
+
+**Upgrade v0.11.97:** o `db push` passou novamente, mas a combinação de tipos DOM/Node do servidor também representou o `Uint8Array` como `Uint8Array<ArrayBufferLike>` e recusou o corpo no `fetch`. O rollback manteve `v0.11.94`. A correção seguinte cria um `ArrayBuffer` nominal com o tamanho exato e copia os bytes para ele, removendo a ambiguidade com `SharedArrayBuffer`. A atualização continua sendo feita pelo painel.
+
+**Upgrade v0.11.98:** Prisma, build da API e build do painel passaram. A etapa coordenada do ConnectChat falhou porque a mesma tag ainda não existia no repositório do Chat; o rollback manteve `v0.11.94`. A tag `v0.11.98` do ConnectChat foi publicada depois, apontando para seu commit estável correspondente, mas esta versão não chegou a ser aplicada novamente antes da revisão de fluxo abaixo.
+
+**Revisão v0.11.99:** a preparação do consumidor e a autenticação de um número deixaram de ser apresentadas como duas conexões concorrentes. `WhatsApp → Números` agora contém a configuração técnica única (`installation_id`, origem HTTPS e chave cifrada) e, quando pronta, abre diretamente o onboarding oficial da Central. O provider `whatsapp-nivoo` não aparece mais na lista/wizard genéricos de Integrações; seus registros continuam preservados e disponíveis ao runtime. A linha técnica ganhou marca própria e não é mais convertida no primeiro espelho de número. Build e smoke test desta revisão continuam a cargo do atualizador no servidor.
+
+**Revisão v0.12.01:** o `launch_url` do onboarding deixa de abrir como uma aba comum e passa a usar a janela auxiliar nomeada `nivoo-whatsapp-connect`, com 560×720 px, redimensionável e rolável. O comportamento porta o fluxo já operacional do AquaPark e mantém a tela de números visível durante a autenticação Meta/Nivoo.
+
+Atualização de 2026-10-06 — **Canal ConnectChat:** foi adicionada a especialidade
+`ia-studio.connectchat-channel@1.0.1`, o adaptador HTTP somente de backend e a
+tela **ConnectChat → Conversas**. O canal usa polling incremental por
+`serverSequence`, retries idempotentes e actor por usuário local; não usa SQL,
+fallback entre instalações ou WebSocket empresarial. A configuração agora é uma
+Connection `connectchat` em **Integrações → Conexões**: URL, actor e timeout
+ficam no config local; a chave técnica é cifrada no Secrets Manager. Falta criar
+e testar essa conexão, executar build no servidor e validar uma conversa real.
+O contrato agora expõe `businessContact.displayName` informado no acesso como
+fallback seguro; fragmentos de UUID não aparecem mais no atendimento. O nome comercial continua
+fora do ConnectChat e será resolvido pelo IA Studio a partir de `customerRef`
+em um gateway interno posterior.
+
+Atualização de 2026-10-07 — **Identificação comercial ConnectChat:** o
+`customerRef` é persistido pelo ConnectChat como referência opaca e a API de
+integração o devolve somente ao backend do IA Studio. Nesta vertente, a
+referência `ixc:<connection-id>:<customer-id>` permite ao backend consultar a
+projeção mínima de identificação no IXC ativo; o navegador recebe só o nome
+resolvido. Falha de ERP preserva a conversa e usa `@ID` como fallback.
+
+Atualização de 2026-10-07 — **Vínculo consentido ConnectChat:** o atendente
+autorizado informa o código IXC na conversa, o IA Studio cria um pedido com a
+referência opaca e o cliente o confirma na PWA. A PWA não recebe prova nem
+referência comercial; a conclusão do mesmo `requestId` acontece entre os dois
+backends pela Connection configurada. A permissão granular
+`comm.connectchat.link.customer` protege a ação e é auditada.
+
+Atualização de 2026-10-06 — **Permissões ConnectChat:** instalações já
+provisionadas não recebiam permissões novas no perfil Administrador, porque o
+seed retornava antes da sincronização quando já havia usuários. O perfil agora é
+sincronizado em todo boot da API; após o deploy e novo login, o menu
+**ConnectChat → Conversas** fica disponível ao Administrador.
+
+## Frente atual — vertentes próprias e reinício limpo do desenvolvimento
+
+Atualização de 2026-10-05 — **Base replicável:** a tag `v0.11.42` fixa uma
+referência completa e estável da Newnet para criação manual de novas vertentes.
+Não houve retirada de código, dados, integrações ou comportamento. O manifesto
+`docs/base-replicavel.md` distingue o núcleo reutilizável da vertical ISP/IXC
+que uma futura cópia poderá avaliar em tarefa própria; a Newnet permanece
+intacta e não é a versão "limpa" dessa futura extração.
+
+Atualização de 2026-10-05 — **Análise de chamados IXC:** a Capability
+`ia-studio.capability.ixc-ticket-analysis` está `in-progress`. O S0 (Recovery
+proporcional + contrato) foi concluído; o S1 adiciona uma leitura limitada dos
+cinco atendimentos de maior ID do cliente para uma tool de assistente, sem
+mutação ou persistência de histórico. S2 continua pendente de build no servidor
+e evidência integrada com uma conexão IXC e um assistente autorizados.
+
+O release `v0.11.40` retirou Mapeamentos/Explorador e o provider Altarede;
+esta vertente agora usa IXC como único ERP ISP. A documentação vigente passa a
+ser o contrato do módulo ISP, o Integration Manager e a Capability IXC — o
+relatório pré-build que descrevia o provider aposentado foi removido. A próxima
+evidência funcional continua sendo a atualização da instalação pelo painel,
+build no host e uma consulta real registrada nos logs de integração e de tool.
+
+Atualização de 2026-10-05 — **Integrações locais:** o Marketplace deixou de
+existir como menu, rota, API, ACL ou etapa de instalação. `ProviderDefinition`
+continua sendo o catálogo interno semeado pelo Registry; em
+**Integrações → Conexões**, o operador escolhe diretamente um provider ativo e
+implementado para configurar. Conexões, segredos e logs existentes foram
+preservados. A tabela física de instalações legada não é mais lida nem escrita,
+evitando uma migração destrutiva em instalações existentes.
+
+Atualização de 2026-10-05 — **Retirada de legado ISP:** Recursos
+(Mapeamentos/Explorador), seus endpoints e permissões, e o provider Altarede
+foram retirados por não atenderem fluxo ativo da vertente Newnet. Incidentes e
+tools ISP resolvem somente conexões IXC; a análise de chamados continua
+independente do módulo removido. Os registros antigos de conexão, segredo, log e
+`resource_mappings` permaneceram preservados fisicamente e ficaram inacessíveis ao
+runtime, para que o upgrade não exija apagamento de dados.
+
+O modelo anterior de “duas instâncias do mesmo checkout” foi corrigido. A prova
+com `ia-dev` e `ia-teste` demonstrou isolamento de recursos, mas essas instalações
+são descartáveis e não representam clientes. O destino agora é:
+
+- IA Studio permanece a estrutura-base conceitual;
+- este repositório GitHub atual é a implementação Newnet ISP e sua fonte de
+  instalação neste momento;
+- uma futura loja ou outro cliente nasce em outro repositório/vertente, com os
+  módulos pertinentes a seu negócio;
+- o host somente coabita aplicações independentes, cada uma em `/opt/<app-id>`
+  e com banco, Redis, PM2, domínio, storage e backup próprios.
+
+S1, S2, S3, S4 e S5 estão concluídos; a Capability geral está `accepted`. S4 foi
+redefinido para provar instalação limpa da vertente
+Newnet e coexistência sem cruzamento com Finanças, Mercado e os demais produtos
+reais do host — não exige manter uma segunda cópia idêntica do IA Studio. A
+remoção de `ia-dev` e `ia-teste` foi autorizada porque não havia dados a
+preservar.
+
+Atualização de 2026-10-02: a vertente Newnet foi instalada limpa em
+`/opt/newnet-ia-studio`, com banco/role, Redis, PM2, Nginx e HTTPS próprios; Ctrl
+Leads e Finanças permaneceram online. A primeira prova de backup confirmou que
+o pacote era criado e a unidade systemd concluía, mas `system_restores` ficava
+`RUNNING`. O diagnóstico transacional identificou o motivo: o id físico da
+tabela é `text` e o writer aplicava `::uuid`. A correção versionada remove esse
+cast e deixa falha de persistência visível. O backup na `v0.11.30` chegou a
+`SUCCESS`, com logs e arquivo persistidos; S2 foi concluído. A primeira
+restauração revelou uma regressão operacional: o script removia `public`, perdia
+`pgvector`, abortava antes de aplicar `db.sql` e o trap antigo religava
+API/worker contra banco vazio. A correção `v0.11.32` aplica dumps
+`--clean --if-exists` sem derrubar `public`, garante a extensão pelo
+administrador do cluster, preserva snapshot para rollback e não inicia serviços
+se o banco não estiver recuperável. O primeiro recovery do pacote anterior a
+`--clean` parou corretamente no schema técnico `iastudio_meta` já existente;
+`v0.11.33` prepara somente esse bookkeeping e não religa PM2 quando o snapshot
+prévio também não tinha `core_users`. S4 continua pendente até a recuperação
+real do pacote Newnet e um ciclo novo de backup/restauração verde.
+
+Atualização `v0.11.34`: a restauração do pacote Newnet foi comprovada no host
+(`core_users|1`, PM2 e healthcheck verdes). O backup capturou sua própria row
+antes de fechá-la, e por isso a restauração trouxe uma operação `RUNNING` já
+concluída. O restore agora encerra essas rows herdadas como `FAILED`, com motivo
+auditável; a reconciliação única da row já presente no host ainda é necessária.
+
+Atualização `v0.11.35`: a prova de restauração revelou uma superfície UX
+operacional: enquanto PM2 reinicia, Nginx responde `502` e o polling expunha
+HTML cru em toasts repetidos. O painel agora trata essa janela como reconexão
+esperada e apresenta registros herdados como encerrados, não como falso backup
+falho. A fonte de estado também ordena operações terminais por conclusão.
+
+Atualização `v0.11.36`: a solução estrutural separa o diário administrativo
+`system_restores` do banco de negócio restaurado. Antes do restore, o script
+exporta somente essa tabela da instalação receptora; após aplicar o pacote,
+recoloca o diário local e fecha a operação atual. Nenhum status/histórico
+operacional do snapshot passa a determinar a tela local.
+
+Atualização `v0.11.37`: o protocolo de status deixa de inferir a operação
+atual pelo último registro terminal do banco. O `202` de backup/restauração
+devolve o identificador que o painel usa no polling; sem esse identificador a
+API expõe somente um lock em execução. Assim um erro histórico não pode ser
+apresentado como falha da operação recém-disparada.
+
+Evidência operacional final de S4 — 2026-10-02: em `v0.11.37`, a instalação
+Newnet gerou `full-20261002-165318.tar.gz` e restaurou esse mesmo pacote. O
+painel apresentou `Restauração concluída`/`SUCCESS`, com os logs
+`DB_RESTORE: banco restaurado com sucesso` e `DONE`; o toast confirmou que a
+aplicação voltou a responder. As respostas `502` vistas exclusivamente no
+DevTools ocorreram enquanto o restore parou o PM2 de propósito e cessaram na
+reconexão; não foram convertidas em falha ou alerta do painel. Essa prova fecha
+S4 e abre S5/Acceptance, mantendo a Capability `in-progress` até a consolidação
+integrada.
+
+Acceptance integrada — 2026-10-03: S5 consolidou os oito critérios do contrato,
+os gates S1–S4 e a prova do host em
+[`capabilities/saas-to-dedicated-s5-acceptance.md`](capabilities/saas-to-dedicated-s5-acceptance.md).
+A Capability `ia-studio.capability.saas-to-dedicated-installation` está
+**`accepted`**. Novas vertentes (ISP ou outro segmento) exigem Capability e
+contrato próprios; não reabrem nem reutilizam o modelo SaaS aposentado.
+
+## Auditoria pós-faxina — 2026-09-30
+
+Os gates de S1, S2 operacional, S3, S4 estático e removedor SaaS passaram com
+o checkout `v0.11.28`. Não há resíduo funcional de tenant, Console, Baileys,
+Gemini/Ollama, licensing ou billing. Foram corrigidos metadados e READMEs vivos
+que ainda descreviam SaaS, e a especialidade WhatsApp que ordenava reintroduzir
+Baileys/coexistência foi aposentada e retirada do catálogo ativo. O diretório
+físico `platform-console/` foi confirmado vazio e fora do Git; sua remoção é
+somente housekeeping local, sem impacto funcional. S1 permanece 100%; S2/S4 e a
+Capability geral permanecem `in-progress` até a prova real da segunda instância
+e a Acceptance integrada.
+
+Atualização `v0.11.26`: os wrappers públicos de instalação e desinstalação
+chamam explicitamente o Bash antes de delegar. Isso elimina a dependência do bit
+executável que bloqueou a primeira tentativa de criar a segunda instância; o
+gate S4 verifica esse contrato.
+
+Atualização `v0.11.27`: a instalação dedicada força ambiente de build antes do
+`npm install`, mesmo quando iniciada após carregar o `.env` de uma instância
+existente. Também foram removidas crases que o heredoc SQL expansível tentava
+executar como comando. A tentativa parcial de `ia-teste` deve ser removida pelo
+desinstalador dedicado antes de nova execução; S4 continua `in-progress` até a
+prova com as duas instâncias ativas.
+
+Atualização `v0.11.28`: a primeira prova real de backup do `ia-teste` criou o
+pacote mas revelou que a row do painel dependia de callback em memória da API e
+ficava presa em `RUNNING`. O backup passa a rodar via unidade systemd e a
+auto-reportar logs/estado terminal na base local; linhas órfãs por mais de 30
+minutos são marcadas `FAILED`. S4 permanece `in-progress` até repetir backup e
+restauração isolados com o novo mecanismo e confirmar que `ia-dev` não muda.
+
+## Checkpoint S3 — Console SaaS → administração local
+
+S3 está **concluído**. A matriz de decisão e a evidência do corte estão em
+[`docs/capabilities/saas-to-dedicated-s3-console-matrix.md`](capabilities/saas-to-dedicated-s3-console-matrix.md): as funções operacionais de atualização,
+backup e restauração foram migradas para `platform-admin` em
+**Configurações → Administração da instalação**, com autorização local
+`system.maintain`; as superfícies comerciais e de plataforma foram removidas.
+O gate `scripts/migration/verify-console-retirement.sh` passou, sem
+`platform-console`, rota, menu, endpoint, build, publicação ou vhost `/console/`
+ativo. Não houve tag, release ou deploy.
+
+S1 permanece **100% concluído**. A Capability geral segue **`in-progress`**:
+o próximo slice é S2, PostgreSQL dedicado limpo e migração seletiva auditável;
+S4 (instalação e isolamento de múltiplas instâncias) continua pendente e não
+integra este checkpoint.
+
+Atualização de 2026-09-15 (S2 em andamento): runtime, auditoria e respondente
+WhatsApp não conservam mais contratos SaaS residuais; o gate
+`verify-operational-dedicated.sh` passa. A exportação da fonte histórica agora
+registra seleção, contagem e checksum por tabela e o verificador independente
+recusa NDJSON com campos sensíveis. A importação permanece deliberadamente
+inexecutada: faltam backup completo verificável, seleção operacional aprovada
+e o artefato exportado real da instância ISP. Não há importação automática,
+SQL de restauração ou inferência de relações filhas.
+
+O procedimento de S2 já separa `backup-saas-historical.sh` do backup da nova
+instalação: o snapshot histórico, incluindo segredos, é verificável e serve
+somente a rollback da fonte SaaS; sua política proíbe restore no dedicado.
+
+Atualização de 2026-09-15 (S4 em andamento): install, provisionamento, upgrade,
+backup, restore e uninstall recebem lock por instância; banco/role, Redis,
+processos PM2, diretório, storage, backup e vhost são derivados do
+`instance-id`. O antigo uninstall global foi substituído por remoção confirmada
+da instância indicada, sem apagar dependências do host ou outros clientes. O
+gate estático `verify-instance-isolation.sh` passou para `isp-a` e `loja-b`.
+Ainda falta a prova no servidor de duas instalações reais e operações cruzadas
+sem efeito.
+
+Atualização de 2026-09-18 (S2): o responsável confirmou que não há clientes nem
+dados operacionais na instalação de desenvolvimento. A migração seletiva não é
+necessária para a primeira instância; isso foi registrado em
+`docs/migrations/s2-dev-data-disposition.md`, sem backup vazio ou conversão do
+schema SaaS. O corte de código e a disposição de dados de S2 foram aprovados
+pelo gate operacional; ver a reclassificação de estado abaixo (v0.11.6).
+
+Atualização de 2026-09-18 (S4, evidência real): o SaaS legado foi removido pelo
+removedor restrito sem afetar os processos PM2 de Ctrl Leads ou Finanças. A
+primeira criação de `ia-dev` revelou um cluster PostgreSQL 17 ativo em
+`localhost:5433`; o instalador fixava `127.0.0.1:5432`, criando uma instância
+parcial antes do provisionamento. A correção em andamento descobre a porta do
+cluster e valida TCP antes de criar recursos. S4 permanece 50%: falta remover
+somente `ia-dev`, instalar A limpa e provar B no mesmo host.
+
+Atualização de 2026-09-21 (S4 — instalação limpa comprovada + upgrade validado):
+a `ia-dev` foi instalada do zero em host real, ponta a ponta — schema
+provisionado, `platform-api` (nest build) e `platform-admin` (vite build,
+autenticando no registry privado `@studio-ux-ds`) compilados, PM2
+`iastudio-ia-dev-api`/`-worker` online, vhost e HTTPS (Let's Encrypt) ativos em
+`chat-studio.newnettelecom.com.br`. Ctrl Leads e Finanças seguiram online sem
+cruzamento. A atualização pelo painel (Administração da instalação) também foi
+exercida com sucesso — primeira atualização dedicada de ponta a ponta.
+
+O caminho exigiu uma sequência de correções de fonte, todas permanentes nos
+scripts/código (sem patch manual recorrente):
+- v0.11.6 — normalização da `DATABASE_URL` para psql em upgrade/backup/restore
+  (o `?schema=public` do Prisma quebrava o libpq);
+- v0.11.7 — 26 erros de TypeScript no build da API (SettingsService renomeado,
+  imports de auth/Prisma, `agentId`);
+- v0.11.8 — token do registry privado `@studio-ux-ds` na instalação (401 no
+  build do platform-admin);
+- v0.11.9 — permissão do web root do painel para o nginx (umask 077 → 500);
+- v0.11.10 — bookkeeping do provisionamento fora do schema `public` (o `db push`
+  do upgrade exigia `--accept-data-loss` para dropar a tabela de controle);
+  destravou a atualização pelo painel;
+- v0.11.11 / v0.11.12 — curadoria do Marketplace (IA só com OpenAI e Anthropic;
+  WhatsApp Baileys interno e manual retirados da vitrine).
+
+Falta apenas a prova de B para fechar o S4: uma segunda instância isolada no
+mesmo host, sem cruzamento de banco/role, Redis, PM2, diretório, backup ou vhost.
+
+Reclassificação de estado (alinha ESTADO e contrato): S2 fica **em andamento** —
+o corte de código está aprovado pelo gate e a migração de dados é não aplicável
+(`s2-dev-data-disposition.md`), permanecendo in-progress até a Acceptance
+integrada, como já consta no contrato da Capability.
+
+Progresso da Capability (S1–S5; S0 é Recovery e não entra no denominador):
+S1 100%, S2 **em andamento**, S3 100%, S4 **75%** (instalação limpa de A e
+upgrade comprovados; falta a prova de B), S5 0%; geral **in-progress** (gated por
+S2/S4). A instalação limpa de A já passou em host real; faltam a prova de duas
+instâncias e a Acceptance integrada.
+
+Atualização de 2026-09-21 (Faxina de código e arquivos mortos — CONCLUÍDA):
+frente executada pela especialidade `ia-studio.system-cleanup@1.0.0`, em etapas,
+para o repo passar a representar só o que está em uso. Inventário read-only em
+[`docs/faxina/etapa-0-inventario.md`](faxina/etapa-0-inventario.md).
+- v0.11.16 — cria a especialidade + inventário Etapa 0 (catálogo local → 1.5.0
+  na v0.11.17).
+- v0.11.17 (Etapa 1) — remove mortos por reachability: pastas-esqueleto SaaS
+  vazias (`billing`, `licensing`, `core/organizations`, `core/workspaces`,
+  `ai/costs`), arquivos órfãos (`account.js`, `catalog.seed.ts`, um DTO), a tela
+  de pagamento SaaS (`PaginaPagamento` + rota `/pagar`) e a linha morta
+  `ia-studio.tenant-domains` do catálogo.
+- v0.11.18 (Etapa 2a) — remove os motores LLM Gemini/Ollama (arquivos + fiação +
+  deps). Enum `AiProviderKind` (Prisma) preservado. `nest build` verde.
+- v0.11.19 (Etapa 2b/API) + v0.11.20 (Etapa 2b/admin) — removem o subsistema
+  WhatsApp Baileys por completo (modo manual/coexistência + pareamento por QR):
+  7 arquivos de API + a pasta `connectors/`, a fiação no inbox/orquestrador/
+  responder/seed, os endpoints do controller, as deps npm (`@whiskeysockets/
+  baileys`, `qrcode`), e no painel o `whatsappBaileys.js` + a UI em
+  `ChatWindow`/`MessageComposer`/`ConexaoDetalhe`/`whatsapp.js`.
+
+- v0.11.22 — limpa também o schema (a pedido do dono, sem órfãos): remove a
+  coluna `WhatsappChat.manual_connection_id`, a tabela `WhatsappBaileysSession` e
+  os valores de enum `AiProviderKind.GEMINI/OLLAMA`. Como é destrutivo e o upgrade
+  usa `db push`, o `upgrade.sh` ganhou o passo idempotente `SCHEMA_HOUSEKEEPING`
+  (antes do `db push`) que dropa os objetos e recria o enum quando ainda existem —
+  no-op em instalação nova, recuperável (backup roda antes). `nest build` verde com
+  o client já sem os campos.
+
+WhatsApp oficial (Meta), OpenAI e
+Anthropic seguem intactos. Verificação: `nest build` real da API verde no estado
+pós-remoção; admin conferido por parser JSX (esbuild) + grep; os quatro gates
+verdes em todas as etapas. A prova de build final do admin é a atualização pelo
+painel.
+
+## 🏗️ Conversão SaaS → instalação dedicada — Capability ativa
+
+O modelo aprovado é uma instância independente por cliente, não SaaS
+multi-tenant. O Architecture Recovery concluiu que a base é suficiente para esta
+frente e materializou:
+
+- Baseline: [`docs/architecture-baseline.md`](architecture-baseline.md).
+- Decisão: [`docs/rfcs/RFC-001-conversao-saas-instalacao-dedicada.md`](rfcs/RFC-001-conversao-saas-instalacao-dedicada.md).
+- Capability Contract em estado **`in-progress`**:
+  [`docs/capabilities/saas-to-dedicated-installation.md`](capabilities/saas-to-dedicated-installation.md).
+- Manifesto do corte atômico de S1:
+  [`docs/capabilities/saas-to-dedicated-s1-cut-manifest.md`](capabilities/saas-to-dedicated-s1-cut-manifest.md).
+
+O primeiro slice técnico é **S1 — núcleo dedicado**: schema, auth, ACL, API e
+eventos deixam de depender de organização/workspace/ambiente. A decisão foi
+tomada: a instância ISP nasce em banco limpo, a fonte SaaS é preservada e somente
+dados operacionais aprovados seguem por exportação NDJSON seletiva e auditável
+(sem secrets e sem SQL de restauração); ver
+`docs/migrations/isp-dedicated-operational-data-export.md`. A vertical ISP/IXC é
+Capability posterior, dependente desta conversão; Delivery System é outro projeto
+e não entra nesta frente.
+
+O gate transversal `scripts/migration/verify-dedicated-cut.sh --check` ainda
+falha na baseline recuperada (schema 209 referências; auth 68; ACL 53; API 1.254;
+eventos 735). Isto impede a conclusão de S1 e da Capability; a próxima alteração
+de código deve substituir essas cinco superfícies no mesmo conjunto coeso, sem
+compatibilidade de tenant ou correções avulsas.
+
+Atualização de 2026-09-15 (gate estrutural de S1): o corte transversal passou
+com `schema 0`, `auth 0`, `ACL 0`, `API 0` e `eventos 0` referências bloqueantes
+contra a baseline de 2.319; `git diff --check` também passou. Schema, JWT,
+ACL, API e Event Bus não carregam tenant, billing/licensing e os modelos
+Organization/Workspace/Environment foram retirados do alvo. O administrador da
+instalação é agora um usuário local com perfil ACL completo, sem bypass de
+plataforma. S1 e a Capability continuam **`in-progress`**: ainda faltam a prova
+em PostgreSQL da base limpa, exportação/importação seletiva auditável, painel
+dedicado e isolamento operacional de instâncias dos slices seguintes.
+
+Atualização de 2026-09-15: o lote de IA consolidou knowledge/RAG, memória,
+colaboração, revisão de conteúdo, análise de atendimento, tools/seed e MCP como
+portas locais. O módulo de custos/orçamentos e seus consumidores foi removido
+por constituir metering comercial. Depois de desacoplar todos os consumidores
+diretos, os campos/índices desses fluxos foram retirados do schema; não houve
+fallback, UUID sentinela, `undefined` artificial ou reclassificação de
+referência ativa. Gate atual: `schema 164 ativos`; `auth 0 ativos + 12
+temporários bloqueantes`; `ACL 0 ativos + 12 temporários bloqueantes`; `API 372
+ativos`; `eventos 70 ativos`; `S1 72,8%` (630/2.319 bloqueantes restantes).
+S1 e a Capability seguem **`in-progress`**. O próximo corte é identidade
+administrativa local (usuários, perfis, convites e relações de
+workspace/organização), pois é o consumidor real dos 12 adaptadores temporários
+de Auth e ACL.
+
+Atualização de 2026-09-15 (lote administrativo local): Settings, Resource
+Mapping/Explorer/Suggest, API Keys, Developer Tools, OAuth Google e as portas
+administrativas de WhatsApp passaram a usar contratos locais. Sessões Baileys,
+estado de sync, vínculo canal→agente e IntegrationLog tiveram seus campos
+físicos de tenant removidos após a limpeza dos consumidores diretos. O
+`tenant.util` foi removido, sem fallback de header/UUID. Flags, auditoria e
+dashboards são locais; a API de conta/licença e a gestão de usuários por
+organização foram retiradas. Gate: `schema 137 ativos`; `auth 0 ativos + 4
+temporários bloqueantes`; `ACL 0 ativos + 4 temporários bloqueantes`; `API 126
+ativos`; `eventos 20 ativos`; `S1 87,5%` (291/2.319). O próximo bloco é retirar
+organização/licenciamento/billing e substituir o último guard administrativo
+SaaS por autorização local, antes da limpeza física restante. S1 e Capability
+seguem **`in-progress`**.
+
+O corte de identidade foi concluído no código de origem: usuários, perfis,
+convites, ACL local e auditoria agora trabalham sem organização/workspace;
+memberships e a API/módulo de workspaces foram removidos junto com a relação
+física `WorkspaceMember`. Gate: `schema 161 ativos`; `auth 0 ativos + 12
+temporários bloqueantes`; `ACL 0 ativos + 12 temporários bloqueantes`; `API 275
+ativos`; `eventos 70 ativos`; `S1 77,1%` (530/2.319). Os adaptadores continuam
+porque ainda são chamados por consumidores reais externos a essa cadeia (core
+SaaS remanescente, recursos, settings, WhatsApp e Developer Tools); não foram
+removidos prematuramente nem convertidos em fallback. S1 e Capability seguem
+**`in-progress`**.
+
+O bloco Auth/ACL/API de borda foi iniciado: o login/JWT/ACL agora seguem o
+contrato local e headers/resolvedores SaaS falham explicitamente. O gate separa
+resíduos ativos dos adaptadores temporários bloqueantes. Última leitura: schema
+209 ativos; auth 0 ativos + 12 temporários; ACL 0 ativos + 12 temporários; API
+1.204 ativos; eventos 701 ativos. O Event Bus, log persistido, producers,
+consumer direto e worker já não carregam tenant no envelope. S1 continua
+`in-progress`; falta propagar o corte para schema, repositories, serviços, DTOs
+e módulos SaaS antes de qualquer aceite.
+
+A cadeia dispatcher → workflow → execução foi iniciada antes do schema: APIs,
+DTOs, services, repositories e motor não recebem escopo e não usam
+Limits/Usage. `ConnectionsService.execute`, renderização de templates,
+orquestradores de e-mail/WhatsApp e Notification Center agora expõem contratos
+locais, e os nós os consomem sem escopo. Worker de notificação, scheduler,
+conexões, marketplace, cofre de segredos e logs de integração também passaram a
+operar localmente. As demais chamadas/modelos SaaS seguem ativas e bloqueantes
+até sua remoção real; schema permanece intacto nesta etapa. Última leitura:
+schema 205 ativos; auth 0 ativos + 12 temporários; ACL 0 ativos + 12
+temporários; API 942 ativos; eventos 531 ativos. S1 continua
+`in-progress`.
+
+O sub-slice WhatsApp eliminou tenant dos templates HSM (CRUD, replicação e sync
+Meta), webhook inbound, repositório de chats, inbox HTTP e consumidores diretos
+de IA/ISP. O gate agora registra schema 205 ativos; auth 0 ativos + 12
+temporários; ACL 0 ativos + 12 temporários; API 753 ativos; eventos 434 ativos.
+A atribuição completa de atendimento segue como dependência ativa e não foi
+classificada como temporária. S1 e a Capability seguem `in-progress`.
+
+O sub-slice seguinte consolidou a cadeia de atendimento: claim, release,
+transfer, close, reopen, takeover, timeline, equipes, filas, membros e o
+encaminhamento ISP usam contratos locais e persistência sem tenant. O CRUD de
+agentes (incluindo versões, importação/exportação e execução HTTP) também foi
+reduzido a uma instância dedicada e retirou limites/licensing/metering. Gate
+atual: `schema: 205 ativas`, `API: 638 ativas`, `eventos: 319 ativas`; Auth e
+ACL têm 12 adaptadores temporários bloqueantes cada. O runner de agentes e suas
+portas de provider, ferramentas, RAG e colaboração ainda são dependências
+ativas reais. S1 e a Capability seguem `in-progress`.
+
+O mesmo fluxo avançou por catálogo de tools do agente, consulta RAG e
+colaboração: essas portas agora usam apenas IDs locais de ferramenta, base,
+agente, run e correlação. O gate registra `schema: 205 ativas`, `API: 620
+ativas`, `eventos: 303 ativas`; Auth/ACL têm 12 temporárias bloqueantes cada.
+`ToolExecutionContext`, runtime de tools, aprovações, logs e persistência de
+runs seguem bloqueantes reais e serão removidos antes do schema. S1 e a
+Capability seguem `in-progress`.
+
+O runner agora persiste e retoma runs por agente, execução, correlação e
+contexto conversacional locais; budget, metering e licensing saíram desse
+caminho. Gate: `schema: 205 ativas`, `API: 610 ativas`, `eventos: 293 ativas`;
+Auth/ACL seguem com 12 temporárias bloqueantes cada. `ToolExecutionContext`,
+runtime, logs e aprovações são o concentrador ativo restante desse fluxo. S1 e
+a Capability seguem `in-progress`.
+
+Storage (gravação, listagem e download) passou a ser uma porta local, sem
+metering, e os handlers de histórico, diagnóstico ISP e configuração de fila
+usam contratos locais. O gerador de link de pagamento ISP ainda persiste escopo
+e permanece bloqueante para a reconstrução aprovada. Gate: `schema: 205
+ativas`, `API: 597 ativas`, `eventos: 292 ativas`; Auth/ACL têm 12 temporárias
+bloqueantes cada. S1 e a Capability seguem `in-progress`.
+
+O corte de execução aprovada está local: storage, links de pagamento ISP,
+handlers, `ToolExecutionContext`, runtime, logs, aprovações e reconstrução após
+decisão preservam somente IDs operacionais de agente, run, execução,
+correlação, memória e conversa. Não há tenant reconstituído nesse caminho.
+Administração de políticas/aprovações ainda é consumidora ativa, portanto o
+schema continua preservado. Gate: `schema: 205 ativas`, `API: 587 ativas`,
+`eventos: 285 ativas`; Auth/ACL mantêm 12 temporárias bloqueantes cada. S1 e a
+Capability seguem `in-progress`.
+
+Dentro desse mesmo fluxo, provider e orquestrador de conexão de IA agora são
+portas locais; embeddings, Console de Desenvolvedor, sugestão de recursos,
+análise de atendimento e revisão de conteúdo já as consomem sem escopo SaaS.
+Gate atual: `schema: 205 ativas`, `API: 626 ativas`, `eventos: 309 ativas`;
+Auth/ACL continuam com 12 adaptadores temporários bloqueantes cada. Tools, RAG,
+colaboração, aprovações e a persistência do runner continuam dependências
+ativas reais. S1 e a Capability seguem `in-progress`.
+
+O sub-slice ISP de incidentes consolidou contratos locais para incidentes,
+targets, dispatches, plantão, resolvedor de ERP, configuração operacional,
+cron de outage e tools correlatas. O gate agora registra schema 205 ativos;
+auth 0 ativos + 12 temporários; ACL 0 ativos + 12 temporários; API 850 ativos;
+eventos 531 ativos. Templates e inbound/inbox de WhatsApp são o próximo bloco
+ativo; não foram classificados como temporários. S1 e a Capability seguem
+`in-progress`.
 
 ## 🔴 REGRA DE OURO (o furo recorrente)
 
@@ -256,13 +757,10 @@ login white-label. **Nada muda em produção até cadastrar endereço** (registr
 
 ## 🧹 Pendências técnicas conhecidas (não urgentes)
 
-- **Catálogo de templates HSM (padrão do Aquapark) — IA Studio NÃO tem.** A regra nova no `CLAUDE.md`
-  exige um catálogo nativo de templates prontos-pra-publicar (seed no boot + `resolveButtonUrl` das ações
-  de botão/links de acesso). O IA Studio hoje só tem CRUD manual de template (`WhatsappTemplate`). **Frente
-  própria:** portar o subsistema `whatsapp-template-catalog/` do Aquapark (`catalog.seed.ts` +
-  `template-actions.ts` + mapper/service/controller + aba "Templates do Sistema"), semeando os templates do
-  ISP como padrões (inclusive o **alerta de incidente** da frente 6). Enquanto não vier, o template do alerta
-  é criado manual na Meta e apontado no card "Equipe de plantão".
+- **Catálogo HSM:** a integração Central Nivoo adicionou três modelos ISP como rascunhos nativos
+  semeados por número no boot e na sincronização, com revisão/publicação explícita na tela de Templates.
+  Esses modelos não têm botões; o resolvedor de URLs simbólicas continua reservado para futuros modelos
+  que precisarem de botões. Publicação e aprovação pela Meta ainda dependem da instalação real.
 
 - **PIX inline** na página de pagamento: falta o endpoint IXC do "Copiar código PIX" (o `get_boleto
   dados` não traz o EMV). Op `financeiro.boleto_pix` + `findPixEmv` prontas — só trocar a chamada.
@@ -288,7 +786,7 @@ Regras e estado:
 Arquitetura viva:
 - `docs/diretrizes-arquiteturais.md` — 58 diretrizes que governam o desenho.
 - `docs/deploy-e-versionamento.md` — runbook de deploy/release/backup.
-- `RELATORIO-ANALISE-E-ARQUITETURA.md` — **Parte 2** = contrato da API do ERP Altarede (referência viva da integração ISP). Parte 1 é histórico.
+- `platform-api/src/modules/isp/README.md` — contrato vivo da integração IXC e das tools ISP.
 - `docs/base-doc-e-portes-aquapark.md` — backlog do que ainda falta portar do Aquapark.
 
 Estado por módulo ("o que existe e como funciona hoje"):

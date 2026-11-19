@@ -6,9 +6,6 @@ import { Injectable, Logger } from '@nestjs/common';
 
 /** Contexto de execucao de uma tool builtin (escopo do run). */
 export interface ToolExecutionContext {
-  organizationId: string;
-  workspaceId?: string | null;
-  environmentId?: string | null;
   agentId: string;
   agentRunId: string;
   traceId: string;

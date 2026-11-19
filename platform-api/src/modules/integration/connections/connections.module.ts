@@ -2,7 +2,7 @@
 import { Module } from '@nestjs/common';
 import { RegistryModule } from '../registry/registry.module';
 import { SecretsModule } from '../secrets/secrets.module';
-import { MarketplaceModule } from '../marketplace/marketplace.module';
+import { ProviderCatalogModule } from '../catalog/provider-catalog.module';
 import { ConnectionsRepository } from './connections.repository';
 import { IntegrationLogsRepository } from './integration-logs.repository';
 import { ConnectionsService } from './connections.service';
@@ -11,7 +11,7 @@ import { GoogleOauthService } from './google-oauth.service';
 import { GoogleOauthController } from './google-oauth.controller';
 
 @Module({
-  imports: [RegistryModule, SecretsModule, MarketplaceModule],
+  imports: [RegistryModule, SecretsModule, ProviderCatalogModule],
   controllers: [ConnectionsController, GoogleOauthController],
   providers: [ConnectionsRepository, IntegrationLogsRepository, ConnectionsService, GoogleOauthService],
   // Repositories exportados pro modulo comm (Fase 3): o orquestrador WhatsApp

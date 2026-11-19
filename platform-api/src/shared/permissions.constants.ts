@@ -3,8 +3,8 @@
 // de sistema atualizados (SYSTEM_PROFILES). Administrador herda tudo via
 // ALL_PERMISSIONS automaticamente.
 //
-// Ator de plataforma (is_platform_admin) tem bypass total no PermissionsGuard —
-// este catalogo governa apenas usuarios de organization.
+// O catálogo governa exclusivamente usuários locais da instância; não existe
+// bypass de plataforma nem escopo de organização.
 
 export const PERMISSIONS = {
   // ─── Usuarios e acessos ─────────────────────────────
@@ -16,24 +16,17 @@ export const PERMISSIONS = {
   CORE_PROFILES_READ: 'core.profiles.read',
   CORE_PROFILES_WRITE: 'core.profiles.write',
 
-  // ─── Workspaces e ambientes ─────────────────────────
-  CORE_WORKSPACES_READ: 'core.workspaces.read',
-  CORE_WORKSPACES_WRITE: 'core.workspaces.write',
-  CORE_ENVIRONMENTS_READ: 'core.environments.read',
-  CORE_ENVIRONMENTS_WRITE: 'core.environments.write',
-
   // ─── Auditoria / Configuracoes ──────────────────────
   CORE_AUDIT_READ: 'core.audit.read',
   CORE_SETTINGS_READ: 'core.settings.read',
   CORE_SETTINGS_WRITE: 'core.settings.write',
 
-  // ─── Minha Conta (diretriz 42) ──────────────────────
-  ACCOUNT_READ: 'account.read',
-  LICENSE_READ: 'license.read',
+  // ─── Administração da instalação ────────────────────
+  // Manutenção que afeta a aplicação inteira: update, backup, restore e
+  // feature flags. A autorização é exclusivamente a ACL local desta permissão.
+  SYSTEM_MAINTAIN: 'system.maintain',
 
   // ─── Integrações (Fase 2 — Integration Manager) ─────
-  INTEGRATIONS_MARKETPLACE_READ: 'integrations.marketplace.read',
-  INTEGRATIONS_MARKETPLACE_MANAGE: 'integrations.marketplace.manage',
   INTEGRATIONS_CONNECTIONS_READ: 'integrations.connections.read',
   INTEGRATIONS_CONNECTIONS_WRITE: 'integrations.connections.write',
   INTEGRATIONS_CONNECTIONS_EXECUTE: 'integrations.connections.execute',
@@ -61,6 +54,11 @@ export const PERMISSIONS = {
   COMM_WHATSAPP_NUMBERS_READ: 'comm.whatsapp.numbers.read',
   // Vincular um assistente de IA a um número (quem atende sozinho o canal).
   COMM_WHATSAPP_ASSISTANT_MANAGE: 'comm.whatsapp.assistant.manage',
+
+  // ─── ConnectChat (canal interno de atendimento) ───────
+  COMM_CONNECTCHAT_READ: 'comm.connectchat.read',
+  COMM_CONNECTCHAT_WRITE: 'comm.connectchat.write',
+  COMM_CONNECTCHAT_LINK_CUSTOMER: 'comm.connectchat.link.customer',
 
   // ─── Automação (Fase 4 — Automation Platform) ───────
   AUTOMATION_WORKFLOWS_READ: 'automation.workflows.read',
@@ -92,8 +90,6 @@ export const PERMISSIONS = {
   AI_TOOLS_WRITE: 'ai.tools.write',
   AI_APPROVALS_READ: 'ai.approvals.read',
   AI_APPROVALS_DECIDE: 'ai.approvals.decide',
-  AI_COSTS_READ: 'ai.costs.read',
-  AI_COSTS_MANAGE: 'ai.costs.manage',
   AI_MCP_READ: 'ai.mcp.read',
   AI_MCP_WRITE: 'ai.mcp.write',
   AI_PROVIDERS_READ: 'ai.providers.read',
@@ -102,18 +98,12 @@ export const PERMISSIONS = {
   AI_ANALYSIS_READ: 'ai.analysis.read',
   AI_ANALYSIS_RUN: 'ai.analysis.run',
 
-  // ─── ISP (Fase 6 — Solução Altarede / Manutenção) ───
+  // ─── ISP (Fase 6 — Solução IXC / Manutenção) ───
   ISP_INCIDENTS_READ: 'isp.incidents.read',
   ISP_INCIDENTS_WRITE: 'isp.incidents.write',
   ISP_INCIDENTS_ACTIVATE: 'isp.incidents.activate',
   ISP_INCIDENTS_DISPATCH: 'isp.incidents.dispatch',
   ISP_TOOLS_USE: 'isp.tools.use',
-
-  // ─── Recursos (Fase 7 — Resource Model/Mapper/Explorer) ─────
-  RESOURCE_MAPPINGS_READ: 'resource.mappings.read',
-  RESOURCE_MAPPINGS_WRITE: 'resource.mappings.write',
-  RESOURCE_EXPLORE_READ: 'resource.explore.read',
-  RESOURCE_MAPPER_SUGGEST: 'resource.mapper.suggest',
 
   // ─── Desenvolvedor (Fase 7 — DevTools + Developer Center) ───
   DEVTOOLS_USE: 'devtools.use',
@@ -146,35 +136,19 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
-    key: 'workspaces',
-    label: 'Workspaces e Ambientes',
-    permissions: [
-      PERMISSIONS.CORE_WORKSPACES_READ,
-      PERMISSIONS.CORE_WORKSPACES_WRITE,
-      PERMISSIONS.CORE_ENVIRONMENTS_READ,
-      PERMISSIONS.CORE_ENVIRONMENTS_WRITE,
-    ],
-  },
-  {
     key: 'governance',
     label: 'Auditoria e Configurações',
     permissions: [
       PERMISSIONS.CORE_AUDIT_READ,
       PERMISSIONS.CORE_SETTINGS_READ,
       PERMISSIONS.CORE_SETTINGS_WRITE,
+      PERMISSIONS.SYSTEM_MAINTAIN,
     ],
-  },
-  {
-    key: 'account',
-    label: 'Minha Conta',
-    permissions: [PERMISSIONS.ACCOUNT_READ, PERMISSIONS.LICENSE_READ],
   },
   {
     key: 'integrations',
     label: 'Integrações',
     permissions: [
-      PERMISSIONS.INTEGRATIONS_MARKETPLACE_READ,
-      PERMISSIONS.INTEGRATIONS_MARKETPLACE_MANAGE,
       PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ,
       PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE,
       PERMISSIONS.INTEGRATIONS_CONNECTIONS_EXECUTE,
@@ -205,6 +179,15 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE,
       PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ,
       PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE,
+    ],
+  },
+  {
+    key: 'connectchat',
+    label: 'ConnectChat',
+    permissions: [
+      PERMISSIONS.COMM_CONNECTCHAT_READ,
+      PERMISSIONS.COMM_CONNECTCHAT_WRITE,
+      PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER,
     ],
   },
   {
@@ -242,8 +225,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       PERMISSIONS.AI_TOOLS_WRITE,
       PERMISSIONS.AI_APPROVALS_READ,
       PERMISSIONS.AI_APPROVALS_DECIDE,
-      PERMISSIONS.AI_COSTS_READ,
-      PERMISSIONS.AI_COSTS_MANAGE,
       PERMISSIONS.AI_MCP_READ,
       PERMISSIONS.AI_MCP_WRITE,
       PERMISSIONS.AI_PROVIDERS_READ,
@@ -260,16 +241,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       PERMISSIONS.ISP_INCIDENTS_ACTIVATE,
       PERMISSIONS.ISP_INCIDENTS_DISPATCH,
       PERMISSIONS.ISP_TOOLS_USE,
-    ],
-  },
-  {
-    key: 'resources',
-    label: 'Recursos',
-    permissions: [
-      PERMISSIONS.RESOURCE_MAPPINGS_READ,
-      PERMISSIONS.RESOURCE_MAPPINGS_WRITE,
-      PERMISSIONS.RESOURCE_EXPLORE_READ,
-      PERMISSIONS.RESOURCE_MAPPER_SUGGEST,
     ],
   },
   {
@@ -293,17 +264,10 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.CORE_INVITES_WRITE]: 'Criar/revogar convites',
   [PERMISSIONS.CORE_PROFILES_READ]: 'Ver perfis de acesso',
   [PERMISSIONS.CORE_PROFILES_WRITE]: 'Criar/editar perfis de acesso',
-  [PERMISSIONS.CORE_WORKSPACES_READ]: 'Ver workspaces',
-  [PERMISSIONS.CORE_WORKSPACES_WRITE]: 'Criar/editar workspaces',
-  [PERMISSIONS.CORE_ENVIRONMENTS_READ]: 'Ver ambientes',
-  [PERMISSIONS.CORE_ENVIRONMENTS_WRITE]: 'Criar/editar ambientes',
   [PERMISSIONS.CORE_AUDIT_READ]: 'Ver trilha de auditoria',
   [PERMISSIONS.CORE_SETTINGS_READ]: 'Ver configurações',
   [PERMISSIONS.CORE_SETTINGS_WRITE]: 'Alterar configurações',
-  [PERMISSIONS.ACCOUNT_READ]: 'Ver Minha Conta',
-  [PERMISSIONS.LICENSE_READ]: 'Ver licença e consumo',
-  [PERMISSIONS.INTEGRATIONS_MARKETPLACE_READ]: 'Ver marketplace de conectores',
-  [PERMISSIONS.INTEGRATIONS_MARKETPLACE_MANAGE]: 'Instalar/desinstalar conectores',
+  [PERMISSIONS.SYSTEM_MAINTAIN]: 'Administrar atualização, backup e restauração da instalação',
   [PERMISSIONS.INTEGRATIONS_CONNECTIONS_READ]: 'Ver conexões',
   [PERMISSIONS.INTEGRATIONS_CONNECTIONS_WRITE]: 'Criar/gerenciar conexões',
   [PERMISSIONS.INTEGRATIONS_CONNECTIONS_EXECUTE]: 'Executar operações em conexões',
@@ -328,6 +292,9 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.COMM_WHATSAPP_TEMPLATES_MANAGE]: 'Criar/sincronizar templates WhatsApp',
   [PERMISSIONS.COMM_WHATSAPP_NUMBERS_READ]: 'Ver números WhatsApp conectados',
   [PERMISSIONS.COMM_WHATSAPP_ASSISTANT_MANAGE]: 'Vincular assistente de IA ao número',
+  [PERMISSIONS.COMM_CONNECTCHAT_READ]: 'Ver conversas ConnectChat',
+  [PERMISSIONS.COMM_CONNECTCHAT_WRITE]: 'Responder e editar mensagens ConnectChat',
+  [PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER]: 'Vincular cliente ConnectChat',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_READ]: 'Ver fluxos de automação',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_WRITE]: 'Criar/editar fluxos de automação',
   [PERMISSIONS.AUTOMATION_WORKFLOWS_PUBLISH]: 'Publicar/reverter versões de fluxo',
@@ -353,8 +320,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.AI_TOOLS_WRITE]: 'Criar/editar ferramentas',
   [PERMISSIONS.AI_APPROVALS_READ]: 'Ver aprovações e políticas de IA',
   [PERMISSIONS.AI_APPROVALS_DECIDE]: 'Aprovar/rejeitar ações e gerenciar políticas',
-  [PERMISSIONS.AI_COSTS_READ]: 'Ver custos e consumo de IA',
-  [PERMISSIONS.AI_COSTS_MANAGE]: 'Gerenciar orçamentos de IA',
   [PERMISSIONS.AI_MCP_READ]: 'Ver servidores MCP',
   [PERMISSIONS.AI_MCP_WRITE]: 'Cadastrar/sincronizar servidores MCP',
   [PERMISSIONS.AI_PROVIDERS_READ]: 'Ver provedores e conexões de IA',
@@ -365,10 +330,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.ISP_INCIDENTS_ACTIVATE]: 'Ativar/encerrar incidentes (ISP)',
   [PERMISSIONS.ISP_INCIDENTS_DISPATCH]: 'Disparar informativo em massa (ISP)',
   [PERMISSIONS.ISP_TOOLS_USE]: 'Usar ferramentas ISP do agente',
-  [PERMISSIONS.RESOURCE_MAPPINGS_READ]: 'Ver mapeamentos de recursos',
-  [PERMISSIONS.RESOURCE_MAPPINGS_WRITE]: 'Criar/editar mapeamentos de recursos',
-  [PERMISSIONS.RESOURCE_EXPLORE_READ]: 'Explorar recursos (somente leitura)',
-  [PERMISSIONS.RESOURCE_MAPPER_SUGGEST]: 'Sugerir mapeamento com IA',
   [PERMISSIONS.DEVTOOLS_USE]: 'Usar o Console do Desenvolvedor',
   [PERMISSIONS.DEVELOPER_APIKEYS_READ]: 'Ver chaves de API (metadados)',
   [PERMISSIONS.DEVELOPER_APIKEYS_MANAGE]: 'Criar/revogar chaves de API',
@@ -380,14 +341,14 @@ export interface SystemProfileDef {
   permissions: string[];
 }
 
-// Perfis de sistema criados no provisionamento de cada organization.
+// Perfis de sistema criados no provisionamento de cada instância.
 // Administrador = todas; Operador = somente leitura (*.read);
 // Atendente WhatsApp = operacao da Central de Atendimento (Fase 3);
 // Operador de Automação = opera fluxos/execuções sem publicar (Fase 4).
 export const SYSTEM_PROFILES: SystemProfileDef[] = [
   {
     name: 'Administrador',
-    description: 'Acesso total à organização',
+    description: 'Acesso total à instância',
     permissions: ALL_PERMISSIONS,
   },
   {
@@ -408,6 +369,14 @@ export const SYSTEM_PROFILES: SystemProfileDef[] = [
       PERMISSIONS.COMM_WHATSAPP_TEAMS_READ,
       PERMISSIONS.COMM_WHATSAPP_QUEUES_READ,
       PERMISSIONS.COMM_WHATSAPP_TEMPLATES_READ,
+    ],
+  },
+  {
+    name: 'Atendente ConnectChat',
+    description: 'Atende conversas do ConnectChat',
+    permissions: [
+      PERMISSIONS.COMM_CONNECTCHAT_READ,
+      PERMISSIONS.COMM_CONNECTCHAT_WRITE,
     ],
   },
   {
@@ -437,7 +406,6 @@ export const SYSTEM_PROFILES: SystemProfileDef[] = [
       PERMISSIONS.AI_MEMORY_WRITE,
       PERMISSIONS.AI_TOOLS_READ,
       PERMISSIONS.AI_APPROVALS_READ,
-      PERMISSIONS.AI_COSTS_READ,
       PERMISSIONS.AI_ANALYSIS_READ,
       PERMISSIONS.AI_ANALYSIS_RUN,
     ],
@@ -454,12 +422,8 @@ export const SYSTEM_PROFILES: SystemProfileDef[] = [
   },
   {
     name: 'Desenvolvedor',
-    description: 'Mapeia recursos, explora dados e usa Console/Chaves de API',
+    description: 'Usa a bancada e gerencia Chaves de API',
     permissions: [
-      PERMISSIONS.RESOURCE_MAPPINGS_READ,
-      PERMISSIONS.RESOURCE_MAPPINGS_WRITE,
-      PERMISSIONS.RESOURCE_EXPLORE_READ,
-      PERMISSIONS.RESOURCE_MAPPER_SUGGEST,
       PERMISSIONS.DEVTOOLS_USE,
       PERMISSIONS.DEVELOPER_APIKEYS_READ,
       PERMISSIONS.DEVELOPER_APIKEYS_MANAGE,

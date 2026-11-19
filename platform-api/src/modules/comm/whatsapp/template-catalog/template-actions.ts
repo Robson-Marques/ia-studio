@@ -3,9 +3,9 @@
 // não aceita domínio dinâmico em botão de URL). Ação DINÂMICA carrega {{1}}
 // (id/token da entidade) e exige uma URL de amostra na revisão da Meta.
 //
-// A base pública vem de CONFIG POR ORG (`system.public_url`, lida pelo service)
+// A base pública vem da configuração local (`system.public_url`, lida pelo service)
 // — nunca de env manual (a IA/seed roda no worker, sem request). Portado do
-// Aquapark (`template-actions.ts`), adaptado ao multi-tenant.
+// Aquapark (`template-actions.ts`), adaptado à instância dedicada.
 
 export type ButtonAction =
   | 'OPEN_INCIDENTS'

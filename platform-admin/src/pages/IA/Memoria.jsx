@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
 import { listMemoryProfiles } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { MEMORY_SCOPES } from './ia.constants';
 
 // IA/Memoria — LISTAGEM no molde `ListScreen` do DS (v0.10.34). Antes era um
@@ -21,7 +20,6 @@ export default function Memoria({ seg, title = 'Memória', subtitle = DEFAULT_SU
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -31,7 +29,7 @@ export default function Memoria({ seg, title = 'Memória', subtitle = DEFAULT_SU
   async function load() {
     setLoading(true);
     try {
-      const { items: list } = await listMemoryProfiles({ environment_id: environmentId || undefined });
+      const { items: list } = await listMemoryProfiles();
       setItems(list);
     } catch (err) {
       toast.error(err.message);
@@ -40,7 +38,7 @@ export default function Memoria({ seg, title = 'Memória', subtitle = DEFAULT_SU
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scopeLabel = (s) => (MEMORY_SCOPES.find((x) => x.value === s)?.label || s);
 

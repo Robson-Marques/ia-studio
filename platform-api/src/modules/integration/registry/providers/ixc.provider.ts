@@ -13,9 +13,8 @@
 //
 // Este provider expoe DUAS familias de operacoes:
 //   1) O CONTRATO CANONICO da solucao ISP (`cliente.dados`, `financeiro.*`,
-//      `os.cadastrar`, `conectividade.listar_com_status`...) — as mesmas chaves
-//      do AltaredeProvider. Assim as tools do agente (isp-tools.ts) funcionam
-//      com qualquer um dos dois ERPs, sem tocar em tool nenhuma.
+//      `os.cadastrar`, `conectividade.listar_com_status`...) — as chaves que
+//      as tools do agente ISP consomem sem chamar HTTP diretamente.
 //   2) Operacoes GENERICAS (`ixc.listar/inserir/editar/excluir`) pra qualquer
 //      tabela — usadas por nos de workflow e usuarios avancados.
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
@@ -75,9 +74,11 @@ const T = {
 
 // Catalogo de operacoes (sem path arbitrario — a chave decide o que roda).
 const OPERATIONS = [
-  // Contrato canonico ISP (mesmas chaves do AltaredeProvider)
+  // Contrato canônico ISP.
   'cliente.dados',
-  // Extensao do IXC (sem equivalente no Altarede hoje): identificar por telefone.
+  // Projeção mínima para identificação de atendimento por referência externa.
+  'cliente.identificacao',
+  // Extensão IXC: identificar por telefone.
   'cliente.por_telefone',
   'cliente.planos',
   'cliente.acesso',
@@ -90,6 +91,9 @@ const OPERATIONS = [
   'conectividade.listar_com_status',
   'os.cadastrar',
   'os.listar_abertas',
+  // Extensão IXC: histórico limitado para análise assistida. Não é operação
+  // do contrato comum de atendimento; a tool que a usa força uma conexão IXC.
+  'atendimento.listar_chamados_recentes',
   'atendimento.listar_setor',
   'atendimento.listar_motivo_atendimento',
   // Acesso generico a qualquer tabela do IXC
@@ -204,11 +208,6 @@ export class IxcProvider extends BaseProvider {
 
   async execute(ctx: ProviderContext, operation: string, params: unknown): Promise<unknown> {
     if (!(OPERATIONS as readonly string[]).includes(operation)) {
-      if (operation === 'financeiro.boleto_por_email') {
-        throw new BadRequestException(
-          'O IXC não expõe envio de boleto por e-mail pela API. Use formato "linha" (linha digitável/PIX) ou "pdf".',
-        );
-      }
       throw new BadRequestException(
         `Operação desconhecida "${operation}". Disponíveis: ${OPERATIONS.join(', ')}.`,
       );
@@ -219,6 +218,9 @@ export class IxcProvider extends BaseProvider {
     switch (operation as Operation) {
       case 'cliente.dados':
         return { data: await this.findClientes(ctx, token, this.str(args, 'cpf', true)) };
+
+      case 'cliente.identificacao':
+        return { data: await this.customerIdentification(ctx, token, this.str(args, 'customerId', true)!) };
 
       case 'cliente.por_telefone':
         return { data: await this.findClientesPorTelefone(ctx, token, this.str(args, 'telefone', true)!) };
@@ -267,6 +269,9 @@ export class IxcProvider extends BaseProvider {
 
       case 'os.listar_abertas':
         return { data: await this.osAbertas(ctx, token, args) };
+
+      case 'atendimento.listar_chamados_recentes':
+        return { data: await this.chamadosRecentes(ctx, token, args) };
 
       case 'atendimento.listar_setor':
         return { data: await this.list(ctx, token, T.ticketSetor, { rp: '200', sortname: `${T.ticketSetor}.id` }) };
@@ -434,6 +439,16 @@ export class IxcProvider extends BaseProvider {
       if (rows.length > 0) return rows;
     }
     return [];
+  }
+
+  /** Projeção mínima por id do ERP, usada somente para identificar um atendimento já vinculado. */
+  private async customerIdentification(ctx: ProviderContext, token: string, customerId: string): Promise<Record<string, string>[]> {
+    const rows = await this.list(ctx, token, T.cliente, this.eq(`${T.cliente}.id`, customerId, `${T.cliente}.id`));
+    return rows.slice(0, 1).flatMap((row) => {
+      const id = this.str(row, 'id');
+      const name = this.firstLabel(row, ['razao', 'fantasia']);
+      return id && name ? [{ id, name }] : [];
+    });
   }
 
   /**
@@ -716,6 +731,33 @@ export class IxcProvider extends BaseProvider {
       if (IxcProvider.OS_CLOSED_STATUS.has(status)) return false;
       if (login && r['id_login'] && String(r['id_login']) !== login) return false;
       return true;
+    });
+  }
+
+  /**
+   * Histórico recente de atendimentos do cliente para leitura assistida.
+   * O limite é fechado no provider: mesmo um chamador interno não consegue
+   * transformar a consulta numa varredura do IXC. "Recente" é a ordem
+   * decrescente do identificador do próprio atendimento; não inferimos datas
+   * ou status de encerramento que possam variar entre instalações do IXC.
+   */
+  private async chamadosRecentes(
+    ctx: ProviderContext,
+    token: string,
+    args: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
+    let idCliente = this.str(args, 'id_cliente');
+    if (!idCliente) {
+      const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true)!);
+      idCliente = String(cliente['id']);
+    }
+    return this.list(ctx, token, T.ticket, {
+      qtype: `${T.ticket}.id_cliente`,
+      query: idCliente,
+      oper: '=',
+      rp: '5',
+      sortname: `${T.ticket}.id`,
+      sortorder: 'desc',
     });
   }
 

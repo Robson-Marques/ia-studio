@@ -17,12 +17,6 @@ export class CreateAgentDto {
   @MaxLength(120)
   name!: string;
 
-  @IsString()
-  workspace_id!: string;
-
-  @IsString()
-  environment_id!: string;
-
   @IsOptional()
   @IsString()
   @MaxLength(500)
@@ -223,12 +217,6 @@ export class ExecuteAgentDto {
 export class ImportAgentDto {
   @IsObject()
   data!: Record<string, unknown>;
-
-  @IsString()
-  workspace_id!: string;
-
-  @IsString()
-  environment_id!: string;
 
   @IsOptional()
   @IsString()

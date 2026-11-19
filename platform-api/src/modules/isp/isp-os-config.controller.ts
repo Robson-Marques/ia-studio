@@ -3,9 +3,6 @@ import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../shared/permissions.constants';
-import { CurrentUser } from '../../shared/auth/current-user.decorator';
-import { AuthenticatedUser } from '../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../shared/auth/tenant.util';
 import { IspOsConfigService } from './isp-os-config.service';
 import { OsConfigPair } from './isp-os-config.repository';
 
@@ -25,36 +22,29 @@ export class IspOsConfigController {
   @ApiOperation({ summary: 'Descobre setores/assuntos do ERP para a config de OS' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
   discover(
-    @CurrentUser() user: AuthenticatedUser,
     @Query('connection_id') connectionId?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.service.discover(resolveOrganizationId(user, orgQuery), connectionId);
+    return this.service.discover(connectionId);
   }
 
   /** Config salva de uma conexão. */
   @Get()
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
   list(
-    @CurrentUser() user: AuthenticatedUser,
     @Query('connection_id') connectionId: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.service.list(resolveOrganizationId(user, orgQuery), connectionId);
+    return this.service.list(connectionId);
   }
 
   /** Salva o conjunto de pares setor↔assunto (substitui a config da conexão). */
   @Put()
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
   save(
-    @CurrentUser() user: AuthenticatedUser,
     @Body() body: SaveOsConfigBody,
-    @Query('organization_id') orgQuery?: string,
   ) {
     return this.service.save(
-      resolveOrganizationId(user, orgQuery),
       body.connection_id,
-      user.sub ?? null,
+      null,
       Array.isArray(body.pairs) ? body.pairs : [],
     );
   }
@@ -63,8 +53,8 @@ export class IspOsConfigController {
   @Get('filas')
   @ApiOperation({ summary: 'Mapa setor→fila (para o handoff do bot)' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
-  getFilas(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
-    return this.service.getQueueMapping(resolveOrganizationId(user, orgQuery));
+  getFilas() {
+    return this.service.getQueueMapping();
   }
 
   /** Salva o mapa setor→fila. Cada valor é o id de uma AttendanceQueue (ou vazio). */
@@ -72,19 +62,17 @@ export class IspOsConfigController {
   @ApiOperation({ summary: 'Salva o mapa setor→fila' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
   setFilas(
-    @CurrentUser() user: AuthenticatedUser,
     @Body() body: { suporte?: string | null; financeiro?: string | null },
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.service.setQueueMapping(resolveOrganizationId(user, orgQuery), body ?? {});
+    return this.service.setQueueMapping(body ?? {});
   }
 
   /** Máximo de boletos em aberto que a IA envia numa mensagem (0 = todos). */
   @Get('boleto-max')
   @ApiOperation({ summary: 'Máximo de boletos que a IA envia' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
-  async getBoletoMax(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
-    return { max: await this.service.getBoletoMax(resolveOrganizationId(user, orgQuery)) };
+  async getBoletoMax() {
+    return { max: await this.service.getBoletoMax() };
   }
 
   /** Salva o máximo de boletos (0 a 20; 0 = todos os em aberto). */
@@ -92,19 +80,17 @@ export class IspOsConfigController {
   @ApiOperation({ summary: 'Salva o máximo de boletos que a IA envia' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
   async setBoletoMax(
-    @CurrentUser() user: AuthenticatedUser,
     @Body() body: { max?: number },
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return { max: await this.service.setBoletoMax(resolveOrganizationId(user, orgQuery), Number(body?.max ?? 0)) };
+    return { max: await this.service.setBoletoMax(Number(body?.max ?? 0)) };
   }
 
   /** Config do link público de pagamento (validade + URL pública). */
   @Get('pagamento')
   @ApiOperation({ summary: 'Config do link de pagamento (TTL + URL pública)' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
-  getPagamento(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
-    return this.service.getPagamentoConfig(resolveOrganizationId(user, orgQuery));
+  getPagamento() {
+    return this.service.getPagamentoConfig();
   }
 
   /** Salva a config do link de pagamento. */
@@ -112,19 +98,17 @@ export class IspOsConfigController {
   @ApiOperation({ summary: 'Salva a config do link de pagamento' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
   setPagamento(
-    @CurrentUser() user: AuthenticatedUser,
     @Body() body: { ttl_horas?: number; base_url?: string },
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.service.setPagamentoConfig(resolveOrganizationId(user, orgQuery), body ?? {});
+    return this.service.setPagamentoConfig(body ?? {});
   }
 
   /** Config do alerta de incidente à equipe de plantão (equipe + limiar + template). */
   @Get('plantao')
   @ApiOperation({ summary: 'Config do alerta de incidente à equipe de plantão' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
-  getPlantao(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
-    return this.service.getPlantaoConfig(resolveOrganizationId(user, orgQuery));
+  getPlantao() {
+    return this.service.getPlantaoConfig();
   }
 
   /** Salva a config do plantão. `team_id` é o id de uma AttendanceTeam (ou vazio). */
@@ -132,10 +116,8 @@ export class IspOsConfigController {
   @ApiOperation({ summary: 'Salva a config do alerta de incidente à equipe' })
   @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
   setPlantao(
-    @CurrentUser() user: AuthenticatedUser,
     @Body() body: { team_id?: string | null; limiar_pct?: number; template?: string | null; cooldown_min?: number },
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.service.setPlantaoConfig(resolveOrganizationId(user, orgQuery), body ?? {});
+    return this.service.setPlantaoConfig(body ?? {});
   }
 }

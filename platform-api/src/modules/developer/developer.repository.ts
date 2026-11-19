@@ -8,9 +8,8 @@ import { PrismaService } from '../../shared/prisma/prisma.service';
 export class DeveloperRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string): Promise<DeveloperApiKey[]> {
+  findAll(): Promise<DeveloperApiKey[]> {
     return this.prisma.developerApiKey.findMany({
-      where: { organization_id: organizationId },
       orderBy: { created_at: 'desc' },
     });
   }

@@ -5,7 +5,6 @@ import { IntegrationDirection, IntegrationLogStatus, Prisma } from '@prisma/clie
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface IntegrationLogInput {
-  organizationId: string;
   connectionId: string;
   direction: IntegrationDirection;
   operation: string;
@@ -28,7 +27,6 @@ export class IntegrationLogsRepository {
     try {
       await this.prisma.integrationLog.create({
         data: {
-          organization_id: input.organizationId,
           connection_id: input.connectionId,
           direction: input.direction,
           operation: input.operation,
@@ -45,9 +43,9 @@ export class IntegrationLogsRepository {
     }
   }
 
-  findByConnection(organizationId: string, connectionId: string, take = 50) {
+  findByConnection(connectionId: string, take = 50) {
     return this.prisma.integrationLog.findMany({
-      where: { organization_id: organizationId, connection_id: connectionId },
+      where: { connection_id: connectionId },
       orderBy: { created_at: 'desc' },
       take: Math.min(Math.max(take, 1), 200),
     });

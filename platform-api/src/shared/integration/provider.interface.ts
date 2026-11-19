@@ -42,7 +42,7 @@ export interface WizardSchema {
   steps: WizardStep[];
   /** true = wizard exibe o passo final "Testar e salvar" (health check). */
   testable: boolean;
-  /** Caminho do webhook deste provider (ex.: '/api/webhooks/whatsapp'). O front
+  /** Caminho do webhook deste provider, quando aplicável. O front
    *  mostra a URL completa (origin + path) com botao copiar pra colar na Meta. */
   webhookPath?: string;
 }
@@ -74,6 +74,8 @@ export interface ConnectResult {
 
 export interface HealthResult {
   ok: boolean;
+  /** Autenticação ainda depende do usuário (ex.: leitura de QR Code). */
+  pendingAuth?: boolean;
   detail?: string;
   /** Checks individuais (ex.: { token: true, endpoint: true }). */
   checks?: Record<string, boolean>;

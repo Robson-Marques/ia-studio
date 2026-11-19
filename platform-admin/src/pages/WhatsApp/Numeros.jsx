@@ -1,37 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ListScreen, Badge, Button, Modal, Field, Select, Checkbox, useToast } from '@studio-ux-ds/react';
+import { ListScreen, Badge, Button, Modal, Field, Input, Select, Checkbox, ConfirmDialog, useToast } from '@studio-ux-ds/react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatDateTime } from '../../lib/format';
 import {
   listNumbers, syncNumber,
+  createWahaNumber, getWahaPairing, restartWahaPairing,
   getNumberAssistant, setNumberAssistant, removeNumberAssistant,
+  getCentralSetup, configureCentralSetup, startCentralOnboarding, getCentralOnboardingSession, disconnectCentralNumber,
 } from '../../services/whatsapp';
 import { listAgents } from '../../services/ai';
-import { MESSAGING_LIMIT_LABEL, QUALITY, formatPhone } from './whatsapp.constants';
+import { formatPhone } from './whatsapp.constants';
 import { statusToTone } from '../../lib/tone';
 
-// WhatsApp/Números — as conexões com a Meta: situação, qualidade, limite de
-// conversas e sincronização. Migrada pro DS na v0.10.9.
-//
-// Decisões de composição:
-//
-//  · **Grade de cards → tabela.** Eram 9 campos empilhados num card por número;
-//    numa tabela os mesmos números ficam comparáveis lado a lado, que é o que se
-//    quer num painel de conexões ("qual está com qualidade baixa?").
-//  · **Sincronizar saiu do card e foi pra barra de lote** — e aceita vários de
-//    uma vez, o que antes exigia um clique por número. Só aparece quando toda a
-//    seleção está ativa: sincronizar conexão desativada devolve erro da Meta.
-//  · **A linha abre a conexão DAQUELE número** em Integrações — que é onde ela se
-//    gerencia; esta tela é o painel de saúde, não o cadastro. O `id` do número é o
-//    id da própria conexão (o backend deriva a lista das conexões `whatsapp-meta`),
-//    então o link é direto. Na v0.10.9 a linha caía na LISTA de conexões,
-//    obrigando a procurar de novo o que já tinha sido escolhido; na v0.10.10 virou
-//    `?open=<id>`, e na v0.10.11 — quando a conexão ganhou rota própria — virou o
-//    endereço dela. O `?open=` continua funcionando para links antigos: a tela de
-//    Conexões o encaminha.
-//  · O erro de sincronização fica **na célula da situação**, visível: informação
-//    essencial não vive em tooltip (regra do DS).
+// WhatsApp/Números — Meta oficial pela Central Nivoo e sessões WAHA por QR.
+// Reúne onboarding, situação, histórico, assistente e desconexão.
 
 const STATUS_LABEL = {
   ACTIVE: { label: 'Ativa', variant: 'green' },
@@ -46,7 +28,6 @@ const STATUS_LABEL = {
 
 export default function Numeros() {
   const toast = useToast();
-  const navigate = useNavigate();
   const { can } = usePermissions();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +40,21 @@ export default function Numeros() {
   const [mAgentId, setMAgentId] = useState('');
   const [mEnabled, setMEnabled] = useState(true);
   const [savingBind, setSavingBind] = useState(false);
+  const [setup, setSetup] = useState({ configured: false });
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupInstallationId, setSetupInstallationId] = useState('');
+  const [setupOrigin, setSetupOrigin] = useState('');
+  const [setupKey, setSetupKey] = useState('');
+  const [savingSetup, setSavingSetup] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [disconnectTarget, setDisconnectTarget] = useState(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [wahaConfirmOpen, setWahaConfirmOpen] = useState(false);
+  const [wahaSaving, setWahaSaving] = useState(false);
+  const [pairing, setPairing] = useState(null);
+  const [pairingState, setPairingState] = useState(null);
+  const [pairingBusy, setPairingBusy] = useState(false);
 
   const canManageAssistant = can('comm.whatsapp.assistant.manage');
 
@@ -74,7 +70,8 @@ export default function Numeros() {
   async function load() {
     setLoading(true);
     try {
-      const numbers = await listNumbers();
+      const [setup, numbers] = await Promise.all([getCentralSetup(), listNumbers()]);
+      setSetup(setup);
       setItems(numbers);
       loadBindings(numbers);
     } catch (err) {
@@ -84,20 +81,177 @@ export default function Numeros() {
     }
   }
 
-  // Vínculo de cada número (para a coluna "Assistente"). Best-effort — um número
-  // sem vínculo simplesmente não aparece no mapa.
+  // Vínculo de cada número (para a coluna "Assistente"). Uma falha de leitura
+  // é informada sem esconder os demais números da lista.
   async function loadBindings(numbers) {
     const results = await Promise.all(
       (numbers || []).map((n) =>
-        getNumberAssistant(n.id).then((v) => [n.id, v]).catch(() => [n.id, null]),
+        getNumberAssistant(n.id).then((v) => [n.id, v, null]).catch((error) => [n.id, null, error]),
       ),
     );
     const map = {};
     for (const [id, view] of results) if (view) map[id] = view;
+    const failure = results.find(([, , error]) => error)?.[2];
+    if (failure) toast.error(`Não foi possível carregar alguns vínculos de assistentes: ${failure.message}`);
     setBindings(map);
   }
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    let polling = false;
+    const timer = window.setInterval(async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const session = await getCentralOnboardingSession(sessionId);
+        if (session.status === 'CONNECTED') {
+          window.clearInterval(timer);
+          setSessionId(null);
+          toast.success('Número conectado pela Central WhatsApp.');
+          await load();
+        } else if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(session.status)) {
+          window.clearInterval(timer);
+          setSessionId(null);
+          toast.error(session.failure_message || 'A conexão não foi concluída. Inicie uma nova tentativa.');
+        }
+      } catch (err) {
+        window.clearInterval(timer);
+        setSessionId(null);
+        toast.error(err.message);
+      } finally { polling = false; }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!pairing?.id || pairingState?.connected) return undefined;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const state = await getWahaPairing(pairing.id);
+        if (!cancelled) {
+          setPairingState(state);
+          if (state.connected) load();
+        }
+      } catch (err) {
+        if (!cancelled) toast.error(err.message);
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 4000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [pairing?.id, pairingState?.connected]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function connectNumber() {
+    if (!setup.configured) {
+      openSetup();
+      return;
+    }
+    // A jornada hospedada pela Nivoo é curta e autocontida. Abrimos como
+    // janela auxiliar, igual ao fluxo operacional do AquaPark, para o
+    // administrador continuar vendo o IA Studio ao fundo em vez de perder o
+    // contexto em outra aba.
+    const popup = window.open(
+      'about:blank',
+      'nivoo-whatsapp-connect',
+      'popup,width=560,height=720,resizable=yes,scrollbars=yes',
+    );
+    if (!popup) { toast.error('Permita abrir a janela de conexão do WhatsApp.'); return; }
+    popup.opener = null;
+    popup.focus();
+    setConnecting(true);
+    try {
+      const session = await startCentralOnboarding();
+      if (new URL(session.launch_url).origin !== 'https://integracoes.nivoo.dev.br') {
+        throw new Error('A Central retornou um endereço de conexão inesperado.');
+      }
+      popup.location.href = session.launch_url;
+      setSessionId(session.session_id);
+    } catch (err) {
+      popup.close();
+      toast.error(err.message);
+    } finally { setConnecting(false); }
+  }
+
+  function openSetup() {
+    setSetupInstallationId(String(setup.installation_id ?? ''));
+    setSetupOrigin(String(setup.consumer_origin ?? window.location.origin));
+    setSetupKey('');
+    setSetupOpen(true);
+  }
+
+  async function saveSetup() {
+    if (!setupInstallationId.trim()) { toast.error('Informe o identificador da instalação.'); return; }
+    if (!setupOrigin.trim()) { toast.error('Informe a origem HTTPS do painel.'); return; }
+    if (!setup.configured && !setupKey.trim()) { toast.error('Informe a chave interna do consumidor.'); return; }
+    setSavingSetup(true);
+    try {
+      const updated = await configureCentralSetup({
+        installation_id: setupInstallationId.trim(),
+        consumer_origin: setupOrigin.trim(),
+        ...(setupKey.trim() ? { internal_key: setupKey.trim() } : {}),
+      });
+      setSetup(updated);
+      setSetupOpen(false);
+      setSetupKey('');
+      if (updated.last_health_ok === true) {
+        toast.success('Central Nivoo configurada e validada. Agora conecte o número.');
+      } else {
+        toast.warn(updated.status_detail || 'Configuração salva, mas a Central ainda não confirmou o acesso. Confira o cadastro do consumidor.');
+      }
+    } catch (err) { toast.error(err.message); }
+    finally { setSavingSetup(false); }
+  }
+
+  async function confirmDisconnect() {
+    if (!disconnectTarget) return;
+    setDisconnecting(true);
+    try {
+      await disconnectCentralNumber(disconnectTarget.id);
+      toast.success('Número desconectado. O histórico foi preservado.');
+      setDisconnectTarget(null);
+      await load();
+    } catch (err) { toast.error(err.message); }
+    finally { setDisconnecting(false); }
+  }
+
+  async function saveWaha() {
+    setWahaSaving(true);
+    try {
+      const created = await createWahaNumber({
+        name: `WhatsApp QR Code ${items.filter((item) => item.provider_key === 'whatsapp-waha').length + 1}`,
+        department: '',
+        is_default: items.length === 0,
+        allow_automations: false,
+        risk_accepted: true,
+      });
+      setWahaConfirmOpen(false);
+      setPairing({ id: created.id, name: created.name });
+      setPairingState(null);
+      toast.success('Sessão criada. Leia o QR Code para conectar.');
+      await load();
+    } catch (err) { toast.error(err.message); }
+    finally { setWahaSaving(false); }
+  }
+
+  async function renewQr() {
+    if (!pairing?.id) return;
+    setPairingBusy(true);
+    try {
+      await restartWahaPairing(pairing.id);
+      setPairingState(null);
+      toast.success('Novo QR Code solicitado.');
+    } catch (err) { toast.error(err.message); }
+    finally { setPairingBusy(false); }
+  }
+
+  function openNumber(number) {
+    if (number.provider_key !== 'whatsapp-waha') return;
+    setPairing({ id: number.id, name: number.name });
+    setPairingState(null);
+  }
 
   // ─── Vínculo assistente↔número ──────────────────────
   async function openAssistantModal(number) {
@@ -154,31 +308,58 @@ export default function Numeros() {
     }
     setSyncing(false);
     clear();
-    if (ok) toast.success(ok === 1 ? 'Número sincronizado com a Meta.' : `${ok} números sincronizados com a Meta.`);
+    if (ok) toast.success(ok === 1 ? 'Número sincronizado com a Central.' : `${ok} números sincronizados com a Central.`);
     if (falhas.length) toast.error(`Não deu pra sincronizar ${falhas.length}: ${falhas[0]}`);
     load();
   }
 
-  const conectar = can('integrations.connections.write') && (
+  const canManageConnections = can('integrations.connections.write');
+  const configurar = canManageConnections && (
     <Button
-      variant="primary"
-      icon="plus"
-      title="O cadastro de um número novo é feito pela conexão, em Integrações"
-      onClick={() => navigate('/integracoes/conexoes')}
+      variant={setup.configured ? 'secondary' : 'primary'}
+      icon="settings"
+      title="Identificação técnica desta instalação na Central Nivoo"
+      onClick={openSetup}
     >
-      Conectar número
+      {setup.configured ? 'Configuração da Central' : 'Configurar Central'}
     </Button>
   );
+  const conectarMeta = canManageConnections && setup.configured && (
+    <Button
+      variant="secondary"
+      icon="plus"
+      title="Abrir a autenticação oficial da Meta pela Central Nivoo"
+      loading={connecting}
+      onClick={connectNumber}
+    >
+      Meta oficial
+    </Button>
+  );
+  const conectarWaha = canManageConnections && (
+    <Button variant="primary" icon="plus" title="Conectar uma sessão WAHA lendo um QR Code" onClick={() => setWahaConfirmOpen(true)}>
+      Conectar por QR Code
+    </Button>
+  );
+  const headerActions = canManageConnections ? (
+    <div className="flex items-center gap-2 flex-wrap">
+      {configurar}
+      {conectarMeta}
+      {conectarWaha}
+    </div>
+  ) : null;
 
   const columns = [
     { key: 'name', header: 'Número', render: (n) => (
       <div className="min-w-0">
         <p style={{ fontWeight: 500, margin: 0, color: 'var(--su-text-primary)' }} className="truncate">{n.name}</p>
         <p style={{ fontSize: 12, margin: 0, color: 'var(--su-text-muted)' }} className="truncate">
-          {n.phone ? formatPhone(n.phone) : 'número ainda não sincronizado'}
+          {n.phone ? formatPhone(n.phone) : n.phone_number_id ? `ID ${n.phone_number_id}` : 'número ainda não identificado'}
           {n.display_name ? ` · ${n.display_name}` : ''}
         </p>
       </div>
+    ) },
+    { key: 'provider', header: 'Método', render: (n) => (
+      <Badge tone={n.provider_key === 'whatsapp-nivoo' ? 'info' : 'warning'}>{n.provider_label}</Badge>
     ) },
     { key: 'status', header: 'Situação', render: (n) => {
       const st = STATUS_LABEL[n.status] || STATUS_LABEL.PENDING_AUTH;
@@ -187,6 +368,7 @@ export default function Numeros() {
           <div className="flex flex-wrap items-center gap-1">
             <Badge tone={statusToTone(st.variant)}>{st.label}</Badge>
             {n.is_default && <Badge tone="info">padrão</Badge>}
+            {n.provider_key === 'whatsapp-waha' && !n.allow_automations && <Badge tone="neutral">manual</Badge>}
           </div>
           {n.last_sync_error && (
             <p style={{ fontSize: 11, margin: 0, color: 'var(--su-danger-fg)' }}>{n.last_sync_error}</p>
@@ -197,12 +379,8 @@ export default function Numeros() {
         </div>
       );
     } },
-    { key: 'quality', header: 'Qualidade', render: (n) => {
-      const q = QUALITY[n.quality_rating] || QUALITY.UNKNOWN;
-      return <Badge tone={statusToTone(q.variant)}>{q.label}</Badge>;
-    } },
-    { key: 'limit', header: 'Pode enviar', render: (n) => MESSAGING_LIMIT_LABEL[n.messaging_limit] || 'não informado pela Meta' },
-    { key: 'templates', header: 'Templates', align: 'right', render: (n) => n.templates_count ?? 0 },
+    { key: 'history', header: 'Histórico desde', render: (n) => n.provider_key === 'whatsapp-waha' ? 'tempo real' : (n.history?.available_from ? formatDateTime(n.history.available_from) : 'não informado') },
+    { key: 'templates', header: 'Templates', align: 'right', render: (n) => n.supports_templates ? (n.templates_count ?? 0) : '—' },
     { key: 'assistant', header: 'Assistente', render: (n) => {
       const b = bindings[n.id];
       return (
@@ -223,25 +401,34 @@ export default function Numeros() {
       );
     } },
     { key: 'health', header: 'Última checagem', render: (n) => {
+      if (n.status === 'PENDING_AUTH') return <Badge tone="warning">aguardando QR</Badge>;
       if (n.last_health_ok === null || n.last_health_ok === undefined) return '—';
       return n.last_health_ok
         ? <Badge tone="success">respondeu</Badge>
         : <Badge tone="danger">não respondeu</Badge>;
     } },
-    { key: 'sync', header: 'Sincronizado', render: (n) => (n.last_sync_at ? formatDateTime(n.last_sync_at) : 'nunca') },
+    { key: 'sync', header: 'Sincronizado', render: (n) => n.provider_key === 'whatsapp-waha' ? 'tempo real' : (n.last_sync_at ? formatDateTime(n.last_sync_at) : 'nunca') },
+    { key: 'disconnect', header: 'Conexão', render: (n) => can('integrations.connections.write') && (
+      (n.provider_key === 'whatsapp-nivoo' && n.remote_status === 'ACTIVE') ||
+      (n.provider_key === 'whatsapp-waha' && n.status !== 'DISABLED')
+    ) ? (
+      <Button variant="danger" size="sm" title="Desconectar este número e parar os envios" onClick={(e) => { e.stopPropagation(); setDisconnectTarget(n); }}>
+        Desconectar
+      </Button>
+    ) : '—' },
   ];
 
   // Só oferece sincronizar quando TODA a seleção está ativa — a Meta recusa
   // conexão desativada, e a interface deixa de propor o que não se pode fazer.
   const bulkActions = (ids, clear) => {
     const selecionados = items.filter((n) => ids.includes(n.id));
-    if (!selecionados.every((n) => n.status === 'ACTIVE')) return null;
+    if (!selecionados.every((n) => n.status === 'ACTIVE' && n.provider_key === 'whatsapp-nivoo')) return null;
     return (
       <Button
         variant="ghost"
         icon="refresh"
         loading={syncing}
-        title="Pergunta à Meta agora: situação, qualidade, limite e templates"
+        title="Atualiza conversas e modelos pela Central"
         onClick={() => handleSync(ids, clear)}
       >
         Sincronizar agora
@@ -253,8 +440,8 @@ export default function Numeros() {
     <>
     <ListScreen
       title="Números"
-      subtitle="Os números de WhatsApp conectados à Meta. A sincronização automática roda a cada 10 minutos."
-      primaryAction={conectar}
+      subtitle="Conecte pela Meta oficial ou use a opção não oficial por QR Code com WAHA. É possível manter vários números."
+      primaryAction={headerActions}
       search={q}
       onSearch={setQ}
       searchPlaceholder="Buscar número…"
@@ -262,18 +449,108 @@ export default function Numeros() {
       columns={columns}
       rows={rows}
       getRowId={(n) => n.id}
-      onRowClick={(n) => navigate(`/integracoes/conexoes/${n.id}`)}
-      getRowLabel={(n) => `Abrir a conexão de ${n.name}`}
+      onRowClick={openNumber}
       bulkActions={bulkActions}
       filterActive={!!q.trim()}
       emptyNew={{
         icon: 'phone',
         title: 'Nenhum número conectado',
-        description: 'Conecte um número pela conexão “WhatsApp (Meta Cloud API)”, em Integrações → Conexões. Enquanto a Meta não aprovar o cadastro rápido, a conexão é feita informando as credenciais.',
-        action: conectar,
+        description: 'Escolha a Meta oficial ou conecte uma sessão WAHA lendo o QR Code.',
       }}
       emptyFiltered={{ title: 'Nenhum número encontrado', description: 'Nenhum número com esse nome ou telefone.', onClear: () => setQ('') }}
     />
+
+    <ConfirmDialog
+      open={Boolean(disconnectTarget)}
+      danger
+      loading={disconnecting}
+      title="Desconectar número"
+      message={`Desconectar ${disconnectTarget?.name || 'este número'}? Envios e recebimento param. As conversas e os arquivos já armazenados permanecem disponíveis para leitura.`}
+      confirmLabel="Desconectar"
+      onClose={() => !disconnecting && setDisconnectTarget(null)}
+      onConfirm={confirmDisconnect}
+    />
+
+    <Modal
+      open={setupOpen}
+      onClose={() => (savingSetup ? null : setSetupOpen(false))}
+      title="Configuração da Central Nivoo"
+      maxWidth={560}
+      footer={
+        <div className="flex items-center gap-2" style={{ justifyContent: 'flex-end', width: '100%' }}>
+          <Button variant="secondary" disabled={savingSetup} onClick={() => setSetupOpen(false)}>Cancelar</Button>
+          <Button variant="primary" loading={savingSetup} onClick={saveSetup}>Salvar e validar</Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <p style={{ fontSize: 13, color: 'var(--su-text-secondary)', margin: 0 }}>
+          Esta etapa apenas identifica o IA Studio perante a Central. Depois de validada, o botão
+          “Conectar número” abre diretamente a autenticação da Meta na Central Nivoo.
+        </p>
+        <Field label="Identificador da instalação" required hint="O mesmo installation_id cadastrado em Plataforma → Consumidores integradores na Central.">
+          <Input
+            value={setupInstallationId}
+            onChange={(e) => setSetupInstallationId(e.target.value)}
+            name="nivoo-installation-id"
+            autoComplete="off"
+          />
+        </Field>
+        <Field label="Origem HTTPS do painel" required hint="Somente a origem exata, sem caminho. Ex.: https://painel.exemplo.com.br">
+          <Input
+            type="url"
+            value={setupOrigin}
+            onChange={(e) => setSetupOrigin(e.target.value)}
+            name="nivoo-consumer-origin"
+            autoComplete="url"
+          />
+        </Field>
+        <Field
+          label="Chave interna do consumidor"
+          required={!setup.configured}
+          hint={setup.configured ? 'Deixe em branco para manter a chave já cifrada no cofre.' : 'A chave fica cifrada no cofre e não volta para o navegador.'}
+        >
+          <Input
+            type="password"
+            value={setupKey}
+            onChange={(e) => setSetupKey(e.target.value)}
+            name="nivoo-internal-key"
+            autoComplete="new-password"
+          />
+        </Field>
+        {setup.configured && setup.last_health_ok === false && setup.status_detail && (
+          <p style={{ fontSize: 12, color: 'var(--su-danger-fg)', margin: 0 }}>{setup.status_detail}</p>
+        )}
+      </div>
+    </Modal>
+
+    <ConfirmDialog
+      open={wahaConfirmOpen}
+      onClose={() => !wahaSaving && setWahaConfirmOpen(false)}
+      onConfirm={saveWaha}
+      loading={wahaSaving}
+      title="Conectar WhatsApp por QR Code"
+      message="Esta conexão usa um método não oficial e pode sofrer limitações ou bloqueio pela Meta. O servidor já está configurado nesta instalação; ao continuar, basta escanear o QR Code no WhatsApp."
+      confirmLabel="Continuar e mostrar QR Code"
+    />
+
+    <Modal
+      open={!!pairing}
+      onClose={() => { setPairing(null); setPairingState(null); }}
+      title={pairing ? `QR Code — ${pairing.name}` : 'QR Code'}
+      maxWidth={520}
+      footer={<div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => { setPairing(null); setPairingState(null); }}>Fechar</Button>{!pairingState?.connected && <Button variant="primary" icon="refresh" loading={pairingBusy} onClick={renewQr}>Gerar novo QR</Button>}</div>}
+    >
+      <div className="space-y-4" style={{ textAlign: 'center' }}>
+        {pairingState?.connected ? (
+          <><Badge tone="success">Conectado</Badge><p style={{ color: 'var(--su-text-muted)' }}>O número já está ativo e pode receber mensagens na Central de Atendimento.</p></>
+        ) : pairingState?.qr ? (
+          <><p style={{ margin: 0 }}>No WhatsApp do celular, abra <strong>Aparelhos conectados</strong> e leia este código.</p><div style={{ background: '#fff', padding: 12, display: 'inline-block', borderRadius: 'var(--su-radius-md)' }}><img src={pairingState.qr} alt="QR Code para conectar o WhatsApp" style={{ width: 280, height: 280, display: 'block' }} /></div><Badge tone="warning">Aguardando leitura</Badge></>
+        ) : (
+          <><p style={{ color: 'var(--su-text-muted)' }}>Preparando a sessão e o QR Code…</p><Badge tone="warning">{pairingState?.status || 'iniciando'}</Badge></>
+        )}
+      </div>
+    </Modal>
 
     <Modal
       open={!!modalNumber}

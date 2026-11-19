@@ -10,7 +10,7 @@ Camadas `Internal → SDK → Public`. A **Public API** é uma fachada estável 
 
 ## Public API
 - `GET /api/v1/public/ping` — health autenticado (valida a credencial).
-- `GET /api/v1/public/me` — organization + escopos da chave.
+- `GET /api/v1/public/me` — identidade da instalação + escopos da chave.
 - Autenticação: header `x-api-key: ias_...` ou `Authorization: Bearer ias_...`.
 - `ApiKeyGuard` resolve a chave (`DeveloperService.authenticate`), checa revogação/expiração, faz `touch` de `last_used_at` e anexa `request.apiKey` (`ApiKeyContext`). Rotas marcadas `@Public()` para pular o `JwtAuthGuard` global.
 

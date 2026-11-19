@@ -14,9 +14,6 @@ import { IMessageBroker, MESSAGE_BROKER, QUEUES } from '../../../shared/broker/m
 export type NotificationChannel = 'whatsapp' | 'email' | 'in_app';
 
 export interface NotifyArgs {
-  organizationId: string;
-  workspaceId?: string | null;
-  environmentId?: string | null;
   recipient: { phone?: string; email?: string; user_id?: string };
   /** Template do catalogo (diretriz 11) — renderizado com `data`. */
   templateId?: string;
@@ -73,7 +70,7 @@ export class NotificationCenterService {
     let lastDetail = '';
     for (const ch of chain) {
       const result = await this.deliverVia(ch, args, content);
-      if (result.status === 'SENT') return result;
+      if (result.status === 'SENT' || result.status === 'QUEUED') return result;
       lastDetail = result.detail ?? '';
       if (result.status === 'SKIPPED') continue;
     }
@@ -102,7 +99,7 @@ export class NotificationCenterService {
   private async resolveContent(args: NotifyArgs): Promise<{ title: string; body: string }> {
     if (args.templateId) {
       try {
-        const rendered = await this.templates.render(args.organizationId, args.templateId, args.data ?? {});
+        const rendered = await this.templates.render(args.templateId, args.data ?? {});
         return { title: rendered.subject ?? args.title ?? 'Notificação', body: rendered.body };
       } catch (e) {
         this.logger.warn(`Template ${args.templateId} indisponível (${(e as Error).message}) — usando conteúdo direto.`);
@@ -119,18 +116,15 @@ export class NotificationCenterService {
     try {
       if (channel === 'whatsapp') {
         if (!args.recipient.phone) return { channel, status: 'SKIPPED', detail: 'sem telefone' };
-        await this.whatsapp.send(
+        const result = await this.whatsapp.send(
           {
-            organizationId: args.organizationId,
-            workspaceId: args.workspaceId ?? undefined,
-            environmentId: args.environmentId ?? undefined,
             phone: args.recipient.phone,
             sender: 'system',
           },
           { kind: 'text', body: content.body || content.title },
         );
-        await this.log(args, channel, 'SENT');
-        return { channel, status: 'SENT' };
+        await this.log(args, channel, 'QUEUED', `job_id=${result.jobId ?? 'indisponível'}; confirmação pendente na Central`);
+        return { channel, status: 'QUEUED' };
       }
 
       if (channel === 'email') {
@@ -139,11 +133,6 @@ export class NotificationCenterService {
         // ativa no escopo, o orchestrator lança e o fallback (in_app) assume.
         const hasHtml = /</.test(content.body);
         await this.email.send(
-          {
-            organizationId: args.organizationId,
-            workspaceId: args.workspaceId ?? undefined,
-            environmentId: args.environmentId ?? undefined,
-          },
           {
             to: args.recipient.email,
             subject: content.title || 'Notificação',
@@ -155,11 +144,8 @@ export class NotificationCenterService {
         return { channel, status: 'SENT' };
       }
 
-      // in_app — sino do painel (user_id null = broadcast da organization).
+      // in_app — sino do painel (user_id null = broadcast da instância).
       await this.repository.createInApp({
-        organization_id: args.organizationId,
-        workspace_id: args.workspaceId ?? null,
-        environment_id: args.environmentId ?? null,
         user_id: args.recipient.user_id || null,
         title: content.title,
         body: content.body,
@@ -181,8 +167,6 @@ export class NotificationCenterService {
   ): Promise<void> {
     await this.repository
       .createLog({
-        organization_id: args.organizationId,
-        environment_id: args.environmentId ?? null,
         channel: channel ?? 'none',
         recipient: args.recipient.phone ?? args.recipient.email ?? args.recipient.user_id ?? null,
         template_id: args.templateId ?? null,

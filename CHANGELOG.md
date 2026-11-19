@@ -1,5 +1,873 @@
 # Changelog — IA Studio
 
+## Não publicado
+
+## v0.12.10 - 2026-11-18 (persistência de mídias WhatsApp sem alterar o atualizador)
+
+- Correção baseada diretamente na v0.12.8 e no conector WAHA realmente utilizado pela instalação.
+- Mensagens de mídia recebidas e ecos enviados tentam guardar os bytes imediatamente no StorageService local/S3 da instância.
+- Download pelo painel passa a servir a cópia persistida; quando ainda não existe, mantém o proxy original e armazena a mídia recuperada para os próximos acessos.
+- Mantém as validações de acesso à conversa, estrutura de mensagens, fluxo de atualização, PM2 e schema existentes.
+- Sem alteração de banco. Verificar que o STORAGE_LOCAL_PATH reside em armazenamento persistente quando STORAGE_DRIVER=local.
+
+
+## v0.12.8 - 2026-11-18 (mídia WAHA reconciliada pelo evento canônico)
+
+- Corrige o download de imagem, figurinha, áudio, vídeo e documento enviados pelo painel: o eco `message.any` agora substitui a referência provisória pelo `chatId+messageId` definitivo publicado pela própria WAHA.
+- Mensagens de mídia já gravadas por versões anteriores são recuperadas sem migração de banco: o proxy reconstrói o descritor com o endereço técnico observado na conversa e mantém o descritor original como fallback auditável.
+- Mantém os bytes protegidos pelo proxy autenticado, o limite de 32 MB e o carregamento visual já existente. Sem alteração de schema.
+
+## v0.12.7 - 2026-11-18 (miniatura de mídia e nome do contato WAHA)
+
+- Imagens, figurinhas e áudios da conversa passam a carregar automaticamente quando entram na área visível, preservando o download autenticado e sob demanda; falhas continuam com ação explícita para tentar novamente.
+- O nome do contato WAHA passa a considerar `pushName`/`notifyName` também dentro de `_data` e usa a Contacts API como fallback, inclusive para completar conversas já existentes no boot.
+- Avatares da lista e do cabeçalho usam até duas iniciais do nome; quando o nome não está disponível, usam os dois últimos dígitos do telefone em vez do primeiro caractere da máscara `(`. Sem alteração de schema.
+
+## v0.12.6 - 2026-11-18 (telefone real, eco do celular e envio WAHA)
+
+- Corrige conversas WAHA que exibiam o identificador privado `@lid` como telefone: o backend consulta o mapa oficial LID→PN da sessão, preserva o endereço técnico do chat separadamente e migra o registro existente sem perder mensagens ou atendimento.
+- Atualiza inclusive as sessões já pareadas para o evento `message.any`, passando a espelhar na conversa as mensagens enviadas diretamente pelo celular. Ecos de envios feitos pelo painel são deduplicados pelo identificador WAHA.
+- Texto, imagem, áudio, vídeo e documento passam a responder usando o endereço real já observado (`@lid` ou `@c.us`), em vez de transformar os dígitos do LID em um destinatário `@c.us` inválido. Sem alteração de schema.
+
+## v0.12.5 - 2026-11-18 (WAHA local e conexão direta por QR Code)
+
+- Porta para o IA Studio o provisionamento Docker já validado no Control Leads: durante instalação/upgrade, cada aplicação recebe container, porta local, chave técnica e volume de sessões próprios. A API WAHA fica restrita a `127.0.0.1`; o painel não pede URL nem chave.
+- **WhatsApp → Números** passa a criar a sessão automaticamente após o aviso de risco e abre diretamente o QR Code. Nome, conexão padrão e bloqueio de automações são definidos de forma segura; ainda é possível conectar vários números.
+- Remove a repetição das três ações no estado vazio da tela de Números; as ações permanecem uma única vez no cabeçalho.
+- Mantém compatibilidade de leitura com conexões WAHA externas criadas na versão anterior. Sem alteração de schema.
+
+## v0.12.4 - 2026-11-18 (correção do build WAHA)
+
+- Corrige os dois erros TypeScript encontrados pelo build da `v0.12.3`: a guarda de automação WAHA passa a usar `isEnabled` somente no método de vínculo do assistente, e `WhatsappMessageType` ganha sua exportação explícita com os tipos inbound suportados.
+- Sem mudança de schema. O rollback da tentativa anterior preservou a `v0.12.01`; a atualização deve seguir diretamente para `v0.12.4`.
+
+## v0.12.3 - 2026-11-18 (WAHA por QR Code + blindagem da linha de release)
+
+- WhatsApp → Números passa a oferecer dois métodos: **Meta oficial pela Central Nivoo** e **WAHA não oficial por QR Code**. A WAHA aceita várias sessões, exige aceite de risco, valida o webhook com HMAC, entra na mesma Central de Atendimento e envia/recebe texto, imagem, áudio, vídeo e documento. Mídia WAHA é recuperada sob demanda sem persistir base64; automações ficam desligadas por padrão. O legado YCloud permanece fora do runtime.
+- A tela de atualização passa a ignorar qualquer tag numericamente maior que não descenda da versão instalada. Isso impede que uma tag criada na branch histórica anterior à conversão dedicada volte a oferecer schema SaaS com `organization_id`/`workspace_id`.
+- O relatório documental publicado isoladamente na `v0.12.2` foi incorporado à linha dedicada correta. A `v0.12.2` não deve ser reaplicada: ela pertence ao histórico divergente e o rollback preservou a instalação anterior.
+
+## Histórico coordenado recente
+
+- v0.12.01: a autenticação WhatsApp hospedada pela Central Nivoo passa a abrir em uma janela popup compacta, preservando o IA Studio visível ao fundo, em vez de ocupar uma nova aba do navegador.
+
+- v0.11.99: separa a preparação técnica da Central Nivoo da conexão de números. A identificação da instalação passa a ser configurada em um modal próprio de **WhatsApp → Números**; depois disso, **Conectar número** abre diretamente a autenticação oficial da Meta na Central, sem redirecionar para Integrações. O consumidor e os espelhos WhatsApp deixam de aparecer no gerenciador genérico de conexões, e o registro técnico deixa de ser reaproveitado como primeiro número.
+
+- v0.11.98: o upload bruto para a Central copia o `Buffer` recebido para um `ArrayBuffer` nominal antes do `fetch`, compatível com a combinação de tipos DOM/Node usada pelo build no servidor.
+
+- v0.11.97: corrige o corpo binário do cliente Central Nivoo para `Uint8Array` compatível com `fetch` no build Nest; o atualizador passa a mostrar até 6 KiB da saída conjunta dos builds API e painel quando falham.
+
+- v0.11.96: o hook anterior ao `prisma db push` prepara de forma idempotente cinco colunas novas de identificadores/jobs e seus índices únicos, evitando o aviso genérico de risco em tabelas existentes. O atualizador agora registra a saída completa do Prisma quando a etapa falha; `--accept-data-loss` continua proibido.
+
+- WhatsApp integrado exclusivamente pela Central Nivoo: onboarding oficial, posse dos números, conversas e mensagens paginadas, mídia autenticada, templates, envio assíncrono por job e desconexão confirmada.
+- Painel de números configura e abre a Central; caixa de entrada apresenta metadados, respostas, reações e mídia por proxy. Gravação OGG/Opus sai como nota de voz; MP4 sai como áudio comum.
+- Providers e webhooks Meta/YCloud antigos saíram do runtime. Vínculos são desativados e segredos exclusivos apagados; histórico de conexões, logs e conversas permanece para auditoria.
+- Mensagens de entrada novas guardam pendência de publicação do evento e são reprocessadas após falha, sem reativar automações do histórico inicial.
+- Leitura, mídia e ações de atendimento exigem visibilidade da conversa específica; metadados de envio WhatsApp sensíveis são ocultados dos logs.
+- Catálogo nativo de três templates HSM para alertas e avisos ISP é semeado por número como rascunho. A publicação dos modelos do sistema é explícita no painel.
+- Disparos ISP respeitam a janela de 24 horas e guardam o job da Central como pendente; a reconciliação marca sucesso ou falha final. O Notification Center também registra aceite WhatsApp como `QUEUED`.
+- Ativação operacional pendente de cadastro do consumidor Newnet, origem HTTPS e chave no backend, migração/build no servidor e validação com instalação real.
+
+- Release coordenada v0.11.94: usa o contrato multipart já validado no Fastify
+  para ler os campos do anexo enviado pela Central.
+
+- Release coordenada v0.11.92: a Central do ConnectChat passa a renderizar com
+  segurança imagens, áudios, vídeos e documentos recebidos e permite enviar
+  anexos para o cliente pelo mesmo histórico contínuo.
+
+- Release coordenada v0.11.93: corrige a compatibilidade da transferência
+  multipart no runtime Node do servidor ao encaminhar o arquivo da Central.
+
+- Release coordenada v0.11.91: a Central renova a presença enquanto o atendente
+  escreve e mostra a atividade específica do cliente — digitando, gravando
+  áudio ou gravando vídeo — sem o indicador desaparecer durante a interação.
+
+- Release coordenada v0.11.90: o rodapé do painel passa a mostrar a tag real
+  instalada, em vez de reaproveitar o primeiro título histórico do changelog.
+  A recuperação do ConnectChat também reabre os atendimentos legados que ainda
+  apareciam encerrados após o desvínculo.
+
+- Release coordenada v0.11.89: desvincular cliente no ConnectChat não encerra
+  mais o atendimento. A Central preserva o mesmo histórico e conversa ativa,
+  remove a confirmação redundante e permite identificar outro cadastro no mesmo
+  ID.
+
+- Release coordenada v0.11.88: a Central ConnectChat passa a mostrar os
+  recibos de enviada, entregue e lida em cada mensagem da empresa. A leitura
+  usa dois tiques verde-neon para se destacar com contraste sobre a bolha azul;
+  a digitação do cliente também aparece durante o atendimento.
+
+- Release coordenada v0.11.87: a última mensagem do ConnectChat passa a parar
+  acima do compositor flutuante. A rolagem preserva a bolha inteira visível no
+  fim, mantendo a sobreposição apenas para o histórico anterior.
+
+- Release coordenada v0.11.86: elimina a faixa de rodapé visual que aparecia
+  sob o compositor flutuante do ConnectChat; o fundo do atendimento permanece
+  contínuo enquanto a barra sobrepõe a conversa.
+
+- Release coordenada v0.11.85: um cliente desvinculado pode ser vinculado de
+  novo pela Central. Cada tentativa consciente recebe uma chave própria, sem
+  reutilizar o sucesso histórico de um vínculo já encerrado.
+
+- Release coordenada v0.11.84: a Central ConnectChat passa a revalidar o HTML
+  do painel após cada release, garantindo que ações novas — como desvincular o
+  cliente — não fiquem escondidas por uma interface antiga em cache.
+
+- Release coordenada v0.11.83: restaura o compositor flutuante do ConnectChat,
+  mantendo a digitação acessível e a lista de mensagens rolando por baixo dele.
+
+- Release coordenada v0.11.82: completa automaticamente o nome comercial dos
+  vínculos ConnectChat já existentes, para que a PWA também mostre o cliente
+  vinculado sem exigir que a empresa refaça a identificação.
+
+- Release coordenada v0.11.81: Central ConnectChat passa a apresentar a conta
+  ConnectChat e o cliente IXC separadamente e disponibiliza o desvínculo manual.
+
+- A Central ConnectChat passa a exibir separadamente o cliente IXC vinculado e
+  a conta ConnectChat da pessoa, além de permitir o desvínculo manual, auditado
+  e autorizado pelo mesmo controle de vínculo.
+
+- Release coordenada v0.11.80: corrige a compilação do PWA do ConnectChat após
+  a remoção da confirmação residual de vínculo.
+
+- Release coordenada v0.11.79: remove da PWA do ConnectChat qualquer confirmação
+  residual de vínculo. A Central é a única responsável por localizar e vincular
+  o cadastro; o cliente apenas aguarda a liberação automática do atendimento.
+
+- A Central ConnectChat vincula diretamente o cliente localizado pelo código
+  IXC, sem depender de confirmação adicional na PWA. Após o vínculo, lista e
+  cabeçalho mostram o nome comercial e o estado **Cliente vinculado**.
+
+- Release coordenada v0.11.77: ConnectChat passa a oferecer e registrar push
+  somente após o vínculo ativo, repetindo o registro automaticamente quando a
+  pessoa já havia autorizado notificações no navegador.
+
+- Release coordenada v0.11.76: o cabeçalho do ConnectChat ganha controles
+  vetoriais de tema e conta, com menu de sessão mais claro. O convite de push
+  passa a ocorrer dentro da conversa e só pede permissão do navegador após a
+  confirmação explícita da pessoa usuária.
+
+- Release coordenada v0.11.75: vídeo enviado pelo ConnectChat é carregado
+  diretamente no player da mensagem, sem cartão intermediário para abrir. A
+  prévia da câmera permanece contínua durante a gravação de vídeo.
+
+- Release coordenada v0.11.74: finaliza a compatibilidade do ConnectChat com
+  MIME não canônico de vídeo gravado pelo navegador, preservando a validação
+  binária obrigatória do arquivo.
+
+- Release coordenada v0.11.73: corrige o envio de vídeo gravado no ConnectChat.
+  A categoria de mídia acompanha o arquivo e a API reconhece MIME genérico de
+  navegadores móveis sem abrir mão da extensão e da assinatura binária.
+
+- Release coordenada v0.11.72: registra a correção operacional do ConnectChat
+  no proxy público Newnet, que passa a aceitar anexos de até 100 MB sem
+  interromper uploads com HTTP 413 antes da API.
+
+- Release coordenada v0.11.71: eleva o limite de anexos do ConnectChat para
+  100 MB no cliente, proxy interno e API, e reancora automaticamente a
+  conversa na última mensagem após mídia ou mudança do compositor.
+
+- Corrige a presença do ConnectChat ponta a ponta: a Central do IA Studio
+  publica início e fim da digitação do atendente, com validação de conversa e
+  permissão de resposta já existente. A sinalização é transitória e não altera
+  banco nem mídia.
+
+- Release coordenada v0.11.69: corrige a captura de vídeo e a apresentação de
+  imagens do ConnectChat. A câmera fica visível durante a gravação, imagens
+  aparecem abertas na conversa e a lixeira usa o mesmo vetor do AquaPark
+  Mobile. Não altera banco, mídia ou contratos.
+
+- Release coordenada v0.11.68: porta o comportamento mobile completo do
+  compositor do ConnectChat. A gravação vira uma cápsula com envio imediato,
+  o compositor flutua sobre a conversa, as ações adotam azul Newnet e foto e
+  vídeo usam captura pela câmera. Não altera banco, mídia ou contratos.
+
+- Release coordenada v0.11.67: refina o PWA do ConnectChat com a cápsula de
+  composição arredondada da referência do AquaPark, ícones curados de clipe,
+  microfone, envio, play e pausa, e duração de áudio exibida somente em
+  minutos e segundos inteiros. Não altera banco, mídia ou contratos.
+
+- Release coordenada v0.11.66: corrige o player de voz do ConnectChat para
+  manter o mesmo layout antes e durante a reprodução, restaura a forma de onda,
+  fixa o shell da conversa e clareia as mensagens enviadas.
+
+- Release coordenada v0.11.65: conclui o ajuste do compositor do ConnectChat.
+  Microfone e envio passam a alternar sem controle desabilitado residual; a
+  gravação usa painel próprio no rodapé, preservando a área de mensagens.
+
+- Release coordenada v0.11.64: porta para o ConnectChat a composição mobile
+  consolidada no AquaPark — clipe, campo de múltiplas linhas expansível e
+  microfone ou envio. Corrige a bandeja de anexos para respeitar seu estado
+  fechado e simplifica o player de voz dentro da conversa; não altera banco,
+  mídia ou contratos de integração.
+
+- Release coordenada v0.11.63: corrige a apresentação do ConnectChat no tema
+  claro e a posição da bandeja de anexos. O clipe abre e fecha a bandeja acima
+  do compositor, que permanece utilizável; não há alteração de banco, mídia ou
+  contrato de integração.
+
+- Release coordenada v0.11.62: corrige a compilação do PWA do ConnectChat que
+  impedia a atualização da v0.11.61. A correção remove uma comparação de tipo
+  redundante após o tratamento específico de mensagens de voz; não altera
+  banco, migrações ou contratos de integração.
+
+- Release coordenada v0.11.61: atualiza o ConnectChat junto ao IA Studio com
+  o compositor de mídia refinado para celular. Áudio passa a ter prévia e
+  player próprio com reprodução, pausa, progresso e duração; o gravador exibe
+  contador, waveform, descarte e confirmação. A seleção de mídia deixa os
+  cartões grandes e usa uma bandeja compacta de galeria, câmera, vídeo e
+  documento, mantendo o mesmo contrato privado de anexos.
+
+- Release coordenada v0.11.60: atualiza o ConnectChat junto ao IA Studio para
+  o novo compositor de mídia do PWA. O cliente passa a alternar microfone e
+  envio conforme há texto, selecionar foto, vídeo e documento por ações
+  próprias, registrar foto pela câmera, gravar áudio com pausar/retomar,
+  descarte e confirmação antes do envio, e pré-visualizar a mídia. A mesma
+  release habilita vídeo privado validado (`mp4`, `webm`, `mov`) na API do
+  ConnectChat e ajusta o tema escuro para o azul da Newnet.
+
+- Release coordenada v0.11.59: incorpora no ConnectChat o envio de fotos,
+  documentos e áudios gravados no atendimento, além da escolha persistente
+  entre tema claro e escuro. Os anexos permanecem em volume protegido do
+  ConnectChat, com validação antes do armazenamento e backup/restauração
+  incluídos no ciclo da aplicação.
+
+- Release conjunta para corrigir o layout da conversa do ConnectChat: o aviso
+  inicial deixa de ocupar a área das mensagens, a lista volta a preencher e
+  rolar a tela, e a comunicação passa a explicar o cadastro e os serviços da
+  Newnet sem linguagem técnica de vínculo.
+
+- Release conjunta para ajustar o botão de envio do ConnectChat ao padrão de
+  ação circular com avião de papel, usando a identidade azul da Newnet e estado
+  desabilitado sem texto.
+
+- Release conjunta para corrigir o novo pareamento do ConnectChat: a migração
+  preserva o histórico de aparelhos revogados e limita cada identidade a um
+  único aparelho ativo, sem retornar erro interno após a verificação Didit.
+
+- Release conjunta para corrigir a compilação do PWA do ConnectChat quando um
+  erro da API não possui código. A atualização coordenada volta a alcançar o
+  build e o health check da mesma tag nos dois repositórios.
+
+- O atualizador coordenado agora constrói API e PWA do ConnectChat em etapas
+  separadas e registra a saída relevante no painel se houver falha, antes de
+  restaurar a versão anterior. A execução usa o script presente na release
+  baixada, para que a própria atualização aplique essas correções.
+
+- Release conjunta para substituir o `@ID` único do ConnectChat pelo nome não
+  único informado pela pessoa, validando nome e telefone antes do envio do OTP
+  e mantendo telefone como acesso e vínculo. Corrige também o menu de três
+  pontos do PWA, que deixa de encerrar a sessão ao abrir, orienta a solicitar
+  um novo código quando ele expirar ou for bloqueado e detecta o navegador ou
+  aparelho sem pedir um nome técnico ao cliente.
+
+- Release conjunta para configurar a assinatura `NEWNET` no envio de códigos
+  Didit do ConnectChat, reposicionar a tela como área de atendimento e
+  serviços e restaurar o favicon azul do PWA.
+
+- Release conjunta de correção para usar no PWA do ConnectChat o monograma N
+  branco, extraído da logo oficial da Newnet, sem o cartão claro ou azul sobre
+  a interface escura.
+
+- Release conjunta de correção para trocar o encapsulamento SVG que não
+  renderizava pelo favicon PNG oficial da Newnet no PWA do ConnectChat.
+
+- Release conjunta de correção para propagar o favicon oficial da Newnet no
+  PWA do ConnectChat, mantendo a mesma versão entre os dois repositórios.
+
+- A atualização pelo painel da instalação Newnet passa a coordenar a mesma tag
+  do ConnectChat: valida a chave de deploy, obtém a release, mantém o backup e
+  rollback próprios do Chat e exige healthcheck antes de concluir. Os dois
+  serviços seguem isolados em runtime e dados.
+
+- A Central ConnectChat permite ao usuário autorizado informar o código IXC,
+  solicitar a confirmação do cliente e concluir o vínculo depois da aprovação
+  no PWA. A referência e a identidade técnica continuam restritas ao backend.
+- Criada a permissão granular **Vincular cliente ConnectChat**; Administrador a
+  herda pelo catálogo total e o perfil Atendente ConnectChat continua limitado
+  a leitura e mensagens.
+- ConnectChat passa a receber a projeção comercial de nome exclusivamente pelo
+  backend do IA Studio. A referência opaca `ixc:<connection-id>:<customer-id>`
+  é validada contra uma conexão IXC ativa e resolvida em tempo real, sem
+  copiar cadastro para o ConnectChat ou enviar a referência ao navegador.
+- O atendimento mostra o nome comercial quando a resolução existe, usa `@ID`
+  como fallback e nunca volta a exibir fragmentos de UUID.
+
+## v0.11.45 - 2026-10-06 (Permissões do Administrador)
+
+- Corrigido o provisionamento de instalações existentes: o perfil de sistema
+  **Administrador** agora sincroniza `ALL_PERMISSIONS` a cada inicialização da
+  API, incluindo as permissões ConnectChat adicionadas após a criação do banco.
+
+## v0.11.44 - 2026-10-06 (Correção de configuração ConnectChat)
+
+- ConnectChat agora é provider do Integration Manager. A configuração é feita
+  em **Integrações → Conexões**: URL, actor referência e timeout pertencem à
+  conexão; a chave técnica é guardada cifrada pelo Secrets Manager.
+- O canal de atendimento resolve exclusivamente uma conexão ConnectChat ativa
+  e executa as operações pelo Provider Registry, preservando health, logs e
+  estado da conexão sem depender de variáveis de ambiente.
+
+## v0.11.43 - 2026-10-06 (Especialidade ConnectChat)
+
+- Adicionada `ia-studio.connectchat-channel@1.0.0`, criada após alinhamento
+  aprovado para governar a integração segura do canal ConnectChat ao atendimento
+  do IA Studio, sem expor chave técnica nem alterar a API ConnectChat.
+- Adicionado adaptador HTTP exclusivo do backend, com autenticação técnica,
+  actor por usuário, timeout, retry idempotente e polling incremental por
+  sequência; a Central de Atendimento agora possui a tela **ConnectChat →
+  Conversas**, protegida por permissões próprias.
+
+## v0.11.42 - 2026-10-05 (Base de referência replicável)
+
+- Fixada a tag como referência estável e completa da vertente Newnet para
+  criação de novos repositórios dedicados.
+- Adicionado `docs/base-replicavel.md`, que separa núcleo reutilizável e
+  vertical ISP/IXC somente como matriz de decisão futura para uma cópia. Nenhum
+  código, dado, rota, provider ou comportamento foi removido nesta entrega.
+
+## v0.11.41 - 2026-10-05 (Documentação de continuidade IXC)
+
+- Consolidada a fonte de verdade após a retirada de Mapeamentos e Altarede:
+  Baseline, handoff, README, contratos de integração/ISP e especialidades agora
+  descrevem o IXC como ERP ISP único e o estado legado como inerte.
+- Corrigido o contrato da análise assistida: “recente” significa os cinco
+  `su_ticket` de maior ID do cliente, não uma janela temporal.
+
+## v0.11.40 - 2026-10-05 (IXC como ERP único da vertente)
+
+- Retirado o módulo de **Recursos**: menu, rotas, telas, endpoints, ACL e os
+  exemplos inativos de mapeamento não faziam parte de nenhum fluxo ativo da
+  vertente Newnet nem da análise de chamados IXC.
+- O provider Altarede e seus vínculos de Registry foram removidos. O catálogo e
+  a lista operacional passam a expor somente providers com implementação
+  embarcada; conexões, segredos, logs e a tabela legada de mapeamentos seguem
+  preservados fisicamente, mas não são lidos pelo runtime.
+- Incidentes e tools ISP agora resolvem somente conexões IXC. A 2ª via deixa de
+  aceitar o formato de e-mail, que o IXC não suporta.
+
+## v0.11.39 - 2026-10-05 (Integrações locais e análise IXC)
+
+- Adicionada `ia-studio.local-integrations-configuration@1.0.0`, criada após
+  alinhamento aprovado para governar providers embarcados e conexões locais sem
+  reinstalar um catálogo SaaS.
+- Marketplace removido do painel, API e ACL. Providers ativos e implementados
+  agora são escolhidos diretamente em **Integrações → Conexões**; conexões,
+  segredos e logs existentes são preservados.
+- Adicionada `ia-studio.assistant-ticket-analysis@1.0.0`, criada após
+  alinhamento aprovado para governar consulta delimitada e análise assistida de
+  chamados IXC, sem alterar chamados nem criar contratos externos.
+- Em construção, `ia-studio.capability.ixc-ticket-analysis@1.0.0`: a tool
+  `consultar_chamados_recentes` consulta no máximo cinco `su_ticket` do cliente
+  em uma conexão IXC curada, reduz os dados enviados ao assistente e não executa
+  mutações no ERP.
+
+## v0.11.38 - 2026-10-03 (Capability dedicada aceita)
+
+- Fechada a Capability de conversão SaaS → instalação dedicada após Acceptance
+  integrada: S1–S4, gates de regressão e restauração real do backup Newnet em
+  `v0.11.37` estão registrados em `docs/capabilities/saas-to-dedicated-s5-acceptance.md`.
+- O antigo Architecture Lock SaaS foi marcado explicitamente como registro
+  histórico sem autoridade normativa; as fontes de estado corrente agora
+  descrevem somente o modelo dedicado aceito.
+
+## v0.11.37 - 2026-10-02 (Administração: estado por operação)
+
+- O painel acompanha backup e restauração pelo identificador retornado no
+  aceite (`202`). A consulta sem identificador informa exclusivamente o lock
+  vivo da instalação; registros terminais históricos não podem mais aparecer
+  como resultado da operação recém-iniciada nem disparar toast de falha falso.
+
+## v0.11.36 - 2026-10-02 (Restauração: diário local independente)
+
+- A restauração não importa mais `system_restores` do pacote como se fosse dado
+  operacional. Ela preserva e reaplica o diário administrativo da instalação
+  receptora, incluindo a operação de restore em curso. Backups e falhas antigas
+  do snapshot não voltam a alterar o estado atual do painel.
+
+## v0.11.35 - 2026-10-02 (Administração local: reconexão pós-restauração)
+
+- O painel passa a tratar `502/503/504` temporários durante reinício de uma
+  restauração como reconexão aguardada, sem despejar HTML do Nginx em toasts.
+- Registros herdados do snapshot são apresentados como encerrados, não como um
+  falso backup falho. A API prioriza a operação terminal mais recente ao exibir
+  o estado atual.
+
+## v0.11.34 - 2026-10-02 (Restauração: operações do snapshot)
+
+- Encerra como `FAILED` — com justificativa auditável — as operações que o
+  próprio backup capturou em `RUNNING` antes de registrar seu resultado final.
+  Ao restaurar, elas não voltam mais como falso bloqueio no painel local.
+
+## v0.11.33 - 2026-10-02 (Recovery de backup anterior a `--clean`)
+
+- Permite recuperar o pacote Newnet criado antes de `v0.11.32`: remove somente
+  o schema técnico `iastudio_meta` do alvo antes de o dump antigo recriá-lo.
+  Não toca em `public` e não muda recursos de outras aplicações do host.
+- O rollback só religa PM2 se o banco anterior já tinha `core_users`. Um banco
+  vazio que não pôde ser restaurado deixa o Newnet parado, em vez de produzir
+  healthcheck enganoso.
+
+## v0.11.32 - 2026-10-02 (Restauração: pgvector pertence ao cluster)
+
+- Impede que `db.sql` de um pacote tente executar `DROP`/`CREATE`/`COMMENT` de
+  `pgvector` com o role da aplicação. A extensão é garantida separadamente como
+  `postgres`; dados e tabelas continuam sendo restaurados pelo role local.
+
+## v0.11.31 - 2026-10-02 (Restauração: não iniciar sobre banco vazio)
+
+- Corrige a restauração completa que apagava `public` antes de carregar o
+  pacote. Como `pgvector` é uma extensão criada pelo administrador do cluster,
+  a tentativa posterior de recriá-la com o role da aplicação falhava e o trap
+  antigo reiniciava API e worker contra um banco sem tabelas.
+- Backups completos passam a gerar SQL com `--clean --if-exists`; a restauração
+  aplica esse dump in-place, garante `pgvector` como `postgres`, preserva um
+  snapshot local para rollback e só religa PM2 quando o banco estiver
+  recuperável. Em falha, a aplicação fica parada em vez de expor saúde falsa.
+- Restaurações preservam a identidade operacional local (`app-id`, banco,
+  Redis e porta): somente segredos necessários para decifrar dados retornam do
+  pacote. O utilitário de restauração somente de banco recebe a mesma proteção.
+- S4 continua em andamento: a correção está validada estaticamente, mas ainda
+  precisa da prova real de recovery do backup Newnet e de uma restauração normal
+  de pacote novo no host.
+
+## v0.11.30 - 2026-10-02 (Backup: estado terminal no PostgreSQL)
+
+- Corrige o fechamento de backup no painel: `system_restores.id` é uma coluna
+  `text` no PostgreSQL, mas o script e o repositório a comparavam com cast
+  `::uuid`. O arquivo era criado, porém os logs e o estado terminal falhavam
+  silenciosamente, deixando a operação em `RUNNING`.
+- Remove o cast incorreto no script e no repositório e torna erro de
+  persistência visível no journal da unidade systemd, em vez de descartá-lo.
+- O gate S4 agora recusa o cast incompatível. A confirmação operacional desta
+  correção ainda exige gerar um backup após atualizar a aplicação Newnet.
+
+## v0.11.29 - 2026-10-02 (Vertentes próprias e coabitação de aplicações)
+
+- Corrige o contrato de implantação: IA Studio é a estrutura-base e cada
+  cliente recebe uma vertente em repositório próprio. O host pode coabitar
+  produtos independentes, mas não instala cópias idênticas de um checkout SaaS.
+- O contrato operacional passa de `instance-id` para `app-id`: diretório,
+  configuração, banco/role PostgreSQL, Redis, PM2, lock, storage, backup e
+  vhost são derivados de `/opt/<app-id>` e do repositório da vertente.
+- Remove o bootstrap de instalação a partir do checkout SaaS. Instalações novas
+  usam `scripts/install.sh --app-id` diretamente a partir de uma tag da
+  vertente; upgrade continua limitado ao `origin` daquela aplicação.
+- Adiciona `uninstall-discarded-dev-apps.sh`, um removedor transitório com
+  prévia e confirmação exclusiva, limitado a `ia-dev` e `ia-teste`. Ele não
+  aceita outros IDs e preserva os demais produtos e serviços do host.
+- Atualiza Capability Contract, RFC, baseline, runbook, auditoria S4 e as
+  diretrizes arquiteturais para o modelo dedicado vigente. S1 permanece 100%;
+  S2, S4 e Acceptance continuam `in-progress` até a evidência operacional real.
+
+## v0.11.28 - 2026-10-01 (Backup local: estado terminal resiliente)
+
+- Corrige o backup que podia criar o arquivo e permanecer indefinidamente em
+  `RUNNING` após perder o callback do processo API. Backup e restauração passam
+  a operar em unidades transientes do systemd; o script de backup grava logs e
+  estado `SUCCESS`/`FAILED` diretamente na base da própria instância.
+- Operação órfã por mais de 30 minutos passa a ser marcada `FAILED`, liberando
+  o lock e expondo o erro no painel. A administração local também mostra o
+  último resultado terminal, não apenas uma operação em andamento.
+- O gate S4 valida esse contrato de resiliência. Sem alteração de schema.
+
+## v0.11.27 - 2026-09-30 (Instalação dedicada: build a partir de instância existente)
+
+- Corrige o provisionamento da segunda instância quando o instalador é chamado
+  após carregar o `.env` de uma instância em produção: o build agora força
+  `NODE_ENV=development`, preservando as devDependencies exigidas por Prisma,
+  Nest e Vite; o processo PM2 continua recebendo `production` do `.env` local.
+- Remove crases de comentários no SQL do provisionador, que um heredoc
+  expansível interpretava como comando de shell.
+- O gate S4 verifica os dois contratos para evitar nova regressão.
+
+## v0.11.26 - 2026-09-30 (Instalação dedicada: wrappers portáveis)
+
+- Corrige os wrappers públicos `scripts/install.sh` e `scripts/uninstall.sh`:
+  eles passam a chamar o Bash explicitamente antes de delegar aos scripts
+  dedicados. Assim, um checkout cuja plataforma não preservou o bit executável
+  não falha com `Permissão negada`.
+- O gate S4 passou a verificar esse contrato nos dois wrappers.
+
+## v0.11.25 - 2026-09-30 (Auditoria pós-faxina de SaaS)
+
+- Corrige metadados e READMEs vivos que ainda descreviam a instalação dedicada
+  como SaaS/multi-tenant ou citavam `LimitsService`/`UsageService` removidos.
+- Atualiza a especialidade de adoção do Studio UX para o contexto local e
+  aposenta a especialidade WhatsApp que instruía reintroduzir Baileys, QR,
+  coexistência manual e escopo SaaS.
+- Registra a casca vazia não versionada de `platform-console/` para housekeeping
+  local. Nenhuma mudança de schema, API, painel executável ou estado dos slices
+  é introduzida.
+
+## v0.11.24 - 2026-09-23 (Upgrade: hook de limpeza de schema versionado)
+
+Blindagem do atualizador para que remoções destrutivas de schema se apliquem
+sozinhas, sem passo manual no host. O passo inline `SCHEMA_HOUSEKEEPING` do
+`upgrade.sh` vira um runner genérico: antes do `prisma db push`, executa
+`scripts/migration/pre-db-push.sql` **da versão-alvo** (o repo já está em checkout
+no TO_VERSION). Como o hook vem do alvo, carrega sempre a limpeza correta para o
+schema que o `db push` vai aplicar — e não a da versão de origem, que foi a causa
+da falha ao subir a v0.11.22 (o atualizador antigo não conhecia a limpeza nova).
+
+O hook `pre-db-push.sql` é idempotente (`IF EXISTS`/guarda), no-op em instalação
+nova, e hoje remove os resíduos do Baileys (coluna `manual_connection_id` + tabela
+de sessão) e dos motores LLM Gemini/Ollama (valores de enum). Futuras remoções
+destrutivas só precisam editar esse .sql — o atualizador roda sozinho.
+
+Verificado contra Postgres 16 real (container): aplica, é idempotente na 2ª
+execução, o enum termina exatamente igual ao schema e os dados de `ai_agent_runs`
+são preservados. `bash -n` e os quatro gates verdes. Sem mudança de schema.
+
+Observação de rollout: quem já está numa versão anterior ao runner (ex.: `ia-dev`
+na v0.11.21) ainda precisa da limpeza única no host UMA vez para subir até aqui;
+depois de instalado o atualizador da v0.11.24, as próximas ficam automáticas.
+
+## v0.11.23 - 2026-09-21 (Faxina: resíduos de Gemini/Ollama no painel e docs)
+
+Segunda varredura achou o que a remoção dos motores (v0.11.18) tinha deixado no
+**painel** e na doc: `platform-admin/.../IA/ia.constants.js` ainda listava os
+modelos Gemini (em `AGENT_MODELS`) e as opções `GEMINI`/`OLLAMA` em
+`PROVIDER_KINDS`; o `ai/README.md` ainda descrevia Gemini/Ollama como
+implementações e no seed. Tudo removido — `PROVIDER_KINDS` volta a espelhar o
+enum `AiProviderKind` (sem GEMINI/OLLAMA); os provedores OpenAI-compatíveis
+(OpenRouter/Groq/DeepSeek/Mistral/Azure/Cohere) seguem. Também tira um comentário
+que citava Ollama no seed.
+
+Sem mudança de schema. Fecha o resíduo de Gemini/Ollama: agora é zero em código,
+schema, deps e docs.
+
+## v0.11.22 - 2026-09-21 (Faxina: limpa também o schema — sem órfãos)
+
+Fecha a faxina de verdade removendo os resíduos que tinham ficado no
+`schema.prisma` por serem mudança de banco: a coluna `WhatsappChat.manual_connection_id`
+(+ índice), o modelo `WhatsappBaileysSession` (tabela `comm_whatsapp_baileys_sessions`)
+e os valores de enum `AiProviderKind.GEMINI`/`OLLAMA`. Instalação nova nasce sem
+eles (o provisionamento gera o schema já limpo).
+
+Como remover isso do banco é destrutivo e o upgrade usa `db push` sem aceitar
+perda automática, foi adicionado ao `upgrade.sh` um passo idempotente
+`SCHEMA_HOUSEKEEPING` que roda ANTES do `db push`: dropa a coluna/índice/tabela
+(`IF EXISTS`) e recria o tipo `AiProviderKind` sem `GEMINI`/`OLLAMA` (Postgres não
+remove valor de enum), só quando esses objetos ainda existem — no-op em instalação
+nova, e recuperável (o backup completo roda antes, no passo 2). Assim o `db push`
+seguinte não vê mais mudança destrutiva.
+
+Verificado: `nest build` verde com o Prisma Client já sem os campos removidos;
+zero referência a eles no código; os quatro gates verdes. Nenhuma linha usa esses
+objetos numa instância dedicada, então a limpeza não perde dado real.
+
+## v0.11.21 - 2026-09-21 (Docs vivos: faxina concluída)
+
+Checkpoint de docs, sem mudança de código. `ESTADO-e-handoff.md` registra a
+faxina de código/arquivos mortos como CONCLUÍDA (Etapas 1, 2a e 2b, v0.11.17–
+v0.11.20), com o que saiu, o que foi preservado (schema intocado; WhatsApp
+oficial, OpenAI e Anthropic intactos) e como cada etapa foi verificada. O
+inventário `docs/faxina/etapa-0-inventario.md` recebe a nota de conclusão com as
+decisões do dono. Sem mudança de schema.
+
+## v0.11.20 - 2026-09-21 (Faxina Etapa 2b/admin: remove a UI do Baileys)
+
+Fecha a remoção do Baileys, agora no painel. Sai o service `whatsappBaileys.js`
+e, dos arquivos que o usavam, todo o modo manual/coexistência e o pareamento por
+QR: no `ChatWindow` (badge, botões "Modo manual"/"Voltar ao oficial", banner e o
+modal de escolha de canal — 409→306 linhas), no `MessageComposer` (o ramo de envio
+manual; `effectiveExpired` volta a ser só `expired`), na `ConexaoDetalhe` (a aba
+inteira de Pareamento: estado, polling, reconectar/reiniciar, QR — 444→312 linhas)
+e em `whatsapp.js` (as chamadas `listManualChannels`/`setManualChannel`).
+
+Com isso o subsistema Baileys some por completo (backend na v0.11.19, painel aqui).
+WhatsApp oficial (Meta/YCloud), atendimento, templates e mídia seguem intactos.
+
+Verificado: cada arquivo editado passou no parser JSX (esbuild, sem erro de
+sintaxe), grep sem referência solta em todo o admin, e os quatro gates verdes. Como
+o registry privado `@studio-ux-ds` não instala fora do host, o `vite build` de
+verdade roda na atualização pelo painel. Sem mudança de schema.
+
+## v0.11.19 - 2026-09-21 (Faxina Etapa 2b/API: remove o subsistema Baileys)
+
+Remove de verdade, no backend, todo o recurso de canal manual/coexistência do
+WhatsApp (Baileys) — decisão do dono: não será usado. Saem 7 arquivos
+(`whatsapp-baileys.controller`, `-registry.service`, `-session.repository`, os 2
+providers `whatsapp-baileys-internal/manual`, e a pasta `connectors/` inteira:
+`connector.types.ts` + `whatsapp-baileys.runtime.ts`, que só o Baileys usava) e
+toda a fiação: registro no `comm.module`/`registry.module`/`provider-seed` (com o
+mecanismo `RETIRED_KEYS`, que só existia para o Baileys), o caminho de envio manual
+e os métodos `setManual/listManualChannels` do inbox, os 2 endpoints do controller,
+a checagem de modo manual no orquestrador e no responder da IA. Removidas também as
+dependências npm órfãs `@whiskeysockets/baileys`, `qrcode` e `@types/qrcode`.
+
+O enum/coluna do Prisma (`manual_connection_id`, `WhatsappBaileysSession`) **não**
+foi tocado (schema é fora do escopo de faxina); vira coluna/modelo órfão inofensivo.
+Meta Cloud API e YCloud (WhatsApp oficial) seguem intactos.
+
+Verificado: `nest build` (tsc) verde no estado pós-remoção (npm caiu de 532→465
+pacotes), grep sem dangling reference, e os quatro gates verdes. A parte do
+**admin** (ChatWindow/MessageComposer/ConexaoDetalhe/whatsapp.js/whatsappBaileys.js)
+sai na v0.11.20 — enquanto isso o admin degrada de forma limpa (as chamadas de modo
+manual dão 404, são engolidas e a UI fica escondida). Sem mudança de schema.
+
+## v0.11.18 - 2026-09-21 (Faxina Etapa 2a: remove os motores LLM Gemini/Ollama)
+
+Remoção de verdade dos motores de LLM dormentes Gemini e Ollama (já sem card no
+marketplace desde v0.11.11). Saem as implementações
+`providers/impl/gemini.provider.ts` e `ollama.provider.ts` e toda a fiação viva:
+imports e registro no `ai.module`; injeção e laço de registro no
+`ai-providers-seed` (e 'gemini'/'ollama' saem de `AI_PROVIDER_RETIRED`); preços e
+heurística de modelo em `pricing.ts`; mapa `KIND_BY_PROVIDER_KEY` e mensagem de
+embeddings em `llm-provider.service`; lista de fallback do orquestrador; modelos
+default por kind em `content-review` e `analysis`.
+
+O enum `AiProviderKind` (GEMINI/OLLAMA) é do Prisma (modelo de dados) e **não** foi
+tocado — remover valores de enum é mudança de schema/destrutiva, fora do escopo de
+faxina. Ficam só OpenAI e Anthropic com motor; os provedores OpenAI-compatíveis
+(OpenRouter/Groq/DeepSeek/Mistral/Azure) seguem intactos.
+
+Verificado: `nest build` (tsc) verde no estado pós-remoção, sem dangling reference
+(grep), e os quatro gates verdes. Sem mudança de schema.
+
+## v0.11.17 - 2026-09-21 (Faxina Etapa 1: remoção de mortos por reachability)
+
+Remove o que a Etapa 0 marcou como morto por reachability e o que você aprovou:
+
+- Arquivos órfãos (nenhum import em toda a árvore): `platform-admin/src/services/account.js`,
+  `platform-api/src/modules/comm/whatsapp/template-catalog/catalog.seed.ts`,
+  `platform-api/src/modules/integration/marketplace/dto/update-provider-definition.dto.ts`.
+- Tela de pagamento SaaS: `platform-admin/src/pages/PaginaPagamento.jsx` e a rota
+  pública `/pagar/:token` (o módulo `billing` do backend está vazio — estava quebrada
+  no dedicado).
+- Pastas-esqueleto vazias da era SaaS (sem `.ts`): `platform-api/src/modules/billing`,
+  `licensing`, `core/organizations`, `core/workspaces`, `ai/costs`.
+- Docs: remove a referência morta à rota `ai/costs` no `ai/README.md`; remove a linha
+  morta `ia-studio.tenant-domains` do catálogo de especialidades (arquivo inexistente),
+  catálogo sobe para 1.5.0.
+
+Sem dangling reference após a remoção (conferido por grep) e os quatro gates seguem
+verdes. Meta Cloud API/YCloud, OpenAI e Anthropic intactos. Motores dormentes
+(Gemini/Ollama, Baileys) saem em versões próprias (Etapa 2). Sem mudança de schema.
+
+## v0.11.16 - 2026-09-21 (Frente de faxina: especialidade + inventário Etapa 0)
+
+Fica de pé a frente de limpeza de código/arquivos mortos. Cria a especialidade
+local `ia-studio.system-cleanup@1.0.0` (via `workflow.specialty-creation@1.0.0`,
+após o alinhamento aprovado): governa a remoção **de verdade** do que não é usado,
+em etapas (0 inventário read-only → 1 arquivos/módulos → 2 intra-código), sem
+quebrar build/gates/runtime, distinguindo *excluir de verdade* de *arquivar* e
+exigindo decisão do dono sobre motores dormentes. Catálogo local sobe para 1.4.0.
+
+Entrega o primeiro artefato dessa especialidade: `docs/faxina/etapa-0-inventario.md`,
+o inventário **somente-leitura** por reachability sobre `platform-api/src` e
+`platform-admin/src`. Classifica: (A) 8 itens mortos por reachability — excluir de
+verdade (pastas-esqueleto SaaS vazias: `billing`, `licensing`, `core/organizations`,
+`core/workspaces`, `ai/costs`; e 3 arquivos órfãos); (B) motores dormentes — decisão
+do dono (LLM Gemini/Ollama; WhatsApp Baileys); (C) cinza/resquício SaaS (tela de
+pagamento `/pagar`); (D) docs/repo (o catálogo referencia `tenant-domains.md`, que
+não existe). **Nada removido nesta versão.**
+
+Só framework/docs; sem mudança de runtime nem de schema. A Etapa 1 (remoção) exige
+as decisões do inventário e novo alinhamento.
+
+## v0.11.15 - 2026-09-21 (Gates exigem ripgrep + auditoria pré-S4 em GO)
+
+Os quatro gates de migração (`verify-dedicated-cut`, `verify-operational-dedicated`,
+`verify-console-retirement`, `verify-instance-isolation`) dependem do `rg`
+(ripgrep) para toda a evidência. Num host sem ripgrep isso falhava em silêncio: o
+S1 usa `rg ... || true` e ficava **falso-verde**, enquanto S2/S3/S4 (`rg ... || fail`)
+ficavam **falso-vermelhos** — a ausência da ferramenta se confundia com falha de
+conteúdo. Cada gate passa a exigir o `rg` logo após `set -euo pipefail`: sem ele,
+para com mensagem clara e `exit 2` (erro de ambiente), em vez de mascarar de
+verde ou vermelho.
+
+Com o ripgrep presente, os quatro gates passam verdes (`EXIT=0`). A
+`docs/auditoria-pre-s4.md` vira **veredito GO** e registra esse achado de
+ambiente (ripgrep obrigatório) além dos anteriores.
+
+Sem mudança de comportamento de runtime; sem mudança de schema.
+
+## v0.11.14 - 2026-09-21 (Gate S4 verde + auditoria de prontidão pré-S4)
+
+A auditoria antes da prova operacional do S4 achou que a v0.11.10 tinha deixado o
+gate `verify-instance-isolation.sh` **vermelho**: o comentário do
+`provision-dedicated-schema.sh` continha, em prosa, os literais da flag de perda
+de dados e do comando de sincronização de schema do Prisma, que o gate proíbe por
+grep (sem distinguir comentário de código) — dois falsos positivos. O comentário
+foi reescrito sem esses literais;
+o provisionamento segue usando migration a partir de banco vazio (nunca sincroniza
+schema no lugar). Gate volta a passar (`EXIT=0`). Adiciona
+`docs/auditoria-pre-s4.md` com os achados e o go/no-go.
+
+Sem mudança de comportamento; sem mudança de schema.
+
+## v0.11.13 - 2026-09-21 (Checkpoint: docs vivos — instalação limpa e upgrade comprovados)
+
+Checkpoint de estado (docs vivos), sem mudança de código. `ESTADO-e-handoff.md`
+registra a instalação limpa da primeira instância dedicada (`ia-dev`) e a
+atualização pelo painel funcionando de ponta a ponta, além da sequência de
+correções v0.11.6–v0.11.12. S4 avança para "instalação limpa de A comprovada;
+falta a prova de B (segunda instância isolada)". S2 fica alinhado como "em
+andamento" entre o handoff e o contrato da Capability. S4 e a Capability seguem
+`in-progress`.
+
+## v0.11.12 - 2026-09-21 (Marketplace: retirar WhatsApp Baileys interno e manual)
+
+Os dois conectores WhatsApp via Baileys (interno e manual) saem da vitrine — não
+serão usados nesta operação. Têm implementação, então não são apagados: o seed de
+providers deixa de semeá-los e passa a desativá-los (is_active=false) no boot,
+idempotente — somem do marketplace e não podem ser instalados, sem apagar a linha
+nem tocar no código do provider (fica dormente). Instalação nova nem os cria. Meta
+Cloud API e YCloud (WhatsApp oficial) seguem iguais.
+
+Aplicado pela atualização do painel (roda no boot). Sem `db push`; sem mudança de
+schema.
+
+## v0.11.11 - 2026-09-19 (Marketplace: só OpenAI e Anthropic na seção de IA)
+
+O marketplace listava seis provedores de IA como "em breve" (Gemini, Ollama,
+OpenRouter, Groq, DeepSeek, Mistral): o painel não testa a conexão deles (não
+têm implementação do lado de integração), então saem da vitrine. Ficam só
+OpenAI e Anthropic, que têm teste de conexão e motor de LLM. O seed de IA deixa
+de criá-los e passa a desativá-los (is_active=false) no boot, de forma
+idempotente — somem do marketplace e não podem ser instalados, sem apagar a
+linha (arquivar ≠ excluir). Instalação nova nem chega a criá-los; os motores de
+LLM de Gemini/Ollama seguem registrados (dormentes), sem card.
+
+Aplicado pela atualização do painel (roda no boot). Sem `db push`; sem mudança
+de schema.
+
+## v0.11.10 - 2026-09-19 (Atualização dedicada: bookkeeping fora do schema público)
+
+A primeira atualização de uma instância dedicada falhava no PRISMA_PUSH: o
+provisionamento cria o schema via `migrate diff --from-empty` e deixava a tabela
+de controle `system_schema_migrations` em `public`; o `prisma db push` do
+upgrade (sem `--accept-data-loss`, correto) via essa tabela como estranha ao
+`schema.prisma` e recusava dropá-la (mudança destrutiva). Como `public` é gerido
+pelo Prisma, o provisionador passa a criar o bookkeeping num schema próprio
+(`iastudio_meta`), que o `db push` não toca — `public` fica idêntico ao
+`schema.prisma` e a atualização flui. Gate atualizado.
+
+Instâncias já instaladas (com a tabela em `public`) precisam de um
+`DROP TABLE IF EXISTS public.system_schema_migrations;` uma vez; a partir daí o
+upgrade pelo painel funciona. Sem mudança de schema Prisma.
+
+## v0.11.9 - 2026-09-19 (Instalação dedicada: nginx 500 no web root do painel)
+
+A primeira instalação limpa (`ia-dev`, v0.11.8) subiu inteira — API, painel,
+PM2, vhost e HTTPS — mas o painel respondia 500 no nginx. Causa: o `umask 077`
+do instalador deixou o clone e o `dist` do platform-admin só-root, e o nginx
+(www-data) não conseguia atravessar os diretórios até o `dist` (EACCES de
+diretório retorna 500, não 403). Correção permanente: após o build, o instalador
+abre só o necessário — travessia (`o+x`) nos diretórios do caminho público e
+leitura (`a+rX`) no `dist` —, mantendo `.env` (600), dados e backups restritos.
+Sem hardcode de caminho (deriva de `INSTANCE_ROOT_BASE`); gate atualizado.
+
+Sem `db push`; sem mudança de schema. Completa a instalação limpa da primeira
+instância dedicada (S4).
+
+## v0.11.8 - 2026-09-18 (Instalação dedicada: token do registry privado @studio-ux-ds)
+
+Com a API compilando (v0.11.7), a instalação passou a quebrar no `npm install`
+do platform-admin: as deps `@studio-ux-ds/*` vêm do registry privado
+`git.nivoo.dev.br` e o `.npmrc` autentica por `${GITLAB_PACKAGE_TOKEN}`, que o
+`install-dedicated.sh` não fornecia (401 Unauthorized). Correção permanente,
+sem patch manual a cada instalação:
+
+- `install-dedicated.sh` aceita `--gitlab-token <token>` (ou herda
+  `GITLAB_PACKAGE_TOKEN` do ambiente), exige o token antes de criar qualquer
+  recurso, exporta-o para os `npm install` e o grava no `.env` da instância.
+- Como o `upgrade.sh` já lê o token do `.env`, os upgrades seguintes passam a
+  autenticar sozinhos; o `--bootstrap-dedicated` repassa `--gitlab-token` ao
+  instalador.
+- Gate `verify-instance-isolation.sh` e `docs/deploy-e-versionamento.md`
+  atualizados para exigir/documentar o token.
+
+Sem `db push`; sem mudança de schema. Fecha o caminho de instalação limpa da
+primeira instância dedicada (S4).
+
+## v0.11.7 - 2026-09-18 (Build da API dedicada: 26 erros de TypeScript)
+
+A instalação dedicada provisionava o schema mas quebrava no `nest build` do
+platform-api com 26 erros de TypeScript, deixando a instância parcial (sem
+nginx nem `dist`). Correção na fonte, sem tocar em runtime nem reintroduzir
+contrato SaaS:
+
+- `SettingsService` foi renomeado para `getValue`/`set` no corte S1; os módulos
+  ISP (`isp-os-config`, `isp-payment-link`, `isp-tools`) ainda chamavam
+  `getLocalValue`/`setLocal` — realinhados ao contrato real (12 `getValue` + 9
+  `set`).
+- `attendance-admin.service.ts`: `Prisma` passa a ser importado de
+  `@prisma/client` (usado nos casts de create input).
+- `whatsapp-numbers.controller.ts`: importa o decorator `CurrentUser`.
+- `developer.controller.ts`: importa o tipo `AuthenticatedUser`.
+- `whatsapp-assistant-responder.service.ts`: em `respond()` o id do assistente
+  vem de `agent.id` (`agentId` só existia no escopo de `onInbound`).
+
+Sem `db push`; sem mudança de schema. Desbloqueia a instalação limpa da
+primeira instância dedicada (S4).
+
+## v0.11.6 - 2026-09-18 (Normalização da DATABASE_URL nas operações PostgreSQL)
+
+O `?schema=public` que o Prisma exige na `DATABASE_URL` da instância quebrava
+`psql`/`pg_dump` em toda operação além do provisionamento (o mesmo erro
+`invalid URI query parameter: "schema"` já corrigido na v0.11.4, mas só lá).
+Agora `scripts/lib/instance.sh` expõe `db_url_for_psql()` como fonte única de
+normalização, e `upgrade.sh`, `backup-full.sh`, `restore-full.sh` e
+`restore-backup.sh` falam com o PostgreSQL pela URL sem a query string do ORM —
+sem repetir o strip por script e sem patch manual a cada instalação. O
+provisionador segue com seu strip próprio; o gate
+`verify-instance-isolation.sh` passa a exigir a normalização e a recusar
+`DATABASE_URL` crua nesses scripts.
+
+Reclassificação de estado: no contrato da Capability, S2 volta a `em andamento`
+(o corte de código segue aprovado pelo gate local e a migração de dados
+permanece não aplicável), permanecendo in-progress até a prova de instalação
+limpa da primeira instância dedicada. Sem `db push`; sem mudança de schema.
+
+## v0.11.5 - 2026-09-18 (Preflight PostgreSQL por host)
+
+O instalador dedicado descobre a porta do cluster PostgreSQL local e valida a
+conexão TCP antes de criar role, banco ou diretórios. Corrige o host real com
+PostgreSQL em `localhost:5433`, sem alterar configuração global nem exigir patch
+manual em futuras instalações.
+
+## v0.11.4 - 2026-09-18 (Provisionamento PostgreSQL dedicado)
+
+Corrige o provisionador inicial para remover `?schema=public` da URL usada pelo
+`psql`; esse parâmetro pertence ao Prisma e impedia criar o schema limpo.
+
+## v0.11.3 - 2026-09-18 (Proteções de coexistência no host)
+
+O instalador dedicado agora recusa banco Redis não vazio, porta derivada já em
+uso e domínio já declarado no Nginx. Isso impede cruzamento com os outros
+produtos que compartilham o servidor.
+
+## v0.11.2 - 2026-09-18 (Remoção segura do SaaS legado)
+
+Adiciona `uninstall-legacy-saas.sh`, com prévia obrigatória e confirmação
+literal. Ele remove exclusivamente os recursos conhecidos do IA Studio SaaS,
+mantendo serviços compartilhados e os demais produtos no host.
+
+## v0.11.1 - 2026-09-18 (Bootstrap sem tocar no legado)
+
+Correção do checkpoint dedicado. O bootstrap pode rodar a partir de um checkout
+temporário da tag e instala a nova instância sem executar scripts nem alterar o
+checkout SaaS histórico.
+
+## v0.11.0 - 2026-09-18 (Checkpoint: base dedicada por instância)
+
+Marco de código para criar a primeira instância dedicada a partir do ambiente
+de desenvolvimento. Não é deploy nem release operacional: S4 ainda requer a
+prova de duas instâncias reais no mesmo host.
+
+- A primeira instalação usa `upgrade.sh --bootstrap-dedicated --to <tag>`:
+  preserva checkout e banco SaaS legados e cria uma base PostgreSQL limpa em
+  `/opt/iastudio/instances/<id>`.
+- `install.sh` exige uma tag (`--source-revision`) e cria clone Git próprio,
+  banco/role PostgreSQL, Redis, PM2, storage, backup e vhost por instância.
+- `upgrade.sh` de instâncias dedicadas não aceita perda de schema
+  automaticamente; mudanças destrutivas falham de forma explícita.
+- S2 está concluído como não aplicável à migração de dados: não existem
+  clientes nem dados operacionais na instalação de desenvolvimento.
+
 ## v0.10.89 - 2026-09-14 (Templates header-media — parte 3: seletor de cabeçalho no formulário)
 
 Sem `db push`. Só `platform-admin` (build do painel). Fecha o header-media (partes 1–2 no backend).

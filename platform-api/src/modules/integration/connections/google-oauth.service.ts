@@ -17,11 +17,9 @@ import { ConnectionsRepository } from './connections.repository';
 import { ConnectionsService } from './connections.service';
 import { GoogleWorkspaceProvider, GOOGLE_WORKSPACE_PROVIDER_KEY } from '../registry/providers/google-workspace.provider';
 import { exchangeCode, getUserEmail, readGoogleOAuthConfig } from '../../../shared/integration/google-gmail.client';
-import { assertSameOrg } from '../../../shared/auth/tenant.util';
 
 interface OAuthStatePayload {
   purpose: 'google_oauth';
-  organization_id: string;
   connection_id: string;
 }
 
@@ -37,16 +35,15 @@ export class GoogleOauthService {
   ) {}
 
   /** Passo 1 (autenticado): devolve a URL de consentimento com state assinado. */
-  async start(organizationId: string, connectionId: string): Promise<{ url: string }> {
+  async start(connectionId: string): Promise<{ url: string }> {
     const connection = await this.connectionsRepo.findById(connectionId);
     if (!connection) throw new NotFoundException('Conexão não encontrada.');
-    assertSameOrg(connection.organization_id, organizationId);
     if (connection.provider_key !== GOOGLE_WORKSPACE_PROVIDER_KEY) {
       throw new BadRequestException('Esta conexão não é do tipo Google Workspace.');
     }
 
     const state = await this.jwt.signAsync(
-      { purpose: 'google_oauth', organization_id: organizationId, connection_id: connectionId } as OAuthStatePayload,
+      { purpose: 'google_oauth', connection_id: connectionId } as OAuthStatePayload,
       { expiresIn: '15m' },
     );
     const config = (connection.config ?? {}) as Record<string, unknown>;

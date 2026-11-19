@@ -71,10 +71,11 @@ export default function TemplateNovo() {
   useEffect(() => {
     listNumbers()
       .then((n) => {
-        setNumbers(n);
+        const official = n.filter((item) => item.supports_templates);
+        setNumbers(official);
         // Na criação, pré-seleciona o primeiro número; na edição o número vem
         // do template (imutável) e não pode ser sobrescrito.
-        if (!isEdit && n.length) setConnectionId((atual) => atual || n[0].id);
+        if (!isEdit && official.length) setConnectionId((atual) => atual || official[0].id);
       })
       .catch((err) => toast.error(err.message));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

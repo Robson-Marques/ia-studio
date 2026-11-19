@@ -1,5 +1,5 @@
-// Console — Atualizacao, Backup e Restauracao (Fase 8). Rotas exclusivas do
-// Console (@PlatformAdminOnly). Infra global da instancia: sem tenant.
+// Administração local — Atualizacao, Backup e Restauracao. Rotas exclusivas
+// autorizadas localmente por permissão explícita, sem tenant.
 // Auditoria de upgrade/backup/restore fica nos services (@Auditable/audit.record).
 import {
   BadRequestException,
@@ -16,17 +16,18 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { PlatformAdminOnly } from '../../shared/auth/platform-admin.guard';
+import { RequirePermissions } from '../../shared/auth/permissions.decorator';
+import { PERMISSIONS } from '../../shared/permissions.constants';
 import { CurrentUserId } from '../../shared/auth/current-user.decorator';
 import { VersionService } from './version.service';
 import { UpgradeService } from './upgrade.service';
 import { BackupService } from './backup.service';
 import { StartUpgradeDto, RestoreDto } from './dto/system.dtos';
 
-@ApiTags('Console — System (Atualização/Backup)')
+@ApiTags('Administração da instalação — Atualização/Backup')
 @ApiBearerAuth()
-@PlatformAdminOnly()
-@Controller('console/system')
+@RequirePermissions(PERMISSIONS.SYSTEM_MAINTAIN)
+@Controller('system')
 export class SystemController {
   constructor(
     private readonly versions: VersionService,
@@ -83,9 +84,9 @@ export class SystemController {
   }
 
   @Get('backups/current')
-  @ApiOperation({ summary: 'Operação de backup/restore em andamento (se houver)' })
-  currentOperation() {
-    return this.backups.currentOperation();
+  @ApiOperation({ summary: 'Operação em andamento ou status da operação identificada por ?id' })
+  currentOperation(@Query('id') id?: string) {
+    return this.backups.currentOperation(id);
   }
 
   @Post('backups')

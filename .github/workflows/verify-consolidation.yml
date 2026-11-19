@@ -1,0 +1,45 @@
+name: Validate IA Studio main consolidation
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  dedicated-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Ensure previous dedicated release is an ancestor
+        run: |
+          git merge-base --is-ancestor v0.12.17 HEAD
+          test -f scripts/install-dedicated.sh
+          test -f platform-admin/src/pages/WhatsApp/PdfThumbnail.jsx
+      - name: Check updater shell syntax
+        run: bash -n scripts/upgrade.sh
+      - name: Install API dependencies without provisioning Docker
+        working-directory: platform-api
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Generate Prisma client and compile API
+        working-directory: platform-api
+        run: |
+          npx prisma generate
+          npm run build
+      - name: Install admin dependencies (private Studio UX registry)
+        working-directory: platform-admin
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo '::error::Configure repository secret NPM_TOKEN for the private @studio-ux-ds GitLab registry.'
+            exit 1
+          fi
+          npm install --no-package-lock --no-audit --no-fund
+      - name: Compile admin with PDF preview and WhatsApp
+        working-directory: platform-admin
+        run: npm run build

@@ -4,14 +4,11 @@ import axios from 'axios';
 //
 //   - baseURL /api/v1 (proxy do Vite em dev; nginx em producao).
 //   - Token JWT persistido em localStorage.iastudio_token.
-//   - Interceptor de request injeta Authorization: Bearer + x-workspace-id
-//     (workspace selecionado no header do shell).
+//   - Interceptor de request injeta somente Authorization: Bearer.
 //   - Interceptor de response redireciona para /login em 401 e limpa storage.
 
 export const TOKEN_KEY     = 'iastudio_token';
 export const USER_KEY      = 'iastudio_user';
-export const WORKSPACE_KEY = 'iastudio_workspace_id';
-export const ENV_KEY       = 'iastudio_environment_id';
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY) || '';
@@ -33,24 +30,6 @@ export function setStoredUser(user) {
   else      localStorage.removeItem(USER_KEY);
 }
 
-export function getStoredWorkspaceId() {
-  return localStorage.getItem(WORKSPACE_KEY) || '';
-}
-
-export function setStoredWorkspaceId(id) {
-  if (id) localStorage.setItem(WORKSPACE_KEY, id);
-  else    localStorage.removeItem(WORKSPACE_KEY);
-}
-
-export function getStoredEnvironmentId() {
-  return localStorage.getItem(ENV_KEY) || '';
-}
-
-export function setStoredEnvironmentId(id) {
-  if (id) localStorage.setItem(ENV_KEY, id);
-  else    localStorage.removeItem(ENV_KEY);
-}
-
 export function clearAuth() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
@@ -67,11 +46,6 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
-  }
-  const wsId = getStoredWorkspaceId();
-  if (wsId) {
-    config.headers = config.headers || {};
-    config.headers['x-workspace-id'] = wsId;
   }
   return config;
 });

@@ -5,7 +5,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { ToolsService } from './tools.service';
 import { CreateToolDto, UpdateToolDto } from './dto/tools.dtos';
 
@@ -18,11 +17,9 @@ export class ToolsController {
   @Get()
   @RequirePermissions(PERMISSIONS.AI_TOOLS_READ)
   findAll(
-    @CurrentUser() user: AuthenticatedUser,
     @Query('only_active') onlyActive?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.tools.findAll(resolveOrganizationId(user, orgQuery), onlyActive === 'true');
+    return this.tools.findAll(onlyActive === 'true');
   }
 
   @Post()
@@ -30,19 +27,16 @@ export class ToolsController {
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateToolDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.tools.create(resolveOrganizationId(user, orgQuery), dto, user.sub);
+    return this.tools.create(dto, user.sub);
   }
 
   @Patch(':id')
   @RequirePermissions(PERMISSIONS.AI_TOOLS_WRITE)
   update(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateToolDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.tools.update(resolveOrganizationId(user, orgQuery), id, dto);
+    return this.tools.update(id, dto);
   }
 }

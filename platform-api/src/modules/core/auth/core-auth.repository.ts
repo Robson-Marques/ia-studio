@@ -16,24 +16,7 @@ export class CoreAuthRepository {
   findById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      include: {
-        profile: { select: { id: true, name: true, permissions: true, deleted_at: true } },
-        organization: { select: { id: true, name: true, slug: true, branding: true, is_active: true } },
-        memberships: {
-          include: {
-            workspace: {
-              select: {
-                id: true, name: true, slug: true, is_active: true,
-                environments: {
-                  select: { id: true, name: true, kind: true, is_default: true },
-                  orderBy: { created_at: 'asc' },
-                },
-              },
-            },
-            profile: { select: { id: true, name: true, permissions: true, deleted_at: true } },
-          },
-        },
-      },
+      include: { profile: { select: { id: true, name: true, permissions: true, deleted_at: true } } },
     });
   }
 
@@ -45,13 +28,6 @@ export class CoreAuthRepository {
     return this.prisma.user.update({
       where: { id },
       data: { password_hash: passwordHash, jwt_revoked_at: new Date() },
-    });
-  }
-
-  findLicenseStatus(organizationId: string) {
-    return this.prisma.license.findUnique({
-      where: { organization_id: organizationId },
-      select: { status: true, trial_ends_at: true, expires_at: true, plan: { select: { name: true, features: true } } },
     });
   }
 }

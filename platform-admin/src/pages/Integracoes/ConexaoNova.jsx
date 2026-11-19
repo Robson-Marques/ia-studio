@@ -1,17 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Screen, WizardScreen, PageHeader, Card, Field, Input, Select, Button, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
-import { getMarketplace, createConnection } from '../../services/integrations';
-import { useWorkspace } from '../../context/WorkspaceContext';
+import { listConnectionProviders, createConnection } from '../../services/integrations';
 import { ConnectionField, WebhookUrlBox } from './ConnectionFields';
 import { statusMeta } from './integration.constants';
 import GoogleOAuthButton from './GoogleOAuthButton';
 
 // Integrações/ConexaoNova — o passo a passo de criar uma conexão (v0.10.11).
 //
-// Rota `/integracoes/conexoes/nova`, aceitando `?provider=<chave>` (é assim que
-// o Marketplace manda para cá). Antes eram DOIS modais em sequência: um para
-// escolher o conector, outro com o wizard.
+// Rota `/integracoes/conexoes/nova`. O escolhedor de provider é o primeiro
+// passo do wizard, sem uma etapa separada de instalação.
 //
 // Por que rota:
 //  · É formulário de vários passos **com credenciais**. Perder o preenchido por
@@ -31,7 +29,6 @@ export default function ConexaoNova() {
   const navigate = useNavigate();
   const toast = useToast();
   const [searchParams] = useSearchParams();
-  const { workspace, environment, workspaceId, environmentId } = useWorkspace();
 
   const [providers, setProviders] = useState([]);
   const [carregandoProviders, setCarregandoProviders] = useState(true);
@@ -45,8 +42,8 @@ export default function ConexaoNova() {
   useEffect(() => {
     (async () => {
       try {
-        const { items } = await getMarketplace();
-        setProviders((items || []).filter((i) => i.installed && i.has_implementation));
+        const { items } = await listConnectionProviders();
+        setProviders(items || []);
       } catch (err) {
         toast.error(err.message);
       } finally {
@@ -96,10 +93,6 @@ export default function ConexaoNova() {
   }
 
   async function salvar() {
-    if (!workspaceId || !environmentId) {
-      toast.error('Escolha o workspace e o ambiente no topo do painel — a conexão precisa saber onde vale.');
-      return;
-    }
     setSalvando(true);
     try {
       const config = {};
@@ -115,8 +108,6 @@ export default function ConexaoNova() {
       const criada = await createConnection({
         provider_key: provider.key,
         name: nome.trim(),
-        workspace_id: workspaceId,
-        environment_id: environmentId,
         config,
         secrets,
       });
@@ -172,17 +163,16 @@ export default function ConexaoNova() {
     );
   }
 
-  // --- Nenhum conector instalado: o passo a passo não tem como começar ---
+  // --- Sem provider disponível: o passo a passo não tem como começar ---
   if (!carregandoProviders && !providers.length) {
     return (
       <Screen as="div" className="space-y-6">
         <PageHeader title="Nova conexão" />
         <Card>
           <EmptyState
-            icon="download"
-            title="Nenhum conector instalado"
-            description="Uma conexão é sempre de algum conector. Instale um no Marketplace e volte aqui."
-            action={<Button variant="primary" onClick={() => navigate('/integracoes/marketplace')}>Ir ao Marketplace</Button>}
+            icon="plug"
+            title="Nenhum conector disponível"
+            description="Nenhum conector ativo está pronto para ser configurado nesta instalação."
           />
         </Card>
       </Screen>
@@ -208,7 +198,7 @@ export default function ConexaoNova() {
             </div>
           ) : passo === 0 ? (
             <>
-              <Field label="Conector" required hint="Só aparecem os conectores instalados que já aceitam conexão.">
+              <Field label="Conector" required hint="Escolha qual sistema esta conexão vai configurar.">
                 <Select value={providerKey} onChange={(e) => setProviderKey(e.target.value)} autoFocus>
                   <option value="">Selecione…</option>
                   {providers.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
@@ -242,8 +232,7 @@ export default function ConexaoNova() {
           ) : (
             <>
               <p style={{ fontSize: 13, margin: 0, color: 'var(--su-text-secondary)' }}>
-                A conexão vai ser criada em <strong>{workspace?.name || 'workspace'}</strong> /{' '}
-                <strong>{environment?.name || environment?.kind || 'ambiente'}</strong>. As senhas e chaves vão para o
+                A conexão vai ser criada nesta instalação. As senhas e chaves vão para o
                 cofre cifradas, e o teste de acesso roda em seguida — se não passar, a conexão é criada mesmo assim e você
                 conserta sem refazer tudo.
               </p>

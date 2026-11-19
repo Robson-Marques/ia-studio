@@ -55,3 +55,13 @@ export function formatPhone(phone) {
   }
   return phone ? `+${d}` : '';
 }
+
+export function contactInitials(name, phone) {
+  const parts = String(name || '').trim().split(/\s+/).map((part) =>
+    Array.from(part).filter((char) => /[0-9A-Za-zÀ-ÖØ-öø-ÿ]/.test(char)).join(''),
+  ).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  if (parts.length === 1) return Array.from(parts[0]).slice(0, 2).join('').toUpperCase();
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits.slice(-2) || '?';
+}

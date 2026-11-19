@@ -7,7 +7,6 @@ import { Observable } from 'rxjs';
 import { randomUUID } from 'crypto';
 import { requestStorage, RequestStore } from './request-context';
 import { RequestWithUser } from '../auth/auth.types';
-import { getEnvironmentIdHeader, getWorkspaceIdHeader, headerValue } from '../auth/tenant.util';
 
 @Injectable()
 export class RequestContextInterceptor implements NestInterceptor {
@@ -18,15 +17,11 @@ export class RequestContextInterceptor implements NestInterceptor {
       actor: {
         id: req.user?.sub,
         email: req.user?.email,
-        actorType: req.user?.actor,
-        organizationId: req.user?.organization_id ?? null,
         profileId: req.user?.profile_id ?? null,
       },
       ip: req.ip,
-      userAgent: headerValue(req, 'user-agent'),
-      workspaceId: getWorkspaceIdHeader(req),
-      environmentId: getEnvironmentIdHeader(req),
-      traceId: headerValue(req, 'x-trace-id') ?? randomUUID(),
+      userAgent: this.header(req, 'user-agent'),
+      traceId: this.header(req, 'x-trace-id') ?? randomUUID(),
     };
 
     return new Observable((subscriber) => {
@@ -38,5 +33,10 @@ export class RequestContextInterceptor implements NestInterceptor {
         });
       });
     });
+  }
+
+  private header(req: RequestWithUser, name: string): string | undefined {
+    const value = req.headers[name.toLowerCase()];
+    return Array.isArray(value) ? value[0] : value;
   }
 }

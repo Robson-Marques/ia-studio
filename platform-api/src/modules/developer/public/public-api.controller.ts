@@ -25,12 +25,11 @@ export class PublicApiController {
     return { ok: true, service: 'ia-studio', version: 'v1' };
   }
 
-  /** Contexto da chave: organization + escopos (sem dados sensiveis). */
+  /** Contexto da chave: escopos locais (sem dados sensíveis). */
   @Get('me')
   me(@Req() req: PublicRequest) {
     const ctx = req.apiKey;
     return {
-      organization_id: ctx?.organization_id ?? null,
       scopes: ctx?.scopes ?? [],
     };
   }

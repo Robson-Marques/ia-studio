@@ -1,11 +1,13 @@
-// Tipos unificados do canal WhatsApp (Meta Cloud API oficial-only — spec
-// "Connection Wizard Meta"). Portados/adaptados do orquestrador do Aquapark.
+// Tipos internos do canal WhatsApp: Meta oficial via Central Nivoo + WAHA.
+// Portados/adaptados do orquestrador do Aquapark.
 //
-// RichMessage: formato padrao de ENVIO (texto, midia, botoes, lista, CTA).
-// NormalizedMessage: formato padrao das mensagens RECEBIDAS via webhook.
+// RichMessage: formato interno de envio compartilhado pelos providers.
 // Sem fallback automatico: quem chama decide o que fazer quando um tipo
 // nao e suportado.
 
+// ─── RichMessage (envio) ────────────────────────────────────────────────
+
+/** Tipos normalizados persistidos/emitidos por mensagens recebidas. */
 export type WhatsappMessageType =
   | 'text'
   | 'image'
@@ -13,34 +15,7 @@ export type WhatsappMessageType =
   | 'video'
   | 'document'
   | 'sticker'
-  | 'location'
-  | 'interactive'
-  | 'template';
-
-export interface NormalizedInboundMedia {
-  media_id: string;
-  mime_type: string;
-  filename?: string;
-  caption?: string;
-}
-
-/** Mensagem inbound normalizada (webhook Meta → inbox). */
-export interface NormalizedMessage {
-  /** wamid da Meta */
-  externalId: string;
-  /** Telefone de origem (E.164 sem +) */
-  from: string;
-  /** phone_number_id que recebeu */
-  phoneNumberId: string;
-  type: WhatsappMessageType;
-  content: string;
-  media?: NormalizedInboundMedia;
-  contactName?: string;
-  timestamp: Date;
-  raw?: unknown;
-}
-
-// ─── RichMessage (envio) ────────────────────────────────────────────────
+  | 'location';
 
 export type RichMessage =
   | RichText
@@ -58,15 +33,19 @@ export interface RichText {
 export interface RichMedia {
   kind: 'image' | 'audio' | 'video' | 'document';
   /**
-   * URL publica da midia (Meta baixa por link) OU media_id ja carregado na
-   * Meta (upload direto do aparelho). Ao menos um dos dois e obrigatorio;
-   * quando ha mediaId, ele tem precedencia sobre url no payload da Cloud API.
+   * URL HTTPS de mídia OU media_id/referência devolvida pelo provider. Ao menos
+   * um dos dois é obrigatório; mediaId tem precedência sobre url.
    */
   url?: string;
-  /** media_id retornado pelo POST /{phone_number_id}/media (upload direto). */
+  /** media_id da Central ou data URI efêmera produzida pelo upload WAHA. */
   mediaId?: string;
+  /** Base64 efêmero usado no envio direto pela WAHA; nunca é persistido. */
+  data?: string;
+  mimeType?: string;
   caption?: string;
   filename?: string;
+  /** Nota de voz gravada no painel; o codec/MIME ainda deve ser aceito pela Meta. */
+  voice?: boolean;
 }
 
 /** Variaveis do template: posicionais flat ({'1': valor}) ou por componente. */

@@ -15,8 +15,6 @@ import { LlmProviderRegistryService } from './providers/llm-provider-registry.se
 import { LlmProviderService } from './providers/llm-provider.service';
 import { OpenAiLlmProvider } from './providers/impl/openai.provider';
 import { AnthropicLlmProvider } from './providers/impl/anthropic.provider';
-import { GeminiLlmProvider } from './providers/impl/gemini.provider';
-import { OllamaLlmProvider } from './providers/impl/ollama.provider';
 
 // Orchestrator
 import { AiOrchestratorService } from './orchestrator/ai-orchestrator.service';
@@ -46,11 +44,6 @@ import { ApprovalsRepository } from './approvals/approvals.repository';
 import { ApprovalPolicyService } from './approvals/approval-policy.service';
 import { ApprovalsService } from './approvals/approvals.service';
 import { ApprovalsController } from './approvals/approvals.controller';
-
-// Costs
-import { CostsRepository } from './costs/costs.repository';
-import { CostsService } from './costs/costs.service';
-import { CostsController } from './costs/costs.controller';
 
 // Collaboration
 import { CollaborationRepository } from './collaboration/collaboration.repository';
@@ -94,7 +87,6 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     KnowledgeController,
     ToolsController,
     ApprovalsController,
-    CostsController,
     CollaborationController,
     McpController,
     AgentsController,
@@ -107,8 +99,6 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     LlmProviderService,
     OpenAiLlmProvider,
     AnthropicLlmProvider,
-    GeminiLlmProvider,
-    OllamaLlmProvider,
     // Orchestrator
     AiOrchestratorService,
     // Memory
@@ -129,9 +119,6 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     ApprovalsRepository,
     ApprovalPolicyService,
     ApprovalsService,
-    // Costs
-    CostsRepository,
-    CostsService,
     // Collaboration
     CollaborationRepository,
     CollaborationService,
@@ -160,8 +147,8 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
   // AgentRunnerService exportado pra futura orquestracao externa (workers).
   // ToolRegistryService exportado pra Fase 6: o IspModule registra as tools ISP
   // no MESMO registry (sem que o AiModule importe o IspModule — evita ciclo).
-  // Fase 7: LlmProviderService + AiOrchestratorService exportados pro Mapper
-  // Inteligente (ResourceModule) e pro Console do Desenvolvedor (DevtoolsModule);
+  // LlmProviderService + AiOrchestratorService exportados pro Console do
+  // Desenvolvedor (DevtoolsModule);
   // ToolRuntimeService exportado pro Console rodar tools do catalogo.
   exports: [AgentRunnerService, ToolRegistryService, LlmProviderService, AiOrchestratorService, ToolRuntimeService],
 })

@@ -35,7 +35,7 @@ export class ChatScopeResolver {
     if (cached && cached.expiresAt > now) return cached.scope;
 
     const perms = user.permissions ?? [];
-    const isSuper = user.is_platform_admin || perms.includes('*');
+    const isSuper = perms.includes('*');
     const has = (p: string) => isSuper || perms.includes(p);
 
     const memberships = await this.repository

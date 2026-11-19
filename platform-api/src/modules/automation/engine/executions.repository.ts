@@ -36,8 +36,8 @@ export class ExecutionsRepository {
     });
   }
 
-  findAllByOrg(organizationId: string, filters: ExecutionFilters = {}, take = 25, skip = 0) {
-    const where: Prisma.WorkflowExecutionWhereInput = { organization_id: organizationId };
+  findAll(filters: ExecutionFilters = {}, take = 25, skip = 0) {
+    const where: Prisma.WorkflowExecutionWhereInput = {};
     if (filters.workflowId) where.workflow_id = filters.workflowId;
     if (filters.status) where.status = filters.status;
     if (filters.traceId) where.trace_id = filters.traceId;

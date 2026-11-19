@@ -4,9 +4,6 @@ import { Prisma, SecretKind } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface CreateSecretRow {
-  organizationId: string;
-  workspaceId?: string | null;
-  environmentId?: string | null;
   name: string;
   kind: SecretKind;
   encryptedValue: string;
@@ -18,9 +15,8 @@ export interface CreateSecretRow {
 export class SecretsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllByOrg(organizationId: string) {
+  findAll() {
     return this.prisma.secret.findMany({
-      where: { organization_id: organizationId },
       orderBy: { created_at: 'desc' },
     });
   }
@@ -32,9 +28,6 @@ export class SecretsRepository {
   create(row: CreateSecretRow) {
     return this.prisma.secret.create({
       data: {
-        organization_id: row.organizationId,
-        workspace_id: row.workspaceId ?? null,
-        environment_id: row.environmentId ?? null,
         name: row.name,
         kind: row.kind,
         encrypted_value: row.encryptedValue,

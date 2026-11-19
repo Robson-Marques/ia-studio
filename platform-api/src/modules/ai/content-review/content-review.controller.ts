@@ -7,7 +7,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { ContentReviewService } from './content-review.service';
 
 @ApiTags('IA — Revisão de conteúdo')
@@ -19,11 +18,9 @@ export class ContentReviewController {
   @Get(':id/content-reviews')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
   list(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.reviews.list(resolveOrganizationId(user, orgQuery), id);
+    return this.reviews.list(id);
   }
 
   @Post(':id/content-reviews')
@@ -32,24 +29,21 @@ export class ContentReviewController {
   review(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.reviews.review(resolveOrganizationId(user, orgQuery), id, { userId: user.sub });
+    return this.reviews.review(id, { userId: user.sub });
   }
 
   @Get(':id/content-reviews/:reviewId/export')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
   @ApiOperation({ summary: 'Baixa uma revisão já produzida (PDF ou TXT)' })
   async export(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Param('reviewId') reviewId: string,
     @Res() reply: FastifyReply,
     @Query('format') format?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     const fmt = format === 'txt' ? 'txt' : 'pdf';
-    const out = await this.reviews.export(resolveOrganizationId(user, orgQuery), id, reviewId, fmt);
+    const out = await this.reviews.export(id, reviewId, fmt);
     return reply
       .header('Content-Type', out.contentType)
       .header('Content-Disposition', `attachment; filename="${out.filename}"`)

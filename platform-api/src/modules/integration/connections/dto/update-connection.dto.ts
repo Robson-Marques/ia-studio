@@ -2,8 +2,7 @@ import { IsArray, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Min } from 
 
 // Atualizacao de dados nao-estruturais da Instance (nome/tags/prioridade) +
 // credenciais (config nao-sensivel + secrets). Estado muda SOMENTE via
-// PATCH /connections/:id/state (state machine). provider_key/workspace/
-// environment NUNCA mudam por aqui.
+// PATCH /connections/:id/state (state machine). provider_key nunca muda por aqui.
 export class UpdateConnectionDto {
   @IsOptional()
   @IsString()

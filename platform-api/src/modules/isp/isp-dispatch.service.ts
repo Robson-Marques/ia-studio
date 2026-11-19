@@ -6,7 +6,8 @@
 // Nasce OFF: so roda quando o operador ativa o modo proativo e confirma.
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { IspIncident } from '@prisma/client';
-import { WhatsappOrchestratorService } from '../comm/whatsapp/whatsapp-orchestrator.service';
+import { WhatsappSmartSendService } from '../comm/whatsapp/whatsapp-smart-send.service';
+import { SEED_CATALOG } from '../comm/whatsapp/template-catalog/catalog.seed';
 import { IspRepository } from './isp.repository';
 import {
   DEFAULT_DISPATCH_RATE_PER_SEC,
@@ -16,6 +17,7 @@ import {
 export interface DispatchResult {
   total: number;
   sent: number;
+  queued: number;
   failed: number;
   skipped: number;
 }
@@ -30,7 +32,7 @@ export class IspDispatchService {
 
   constructor(
     private readonly repository: IspRepository,
-    private readonly whatsapp: WhatsappOrchestratorService,
+    private readonly whatsapp: WhatsappSmartSendService,
   ) {}
 
   /**
@@ -45,7 +47,7 @@ export class IspDispatchService {
       throw new BadRequestException('Disparo em massa exige confirmação explícita.');
     }
     const targets = await this.repository.findIncludedTargets(incident.id);
-    const result: DispatchResult = { total: targets.length, sent: 0, failed: 0, skipped: 0 };
+    const result: DispatchResult = { total: targets.length, sent: 0, queued: 0, failed: 0, skipped: 0 };
     if (targets.length === 0) return result;
 
     const rate = Math.min(Math.max(opts.ratePerSec ?? DEFAULT_DISPATCH_RATE_PER_SEC, 1), MAX_DISPATCH_RATE_PER_SEC);
@@ -56,7 +58,6 @@ export class IspDispatchService {
       if (!target.phone) {
         result.skipped += 1;
         await this.repository.createDispatch({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           target_id: target.id,
           channel: 'WHATSAPP',
@@ -66,29 +67,27 @@ export class IspDispatchService {
         continue;
       }
       try {
-        await this.whatsapp.send(
-          {
-            organizationId: incident.organization_id,
-            workspaceId: incident.workspace_id,
-            environmentId: incident.environment_id,
-            phone: target.phone,
-            sender: 'system',
-          },
-          { kind: 'text', body },
-        );
-        result.sent += 1;
+        const { via, jobId } = await this.whatsapp.send({
+          phone: target.phone,
+          text: body,
+          template: opts.normalized ? SEED_CATALOG[2].name : SEED_CATALOG[1].name,
+          variables: { '1': incident.title },
+          sender: 'system',
+        });
+        if (via === 'skipped' || !jobId) throw new Error('Template não aprovado ou envio não aceito pela Central.');
+        result.queued += 1;
         await this.repository.createDispatch({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           target_id: target.id,
           channel: 'WHATSAPP',
-          status: 'SENT',
-          sent_at: new Date(),
+          status: 'PENDING',
+          job_id: jobId,
+        }).catch((error) => {
+          this.logger.error(`A Central aceitou o job ${jobId}, mas o log ISP falhou: ${(error as Error).message}`);
         });
       } catch (e) {
         result.failed += 1;
         await this.repository.createDispatch({
-          organization_id: incident.organization_id,
           incident_id: incident.id,
           target_id: target.id,
           channel: 'WHATSAPP',
@@ -100,7 +99,7 @@ export class IspDispatchService {
       await sleep(delayMs);
     }
     this.logger.log(
-      `Disparo do incidente ${incident.id}: ${result.sent} enviados, ${result.failed} falhas, ${result.skipped} sem telefone.`,
+      `Disparo do incidente ${incident.id}: ${result.queued} aceitos pela Central, ${result.failed} falhas, ${result.skipped} sem telefone.`,
     );
     return result;
   }

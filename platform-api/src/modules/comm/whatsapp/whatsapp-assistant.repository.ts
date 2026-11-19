@@ -21,9 +21,6 @@ export class WhatsappAssistantRepository {
 
   /** Upsert por conexão: cria ou atualiza o assistente vinculado. */
   upsert(data: {
-    organization_id: string;
-    workspace_id: string;
-    environment_id: string;
     connection_id: string;
     agent_id: string;
     is_enabled: boolean;

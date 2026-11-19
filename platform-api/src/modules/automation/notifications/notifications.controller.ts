@@ -7,7 +7,6 @@ import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { NotificationsRepository } from './notifications.repository';
 import { NotificationCenterService } from './notification-center.service';
 
@@ -24,13 +23,11 @@ export class NotificationsController {
   @Get('inbox')
   async inbox(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('organization_id') orgQuery?: string,
     @Query('take') take?: string,
   ) {
-    const orgId = resolveOrganizationId(user, orgQuery);
     const [items, unread] = await Promise.all([
-      this.repository.findInbox(orgId, user.sub, false, take ? Number(take) : 20),
-      this.repository.countUnread(orgId, user.sub),
+      this.repository.findInbox(user.sub, false, take ? Number(take) : 20),
+      this.repository.countUnread(user.sub),
     ]);
     return { items, unread };
   }
@@ -39,32 +36,27 @@ export class NotificationsController {
   async markRead(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    const orgId = resolveOrganizationId(user, orgQuery);
     const notif = await this.repository.findInAppById(id);
-    if (!notif || notif.organization_id !== orgId || (notif.user_id && notif.user_id !== user.sub)) {
+    if (!notif || (notif.user_id && notif.user_id !== user.sub)) {
       throw new NotFoundException('Notificação não encontrada.');
     }
     return this.repository.markRead(id);
   }
 
   @Post('inbox/read-all')
-  markAllRead(@CurrentUser() user: AuthenticatedUser, @Query('organization_id') orgQuery?: string) {
-    return this.repository.markAllRead(resolveOrganizationId(user, orgQuery), user.sub);
+  markAllRead(@CurrentUser() user: AuthenticatedUser) {
+    return this.repository.markAllRead(user.sub);
   }
 
   /** Log de entrega do Notification Center. */
   @Get('log')
   @RequirePermissions(PERMISSIONS.AUTOMATION_NOTIFICATIONS_READ)
   async log(
-    @CurrentUser() user: AuthenticatedUser,
     @Query('take') take?: string,
     @Query('skip') skip?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
     const [total, items] = await this.repository.findLog(
-      resolveOrganizationId(user, orgQuery),
       take ? Number(take) : 50,
       skip ? Number(skip) : 0,
     );
@@ -75,22 +67,15 @@ export class NotificationsController {
   @Post('send')
   @RequirePermissions(PERMISSIONS.AUTOMATION_NOTIFICATIONS_READ)
   send(
-    @CurrentUser() user: AuthenticatedUser,
     @Body() body: {
       recipient: { phone?: string; email?: string; user_id?: string };
       template_id?: string;
       title?: string;
       content?: string;
       channel?: 'whatsapp' | 'email' | 'in_app';
-      workspace_id?: string;
-      environment_id?: string;
     },
-    @Query('organization_id') orgQuery?: string,
   ) {
     return this.center.notify({
-      organizationId: resolveOrganizationId(user, orgQuery),
-      workspaceId: body.workspace_id,
-      environmentId: body.environment_id,
       recipient: body.recipient ?? {},
       templateId: body.template_id,
       title: body.title,

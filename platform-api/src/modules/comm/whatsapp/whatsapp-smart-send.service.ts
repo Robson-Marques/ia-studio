@@ -1,20 +1,17 @@
-// Envio "inteligente" respeitando a janela de 24h da Meta (portado do
+// Envio pela Central respeitando a janela de 24h (portado do
 // Aquapark). Regra unica reutilizavel pelos emissores automaticos (IA e
 // automacao nas Fases 4-5):
 //   - dentro de 24h            → texto livre (a fala dinamica);
 //   - expirou / contato frio   → template HSM aprovado;
-//   - texto livre recusado com 131047 → backstop no template (a janela local
-//     estava desatualizada; o codigo da Meta e autoritativo).
+//   - Central indica requiresTemplate → backstop no template.
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  WhatsappOrchestratorService,
-  OrchestratorScope,
-} from './whatsapp-orchestrator.service';
-import { MetaApiError, META_REENGAGEMENT_CODE } from '../../../shared/integration/meta-graph.client';
+import { WhatsappOrchestratorService } from './whatsapp-orchestrator.service';
+import { NivooCentralError } from '../../../shared/integration/nivoo-whatsapp.client';
 import { SendCriteria, TemplateVariables } from '../../../shared/integration/whatsapp.types';
 import { normalizePhone } from './whatsapp.helpers';
+import { usesOfficialWhatsappWindow } from '../../../shared/integration/whatsapp-provider.constants';
 
-export interface SmartSendArgs extends OrchestratorScope {
+export interface SmartSendArgs {
   phone: string;
   criteria?: SendCriteria;
   /** Texto livre (usado DENTRO da janela de 24h). */
@@ -38,23 +35,21 @@ export class WhatsappSmartSendService {
 
   constructor(private readonly orchestrator: WhatsappOrchestratorService) {}
 
-  async send(args: SmartSendArgs): Promise<{ via: SmartSendVia }> {
+  async send(args: SmartSendArgs): Promise<{ via: SmartSendVia; jobId?: string }> {
     const phone = normalizePhone(args.phone);
     if (!phone) return { via: 'skipped' };
     const language = args.language ?? 'pt_BR';
-    const scope: OrchestratorScope = {
-      organizationId: args.organizationId,
-      workspaceId: args.workspaceId,
-      environmentId: args.environmentId,
-    };
-
-    const connection = await this.orchestrator.resolveConnection(scope, args.criteria);
+    const connection = await this.orchestrator.resolveConnection(args.criteria);
+    // Este serviço existe para a regra Meta janela→template e para o job
+    // assíncrono reconciliado pela Central. WAHA não tem HSM nem job Nivoo;
+    // portanto emissores ISP/Notification Center não podem cair nela.
+    if (!usesOfficialWhatsappWindow(connection.provider_key)) return { via: 'skipped' };
     const state = await this.orchestrator.windowState(connection.id, phone);
 
     // Fora da janela (sabido): direto ao template, sem tentar texto livre.
     if (state !== 'within') {
       const template = state === 'none' ? (args.coldTemplate ?? args.template) : args.template;
-      return { via: await this.sendTemplate(args, phone, template, language) };
+      return this.sendTemplate(args, phone, template, language);
     }
 
     // Dentro da janela: emissor "nao-interromper" desiste.
@@ -62,16 +57,16 @@ export class WhatsappSmartSendService {
 
     // Dentro da janela: texto livre.
     try {
-      await this.orchestrator.send(
-        { ...scope, phone, criteria: { connectionId: connection.id }, sender: args.sender ?? 'system' },
+      const result = await this.orchestrator.send(
+        { phone, criteria: { connectionId: connection.id }, sender: args.sender ?? 'system' },
         { kind: 'text', body: args.text },
       );
-      return { via: 'text' };
+      return { via: 'text', jobId: result.jobId };
     } catch (err) {
-      // Backstop autoritativo: 131047 → janela local desatualizada → template.
-      if (err instanceof MetaApiError && err.metaCode === META_REENGAGEMENT_CODE) {
-        this.logger.warn(`Texto livre recusado (131047) para ${phone} — caindo no template ${args.template}.`);
-        return { via: await this.sendTemplate(args, phone, args.template, language) };
+      // Backstop da Central: janela local desatualizada → template.
+      if (err instanceof NivooCentralError && err.requiresTemplate) {
+        this.logger.warn(`Janela encerrada para ${phone} — usando o modelo ${args.template}.`);
+        return this.sendTemplate(args, phone, args.template, language);
       }
       throw err;
     }
@@ -82,24 +77,21 @@ export class WhatsappSmartSendService {
     phone: string,
     templateName: string,
     language: string,
-  ): Promise<SmartSendVia> {
+  ): Promise<{ via: SmartSendVia; jobId?: string }> {
     try {
-      await this.orchestrator.send(
+      const result = await this.orchestrator.send(
         {
-          organizationId: args.organizationId,
-          workspaceId: args.workspaceId,
-          environmentId: args.environmentId,
           phone,
           criteria: args.criteria,
           sender: args.sender ?? 'system',
         },
         { kind: 'template', name: templateName, language, variables: args.variables },
       );
-      return 'template';
+      return { via: 'template', jobId: result.jobId };
     } catch (err) {
       // Template nao publicado/aprovado → nao quebra o fluxo do emissor.
       this.logger.warn(`Template "${templateName}" não enviado a ${phone}: ${(err as Error).message}`);
-      return 'skipped';
+      return { via: 'skipped' };
     }
   }
 }

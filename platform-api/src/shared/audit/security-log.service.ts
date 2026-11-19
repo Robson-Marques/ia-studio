@@ -14,7 +14,6 @@ export type SecurityEvent =
 
 export interface SecurityLogInput {
   event: SecurityEvent;
-  organizationId?: string | null;
   userId?: string | null;
   email?: string | null;
 }
@@ -30,7 +29,6 @@ export class SecurityLogService {
       const store = getRequestStore();
       await this.prisma.securityLog.create({
         data: {
-          organization_id: input.organizationId ?? null,
           user_id: input.userId ?? null,
           email: input.email ?? null,
           event: input.event,

@@ -1,51 +1,49 @@
-# scripts/ — Instalação, Atualização e Backup (Fase 8)
+# Scripts operacionais — aplicações dedicadas por vertente
 
-Scripts de operação de produção do IA Studio. Modelo consagrado no Aquapark.
+Os scripts operam uma aplicação identificada, nunca uma plataforma compartilhada.
+Cada vertente nasce em repositório próprio; sua instalação tem diretório,
+banco/role PostgreSQL, Redis, fila, storage, backup, PM2 e vhost próprios.
 
-**Ambiente-alvo:** Debian 13, executando como **root** (nenhum script usa `sudo`
-para si — apenas `sudo -u postgres` para falar com o Postgres). Caminho fixo de
-produção: `/opt/iastudio`. Processos PM2: `iastudio-api` + `iastudio-worker`.
-
-> A máquina do Robson **não tem Node** — o build acontece **somente no servidor**
-> (via `install.sh` ou pelo painel de Atualização do Console, que chama
-> `upgrade.sh`). Nunca peça build local.
-
-## Scripts
-
-| Script | O que faz |
+| Script | Responsabilidade |
 |---|---|
-| `install.sh` | **Wizard interativo** (`bash scripts/install.sh` sem args) OU headless. Pergunta: modo `single` (painel + Console no mesmo domínio, Console em `/console/`) ou `multi` (painel/Console/API em domínios separados — recomendado), domínios, SSL Let's Encrypt (e-mail), **nome/e-mail/senha do admin** da plataforma, criar org Demo (s/N), opções avançadas (keep-deps/keep-db). Instala Node 20, PM2, PostgreSQL + **pgvector** (`CREATE EXTENSION vector`), Redis, Nginx, Certbot; cria `iastudio_db`; gera `.env` (segredos aleatórios + `PLATFORM_ADMIN_EMAIL/PASSWORD` + `SEED_DEMO` + `GOOGLE_*`); `prisma db push`; build api + admin + console; sobe PM2 `iastudio-api` + `iastudio-worker`; **verifica o seed** (aguarda a API subir e aborta se o admin não existir em `core_users`); Nginx + SSL. Flags headless: `--mode= --domain[-admin/-console/-api]= --email= --admin-email= --admin-password= [--no-demo --keep-deps --keep-db --no-ssl]`. |
-| `uninstall.sh` | **Wizard interativo** com menu: PURGE TOTAL, keep-deps, keep-db, keep-all. PURGE exige digitar `REMOVER`. Headless: `--purge` (default) / `--keep-deps` / `--keep-db` / `--keep-all` / `--yes`. Remove PM2 (`iastudio-api`+`iastudio-worker`), `/opt/iastudio`, banco/Redis/Nginx/Node conforme o modo. Backups em `/opt/iastudio-backups` são preservados. |
-| `upgrade.sh <tag> <upgrade_id>` | Atualiza para uma tag git em **13 fases**, gravando uma linha por fase em `system_upgrades.log_lines` (String[], via `array_append`; o Console faz polling 2s). Args **posicionais** (como o `SystemService` chama) ou flags `--to/--upgrade-id/--repo-path`. `set -euo pipefail`: falha aborta e marca a row `FAILED` + `error_step` **sem rollback destrutivo** (backup é a 2ª fase). Rebuilda api + admin + console (lê modo/domínios de `/root/.iastudio-credentials`) e faz `pm2 restart iastudio-api iastudio-worker`. |
-| `backup-full.sh [nome]` | Pacote completo de migração `.tar.gz`: `db.sql` + `storage/` + `manifest.json` com segredos do `.env` (ENCRYPTION_KEY, JWT_SECRET…). Imprime o caminho do arquivo. |
-| `restore-full.sh <arquivo.tar.gz> [restore_id]` | Restauração completa (banco + storage + segredos). Roda via **`systemd-run`** (fora da árvore do PM2, evita treekill); `trap EXIT` garante o restart com `pm2 delete + start` para reler o `.env`. |
-| `restore-backup.sh <dump.sql[.gz]>` | Restaura **só o banco** (stop PM2 → restore → start). |
-| `ecosystem.config.js` | Definição PM2 dos apps `iastudio-api` e `iastudio-worker` (fork, cwd `/opt/iastudio/platform-api`, env de produção com `WORKER_INLINE=off`). |
+| `install.sh` | Encaminha para a instalação dedicada. |
+| `install-dedicated.sh` | Clona e instala uma vertente com `--app-id`, domínio, administrador e Redis explícitos. |
+| `provision-dedicated-schema.sh` | Inicializa o schema limpo da aplicação informada. |
+| `uninstall.sh` / `uninstall-dedicated.sh` | Remove somente a aplicação confirmada; nunca dependências ou recursos de outros produtos. |
+| `uninstall-discarded-dev-apps.sh` | Removedor transitório e restrito a `ia-dev` e `ia-teste` do modelo antigo, para reinício limpo do desenvolvimento. |
+| `uninstall-legacy-saas.sh` | Remove o SaaS antigo somente após prévia e confirmação literal; preserva serviços compartilhados do host. |
+| `upgrade.sh` | Atualiza a aplicação dedicada a partir das tags do repositório da própria vertente. |
+| `backup-full.sh` / `restore-full.sh` | Backup e restauração completos da aplicação. O dump usa `--clean --if-exists`; a restauração preserva o schema `public`, garante `pgvector` via administrador do cluster e mantém a aplicação parada se não conseguir recuperar o banco. |
+| `migration/export-isp-operational-data.sh` | Exportação seletiva e somente leitura da base histórica. |
+| `migration/backup-saas-historical.sh` / `verify-saas-historical-backup.sh` | Snapshot verificável da fonte SaaS, exclusivo para rollback e nunca restaurável no dedicado. |
+| `migration/verify-isp-operational-export.sh` | Valida backup, manifesto, checksums, NDJSON e ausência de chaves sensíveis antes da revisão para importação. |
+| `migration/verify-instance-isolation.sh` | Gate S4 estático de recursos e locks exclusivos para vertentes independentes. |
+| `migration/verify-dedicated-cut.sh` | Gate estrutural S1. |
+| `migration/verify-console-retirement.sh` | Gate S3 de retirada do Console e preservação da manutenção local. |
 
-## Fases do `upgrade.sh`
+Exemplo de criação:
 
-`PREFLIGHT → BACKUP → GIT_FETCH → GIT_CHECKOUT → API_INSTALL → PRISMA_PUSH →
-API_BUILD → ADMIN_BUILD → CONSOLE_BUILD → ROTATE_BACKUPS (mantém 7) →
-DONE/MARK_SUCCESS → RESTART (pm2 restart iastudio-api iastudio-worker)`.
-Cada `*_BUILD` faz `npm install` + `vite build`/`nest build` na mesma fase.
+```bash
+bash scripts/install.sh --app-id newnet-isp --domain ia.exemplo.com \
+  --admin-email admin@exemplo.com --admin-password 'senha-forte' \
+  --redis-db 2 --email ops@exemplo.com --source-revision <tag>
+```
 
-O log ao vivo é gravado com `psql … array_append(log_lines, …)` na row de
-`system_upgrades` criada pelo backend antes do spawn.
+O servidor de produção executa os builds. Não há build local obrigatório no
+ambiente de desenvolvimento do Robson.
 
-## Como o backend chama os scripts
+## Atualização e backup
 
-`SystemService` (`platform-api/src/modules/system/`) dispara os scripts com
-`child_process.spawn` **detached** e `stdio: 'ignore'` (o log fica na row do
-banco, escrito pelo próprio script). O caminho da pasta `scripts/` vem da env
-`IASTUDIO_SCRIPTS_DIR` (default `/opt/iastudio/scripts`). Backups ficam em
-`IASTUDIO_BACKUP_DIR` (default `/opt/iastudio-backups`).
+A operação normal começa no painel local, em **Configurações → Administração da
+aplicação**. O backend dispara `upgrade.sh` ou os scripts de backup/restauração,
+e o painel acompanha o log persistido. Falha é registrada; não há fallback
+silencioso nem reversão destrutiva automática.
 
-## Variáveis de ambiente relevantes
+Install, provisionamento, upgrade, backup e restauração usam lock por `app-id`.
+Uma operação concorrente na mesma aplicação falha de forma explícita; vertentes
+diferentes não disputam o mesmo lock.
 
-| Env | Default | Uso |
-|---|---|---|
-| `IASTUDIO_SCRIPTS_DIR` | `/opt/iastudio/scripts` | onde o backend acha os scripts |
-| `IASTUDIO_BACKUP_DIR` | `/opt/iastudio-backups` | pasta de backups/dumps |
-| `IASTUDIO_STORAGE_DIR` | `platform-api/storage` | arquivos do Storage Manager |
-| `SERVER_NAME` | `_` | `server_name` do Nginx no install |
-| `DB_PASS` | aleatório | senha do role `iastudio` (só no install) |
+Toda instalação exige tag, `app-id`, domínio, credenciais locais e Redis
+explícito. Ela clona a `--source-revision` marcada do repositório da vertente em
+`/opt/<app-id>`; no servidor de desenvolvimento que será refeito, execute antes
+a remoção restrita do legado ou das aplicações descartáveis.

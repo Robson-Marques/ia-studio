@@ -1,88 +1,268 @@
 #!/usr/bin/env bash
 # =============================================================================
-# IA Studio — restauracao COMPLETA a partir de um pacote gerado por
-# backup-full.sh (root, sem sudo). DESTRUTIVO: recria o banco e sobrescreve os
-# arquivos de storage e os segredos do .env.
+# IA Studio — restauração completa de um pacote gerado por backup-full.sh.
 #
-# IMPORTANTE (licao do Aquapark): NAO deve rodar como filho do PM2 — o
-# `pm2 delete` deste script mataria a arvore de processos e abortaria o restore
-# no meio (treekill). Por isso o SystemService dispara via `systemd-run` (unidade
-# transiente, fora da arvore do PM2). Aqui garantimos o restart via `trap EXIT`.
+# Executa fora da árvore do PM2 (via systemd-run quando chamado pelo painel).
+# Nunca derruba o schema public: dumps dedicados carregam o próprio --clean e
+# --if-exists. Isso preserva extensões instaladas pelo administrador do cluster
+# (como pgvector) e evita iniciar uma API contra banco vazio após falha.
 #
 # Uso: restore-full.sh <arquivo.tar.gz> [restore_id]
 # =============================================================================
-set -euo pipefail
+set -u -o pipefail
+umask 077
 
 ARCHIVE="${1:?uso: restore-full.sh <arquivo.tar.gz> [restore_id]}"
 RESTORE_ID="${2:-}"
-
-APP_DIR="/opt/iastudio"
-API_DIR="$APP_DIR/platform-api"
-STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+API_DIR="$APP_DIR/platform-api"
 ENV_FILE="$API_DIR/.env"
+WORK=''
+PSQL_DATABASE_URL=''
+LOG_FILE=''
+DATABASE_READY=0
+SERVICES_STOPPED=0
+PREVIOUS_DATABASE_READY=0
 
-[ -f "$ARCHIVE" ] || { echo "Pacote nao encontrado: $ARCHIVE"; exit 1; }
+die() { echo "ERRO: $*" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die 'execute a restauração como root.'
+[ -f "$ARCHIVE" ] || die "pacote não encontrado: $ARCHIVE"
+[ -f "$ENV_FILE" ] || die ".env não encontrado: $ENV_FILE"
 
-set -a; . "$ENV_FILE"; set +a
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+: "${IASTUDIO_APP_ID:?IASTUDIO_APP_ID ausente no .env da aplicação}"
+: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da aplicação}"
+: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da aplicação}"
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib/instance.sh"
+set_application "$IASTUDIO_APP_ID"
+[ "$IASTUDIO_APP_DIR" = "$APP_DIR" ] || die 'configuração não pertence ao diretório da aplicação.'
+acquire_application_lock
+PSQL_DATABASE_URL="$(db_url_for_psql)"
+STORAGE_DIR="${IASTUDIO_STORAGE_DIR:-$API_DIR/storage}"
+mkdir -p "$IASTUDIO_BACKUP_DIR" || die 'não foi possível criar o diretório de backups.'
+LOG_FILE="$IASTUDIO_BACKUP_DIR/restore-${RESTORE_ID:-manual-$(date +%Y%m%d-%H%M%S)}.log"
 
-WORK="$(mktemp -d)"
+sql_escape() { printf '%s' "$1" | sed "s/'/''/g"; }
+log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "$LOG_FILE"; }
 
-# trap EXIT: aconteca o que acontecer, garante que a app volta a subir e limpa
-# o temporario. Recria os processos com `delete + start` para RELER o .env
-# (segredos podem ter mudado na restauracao).
-restart_app() {
-  cd "$API_DIR"
-  pm2 delete iastudio-api iastudio-worker >/dev/null 2>&1 || true
-  pm2 start "$SCRIPT_DIR/ecosystem.config.js" >/dev/null 2>&1 || true
-  pm2 save >/dev/null 2>&1 || true
-  rm -rf "$WORK"
-}
-trap restart_app EXIT
-
-mark() { # atualiza a row system_restores (se restore_id foi passado)
+append_operation_log() {
   [ -n "$RESTORE_ID" ] || return 0
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -c "$1" >/dev/null 2>&1 || true
+  local message escaped
+  message="$(date -u +%H:%M:%S) $1"
+  escaped="$(sql_escape "$message")"
+  psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c \
+    "UPDATE system_restores SET log_lines = array_append(log_lines, '$escaped') WHERE id = '$RESTORE_ID' AND status = 'RUNNING';" \
+    >/dev/null 2>&1 || log 'WARN: não foi possível persistir log da operação no banco.'
 }
 
-# 1) Extrai o pacote.
-tar -xzf "$ARCHIVE" -C "$WORK"
-[ -f "$WORK/db.sql" ] || { echo "Pacote invalido: db.sql ausente."; exit 1; }
-[ -f "$WORK/manifest.json" ] || { echo "Pacote invalido: manifest.json ausente."; exit 1; }
+ensure_operation_row() {
+  [ -n "$RESTORE_ID" ] || return 0
+  local id file
+  id="$(sql_escape "$RESTORE_ID")"
+  file="$(sql_escape "$(basename "$ARCHIVE")")"
+  # O snapshot restaura system_restores para o estado do backup. Recrie a row
+  # atual para que o polling do painel enxergue o estado terminal correto.
+  psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c \
+    "INSERT INTO system_restores (id, kind, status, file_name, log_lines, error, started_by, started_at) VALUES ('$id', 'RESTORE', 'RUNNING', '$file', ARRAY[]::text[], NULL, 'restore-script', now()) ON CONFLICT (id) DO UPDATE SET kind='RESTORE', status='RUNNING', file_name=EXCLUDED.file_name, log_lines=ARRAY[]::text[], error=NULL, finished_at=NULL;" \
+    >/dev/null || return 1
+}
 
-# 2) Para a app antes de mexer no banco.
-cd "$API_DIR"
-pm2 stop iastudio-api iastudio-worker >/dev/null 2>&1 || true
+close_snapshot_operations() {
+  # Um backup captura system_restores antes de o próprio backup conseguir
+  # marcar sua row como SUCCESS. Ao restaurar esse snapshot, tais rows voltam
+  # como RUNNING, embora suas unidades systemd já tenham terminado. Elas não
+  # são operações reais da aplicação restaurada e bloqueariam a tela para
+  # sempre; encerre-as explicitamente, preservando o motivo para auditoria.
+  local current_id escaped_current
+  current_id="$RESTORE_ID"
+  escaped_current="$(sql_escape "$current_id")"
+  psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c \
+    "UPDATE system_restores SET status='FAILED', error=COALESCE(error, 'Operação herdada do snapshot de backup; encerrada pela restauração.'), finished_at=COALESCE(finished_at, now()) WHERE status='RUNNING' AND id <> '$escaped_current';" \
+    >/dev/null
+}
 
-# 3) Recria o schema do banco e restaura o dump.
-#    Zera o schema public e recarrega — o dump plain recria as tabelas.
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;"
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$WORK/db.sql"
+finish_operation() {
+  [ -n "$RESTORE_ID" ] || return 0
+  local status="$1" error="${2:-}" escaped
+  escaped="$(sql_escape "$error")"
+  psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c \
+    "UPDATE system_restores SET status='$status', error=NULLIF('$escaped', ''), finished_at=now() WHERE id='$RESTORE_ID' AND status='RUNNING';" \
+    >/dev/null || { log 'WARN: não foi possível fechar o estado da restauração no banco.'; return 1; }
+}
 
-# 4) Restaura os arquivos de storage.
-if [ -d "$WORK/storage" ]; then
-  mkdir -p "$STORAGE_DIR"
-  rm -rf "${STORAGE_DIR:?}/"* 2>/dev/null || true
-  cp -a "$WORK/storage/." "$STORAGE_DIR/" 2>/dev/null || true
+ensure_vector_extension() {
+  # vector é uma extensão do cluster e normalmente só postgres pode criá-la.
+  # Nunca tente recriá-la com o role da aplicação após uma operação destrutiva.
+  su -s /bin/sh postgres -c "psql -v ON_ERROR_STOP=1 -d '$IASTUDIO_DB_NAME' -c 'CREATE EXTENSION IF NOT EXISTS vector;'" \
+    >>"$LOG_FILE" 2>&1
+}
+
+strip_vector_ddl() {
+  # pg_dump pode serializar o ciclo de vida da extensão. A extensão vector é
+  # infraestrutura do cluster (ownership postgres), não dado da aplicação;
+  # deixar esse DDL no dump faria o role local tentar DROP/CREATE/COMMENT nela.
+  sed -i -E '/^(DROP EXTENSION( IF EXISTS)?|CREATE EXTENSION IF NOT EXISTS|COMMENT ON EXTENSION) vector([ ;]|$)/d' "$1"
+}
+
+prepare_restore_target() {
+  # iastudio_meta é bookkeeping de provisionamento, fora de public. Backups
+  # anteriores ao --clean podem trazê-lo como CREATE SCHEMA e abortariam se o
+  # alvo mantivesse a cópia do provisionamento. Ele pertence exclusivamente a
+  # esta base dedicada e será recriado pelo dump, quando presente.
+  psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'DROP SCHEMA IF EXISTS iastudio_meta CASCADE;' \
+    >>"$LOG_FILE" 2>&1
+}
+
+restore_previous_state() {
+  log 'ROLLBACK: restaurando o estado local anterior após falha.'
+  ensure_vector_extension || log 'ROLLBACK WARN: não foi possível garantir pgvector.'
+  if [ -f "$WORK/pre-restore.sql" ]; then
+    if psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$WORK/pre-restore.sql" >>"$LOG_FILE" 2>&1; then
+      if [ "$PREVIOUS_DATABASE_READY" -eq 1 ]; then
+        DATABASE_READY=1
+      else
+        log 'ROLLBACK: snapshot anterior não tinha core_users; serviços permanecerão parados.'
+      fi
+    else
+      log 'ROLLBACK ERROR: não foi possível restaurar o banco anterior.'
+    fi
+  fi
+  if [ -d "$WORK/pre-restore-storage" ]; then
+    rm -rf "${STORAGE_DIR:?}"/* 2>/dev/null || true
+    mkdir -p "$STORAGE_DIR"
+    cp -a "$WORK/pre-restore-storage/." "$STORAGE_DIR/" >>"$LOG_FILE" 2>&1 || log 'ROLLBACK ERROR: não foi possível restaurar storage anterior.'
+  fi
+  [ -f "$WORK/pre-restore.env" ] && cp "$WORK/pre-restore.env" "$ENV_FILE" || true
+}
+
+restart_or_hold_services() {
+  local status=$?
+  trap - EXIT
+  [ -n "$WORK" ] && rm -rf -- "$WORK" || true
+  if [ "$SERVICES_STOPPED" -eq 1 ] && [ "$DATABASE_READY" -eq 1 ]; then
+    log 'RESTART: reiniciando a aplicação com a configuração local.'
+    pm2 delete "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || true
+    if ! pm2 start "$SCRIPT_DIR/ecosystem.config.js" --update-env >>"$LOG_FILE" 2>&1; then
+      log 'RESTART ERROR: PM2 não iniciou; verifique o log desta restauração.'
+      status=1
+    else
+      pm2 save >/dev/null 2>&1 || true
+    fi
+  elif [ "$SERVICES_STOPPED" -eq 1 ]; then
+    log 'SAFETY: aplicação permanece parada porque o banco não está recuperável; nenhuma API será iniciada contra banco vazio.'
+    status=1
+  fi
+  exit "$status"
+}
+trap restart_or_hold_services EXIT
+
+fail_after_stop() {
+  local reason="$1"
+  log "FAILED: $reason"
+  restore_previous_state
+  finish_operation FAILED "$reason" || true
+  exit 1
+}
+
+log "START: restauração do pacote $(basename "$ARCHIVE")."
+WORK="$(mktemp -d)" || die 'não foi possível criar diretório temporário.'
+if ! tar -xzf "$ARCHIVE" -C "$WORK" >>"$LOG_FILE" 2>&1; then
+  die 'não foi possível extrair o pacote; nenhuma alteração foi aplicada.'
+fi
+[ -f "$WORK/db.sql" ] || die 'pacote inválido: db.sql ausente.'
+[ -f "$WORK/manifest.json" ] || die 'pacote inválido: manifest.json ausente.'
+strip_vector_ddl "$WORK/db.sql"
+
+# Snapshot para rollback real. O dump da origem contém --clean desde v0.11.31;
+# o snapshot também, para recuperar em caso de falha posterior.
+log 'PREFLIGHT: criando snapshot local para rollback.'
+cp "$ENV_FILE" "$WORK/pre-restore.env" || die 'não foi possível preservar .env atual.'
+if ! pg_dump --no-owner --no-privileges --clean --if-exists "$PSQL_DATABASE_URL" > "$WORK/pre-restore.sql" 2>>"$LOG_FILE"; then
+  die 'não foi possível criar snapshot do banco atual; restauração cancelada.'
+fi
+strip_vector_ddl "$WORK/pre-restore.sql"
+# system_restores é o diário operacional da instalação que está recebendo o
+# pacote. Ele não é dado do cliente a ser importado: o próprio backup contém a
+# linha RUNNING que o criou e, se ela voltar, confunde o painel e o lock. Guarde
+# o diário local separadamente para reaplicá-lo após o banco de negócio.
+if ! pg_dump --data-only --no-owner --no-privileges --table=system_restores "$PSQL_DATABASE_URL" > "$WORK/pre-restore-system-restores.sql" 2>>"$LOG_FILE"; then
+  die 'não foi possível preservar o diário local de operações; restauração cancelada.'
+fi
+if psql "$PSQL_DATABASE_URL" -X -Atqc "SELECT to_regclass('public.core_users') IS NOT NULL;" 2>>"$LOG_FILE" | grep -qx 't'; then
+  PREVIOUS_DATABASE_READY=1
+fi
+if [ -d "$STORAGE_DIR" ]; then
+  mkdir -p "$WORK/pre-restore-storage"
+  cp -a "$STORAGE_DIR/." "$WORK/pre-restore-storage/" 2>>"$LOG_FILE" || die 'não foi possível preservar o storage atual.'
 fi
 
-# 5) Reaplica os segredos do manifest no .env (ENCRYPTION_KEY e obrigatorio para
-#    decifrar os secrets restaurados). Usa node para ler o JSON com seguranca.
-node -e '
+log 'STOP: parando processos da aplicação.'
+pm2 stop "$IASTUDIO_PM2_API" "$IASTUDIO_PM2_WORKER" >/dev/null 2>&1 || log 'WARN: processos PM2 já estavam parados.'
+SERVICES_STOPPED=1
+
+log 'DB_RESTORE: garantindo extensão pgvector no cluster.'
+ensure_vector_extension || fail_after_stop 'não foi possível garantir a extensão pgvector antes da restauração.'
+log 'DB_RESTORE: removendo somente o bookkeeping local anterior ao carregamento.'
+prepare_restore_target || fail_after_stop 'não foi possível preparar o bookkeeping local para a restauração.'
+log 'DB_RESTORE: aplicando dump sem apagar o schema public.'
+if ! psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$WORK/db.sql" >>"$LOG_FILE" 2>&1; then
+  fail_after_stop 'psql não conseguiu aplicar o dump; o estado anterior foi restaurado quando possível.'
+fi
+DATABASE_READY=1
+
+log 'OPERATION_HISTORY: preservando o diário administrativo desta instalação.'
+if ! psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'TRUNCATE TABLE system_restores;' >>"$LOG_FILE" 2>&1; then
+  fail_after_stop 'banco restaurado, mas não foi possível preparar o diário local de operações.'
+fi
+if ! psql "$PSQL_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$WORK/pre-restore-system-restores.sql" >>"$LOG_FILE" 2>&1; then
+  fail_after_stop 'banco restaurado, mas não foi possível restaurar o diário local de operações.'
+fi
+
+if ! ensure_operation_row; then
+  fail_after_stop 'banco restaurado, mas não foi possível recriar o registro da operação administrativa.'
+fi
+if ! close_snapshot_operations; then
+  fail_after_stop 'banco restaurado, mas não foi possível encerrar operações herdadas do snapshot.'
+fi
+append_operation_log 'DB_RESTORE: banco restaurado com sucesso.'
+
+if [ -d "$WORK/storage" ]; then
+  log 'STORAGE: restaurando arquivos locais.'
+  rm -rf "${STORAGE_DIR:?}"/* 2>/dev/null || true
+  mkdir -p "$STORAGE_DIR"
+  if ! cp -a "$WORK/storage/." "$STORAGE_DIR/" >>"$LOG_FILE" 2>&1; then
+    fail_after_stop 'não foi possível restaurar os arquivos locais; o estado anterior foi restaurado quando possível.'
+  fi
+fi
+
+# Segredos criptográficos pertencem aos dados restaurados. Identidade de host
+# (DATABASE_URL, REDIS_URL, porta e app-id) é local e nunca vem do pacote.
+log 'SECRETS: reaplicando apenas segredos compatíveis com a aplicação local.'
+if ! node -e '
   const fs = require("fs");
   const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
   const envPath = process.argv[2];
-  const s = m.secrets || {};
-  let env = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
-  for (const [k, v] of Object.entries(s)) {
-    if (v === undefined || v === null || v === "") continue;
-    const re = new RegExp("^" + k + "=.*$", "m");
-    env = re.test(env) ? env.replace(re, k + "=" + v) : (env.replace(/\n?$/, "\n") + k + "=" + v + "\n");
+  const allowed = new Set(["ENCRYPTION_KEY", "JWT_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT"]);
+  const secrets = m.secrets || {};
+  let env = fs.readFileSync(envPath, "utf8");
+  for (const [key, value] of Object.entries(secrets)) {
+    if (!allowed.has(key) || value === undefined || value === null || value === "") continue;
+    const re = new RegExp("^" + key + "=.*$", "m");
+    env = re.test(env) ? env.replace(re, key + "=" + value) : env.replace(/\n?$/, "\n" + key + "=" + value + "\n");
   }
   fs.writeFileSync(envPath, env);
-' "$WORK/manifest.json" "$ENV_FILE"
+' "$WORK/manifest.json" "$ENV_FILE" >>"$LOG_FILE" 2>&1; then
+  fail_after_stop 'não foi possível reaplicar segredos do pacote; o estado anterior foi restaurado quando possível.'
+fi
 
-mark "UPDATE system_restores SET status='SUCCESS', finished_at=now() WHERE id='${RESTORE_ID}' AND status='RUNNING';"
-echo "Restauracao completa concluida. A app sera reiniciada pela trap EXIT."
-# O restart_app (trap EXIT) sobe a app relendo o .env restaurado.
+append_operation_log "DONE: restauração concluída ($(basename "$ARCHIVE"))."
+if ! finish_operation SUCCESS ''; then
+  fail_after_stop 'restauração concluída, mas não foi possível registrar o sucesso administrativo.'
+fi
+log 'DONE: restauração concluída; a aplicação será reiniciada.'
+exit 0

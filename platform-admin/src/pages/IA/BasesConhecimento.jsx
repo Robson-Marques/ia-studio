@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ListScreen, Button, useToast } from '@studio-ux-ds/react';
 import { listKnowledgeBases } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 import { formatDateTime } from './ia.constants';
 
 // IA/BasesConhecimento — LISTAGEM no molde `ListScreen` do DS (v0.10.34): a tela
@@ -16,7 +15,6 @@ export default function BasesConhecimento() {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { environmentId } = useWorkspace();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -26,7 +24,7 @@ export default function BasesConhecimento() {
   async function load() {
     setLoading(true);
     try {
-      const { items: list } = await listKnowledgeBases({ environment_id: environmentId || undefined });
+      const { items: list } = await listKnowledgeBases();
       setItems(list);
     } catch (err) {
       toast.error(err.message);
@@ -35,7 +33,7 @@ export default function BasesConhecimento() {
     }
   }
 
-  useEffect(() => { load(); }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();

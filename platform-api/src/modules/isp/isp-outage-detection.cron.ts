@@ -48,29 +48,22 @@ export class IspOutageDetectionCron {
       for (const incident of drafts) {
         try {
           const connection = await this.resolver.resolve({
-            organizationId: incident.organization_id,
-            workspaceId: incident.workspace_id,
-            environmentId: incident.environment_id,
             connectionId: incident.connection_id,
           });
           const summary = await this.connectivity.query(
-            incident.organization_id,
             connection.id,
             (incident.scope ?? {}) as Record<string, unknown>,
           );
           if (summary.total > 0 && summary.offline_pct >= limit) {
             // (1) Aviso in-app: sugere ao operador promover o rascunho a ativo.
             await this.notifications.notify({
-              organizationId: incident.organization_id,
-              workspaceId: incident.workspace_id,
-              environmentId: incident.environment_id,
-              recipient: { user_id: '' }, // broadcast in-app pra org
+              recipient: { user_id: '' }, // broadcast in-app da instância
               title: 'Possível outage detectado',
               body: `O escopo do rascunho "${incident.title}" está com ${summary.offline_pct}% offline (${summary.offline}/${summary.total}). Revise e, se confirmado, ative o incidente.`,
             });
             // (2) Alerta a equipe de plantao via WhatsApp — mesmo serviço/cooldown
             // do caminho reativo (não re-spamma a cada tick de 10 min).
-            await this.incidents.alertTeamForIncident(incident.organization_id, incident.id, {
+            await this.incidents.alertTeamForIncident(incident.id, {
               total: summary.total,
               offline: summary.offline,
               offline_pct: summary.offline_pct,

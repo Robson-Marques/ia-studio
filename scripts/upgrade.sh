@@ -2,12 +2,12 @@
 # ============================================================
 # IA Studio - upgrade.sh v1.0
 # Aplica um upgrade de versao (git tag) com backup automatico, build e restart.
-# Roda como ROOT no servidor (repo em /opt/iastudio).
+# Roda como ROOT no diretório exclusivo da aplicação da vertente.
 #
-# Disparado pelo painel de Atualizacao do Console (spawn detached), que ja criou
+# Disparado pelo painel local de Administração da instalação (spawn detached), que ja criou
 # a row em system_upgrades (status=RUNNING) e chama com args POSICIONAIS:
 #     bash scripts/upgrade.sh <tag> <upgrade_id>
-# (tambem aceita --to / --upgrade-id / --repo-path para uso manual)
+# (também aceita --to / --upgrade-id / --repo-path para uso manual).
 #
 # Cada fase grava UMA linha em system_upgrades.log_lines (String[]) via psql
 # array_append — o front faz polling a cada 2s. Falha em qualquer fase:
@@ -24,6 +24,7 @@ set -euo pipefail
 # Copiando pra /tmp e reexecutando de la, o arquivo em execucao nao e mais o que
 # o git substitui. Idempotente via UPGRADE_SELF_COPIED.
 if [ "${UPGRADE_SELF_COPIED:-}" != "1" ]; then
+  export IASTUDIO_UPGRADE_SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
   _self_copy="/tmp/iastudio-upgrade-$$.sh"
   cp -- "$0" "$_self_copy"
   export UPGRADE_SELF_COPIED=1
@@ -31,7 +32,14 @@ if [ "${UPGRADE_SELF_COPIED:-}" != "1" ]; then
 fi
 
 # ---------- ARGS (posicionais OU flags) ----------
-TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="${IASTUDIO_APP_DIR:-/opt/iastudio}"; DO_RESTART=1
+SCRIPT_DIR="${IASTUDIO_UPGRADE_SOURCE_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+TO_VERSION=""; UPGRADE_ID=""; REPO_PATH="${IASTUDIO_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"; DO_RESTART=1
+usage() {
+  cat <<'EOF'
+Uso normal (somente aplicação já instalada):
+  bash scripts/upgrade.sh --to <tag> --upgrade-id <uuid> [--repo-path <aplicação>]
+EOF
+}
 POS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,23 +47,21 @@ while [[ $# -gt 0 ]]; do
     --upgrade-id)  UPGRADE_ID="$2"; shift 2 ;;
     --repo-path)   REPO_PATH="$2"; shift 2 ;;
     --no-restart)  DO_RESTART=0; shift ;;
+    -h|--help)     usage; exit 0 ;;
     *)             POS+=("$1"); shift ;;
   esac
 done
 [ -z "${TO_VERSION}" ] && [ "${#POS[@]}" -ge 1 ] && TO_VERSION="${POS[0]}"
 [ -z "${UPGRADE_ID}" ] && [ "${#POS[@]}" -ge 2 ] && UPGRADE_ID="${POS[1]}"
 
+[ ! -d "$REPO_PATH" ] && echo "ERRO: repo nao encontrado: $REPO_PATH" && exit 1
+
 [ -z "$TO_VERSION" ]  && echo "ERRO: versao (tag) obrigatoria" && exit 1
 [ -z "$UPGRADE_ID" ]  && echo "ERRO: upgrade-id obrigatorio" && exit 1
-[ ! -d "$REPO_PATH" ] && echo "ERRO: repo nao encontrado: $REPO_PATH" && exit 1
 
 API_DIR="$REPO_PATH/platform-api"
 ADMIN_DIR="$REPO_PATH/platform-admin"
-CONSOLE_DIR="$REPO_PATH/platform-console"
-BACKUP_DIR="${IASTUDIO_BACKUP_DIR:-/opt/iastudio-backups}"
 ENV_FILE="$API_DIR/.env"
-CRED_FILE="/root/.iastudio-credentials"
-mkdir -p "$BACKUP_DIR"
 
 [ ! -f "$ENV_FILE" ] && echo "ERRO: .env nao encontrado em $ENV_FILE" && exit 1
 DATABASE_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//;s/^'\''//;s/'\''$//')
@@ -72,10 +78,19 @@ set -a
 source "$ENV_FILE"
 set +a
 
-# Modo/dominios pra rebuildar os fronts com a mesma URL da API/base do install.
-MODE="single"; DOMAIN=""; DOMAIN_API=""
-# shellcheck disable=SC1090
-[ -f "$CRED_FILE" ] && source "$CRED_FILE" 2>/dev/null || true
+: "${IASTUDIO_APP_ID:?IASTUDIO_APP_ID ausente no .env da aplicação. Instalações novas usam scripts/install.sh --app-id.}"
+: "${IASTUDIO_PM2_API:?IASTUDIO_PM2_API ausente no .env da aplicação}"
+: "${IASTUDIO_PM2_WORKER:?IASTUDIO_PM2_WORKER ausente no .env da aplicação}"
+BACKUP_DIR="${IASTUDIO_BACKUP_DIR:?IASTUDIO_BACKUP_DIR ausente no .env da aplicação}"
+mkdir -p "$BACKUP_DIR"
+
+# Serializa upgrades/restore/provision da mesma aplicação. Não há lock global:
+# aplicações distintas podem operar sem compartilhar processo, banco ou backup.
+# shellcheck disable=SC1091
+. "$REPO_PATH/scripts/lib/instance.sh"
+set_application "$IASTUDIO_APP_ID"
+[ "$IASTUDIO_APP_DIR" = "$REPO_PATH" ] || { echo 'ERRO: .env não pertence ao repo da aplicação.' >&2; exit 1; }
+acquire_application_lock
 
 # pm2 spawn herda NODE_ENV=production -> npm pula devDependencies (tsc/vite
 # quebram). Forcamos development pro build ter @types/* e as ferramentas.
@@ -89,7 +104,7 @@ log_db() {
   ts=$(date -u +%H:%M:%S)
   line=$(sql_escape "[$ts][$step] $msg")
   echo "[$step] $msg"
-  psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
+  psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
 UPDATE system_upgrades
 SET log_lines = array_append(COALESCE(log_lines, ARRAY[]::text[]), '$line')
 WHERE id = '$UPGRADE_ID';
@@ -124,7 +139,7 @@ mark_failed() {
   # a versao lida ja e a antiga e o painel volta a oferecer o upgrade.
   revert_checkout
   local s; s=$(sql_escape "$step")
-  psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
+  psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
 UPDATE system_upgrades
 SET status='FAILED', finished_at=now(), error_step='$s'
 WHERE id = '$UPGRADE_ID';
@@ -134,47 +149,19 @@ SQL
 }
 trap 'mark_failed "UNEXPECTED" "Erro inesperado na linha $LINENO"' ERR
 
-# PM2 names vary by installation. Find processes belonging to THIS API directory,
-# rather than restarting hardcoded global names (may target another instance).
-find_pm2_name() {
-  local role="$1"
-  pm2 jlist | node -e '
-    let json = "";
-    process.stdin.on("data", chunk => json += chunk);
-    process.stdin.on("end", () => {
-      try {
-        const dir = process.argv[1].replace(/[/]$/, "");
-        const role = process.argv[2];
-        const matches = JSON.parse(json).filter(p => {
-          const cwd = (p.pm2_env?.pm_cwd || "").replace(/[/]$/, "");
-          return cwd === dir && (role === "worker" ? /worker/i.test(p.name) : /api/i.test(p.name) && !/worker/i.test(p.name));
-        });
-        if (matches.length !== 1) process.exit(1);
-        process.stdout.write(matches[0].name);
-      } catch { process.exit(1); }
-    });
-  ' "$API_DIR" "$role"
-}
-
 # ---------- 1) PREFLIGHT ----------
 log_db "PREFLIGHT" "Validando upgrade-id e ambiente"
-STATUS_NOW=$(psql "$DATABASE_URL" -X -tA -c "SELECT status FROM system_upgrades WHERE id = '$UPGRADE_ID'" 2>/dev/null || echo "")
+STATUS_NOW=$(psql "$(db_url_for_psql)" -X -tA -c "SELECT status FROM system_upgrades WHERE id = '$UPGRADE_ID'" 2>/dev/null || echo "")
 [ -z "$STATUS_NOW" ]           && mark_failed "PREFLIGHT" "upgrade-id $UPGRADE_ID nao existe"
 [ "$STATUS_NOW" != "RUNNING" ] && mark_failed "PREFLIGHT" "upgrade-id nao esta RUNNING (atual=$STATUS_NOW)"
 FROM_VERSION=$(cd "$REPO_PATH" && git describe --tags --abbrev=0 2>/dev/null || echo "unknown")
-if [ "$DO_RESTART" -eq 1 ]; then
-  PM2_API_NAME="${IASTUDIO_PM2_API_NAME:-$(find_pm2_name api || true)}"
-  PM2_WORKER_NAME="${IASTUDIO_PM2_WORKER_NAME:-$(find_pm2_name worker || true)}"
-  [ -n "$PM2_API_NAME" ] && [ -n "$PM2_WORKER_NAME" ] || mark_failed "PREFLIGHT" "Nao foi possivel identificar API e worker PM2 deste diretorio. Defina IASTUDIO_PM2_API_NAME e IASTUDIO_PM2_WORKER_NAME no .env"
-  log_db "PREFLIGHT" "PM2 api=$PM2_API_NAME worker=$PM2_WORKER_NAME"
-fi
 log_db "PREFLIGHT" "from=$FROM_VERSION to=$TO_VERSION repo=$REPO_PATH"
 
 # ---------- 2) BACKUP ----------
 TS=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="$BACKUP_DIR/iastudio_db_${FROM_VERSION}-to-${TO_VERSION}_${TS}.sql.gz"
 log_db "BACKUP" "pg_dump -> $(basename "$BACKUP_FILE")"
-if ! pg_dump "$DATABASE_URL" 2>/tmp/iastudio_pgdump.err | gzip > "$BACKUP_FILE"; then
+if ! pg_dump "$(db_url_for_psql)" 2>/tmp/iastudio_pgdump.err | gzip > "$BACKUP_FILE"; then
   mark_failed "BACKUP" "pg_dump falhou: $(head -c 400 /tmp/iastudio_pgdump.err)"
 fi
 log_db "BACKUP" "backup concluido ($(du -h "$BACKUP_FILE" | cut -f1))"
@@ -199,16 +186,30 @@ log_db "API_INSTALL" "npm install (platform-api)"
 cd "$API_DIR"
 npm install --no-audit --no-fund 2>/tmp/iastudio_npm.err >/dev/null || mark_failed "API_INSTALL" "npm install falhou: $(tail -c 600 /tmp/iastudio_npm.err)"
 
+# ---------- 5b) SCHEMA_HOUSEKEEPING ----------
+# Antes do db push, aplica a limpeza de schema versionada da versao-ALVO (o repo
+# ja esta em checkout no TO_VERSION): remove residuos que o db push veria como
+# mudanca destrutiva e recusaria. Como o hook vem do TO_VERSION, ele carrega a
+# limpeza correta para o schema que o db push vai aplicar — nao a da versao de
+# origem. Idempotente; ausente = no-op. O backup completo ja rodou no passo 2 e
+# nenhuma linha viva usa esses objetos numa instancia dedicada, entao e recuperavel.
+PREPUSH_HOOK="$REPO_PATH/scripts/migration/pre-db-push.sql"
+if [ -f "$PREPUSH_HOOK" ]; then
+  log_db "SCHEMA_HOUSEKEEPING" "aplica hook pre-db-push da versao-alvo"
+  psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 -f "$PREPUSH_HOOK" >/tmp/iastudio_housekeep.err 2>&1 \
+    || mark_failed "SCHEMA_HOUSEKEEPING" "hook pre-db-push falhou: $(tail -c 600 /tmp/iastudio_housekeep.err)"
+fi
+
 # ---------- 6) PRISMA_PUSH ----------
-log_db "PRISMA_PUSH" "prisma db push + generate"
-npx prisma db push --accept-data-loss 2>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISMA_PUSH" "db push falhou: $(tail -c 600 /tmp/iastudio_prisma.err)"
+log_db "PRISMA_PUSH" "prisma db push sem aceitação automática de perda"
+npx prisma db push >/tmp/iastudio_prisma.err 2>&1 || mark_failed "PRISMA_PUSH" "db push falhou ou exigiu intervenção para mudança destrutiva: $(tail -c 3000 /tmp/iastudio_prisma.err)"
 npx prisma generate 2>>/tmp/iastudio_prisma.err >/dev/null || mark_failed "PRISMA_PUSH" "prisma generate falhou: $(tail -c 600 /tmp/iastudio_prisma.err)"
 
 # ---------- 7) API_BUILD ----------
 log_db "API_BUILD" "nest build"
-npm run build 2>/tmp/iastudio_build.err >/dev/null || mark_failed "API_BUILD" "nest build falhou: $(tail -c 800 /tmp/iastudio_build.err)"
+npm run build >/tmp/iastudio_build.err 2>&1 || mark_failed "API_BUILD" "nest build falhou: $(tail -c 6000 /tmp/iastudio_build.err)"
 
-# Helper de build de front (usa MODE/dominios do .iastudio-credentials).
+# Helper de build do painel local.
 build_front() {
   local dir="$1"; local api_url="$2"; local base="$3"; local step="$4"
   [ ! -f "$dir/package.json" ] && { log_db "$step" "front ausente ($dir) — pulado"; return 0; }
@@ -218,40 +219,110 @@ build_front() {
   # do DS e o install quebra com ETARGET (derrubou os deploys v0.10.40/41 ate limpar
   # o cache a mao). Os fronts sao os unicos que puxam @studio-ux-ds.
   npm install --no-audit --no-fund --prefer-online 2>/tmp/iastudio_npm.err >/dev/null || mark_failed "$step" "npm install falhou: $(tail -c 600 /tmp/iastudio_npm.err)"
-  VITE_API_URL="$api_url" npm run build -- --base="$base" 2>/tmp/iastudio_build.err >/dev/null || mark_failed "$step" "vite build falhou: $(tail -c 800 /tmp/iastudio_build.err)"
+  VITE_API_URL="$api_url" npm run build -- --base="$base" >/tmp/iastudio_build.err 2>&1 || mark_failed "$step" "vite build falhou: $(tail -c 6000 /tmp/iastudio_build.err)"
 }
 
-# URLs iguais as do install (single = relativo; multi = dominio da API).
-if [ "$MODE" = "single" ]; then
-  ADMIN_API="/api/v1"; ADMIN_BASE="/"
-  CONSOLE_API="/api/v1"; CONSOLE_BASE="/console/"
-else
-  ADMIN_API="https://${DOMAIN_API}/api/v1"; ADMIN_BASE="/"
-  CONSOLE_API="https://${DOMAIN_API}/api/v1"; CONSOLE_BASE="/"
-fi
+# Painel e API vivem no domínio exclusivo da aplicação dedicada.
+ADMIN_API="/api/v1"; ADMIN_BASE="/"
 
 # ---------- 8-9) ADMIN ----------
 log_db "ADMIN_BUILD" "npm install + vite build (platform-admin)"
 build_front "$ADMIN_DIR" "$ADMIN_API" "$ADMIN_BASE" "ADMIN_BUILD"
 log_db "ADMIN_BUILD" "painel do cliente publicado"
 
-# ---------- 10) CONSOLE ----------
-# Duas saidas: `dist` (base principal — /console/ no modo single) e `dist-root`
-# (base=/), usada quando o Console tem DOMINIO DEDICADO cadastrado em Enderecos.
-# Base do Vite/basename do router sao definidos em build — um dist so nao serve
-# os dois casos. O npm install acontece uma vez (dentro do build_front).
-log_db "CONSOLE_BUILD" "npm install + vite build (platform-console)"
-build_front "$CONSOLE_DIR" "$CONSOLE_API" "$CONSOLE_BASE" "CONSOLE_BUILD"
-rm -rf "$CONSOLE_DIR/dist-root"
-if [ "$CONSOLE_BASE" = "/" ]; then
-  cp -r "$CONSOLE_DIR/dist" "$CONSOLE_DIR/dist-root"
+# O index.html é a única peça estável da SPA: ele referencia bundles com hash
+# produzidos pelo Vite. Revalidá-lo sempre impede que uma aba aberta continue
+# no painel anterior depois de uma atualização. Aplicamos a política também em
+# instalações existentes, cujo vhost foi criado antes desta regra.
+refresh_admin_index_cache_policy() {
+  local site="/etc/nginx/sites-available/${IASTUDIO_NGINX_SITE}"
+  local backup="${site}.before-index-cache-${UPGRADE_ID}"
+  [ -f "$site" ] || { log_db "ADMIN_CACHE" "vhost não encontrado; política de cache será aplicada na próxima instalação"; return 0; }
+  grep -Fq 'location = /index.html' "$site" && return 0
+  cp -- "$site" "$backup"
+  sed -i '\|^[[:space:]]*location /[[:space:]]*{|i\  location = /index.html { add_header Cache-Control "no-cache, no-store, must-revalidate" always; }' "$site"
+  if ! grep -Fq 'location = /index.html' "$site" || ! nginx -t; then
+    mv -- "$backup" "$site"
+    nginx -t || true
+    mark_failed "ADMIN_CACHE" "não foi possível configurar a revalidação do painel"
+  fi
+  systemctl reload nginx || {
+    mv -- "$backup" "$site"
+    nginx -t && systemctl reload nginx || true
+    mark_failed "ADMIN_CACHE" "não foi possível recarregar o nginx com a política de cache do painel"
+  }
+  rm -f -- "$backup"
+  log_db "ADMIN_CACHE" "index.html do painel configurado para revalidar a cada atualização"
+}
+refresh_admin_index_cache_policy
+
+# ---------- 10) CONNECTCHAT (release conjunta Newnet) ----------
+# O ConnectChat continua um serviço Docker e banco próprios; "atualização
+# conjunta" significa uma única ação no painel para aplicar a MESMA tag nos dois
+# repositórios, nunca misturar seus processos, volumes ou segredos. Instalações
+# sem ConnectChat simplesmente registram a etapa como não aplicável.
+CONNECTCHAT_AUTO_UPGRADE="${CONNECTCHAT_AUTO_UPGRADE:-1}"
+CONNECTCHAT_INSTALL_DIR="${CONNECTCHAT_INSTALL_DIR:-/opt/connectchat-newnet}"
+CONNECTCHAT_REPOSITORY="${CONNECTCHAT_REPOSITORY:-git@git.nivoo.dev.br:root/connect.git}"
+CONNECTCHAT_DEPLOY_KEY="${CONNECTCHAT_DEPLOY_KEY:-/root/.ssh/connectchat_deploy}"
+CONNECTCHAT_SOURCE_DIR=""
+
+cleanup_connectchat_source() {
+  [ -n "$CONNECTCHAT_SOURCE_DIR" ] && [ -d "$CONNECTCHAT_SOURCE_DIR" ] && rm -rf -- "$CONNECTCHAT_SOURCE_DIR"
+}
+
+if [ "$CONNECTCHAT_AUTO_UPGRADE" = "1" ] && [ -f "$CONNECTCHAT_INSTALL_DIR/.connectchat-release" ]; then
+  [ -f "$CONNECTCHAT_INSTALL_DIR/.env" ] \
+    || mark_failed "CONNECTCHAT_PREFLIGHT" "instalação ConnectChat incompleta em $CONNECTCHAT_INSTALL_DIR (.env ausente)"
+  [ -r "$CONNECTCHAT_DEPLOY_KEY" ] \
+    || mark_failed "CONNECTCHAT_PREFLIGHT" "chave de deploy do ConnectChat não está disponível; esperada em $CONNECTCHAT_DEPLOY_KEY"
+
+  log_db "CONNECTCHAT_PREFLIGHT" "validando a tag $TO_VERSION e a instalação ConnectChat"
+  if ! GIT_SSH_COMMAND="ssh -i $CONNECTCHAT_DEPLOY_KEY -o IdentitiesOnly=yes" \
+    git ls-remote --exit-code --tags "$CONNECTCHAT_REPOSITORY" "refs/tags/$TO_VERSION" >/tmp/connectchat_git.err 2>&1; then
+    mark_failed "CONNECTCHAT_PREFLIGHT" "tag $TO_VERSION não está disponível no repositório ConnectChat: $(tail -c 400 /tmp/connectchat_git.err)"
+  fi
+
+  CONNECTCHAT_SOURCE_DIR="$(mktemp -d "/var/tmp/connectchat-${TO_VERSION#v}.XXXXXX")" \
+    || mark_failed "CONNECTCHAT_FETCH" "não foi possível criar a fonte temporária da release ConnectChat"
+  log_db "CONNECTCHAT_FETCH" "obtendo a release conjunta $TO_VERSION"
+  if ! GIT_SSH_COMMAND="ssh -i $CONNECTCHAT_DEPLOY_KEY -o IdentitiesOnly=yes" \
+    git clone --quiet --branch "$TO_VERSION" --depth 1 "$CONNECTCHAT_REPOSITORY" "$CONNECTCHAT_SOURCE_DIR" 2>/tmp/connectchat_git.err; then
+    cleanup_connectchat_source
+    mark_failed "CONNECTCHAT_FETCH" "clone da release ConnectChat falhou: $(tail -c 400 /tmp/connectchat_git.err)"
+  fi
+
+  log_db "CONNECTCHAT_UPGRADE" "backup, migração e rebuild do ConnectChat"
+  # O script pertence à release que acabou de ser baixada. Usar o script já
+  # instalado faria a primeira atualização após uma correção executar a versão
+  # antiga e esconder novamente o diagnóstico corrigido.
+  if ! bash "$CONNECTCHAT_SOURCE_DIR/ops/upgrade.sh" \
+    --source-dir "$CONNECTCHAT_SOURCE_DIR" --install-dir "$CONNECTCHAT_INSTALL_DIR" >/tmp/connectchat_upgrade.out 2>/tmp/connectchat_upgrade.err; then
+    CONNECTCHAT_FAILURE_SUMMARY="$(
+      {
+        echo '--- saída do upgrade ConnectChat ---'
+        tail -c 1400 /tmp/connectchat_upgrade.out
+        echo
+        echo '--- erros do upgrade ConnectChat ---'
+        tail -c 1400 /tmp/connectchat_upgrade.err
+      } | tr '\n' ' '
+    )"
+    cleanup_connectchat_source
+    mark_failed "CONNECTCHAT_UPGRADE" "upgrade do ConnectChat falhou: $CONNECTCHAT_FAILURE_SUMMARY"
+  fi
+
+  CONNECTCHAT_PWA_PORT="$(sed -n 's/^PWA_PORT=//p' "$CONNECTCHAT_INSTALL_DIR/.env" | head -1)"
+  [[ "$CONNECTCHAT_PWA_PORT" =~ ^[0-9]{2,5}$ ]] || CONNECTCHAT_PWA_PORT=4174
+  if ! curl --fail --silent --show-error "http://127.0.0.1:${CONNECTCHAT_PWA_PORT}/v1/health" >/tmp/connectchat_health.out 2>/tmp/connectchat_health.err; then
+    cleanup_connectchat_source
+    mark_failed "CONNECTCHAT_HEALTH" "ConnectChat não respondeu saudável após o upgrade: $(tail -c 400 /tmp/connectchat_health.err)"
+  fi
+  cleanup_connectchat_source
+  CONNECTCHAT_SOURCE_DIR=""
+  log_db "CONNECTCHAT_DONE" "ConnectChat atualizado e saudável em $TO_VERSION"
 else
-  cd "$CONSOLE_DIR"
-  VITE_API_URL="$CONSOLE_API" npm run build -- --base="/" --outDir=dist-root \
-    2>/tmp/iastudio_build.err >/dev/null \
-    || mark_failed "CONSOLE_BUILD" "vite build (dist-root) falhou: $(tail -c 800 /tmp/iastudio_build.err)"
+  log_db "CONNECTCHAT_SKIPPED" "ConnectChat não está instalado nesta aplicação; etapa não aplicável"
 fi
-log_db "CONSOLE_BUILD" "console publicado (dist + dist-root)"
 
 # ---------- 11) ROTATE_BACKUPS (mantem 7) ----------
 log_db "ROTATE_BACKUPS" "mantendo os 7 backups mais recentes"
@@ -260,7 +331,7 @@ log_db "ROTATE_BACKUPS" "rotacao concluida"
 
 # ---------- 12) MARK_SUCCESS (antes do restart) ----------
 log_db "DONE" "Upgrade aplicado ($FROM_VERSION -> $TO_VERSION)"
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL
+psql "$(db_url_for_psql)" -X -v ON_ERROR_STOP=1 >/dev/null <<SQL
 UPDATE system_upgrades SET status='SUCCESS', finished_at=now() WHERE id = '$UPGRADE_ID';
 SQL
 trap - ERR
@@ -274,10 +345,14 @@ trap - ERR
 # (mesmo detached) — por isso ele fica por ULTIMO, quando o worker ja pegou o
 # codigo novo. Um comando combinado deixava o worker de fora num restart parcial.
 if [ "$DO_RESTART" -eq 1 ]; then
-  log_db "RESTART" "pm2 restart $PM2_WORKER_NAME"
-  pm2 restart "$PM2_WORKER_NAME" --update-env || log_db "RESTART" "AVISO: worker nao reiniciou ($PM2_WORKER_NAME)"
-  log_db "RESTART" "pm2 restart $PM2_API_NAME"
-  pm2 restart "$PM2_API_NAME" --update-env || log_db "RESTART" "AVISO: API nao reiniciou ($PM2_API_NAME)"
+  echo "[RESTART] pm2 restart $IASTUDIO_PM2_WORKER"
+  pm2 restart "$IASTUDIO_PM2_WORKER" --update-env 2>/dev/null \
+    || pm2 start "$SCRIPT_DIR/ecosystem.config.js" --only "$IASTUDIO_PM2_WORKER" 2>/dev/null \
+    || echo "AVISO: restart do $IASTUDIO_PM2_WORKER retornou nao-zero (verifique pm2 list)"
+  echo "[RESTART] pm2 restart $IASTUDIO_PM2_API"
+  pm2 restart "$IASTUDIO_PM2_API" --update-env 2>/dev/null \
+    || pm2 start "$SCRIPT_DIR/ecosystem.config.js" --only "$IASTUDIO_PM2_API" 2>/dev/null \
+    || echo "AVISO: restart do $IASTUDIO_PM2_API retornou nao-zero (verifique pm2 list)"
 else
   echo "[RESTART] pulado (--no-restart)"
 fi

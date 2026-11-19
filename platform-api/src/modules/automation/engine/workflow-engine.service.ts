@@ -111,9 +111,6 @@ export class WorkflowEngineService {
           version: exec.version,
           input: exec.input,
           vars,
-          organizationId: exec.organization_id,
-          workspaceId: exec.workspace_id,
-          environmentId: exec.environment_id,
         });
 
         const nodeType = this.registry.get(current.type);
@@ -128,9 +125,6 @@ export class WorkflowEngineService {
         } else {
           const config = interpolate(current.config ?? {}, varCtx) as Record<string, unknown>;
           const ctx: NodeExecutionContext = {
-            organizationId: exec.organization_id,
-            workspaceId: exec.workspace_id,
-            environmentId: exec.environment_id,
             config,
             input: exec.input,
             vars,
@@ -177,9 +171,6 @@ export class WorkflowEngineService {
           version: exec.version,
           input: exec.input,
           vars,
-          organizationId: exec.organization_id,
-          workspaceId: exec.workspace_id,
-          environmentId: exec.environment_id,
         });
         current = this.pickNext(graph, current, handle, varCtxAfter);
       }

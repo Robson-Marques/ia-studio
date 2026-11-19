@@ -5,8 +5,6 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AiMemoryProfile, Prisma } from '@prisma/client';
 import { MemoryRepository } from './memory.repository';
 import { AuditLogService } from '../../../shared/audit/audit-log.service';
-import { assertSameOrg, validateWorkspaceScope } from '../../../shared/auth/tenant.util';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { CreateMemoryProfileDto, UpdateMemoryProfileDto } from './dto/memory.dtos';
 
 export interface MemoryReadResult {
@@ -23,48 +21,40 @@ export class MemoryService {
   constructor(
     private readonly repository: MemoryRepository,
     private readonly audit: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // ─── Perfis (CRUD) ──────────────────────────────────
 
-  findProfiles(organizationId: string, filters: { workspaceId?: string; environmentId?: string }) {
-    return this.repository.findProfiles(organizationId, filters);
+  findProfiles() {
+    return this.repository.findProfiles();
   }
 
-  async findProfile(organizationId: string, id: string): Promise<AiMemoryProfile> {
+  async findProfile(id: string): Promise<AiMemoryProfile> {
     const profile = await this.repository.findProfileById(id);
     if (!profile) throw new NotFoundException('Perfil de memória não encontrado.');
-    assertSameOrg(profile.organization_id, organizationId);
     return profile;
   }
 
-  async createProfile(organizationId: string, dto: CreateMemoryProfileDto, createdBy: string | null) {
-    await validateWorkspaceScope(this.prisma, organizationId, dto.workspace_id, dto.environment_id);
+  async createProfile(dto: CreateMemoryProfileDto, createdBy: string | null) {
     const profile = await this.repository.createProfile({
-      organization_id: organizationId,
-      workspace_id: dto.workspace_id,
-      environment_id: dto.environment_id,
       name: dto.name,
       scope: dto.scope,
       description: dto.description,
       max_items: dto.max_items,
       default_ttl_seconds: dto.default_ttl_seconds,
       created_by: createdBy,
-    });
+    } as Prisma.AiMemoryProfileUncheckedCreateInput);
     await this.audit.record({
       action: 'ai.memory.profile.create',
       entityType: 'AiMemoryProfile',
       entityId: profile.id,
-      organizationId,
-      workspaceId: dto.workspace_id,
       newValue: { name: profile.name, scope: profile.scope },
     });
     return profile;
   }
 
-  async updateProfile(organizationId: string, id: string, dto: UpdateMemoryProfileDto) {
-    const before = await this.findProfile(organizationId, id);
+  async updateProfile(id: string, dto: UpdateMemoryProfileDto) {
+    const before = await this.findProfile(id);
     const data: Prisma.AiMemoryProfileUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description;
@@ -76,7 +66,6 @@ export class MemoryService {
       action: 'ai.memory.profile.update',
       entityType: 'AiMemoryProfile',
       entityId: id,
-      organizationId,
       oldValue: { name: before.name, is_active: before.is_active },
       newValue: { name: profile.name, is_active: profile.is_active },
     });
@@ -85,8 +74,8 @@ export class MemoryService {
 
   // ─── Entradas (navegacao read-only pelo painel) ─────
 
-  async listEntries(organizationId: string, profileId: string, scopeKey?: string) {
-    await this.findProfile(organizationId, profileId);
+  async listEntries(profileId: string, scopeKey?: string) {
+    await this.findProfile(profileId);
     const now = new Date();
     const rows = await this.repository.findEntries(profileId, scopeKey);
     return rows.filter((r) => !r.expires_at || r.expires_at > now);
@@ -124,7 +113,6 @@ export class MemoryService {
     const expiresAt = ttl ? new Date(Date.now() + ttl * 1000) : null;
     await this.repository.upsertEntry({
       profile_id: profile.id,
-      organization_id: profile.organization_id,
       scope_key: scopeKey,
       key,
       value: (value ?? null) as Prisma.InputJsonValue,

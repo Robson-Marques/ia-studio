@@ -11,19 +11,12 @@ export class KnowledgeRepository {
 
   // ─── Bases ──────────────────────────────────────────
 
-  findBases(organizationId: string, filters: { workspaceId?: string; environmentId?: string } = {}) {
-    const where: Prisma.AiKnowledgeBaseWhereInput = { organization_id: organizationId };
-    if (filters.workspaceId) where.workspace_id = filters.workspaceId;
-    if (filters.environmentId) where.environment_id = filters.environmentId;
-    return this.prisma.aiKnowledgeBase.findMany({ where, orderBy: { created_at: 'desc' } });
+  findBases() {
+    return this.prisma.aiKnowledgeBase.findMany({ where: {}, orderBy: { created_at: 'desc' } });
   }
 
   findBaseById(id: string) {
     return this.prisma.aiKnowledgeBase.findUnique({ where: { id } });
-  }
-
-  countBases(organizationId: string) {
-    return this.prisma.aiKnowledgeBase.count({ where: { organization_id: organizationId } });
   }
 
   createBase(data: Prisma.AiKnowledgeBaseUncheckedCreateInput) {

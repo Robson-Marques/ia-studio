@@ -44,7 +44,7 @@ export class CommNodes implements OnModuleInit {
 
         if (ctx.dryRun) {
           await ctx.log('info', `[simulado] WhatsApp para ${phone}: ${templateName ? `template ${templateName}` : text.slice(0, 80)}`);
-          return { handle: 'success', output: { simulated: true, wamid: 'dry-run' } };
+          return { handle: 'success', output: { simulated: true, state: 'QUEUED' } };
         }
         try {
           const message: RichMessage = templateName
@@ -52,9 +52,6 @@ export class CommNodes implements OnModuleInit {
             : { kind: 'text', body: text };
           const result = await this.whatsapp.send(
             {
-              organizationId: ctx.organizationId,
-              workspaceId: ctx.workspaceId,
-              environmentId: ctx.environmentId,
               phone,
               criteria: {
                 tag: String(ctx.config['tag'] ?? '') || undefined,
@@ -64,7 +61,7 @@ export class CommNodes implements OnModuleInit {
             },
             message,
           );
-          await ctx.log('info', `WhatsApp enviado (wamid=${result.wamid ?? 'n/d'}).`);
+          await ctx.log('info', `WhatsApp aceito pela Central (job_id=${result.jobId ?? 'n/d'}); confirmação pendente.`);
           return { handle: 'success', output: result };
         } catch (e) {
           await ctx.log('error', `WhatsApp falhou: ${(e as Error).message}`);
@@ -109,7 +106,7 @@ export class CommNodes implements OnModuleInit {
         const templateId = String(ctx.config['template_id'] ?? '').trim();
         if (templateId) {
           try {
-            const rendered = await this.templates.render(ctx.organizationId, templateId, {
+            const rendered = await this.templates.render(templateId, {
               input: ctx.input,
               vars: ctx.vars,
             });
@@ -131,11 +128,6 @@ export class CommNodes implements OnModuleInit {
         }
         try {
           const result = await this.email.send(
-            {
-              organizationId: ctx.organizationId,
-              workspaceId: ctx.workspaceId ?? undefined,
-              environmentId: ctx.environmentId ?? undefined,
-            },
             {
               to,
               subject,
@@ -203,9 +195,6 @@ export class CommNodes implements OnModuleInit {
           return { handle: 'success', output: { simulated: true } };
         }
         const result = await this.notifications.notify({
-          organizationId: ctx.organizationId,
-          workspaceId: ctx.workspaceId,
-          environmentId: ctx.environmentId,
           recipient,
           templateId: String(ctx.config['template_id'] ?? '') || undefined,
           title: String(ctx.config['title'] ?? '') || undefined,

@@ -11,11 +11,6 @@ export class CreateTeamDto {
   @MaxLength(500)
   description?: string;
 
-  @IsUUID()
-  workspace_id!: string;
-
-  @IsUUID()
-  environment_id!: string;
 }
 
 export class UpdateTeamDto {
@@ -54,11 +49,6 @@ export class CreateQueueDto {
   @IsUUID()
   team_id?: string;
 
-  @IsUUID()
-  workspace_id!: string;
-
-  @IsUUID()
-  environment_id!: string;
 }
 
 export class UpdateQueueDto {

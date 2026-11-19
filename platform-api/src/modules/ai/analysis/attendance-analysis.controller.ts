@@ -1,13 +1,12 @@
 // Análise de atendimento (Checkpoint 1a). Leitura: ai.analysis.read; disparo
 // da análise: ai.analysis.run (gasta IA). A conversa a analisar é escolhida pela
 // UI; nada é enviado ao cliente nem alterado no atendimento.
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../../shared/auth/permissions.decorator';
 import { PERMISSIONS } from '../../../shared/permissions.constants';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { resolveOrganizationId } from '../../../shared/auth/tenant.util';
 import { AttendanceAnalysisService } from './attendance-analysis.service';
 import { AnalyzeChatDto } from './dto/attendance-analysis.dtos';
 
@@ -20,11 +19,8 @@ export class AttendanceAnalysisController {
   @Get()
   @RequirePermissions(PERMISSIONS.AI_ANALYSIS_READ)
   list(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('environment_id') environmentId?: string,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.analysis.list(resolveOrganizationId(user, orgQuery), environmentId);
+    return this.analysis.list();
   }
 
   @Post('analyze-chat')
@@ -33,8 +29,7 @@ export class AttendanceAnalysisController {
   analyzeChat(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AnalyzeChatDto,
-    @Query('organization_id') orgQuery?: string,
   ) {
-    return this.analysis.analyzeChat(resolveOrganizationId(user, orgQuery), dto.chat_id, { userId: user.sub });
+    return this.analysis.analyzeChat(dto.chat_id, { userId: user.sub });
   }
 }

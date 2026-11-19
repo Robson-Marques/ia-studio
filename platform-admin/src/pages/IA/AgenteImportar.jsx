@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { FormScreen, Field, TextArea, useToast } from '@studio-ux-ds/react';
 import { importAgent } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useWorkspace } from '../../context/WorkspaceContext';
 
 // IA/AgenteImportar — importar assistente de um arquivo exportado (v0.9.90).
 // Promovido a rota: era um Modal com TextArea de 12 linhas para colar o JSON —
@@ -16,7 +15,6 @@ export default function AgenteImportar() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = usePermissions();
-  const { workspaceId, environmentId } = useWorkspace();
 
   const canWrite = can('ai.agents.write');
 
@@ -25,7 +23,6 @@ export default function AgenteImportar() {
 
   async function handleImport() {
     if (!canWrite) { toast.error('Sem permissão.'); return; }
-    if (!workspaceId || !environmentId) { toast.error('Selecione um workspace e um ambiente no topo.'); return; }
     let data;
     try {
       data = JSON.parse(json);
@@ -35,7 +32,7 @@ export default function AgenteImportar() {
     }
     setSaving(true);
     try {
-      const saved = await importAgent({ workspace_id: workspaceId, environment_id: environmentId, data });
+      const saved = await importAgent({ data });
       toast.success('Assistente importado.');
       // Abre o assistente importado pra revisão (o próximo passo natural).
       if (saved?.id) navigate(`/ia/agentes/${saved.id}`);
