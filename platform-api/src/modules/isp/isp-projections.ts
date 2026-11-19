@@ -176,6 +176,20 @@ export function projectContrato(row: Record<string, unknown>): Record<string, un
  * entre instalações; por isso o contrato só expõe a data quando ela veio na
  * resposta e nunca converte status em diagnóstico de encerramento.
  */
+/** OS real, distinta do ticket de atendimento: somente evidências úteis. */
+export function projectOrdemServico(row: Record<string, unknown>): Record<string, unknown> {
+  return compact({
+    id: str(row['id']),
+    protocolo: str(row['protocolo']),
+    assunto: firstString(row, ['assunto', 'titulo', 'descricao_assunto']),
+    status: str(row['status']),
+    aberta_em: firstString(row, ['data_abertura', 'data_agenda', 'data_cadastro', 'data']),
+    concluida_em: firstString(row, ['data_fechamento', 'data_finalizacao', 'data_conclusao']),
+    relato: excerpt(row['mensagem'] ?? row['menssagem'] ?? row['descricao'] ?? row['observacao']),
+    parecer: excerpt(row['solucao'] ?? row['parecer'] ?? row['observacao_tecnica']),
+  });
+}
+
 export function projectChamado(row: Record<string, unknown>): Record<string, unknown> {
   return compact({
     id: str(row['id']),
