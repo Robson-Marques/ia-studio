@@ -115,6 +115,19 @@ export class VersionService {
     } catch {
       // HEAD nao aponta exatamente numa tag — segue pro fallback.
     }
+    // Pode existir mais de uma tag no mesmo commit (incluindo tags antigas
+    // fora do padrão). git describe --exact-match escolhe apenas uma delas.
+    // Consultar TODAS as tags do HEAD antes de recorrer ao CHANGELOG impede
+    // que uma tag não-semver faça a versão instalada regredir no painel.
+    try {
+      const { stdout } = await exec('git', ['tag', '--points-at', 'HEAD'], { cwd: appDir() });
+      const exactTags = stdout.split('\\n').map((tag) => tag.trim())
+        .filter((tag) => TAG_REGEX.test(tag) && this.isOwnLine(tag, expectedMajor))
+        .sort((a, b) => this.compare(b, a));
+      if (exactTags[0]) return exactTags[0];
+    } catch (e) {
+      this.logger.warn(`Falha ao consultar tags do HEAD: ${(e as Error).message}`);
+    }
     // 2) Fallback: primeiro "## vX.Y.Z" do CHANGELOG.md (sempre deste sistema).
     try {
       const changelog = await readFile(path.join(appDir(), 'CHANGELOG.md'), 'utf8');
