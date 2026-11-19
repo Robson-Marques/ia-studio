@@ -452,6 +452,62 @@ export class WhatsappChatsRepository {
     });
   }
 
+  /**
+   * Uma reação ativa por remetente/mensagem nesta conversa individual.
+   * Mantém o alvo no mesmo chat e reutiliza os campos existentes de reaction.
+   * Texto vazio remove a reação sem gerar nova bolha na conversa.
+   */
+  async upsertWahaReaction(args: {
+    connectionId: string;
+    targetMessageId: string;
+    fromMe: boolean;
+    emoji: string;
+    eventId: string;
+    occurredAt: Date;
+  }): Promise<void> {
+    const target = await this.findMessageByConnectionExternalId(args.connectionId, args.targetMessageId);
+    if (!target) return;
+    const sender = args.fromMe ? 'system' : 'contact';
+    const existing = await this.prisma.whatsappMessage.findFirst({
+      where: {
+        connection_id: args.connectionId,
+        chat_id: target.chat_id,
+        type: 'reaction',
+        sender,
+        reaction_to_message_id: args.targetMessageId,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    if (existing) {
+      await this.prisma.whatsappMessage.update({
+        where: { id: existing.id },
+        data: {
+          reaction_emoji: args.emoji || null,
+          occurred_at: args.occurredAt,
+          external_id: args.eventId,
+          content: '',
+        },
+      });
+    } else if (args.emoji) {
+      await this.prisma.whatsappMessage.create({
+        data: {
+          chat_id: target.chat_id,
+          connection_id: args.connectionId,
+          external_id: args.eventId,
+          direction: args.fromMe ? CommMessageDirection.OUTGOING : CommMessageDirection.INCOMING,
+          sender,
+          type: 'reaction',
+          content: '',
+          reaction_emoji: args.emoji,
+          reaction_to_message_id: args.targetMessageId,
+          occurred_at: args.occurredAt,
+          inbound_event_published: true,
+          status: 'received',
+        },
+      });
+    }
+  }
+
   /** Ultimas mensagens (desc); `before` pagina pra tras no historico. */
   listMessages(chatId: string, take = 50, before?: Date): Promise<WhatsappMessage[]> {
     return this.prisma.whatsappMessage.findMany({

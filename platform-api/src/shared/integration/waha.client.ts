@@ -123,7 +123,7 @@ export async function ensureWahaSession(
         url: webhookUrl,
         // message.any inclui mensagens recebidas e também as enviadas pelo
         // aparelho conectado. O external_id deduplica o eco da própria API.
-        events: ['message.any', 'message.ack', 'session.status'],
+        events: ['message.any', 'message.reaction', 'message.ack', 'session.status'],
         hmac: webhookSecret ? { key: webhookSecret } : undefined,
         retries: { policy: 'constant', attempts: 5, delaySeconds: 2 },
       }],
