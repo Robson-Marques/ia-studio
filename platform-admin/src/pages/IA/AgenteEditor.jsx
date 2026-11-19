@@ -63,6 +63,23 @@ const EMPTY = {
   conversation: { auto_reply: false, debounce_seconds: 12, split_paragraphs: false, supervised: false },
 };
 
+// Modelo inicial editável quando a instalação tem um IXC ativo.
+// Não promete resolver sozinho nem executa operações sensíveis.
+const DEFAULT_ISP_ROTEIRO = {
+  objetivo: 'Atender clientes do provedor com clareza e segurança, consultando o IXC para compreender o histórico antes de orientar ou encaminhar.',
+  passos: [
+    { titulo: 'Identificar o cliente', descricao: 'Verifique o vínculo existente. Se não houver identificação confiável, solicite confirmação antes de consultar informações pessoais.' },
+    { titulo: 'Entender o histórico', descricao: 'Consulte os cinco últimos atendimentos e as últimas ordens de serviço do IXC. Procure reincidência, OS aberta e reclamações semelhantes; não presuma resolução.' },
+    { titulo: 'Classificar a solicitação', descricao: 'Entenda se o assunto é suporte, cobrança, informação contratual ou outra necessidade. Não confunda bloqueio contratual com falha física de rede.' },
+    { titulo: 'Investigar ou orientar', descricao: 'Para suporte, use diagnóstico de contrato e conectividade. Para cobrança, só consulte dados financeiros quando a titularidade e as permissões forem confirmadas.' },
+    { titulo: 'Concluir ou encaminhar', descricao: 'Apresente apenas fatos verificados, explique o próximo passo e encaminhe ao atendente humano quando não houver evidência suficiente ou autorização para agir.' },
+  ],
+  situacoes: [
+    { quando: 'O cliente relata que o problema voltou', faca: 'Compare chamados e ordens de serviço anteriores e informe a reincidência com base nos registros.' },
+    { quando: 'O cliente pede desbloqueio, pagamento, alteração ou abertura de OS', faca: 'Não execute ações por iniciativa própria. Respeite aprovação e as regras de atendimento antes de oferecer qualquer procedimento.' },
+  ],
+};
+
 export default function AgenteEditor() {
   const { id: routeId } = useParams();
   const navigate = useNavigate();
@@ -165,8 +182,23 @@ export default function AgenteEditor() {
           ]);
           const selected = (tls || []).filter((t) => readKeys.has(t.key)
             && t.is_active !== false && t.builtin && !t.requires_approval).map((t) => t.key);
-          setForm((prev) => prev.allowed_tools?.length
-            ? prev : { ...prev, allowed_tools: selected });
+          setForm((prev) => {
+            const r = prev.roteiro || {};
+            const emptyRoteiro = !r.objetivo?.trim()
+              && !(r.passos || []).some((p) => p.titulo?.trim() || p.descricao?.trim())
+              && !(r.situacoes || []).some((item) => item.quando?.trim() || item.faca?.trim());
+            const roteiro = emptyRoteiro
+              ? {
+                  objetivo: DEFAULT_ISP_ROTEIRO.objetivo,
+                  passos: DEFAULT_ISP_ROTEIRO.passos.map((item) => ({ ...item })),
+                  situacoes: DEFAULT_ISP_ROTEIRO.situacoes.map((item) => ({ ...item })),
+                }
+              : prev.roteiro;
+            return {
+              ...prev, roteiro,
+              allowed_tools: prev.allowed_tools?.length ? prev.allowed_tools : selected,
+            };
+          });
           setIspAutoConfigured(selected.length > 0);
         }
       })
@@ -455,8 +487,8 @@ export default function AgenteEditor() {
               </p>
               {ispAutoConfigured && !isEdit && (
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--su-text-secondary)' }}>
-                  IXC conectado: habilidades de identificação, chamados e diagnóstico já selecionadas.
-                  Confira-as em “O que faz”; ações de escrita continuam desabilitadas.
+                  IXC conectado: roteiro inicial e habilidades de identificação, chamados e diagnóstico
+                  já preparados. Revise-os em “O que faz”; ações de escrita continuam desabilitadas.
                 </p>
               )}
             </div>
