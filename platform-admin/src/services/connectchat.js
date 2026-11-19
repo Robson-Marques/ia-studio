@@ -115,3 +115,10 @@ export async function previewConnectchatAgent(conversationId) {
     return data;
   } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível gerar a prévia do agente')); }
 }
+
+export async function setConnectchatLabRules(rules) {
+  try {
+    const { data } = await api.put('/ai/connectchat-lab/rules', rules);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível salvar as regras do laboratório')); }
+}
