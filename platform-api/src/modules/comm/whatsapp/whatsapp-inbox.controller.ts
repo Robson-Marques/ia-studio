@@ -222,6 +222,18 @@ export class WhatsappInboxController {
     });
   }
 
+  // Referências WAHA codificadas podem exceder o limite de 100 caracteres
+  // de parâmetros de rota do Fastify. Usa query sem alterar o limite global.
+  @Get('chats/:id/media')
+  @RequirePermissions(...ANY_VIEW)
+  async mediaFromQuery(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('ref') mediaId: string,
+  ) {
+    return this.media(user, id, mediaId);
+  }
+
   @Get('chats/:id/media/:mediaId')
   @RequirePermissions(...ANY_VIEW)
   async media(
