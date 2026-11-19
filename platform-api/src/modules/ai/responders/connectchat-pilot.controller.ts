@@ -14,6 +14,19 @@ import { AgentRunnerService } from '../agents/agent-runner.service';
 import type { ConnectchatMessage } from '../../../shared/integration/connectchat.client';
 
 const BINDING_KEY = 'ai.connectchat.pilot.agent_id';
+const RULES_KEY = 'ai.connectchat.pilot.rules';
+const PILOT_DEFAULTS = {
+  ticketHistory: true,
+  networkDiagnosis: true,
+  financialRead: false,
+  requireCustomerLink: true,
+} as const;
+type PilotRules = {
+  ticketHistory: boolean;
+  networkDiagnosis: boolean;
+  financialRead: boolean;
+  requireCustomerLink: boolean;
+};
 // Nenhuma ferramenta com escrita, envio, desbloqueio, emissão ou alteração
 // é oferecida ao LLM durante o ensaio. Não confiar no nome/categoria dinâmica.
 const READ_TOOLS = [
@@ -26,6 +39,14 @@ class BindPilotDto {
 }
 class PreviewPilotDto {
   @IsString() @MaxLength(2000) @IsOptional() guidance?: string;
+}
+class PilotRulesDto {
+  @IsOptional() @IsString() version?: string;
+  // Booleanos são validados no backend: nada de JSON editável na interface.
+  @IsOptional() ticketHistory?: boolean;
+  @IsOptional() networkDiagnosis?: boolean;
+  @IsOptional() financialRead?: boolean;
+  @IsOptional() requireCustomerLink?: boolean;
 }
 
 @ApiTags('IA — Bancada ConnectChat')
@@ -44,6 +65,46 @@ export class ConnectchatPilotController {
     if (!permissions.includes('*') && (!permissions.includes(a) || !permissions.includes(b))) {
       throw new ForbiddenException('Esta operação exige permissões de agentes e leitura do ConnectChat.');
     }
+  }
+
+  private async pilotRules(): Promise<PilotRules> {
+    const raw = await this.settings.getValue(RULES_KEY);
+    const data = raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? raw as Record<string, unknown> : {};
+    return {
+      ticketHistory: typeof data.ticketHistory === 'boolean' ? data.ticketHistory : PILOT_DEFAULTS.ticketHistory,
+      networkDiagnosis: typeof data.networkDiagnosis === 'boolean' ? data.networkDiagnosis : PILOT_DEFAULTS.networkDiagnosis,
+      financialRead: typeof data.financialRead === 'boolean' ? data.financialRead : PILOT_DEFAULTS.financialRead,
+      requireCustomerLink: typeof data.requireCustomerLink === 'boolean' ? data.requireCustomerLink : PILOT_DEFAULTS.requireCustomerLink,
+    };
+  }
+
+  @Get('rules')
+  @RequirePermissions(PERMISSIONS.AI_AGENTS_READ, PERMISSIONS.COMM_CONNECTCHAT_READ)
+  async getRules(@CurrentUser() user: AuthenticatedUser) {
+    this.requireBoth(user, PERMISSIONS.AI_AGENTS_READ, PERMISSIONS.COMM_CONNECTCHAT_READ);
+    return { ...(await this.pilotRules()), automaticReplies: false, writeActions: false, whatsappEnabled: false };
+  }
+
+  @Post('rules')
+  @RequirePermissions(PERMISSIONS.AI_AGENTS_WRITE, PERMISSIONS.COMM_CONNECTCHAT_READ)
+  async setRules(@CurrentUser() user: AuthenticatedUser, @Body() body: PilotRulesDto) {
+    this.requireBoth(user, PERMISSIONS.AI_AGENTS_WRITE, PERMISSIONS.COMM_CONNECTCHAT_READ);
+    const existing = await this.pilotRules();
+    const keys: (keyof PilotRules)[] = ['ticketHistory', 'networkDiagnosis', 'financialRead', 'requireCustomerLink'];
+    const updated = { ...existing };
+    for (const key of keys) {
+      const value = body[key];
+      if (value === undefined) continue;
+      if (typeof value !== 'boolean') throw new BadRequestException('As regras da bancada precisam ser verdadeiras ou falsas.');
+      updated[key] = value;
+    }
+    // Nunca permitir leitura financeira sem exigir cliente vinculado.
+    if (updated.financialRead && !updated.requireCustomerLink) {
+      throw new BadRequestException('Para consultar débitos, a validação do vínculo do cliente é obrigatória.');
+    }
+    await this.settings.set(RULES_KEY, updated);
+    return { ...updated, automaticReplies: false, writeActions: false, whatsappEnabled: false };
   }
 
   @Get()
@@ -93,15 +154,21 @@ export class ConnectchatPilotController {
     const lastCustomer = [...history].reverse().find((m) => m.role === 'user');
     if (!lastCustomer) throw new BadRequestException('Não existe mensagem de cliente para testar.');
 
-    // Nunca tomar a presença de um telefone ou nome como prova de titularidade.
-    // Sem vínculo IXC confirmado, o ensaio não recebe ferramentas cadastrais.
+    // O vínculo cadastral é requisito obrigatório para operações que consultam
+    // dados do cliente. A bancada continua sem envios automáticos.
     const linked = conversation.businessContact?.linkStatus === 'ACTIVE'
       && conversation.businessContact?.status === 'CUSTOMER';
-    const tools = linked
-      ? [...READ_TOOLS] : ['current_datetime', 'consultar_faq'];
+    const rules = await this.pilotRules();
+    const tools: string[] = ['current_datetime', 'consultar_faq'];
+    if (linked) {
+      tools.push('identificar_cliente', 'consultar_contrato');
+      if (rules.ticketHistory) tools.push('consultar_chamados_recentes');
+      if (rules.networkDiagnosis) tools.push('diagnosticar_conexao', 'status_conexao');
+      if (rules.financialRead) tools.push('consultar_debitos');
+    }
     const customerName = linked ? (conversation.businessContact?.customerDisplayName || '') : '';
     const caution = linked
-      ? 'Existe vínculo de cliente no ConnectChat. Use apenas dados necessários; não execute operações financeiras ou alterações.'
+      ? 'Existe vínculo de cliente no ConnectChat. Use apenas ferramentas liberadas pelas regras; não execute alterações nem envie mensagens automaticamente.'
       : 'O cliente ainda não teve a titularidade validada. Não consulte ou divulgue cadastros, chamados, débitos ou dados pessoais. Solicite identificação segura.';
     const input = [
       '[ENSAIO INTERNO — NÃO ENVIAR MENSAGEM AO CLIENTE]',
@@ -121,7 +188,7 @@ export class ConnectchatPilotController {
     });
     return {
       status: result.status, preview: result.output,
-      runId: result.runId, customerLinked: linked,
+      runId: result.runId, customerLinked: linked, rules,
       sent: false, automaticReplies: false,
     };
   }
