@@ -39,6 +39,7 @@ function ChatMedia({ chatId, message }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [pageCount, setPageCount] = useState(null);
   const targetRef = useRef(null);
   const filenameHint = String(media.filename || (message.type === 'document' ? message.content : '') || '');
   const isPdfHint = filenameHint.toLowerCase().endsWith('.pdf')
@@ -52,6 +53,7 @@ function ChatMedia({ chatId, message }) {
     if (!media.media_id || loading || data) return;
     setLoading(true);
     setError(null);
+    setPageCount(null);
     try {
       const blob = await downloadChatMedia(chatId, media.media_id);
       // PDFs às vezes são servidos como octet-stream; verificar os bytes antes
@@ -123,10 +125,19 @@ function ChatMedia({ chatId, message }) {
   const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf';
   return (
     <div className="w-[260px] max-w-full overflow-hidden rounded-lg border border-black/10 bg-white/80">
-      {isPdf && <PdfThumbnail file={data.file} />}
+      {isPdf && <PdfThumbnail file={data.file} onPageCount={setPageCount} />}
       <div className="flex items-center gap-2 p-2.5">
         <DSIcon name="file-text" size="sm" />
-        <span className="min-w-0 flex-1 truncate text-xs" title={filename}>{filename}</span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium" title={filename}>{filename}</div>
+          <div className="text-[10px] text-gray-500">
+            {[
+              pageCount ? `${pageCount} ${pageCount === 1 ? 'página' : 'páginas'}` : null,
+              isPdf ? 'PDF' : (mime.split('/')[1] || 'arquivo').toUpperCase(),
+              data.file?.size != null ? `${(data.file.size / (1024 * 1024)).toFixed(1).replace('.', ',')} MB` : null,
+            ].filter(Boolean).join(' · ')}
+          </div>
+        </div>
         {isPdf && (
           <a href={data.src} target="_blank" rel="noreferrer" title="Abrir documento" aria-label={`Abrir ${filename}`} style={{ color: '#027eb5' }}>
             <DSIcon name="external-link" size="sm" />
