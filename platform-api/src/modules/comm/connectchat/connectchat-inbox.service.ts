@@ -113,7 +113,7 @@ export class ConnectchatInboxService {
     if (!conversation) throw new BadRequestException('Conversa não encontrada.');
     if (conversation.businessContact?.status !== 'CUSTOMER'
       || conversation.businessContact.linkStatus !== 'ACTIVE') return null;
-    const match = /^ixc:([0-9a-f-]{36}):([1-9]\\d*)$/i.exec(conversation.customerRef || '');
+    const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(conversation.customerRef || '');
     if (!match) return null;
     const connection = await this.connections.findById(match[1]).catch(() => null);
     if (!connection || connection.provider_key !== 'ixc' || connection.status !== 'ACTIVE') return null;
