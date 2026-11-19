@@ -8,6 +8,7 @@ import { ATTENDANCE_STATUS, contactInitials, formatPhone } from './whatsapp.cons
 import MessageComposer from './MessageComposer';
 import AudioPlayer from './AudioPlayer';
 import PdfThumbnail from './PdfThumbnail';
+import VideoPlayer from './VideoPlayer';
 import { statusToTone } from '../../lib/tone';
 
 // WhatsApp/ChatWindow — a conversa aberta. Migrada pro DS na v0.10.9.
@@ -64,9 +65,22 @@ function ChatMedia({ chatId, message }) {
       // de corrigir o MIME para que o visualizador nativo possa renderizar.
       const signature = isDocument ? await blob.slice(0, 5).text() : '';
       const pdf = signature === '%PDF-';
-      const displayBlob = pdf && blob.type.split(';')[0] !== 'application/pdf'
+      // WAHA pode devolver vídeos com application/octet-stream. O navegador
+      // precisa do MIME correto para extrair o quadro da miniatura e reproduzir.
+      let displayBlob = pdf && blob.type.split(';')[0] !== 'application/pdf'
         ? new Blob([blob], { type: 'application/pdf' })
         : blob;
+      if (message.type === 'video' && !displayBlob.type.startsWith('video/')) {
+        const head = new Uint8Array(await displayBlob.slice(0, 16).arrayBuffer());
+        const isMp4 = head.length >= 8 && String.fromCharCode(...head.slice(4, 8)) === 'ftyp';
+        const isWebm = head.length >= 4
+          && head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3;
+        const hintedMime = String(media.mime_type || '').split(';')[0].trim().toLowerCase();
+        const videoMime = isMp4 ? 'video/mp4'
+          : isWebm ? 'video/webm'
+          : hintedMime.startsWith('video/') ? hintedMime : '';
+        if (videoMime) displayBlob = new Blob([displayBlob], { type: videoMime });
+      }
       setData({ src: URL.createObjectURL(displayBlob), mime: displayBlob.type, file: displayBlob });
     } catch (err) {
       setError(err.message);
@@ -76,10 +90,11 @@ function ChatMedia({ chatId, message }) {
     }
   }
 
-  // Imagens, áudios e PDFs visíveis carregam automaticamente. Outros arquivos
-  // continuam sob demanda para evitar downloads de documentos grandes.
+  // Imagens, áudios, vídeos e PDFs visíveis carregam automaticamente.
+// Vídeos só são baixados ao entrar no viewport (miniatura sob demanda),
+// evitando transferir a conversa inteira em segundo plano.
   useEffect(() => {
-    if (data || loading || error || !media.media_id || !(['image', 'sticker', 'audio'].includes(message.type) || isDocument)) return undefined;
+    if (data || loading || error || !media.media_id || !(['image', 'sticker', 'audio', 'video'].includes(message.type) || isDocument)) return undefined;
     const element = targetRef.current;
     if (!element) return undefined;
     if (typeof IntersectionObserver === 'undefined') { load(); return undefined; }
@@ -121,7 +136,7 @@ function ChatMedia({ chatId, message }) {
     return <AudioPlayer src={data.src} light />;
   }
   if (message.type === 'video' || mime.startsWith('video/')) {
-    return <video controls src={data.src} className="rounded-lg max-w-full max-h-64" />;
+    return <VideoPlayer src={data.src} mime={mime} filename={filenameHint || 'video.mp4'} />;
   }
   const filename = filenameHint || 'Documento';
   const isPdf = mime.split(';')[0].trim().toLowerCase() === 'application/pdf';
