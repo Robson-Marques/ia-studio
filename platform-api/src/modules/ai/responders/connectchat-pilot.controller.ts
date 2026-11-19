@@ -138,7 +138,14 @@ export class ConnectchatPilotController {
     const conversations = await this.inbox.listConversations();
     const conversation = conversations.find((c) => c.id === conversationId);
     if (!conversation) throw new BadRequestException('Conversa não encontrada no ConnectChat.');
-    const raw = await this.inbox.getMessages(conversationId, '0', 100) as ConnectchatMessage[];
+    // ConnectChat pagina a partir de uma sequência. Usar o fim da
+    // conversa, não as 100 primeiras mensagens de todo o histórico.
+    let afterSequence = '0';
+    try {
+      const last = BigInt(conversation.lastSequence || '0');
+      if (last > 100n) afterSequence = String(last - 100n);
+    } catch { /* sequência inválida no provider: usar pagina inicial */ }
+    const raw = await this.inbox.getMessages(conversationId, afterSequence, 100) as ConnectchatMessage[];
     const history = raw
       .filter((m) => typeof m.body === 'string' && m.body.trim().length > 0)
       .slice(-20)
@@ -146,8 +153,12 @@ export class ConnectchatPilotController {
         role: m.senderKind === 'CUSTOMER' ? 'user' as const : 'assistant' as const,
         content: m.body.slice(0, 3500),
       }));
-    const lastCustomer = [...history].reverse().find((m) => m.role === 'user');
-    if (!lastCustomer) throw new BadRequestException('Não existe mensagem de cliente para testar.');
+    const lastCustomerIndex = history.map((m) => m.role).lastIndexOf('user');
+    if (lastCustomerIndex < 0) throw new BadRequestException('Não existe mensagem de cliente para testar.');
+    const lastCustomer = history[lastCustomerIndex];
+    if (lastCustomerIndex !== history.length - 1) {
+      throw new BadRequestException('A última mensagem já foi respondida pela empresa. Aguarde nova mensagem do cliente para simular.');
+    }
 
     // O vínculo cadastral é requisito obrigatório para operações que consultam
     // dados do cliente. A bancada continua sem envios automáticos.
