@@ -54,8 +54,24 @@ export class ConnectchatAutoResponderService {
       if (!agent?.is_active || !parseConversation(agent.conversation).auto_reply) return;
       const conversations = await this.inbox.listRawConversations();
       for (const conversation of conversations.filter((c) => c.status === 'OPEN')) {
-        try { await this.respond(agent, conversation); }
-        catch (error) { this.logger.warn(`ConnectChat ${conversation.id}: ${(error as Error).message}`); }
+        try {
+          const pendingKey = `ai.connectchat.pending_identity.${conversation.id}`;
+          const rawPending = await this.settings.getValue(pendingKey);
+          const pending = rawPending && typeof rawPending === 'object' && !Array.isArray(rawPending)
+            ? rawPending as Record<string, unknown> : {};
+          const linkedId = /^ixc:[0-9a-f-]{36}:([1-9]\d*)$/i.exec(conversation.customerRef ?? '')?.[1];
+          const verified = conversation.businessContact?.status === 'CUSTOMER'
+            && conversation.businessContact.linkStatus === 'ACTIVE';
+          if (verified && pending.consent === true && pending.customerId === linkedId
+            && pending.resumed !== true) {
+            await this.respond(agent, conversation, typeof pending.reason === 'string' ? pending.reason : '');
+            // Resumo da conversa é retomado apenas uma vez; a confirmação
+            // autenticada do ConnectChat é a fonte da verdade, nunca o CPF.
+            await this.settings.set(pendingKey, { ...pending, resumed: true, linkedAt: new Date().toISOString() });
+          } else {
+            await this.respond(agent, conversation);
+          }
+        } catch (error) { this.logger.warn(`ConnectChat ${conversation.id}: ${(error as Error).message}`); }
       }
     } catch (error) {
       this.logger.warn(`ConnectChat IA: ${(error as Error).message}`);
@@ -153,18 +169,19 @@ export class ConnectchatAutoResponderService {
     return 'GENERAL';
   }
 
-  private async respond(agent: AiAgent, conversation: ConnectchatConversation): Promise<void> {
+  private async respond(agent: AiAgent, conversation: ConnectchatConversation, resumeReason?: string): Promise<void> {
     const sequence = conversation.lastSequence;
     if (!/^\d+$/.test(sequence) || BigInt(sequence) === 0n) return;
-    const key = `ai.connectchat.cursor.${conversation.id}`;
+    const resume = resumeReason !== undefined;
+    const key = resume ? `ai.connectchat.resume.${conversation.id}` : `ai.connectchat.cursor.${conversation.id}`;
     const raw = await this.settings.getValue(key);
     const current = this.state(raw);
     if (BigInt(current.sequence) >= BigInt(sequence)) return;
     const after = BigInt(sequence) > 50n ? (BigInt(sequence) - 50n).toString() : '0';
     const messages = await this.inbox.getMessages(conversation.id, after, 100) as ConnectchatMessage[];
-    const last = messages.at(-1);
-    if (!last || last.serverSequence !== sequence) return;
-    if (last.senderKind !== 'CUSTOMER' || !last.body?.trim()) {
+    const last = resume ? messages.filter((m) => m.senderKind === 'CUSTOMER').at(-1) : messages.at(-1);
+    if (!last || (!resume && last.serverSequence !== sequence)) return;
+    if (last.senderKind !== 'CUSTOMER' || (!resume && !last.body?.trim())) {
       await this.checkpoint(key, sequence);
       return;
     }
@@ -172,19 +189,22 @@ export class ConnectchatAutoResponderService {
     if (!Number.isFinite(createdAt)) return;
     // Ignora somente o passado anterior à subida do serviço, não a primeira
     // mensagem de uma conversa nova. Assim o primeiro contato é respondido.
-    if (!raw && createdAt < this.bootTime - 2000) {
+    if (!resume && !raw && createdAt < this.bootTime - 2000) {
       await this.checkpoint(key, sequence);
       return;
     }
     const delay = parseConversation(agent.conversation).debounce_seconds * 1000;
-    if (Date.now() - createdAt < delay) return;
+    if (!resume && Date.now() - createdAt < delay) return;
     const claim = randomUUID();
     if (!(await this.claim(key, sequence, claim))) return;
 
     try {
       const context = await this.inbox.contextForAgentPreview(conversation.id);
-      const newest = context.messages.at(-1);
-      if (!newest || newest.serverSequence !== sequence || newest.senderKind !== 'CUSTOMER') {
+      const newest = resume
+        ? { ...(context.messages.filter((m) => m.senderKind === 'CUSTOMER').at(-1) || last),
+            body: resumeReason?.trim() || last.body }
+        : context.messages.at(-1);
+      if (!newest || (!resume && newest.serverSequence !== sequence) || newest.senderKind !== 'CUSTOMER') {
         await this.complete(key, sequence, claim);
         return;
       }
@@ -204,7 +224,7 @@ export class ConnectchatAutoResponderService {
         if (typeof pending['customerId'] === 'string') {
           if ((explicitYes || explicitNo) && typeof pending['consent'] !== 'boolean') {
             await this.settings.set(pendingKey, {
-              customerId: pending['customerId'], consent: explicitYes,
+              ...pending, consent: explicitYes,
               updatedAt: new Date().toISOString(),
             });
             const answer = explicitYes
@@ -224,8 +244,12 @@ export class ConnectchatAutoResponderService {
           const found = await this.support.lookupCpf(candidate[1]);
           const token = createHash('sha256').update(`newnet-cpf:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
           if (found.status === 'FOUND' && found.customerId) {
+            const noticed = await this.settings.getValue(`ai.connectchat.identification_requested.${conversation.id}`);
+            const previous = noticed && typeof noticed === 'object' && !Array.isArray(noticed)
+              ? noticed as Record<string, unknown> : {};
             await this.settings.set(pendingKey, {
               customerId: found.customerId, consent: null, requestedAt: new Date().toISOString(),
+              reason: typeof previous.reason === 'string' ? previous.reason : '',
             });
             await this.inbox.sendAgentMessage(conversation.id,
               'Localizei um cadastro. Posso associar este contato a ele para os próximos atendimentos? Responda sim ou não.',
@@ -254,7 +278,7 @@ export class ConnectchatAutoResponderService {
               : 'Oi! Sou Nete, da Newnet. Para consultar seu atendimento, pode informar o CPF do titular?';
             const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
-            await this.settings.set(noticeKey, { requested: true });
+            await this.settings.set(noticeKey, { requested: true, reason: newest.body.slice(0, 500) });
             await this.settings.set(greetKey, { sent: true });
           }
         }
@@ -483,7 +507,7 @@ export class ConnectchatAutoResponderService {
       const fresh = await this.inbox.contextForAgentPreview(conversation.id);
       const finalMessage = fresh.messages.at(-1);
       if (!finalMessage || finalMessage.serverSequence !== sequence
-        || finalMessage.senderKind !== 'CUSTOMER' || fresh.conversation.status !== 'OPEN') {
+        || (!resume && finalMessage.senderKind !== 'CUSTOMER') || fresh.conversation.status !== 'OPEN') {
         await this.complete(key, sequence, claim);
         return;
       }
