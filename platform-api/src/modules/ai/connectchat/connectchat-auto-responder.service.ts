@@ -113,6 +113,22 @@ export class ConnectchatAutoResponderService {
     });
   }
 
+  /** Bloqueia eco da mesma resposta, inclusive com pequenas trocas de palavras. */
+  private isRepeat(answer: string, previous: ConnectchatMessage[]): boolean {
+    const tokens = (text: string) => new Set(text.toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/).filter((part) => part.length > 2));
+    const a = tokens(answer);
+    if (a.size < 4) return false;
+    return previous.filter((m) => m.senderKind === 'BUSINESS' && !!m.body)
+      .slice(-4).some((m) => {
+        const b = tokens(m.body);
+        const common = [...a].filter((word) => b.has(word)).length;
+        const overlap = common / Math.max(a.size, b.size, 1);
+        return overlap >= 0.82;
+      });
+  }
+
   private async respond(agent: AiAgent, conversation: ConnectchatConversation): Promise<void> {
     const sequence = conversation.lastSequence;
     if (!/^\d+$/.test(sequence) || BigInt(sequence) === 0n) return;
@@ -156,7 +172,7 @@ export class ConnectchatAutoResponderService {
         const noticeKey = `ai.connectchat.identification_requested.${conversation.id}`;
         const already = await this.settings.getValue(noticeKey);
         if (!already) {
-          const message = 'Olá! Sou a assistente virtual da Newnet. Antes de verificar sua conexão, preciso confirmar seu cadastro. Um atendente vai validar seu vínculo com a Newnet por aqui. Assim que estiver identificado, continuo com o suporte.';
+          const message = 'Olá! Sou a assistente virtual da Newnet. Antes de verificar sua conexão, preciso confirmar seu cadastro. A validação do vínculo deve ser feita por um atendente autorizado. Assim que estiver identificado, continuo com o suporte.';
           const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
           await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
           await this.settings.set(noticeKey, { requested: true });
@@ -222,6 +238,12 @@ export class ConnectchatAutoResponderService {
       const answer = result.status === 'COMPLETED' && typeof result.output === 'string'
         ? result.output.trim() : '';
       if (!answer) return;
+      // Não trocar palavras de uma pergunta antiga e enviá-la novamente.
+      if (this.isRepeat(answer, context.messages)) {
+        this.logger.debug(`Resposta redundante suprimida no ConnectChat ${conversation.id}`);
+        await this.complete(key, sequence, claim);
+        return;
+      }
       const fresh = await this.inbox.contextForAgentPreview(conversation.id);
       const finalMessage = fresh.messages.at(-1);
       if (!finalMessage || finalMessage.serverSequence !== sequence
