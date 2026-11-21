@@ -327,10 +327,10 @@ export class ConnectchatAutoResponderService {
           return;
         }
 
-        const candidate = newest.body.match(/(?:^|\D)(\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)/);
+        const candidate = newest.body.match(/(?:^|\D)(\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)/);
         if (candidate) {
-          const found = await this.support.lookupCpf(candidate[1]);
-          const token = createHash('sha256').update(`newnet-cpf:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          const found = await this.support.lookupDocument(candidate[1]);
+          const token = createHash('sha256').update(`newnet-document:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
           if (found.status === 'FOUND' && found.customerId) {
             const noticed = await this.settings.getValue(`ai.connectchat.identification_requested.${conversation.id}`);
             const previous = noticed && typeof noticed === 'object' && !Array.isArray(noticed)
@@ -341,12 +341,12 @@ export class ConnectchatAutoResponderService {
             });
             await this.inbox.sendAgentMessage(conversation.id,
               'Localizei um cadastro. Posso associar este contato a ele para os próximos atendimentos? Responda sim ou não.',
-              `newnet-cpf-${token}`);
+              `newnet-document-${token}`);
           } else {
             const text = found.status === 'UNAVAILABLE'
               ? 'Não consegui consultar o cadastro agora. Vou precisar do apoio de um atendente.'
-              : 'Não consegui localizar um cadastro com esses dados. Confira o CPF do titular ou peça ajuda a um atendente.';
-            await this.inbox.sendAgentMessage(conversation.id, text, `newnet-cpf-${token}`);
+              : 'Não localizei um cadastro com esses dados. Confira o CPF ou CNPJ do titular, por favor.';
+            await this.inbox.sendAgentMessage(conversation.id, text, `newnet-document-${token}`);
           }
         } else {
           // Motivo e CPF são duas etapas diferentes. "Oi" pede o motivo;
@@ -362,8 +362,8 @@ export class ConnectchatAutoResponderService {
           } else if (hasReason && !(await this.settings.getValue(noticeKey))) {
             const greeted = !!(await this.settings.getValue(greetKey));
             const message = greeted
-              ? 'Para consultar seu atendimento, pode informar o CPF do titular?'
-              : 'Oi! Sou Nete, da Newnet. Para consultar seu atendimento, pode informar o CPF do titular?';
+              ? 'Para consultar seu atendimento, pode informar o CPF ou CNPJ do titular?'
+              : 'Oi! Sou Nete, da Newnet. Para consultar seu atendimento, pode informar o CPF ou CNPJ do titular?';
             const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
             await this.settings.set(noticeKey, { requested: true, reason: newest.body.slice(0, 500) });
