@@ -48,6 +48,18 @@ export class ConnectchatInboxService {
     return this.connections.test(await this.connectionId());
   }
 
+  /** Leitura interna, sem enriquecimento/mutação de contatos, para o condutor IA. */
+  async listRawConversations(): Promise<ConnectchatConversation[]> {
+    return this.execute('listConversations') as Promise<ConnectchatConversation[]>;
+  }
+
+  /** Envio do agente pela identidade técnica da conexão, idempotente por
+   * clientMessageId. Não se faz passar por um usuário humano. */
+  async sendAgentMessage(conversationId: string, body: string, clientMessageId: string) {
+    if (!body.trim()) throw new BadRequestException('A IA não gerou texto para enviar.');
+    return this.execute('sendMessage', { conversationId, body: body.trim(), clientMessageId });
+  }
+
   async listConversations() {
     const conversations = await this.execute('listConversations') as ConnectchatConversation[];
     return Promise.all(conversations.map((conversation) => this.presentConversation(conversation)));
