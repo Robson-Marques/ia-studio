@@ -424,6 +424,51 @@ export class ConnectchatAutoResponderService {
    * não autoriza leitura de cadastros/OS/sinal ou qualquer dado privado do IXC.
    * A IA escreve a resposta; o backend determina escopo e permissões.
    */
+  private async formulateLinkPreferenceQuestion(
+    agent: AiAgent,
+    conversation: ConnectchatConversation,
+    messages: ConnectchatMessage[],
+    reason: string,
+  ): Promise<string> {
+    const fallback = 'Encontrei o cadastro. Quer deixar este contato vinculado para facilitar os próximos atendimentos? Sim ou não?';
+    try {
+      const history = messages.filter((m) => typeof m.body === 'string' && m.body.trim())
+        .slice(-10, -1).map((m) => ({
+          role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: redactSubscriberDocuments(m.body).slice(0, 500),
+        }));
+      const result = await this.runner.run({
+        agentId: agent.id,
+        input: 'Cadastro localizado; consultar preferência de vínculo futuro. Motivo: '
+          + redactSubscriberDocuments(reason).slice(0, 250),
+        history,
+        createdBy: null,
+        scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
+        allowedToolsOverride: [],
+        channelInstructions: [
+          'Você é Nete, da Newnet. Seja breve e humana, sem frases de sistema ou explicações burocráticas.',
+          'A busca por documento encontrou um cadastro, mas o cliente NÃO está autenticado.',
+          'Pergunte se ele deseja manter ESTE contato vinculado para facilitar FUTUROS atendimentos.',
+          'Explique implicitamente pela escolha que NÃO vincular NÃO cancela o atendimento atual.',
+          'A escolha é sim ou não. Uma pergunta apenas. Não exiba CPF/CNPJ, nome nem dados cadastrais.',
+          'Não diga que o vínculo foi realizado nem que a identidade foi comprovada.',
+          'Não anuncie consulta técnica, sinal, contrato ou ordem de serviço.',
+          'Responda em português brasileiro com até 180 caracteres e uma única pergunta.',
+        ].join('\n'),
+        dryRun: false,
+      });
+      const output = result.status === 'COMPLETED' && typeof result.output === 'string'
+        ? result.output.replace(/\s+/g, ' ').trim() : '';
+      if (!output || output.length > 180 || !/\b(vinculad|associad|vincular|associar)\w*/i.test(output)
+        || !/\b(sim|autoriza|quer|deseja|pode)\b/i.test(output)
+        || /\b(CPF|CNPJ|contrato|fatura|comprovad)\b/i.test(output)) return fallback;
+      return output;
+    } catch (error) {
+      this.logger.warn(`Pergunta de preferência de vínculo indisponível: ${(error as Error).message}`);
+      return fallback;
+    }
+  }
+
   private async formulateUnlinkedContinuation(
     agent: AiAgent,
     conversation: ConnectchatConversation,
@@ -639,9 +684,11 @@ export class ConnectchatAutoResponderService {
               customerId: found.customerId, connectionId: found.connectionId, consent: null, requestedAt: new Date().toISOString(),
               reason: identifiedReason,
             });
+            const preferenceQuestion = await this.formulateLinkPreferenceQuestion(
+              agent, conversation, context.messages, identifiedReason,
+            );
             await this.inbox.sendAgentMessage(conversation.id,
-              'Localizei um cadastro. Posso associar este contato a ele para os próximos atendimentos? Responda sim ou não.',
-              `newnet-document-${token}`);
+              preferenceQuestion, `newnet-document-${token}`);
           } else {
             const text = found.status === 'UNAVAILABLE'
               ? 'Não consegui consultar o cadastro agora. Vou precisar do apoio de um atendente.'
