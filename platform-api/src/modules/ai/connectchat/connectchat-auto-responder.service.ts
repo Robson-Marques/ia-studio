@@ -38,9 +38,22 @@ export class ConnectchatAutoResponderService {
     private readonly support: ConnectchatSupportContextService,
   ) {}
 
-  // Um interruptor de emergência independente do WhatsApp.
+  // Produção segura por padrão: o bot só liga após opt-in explícito.
+  // Desligar a variável (ou defini-la como off) é o kill switch imediato.
   private enabled(): boolean {
-    return process.env['CONNECTCHAT_AI_AUTOREPLY'] !== 'off';
+    return process.env['CONNECTCHAT_AI_AUTOREPLY'] === 'on';
+  }
+
+  /**
+   * Piloto por identidade GLOBAL autenticada no ConnectChat.
+   * Quando a lista estiver configurada, NUNCA atender outras identidades.
+   * Não filtrar por telefone/CPF, pois esses valores são declarados pelo cliente.
+   */
+  private allowedForPilot(conversation: ConnectchatConversation): boolean {
+    const raw = process.env['CONNECTCHAT_AI_PILOT_IDENTITIES']?.trim();
+    if (!raw) return true;
+    const identities = raw.split(',').map((value) => value.trim()).filter(Boolean);
+    return !!conversation.globalIdentityId && identities.includes(conversation.globalIdentityId);
   }
 
   @Interval(5000)
@@ -55,7 +68,8 @@ export class ConnectchatAutoResponderService {
       const agent = await this.repository.findById(native.id);
       if (!agent?.is_active || !parseConversation(agent.conversation).auto_reply) return;
       const conversations = await this.inbox.listRawConversations();
-      for (const conversation of conversations.filter((c) => c.status === 'OPEN')) {
+      for (const conversation of conversations.filter((c) =>
+        c.status === 'OPEN' && this.allowedForPilot(c))) {
         try {
           const pendingKey = `ai.connectchat.pending_identity.${conversation.id}`;
           const rawPending = await this.settings.getValue(pendingKey);
