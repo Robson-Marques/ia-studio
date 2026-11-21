@@ -189,6 +189,11 @@ export class ConnectchatInboxService {
     return this.execute('editMessage', { messageId, body: body.trim(), actorRef: this.actor(user) });
   }
 
+  /** Presença do assistente técnico; não personifica um operador humano. */
+  async setAgentTyping(conversationId: string, status: 'started' | 'stopped'): Promise<void> {
+    await this.execute('setTyping', { conversationId, status });
+  }
+
   setTyping(user: AuthenticatedUser, conversationId: string, status: 'started' | 'stopped') {
     return this.execute('setTyping', { conversationId, status, actorRef: this.actor(user) });
   }
