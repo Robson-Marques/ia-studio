@@ -201,7 +201,7 @@ export class ConnectchatInboxService {
    * Não confunde consentimento/CPF com prova de identidade. A aprovação é
    * feita pelo próprio assinante na PWA; este método não conclui vínculo.
    */
-  async createAuthenticatedLinkRequest(conversationId: string, customerRef: string, purpose: string) {
+  async createAuthenticatedLinkRequest(conversationId: string, customerRef: string, purpose: string, requestKey: string) {
     const conversation = await this.conversation(conversationId);
     if (conversation.status !== 'OPEN') throw new ConflictException('A conversa precisa estar aberta.');
     if (!/^ixc:[0-9a-f-]{36}:[1-9]\d*$/i.test(customerRef)) {
@@ -215,6 +215,7 @@ export class ConnectchatInboxService {
       purpose,
       customerRef,
       ttlSeconds: 600,
+      requestKey,
     });
   }
 
@@ -225,7 +226,7 @@ export class ConnectchatInboxService {
   async completeAuthenticatedLinkRequest(conversationId: string, requestId: string) {
     const conversation = await this.conversation(conversationId);
     if (conversation.status !== 'OPEN') throw new ConflictException('Conversa encerrada.');
-    if (!/^[0-9a-f-]{36}$/i.test(requestId)) throw new BadRequestException('Pedido de vínculo inválido.');
+    if (!/^[A-Za-z0-9_-]{8,120}$/.test(requestId)) throw new BadRequestException('Pedido de vínculo inválido.');
     return this.execute('completeLinkRequest', {
       globalIdentityId: conversation.globalIdentityId,
       requestId,
