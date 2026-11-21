@@ -256,8 +256,10 @@ export class ConnectchatClient {
     );
   }
 
-  async createLinkRequest(globalIdentityId: string, purpose: string, customerRef?: string, ttlSeconds?: number, actorRef?: string): Promise<unknown> {
-    return this.mutate('/integration/link-requests', { globalIdentityId, purpose, ...(customerRef ? { customerRef } : {}), ...(ttlSeconds ? { ttlSeconds } : {}) }, actorRef);
+  async createLinkRequest(globalIdentityId: string, purpose: string, customerRef?: string, ttlSeconds?: number, actorRef?: string, requestKey?: string): Promise<unknown> {
+    return this.mutate('/integration/link-requests',
+      { globalIdentityId, purpose, ...(customerRef ? { customerRef } : {}), ...(ttlSeconds ? { ttlSeconds } : {}) },
+      actorRef, requestKey ? `ystudio:link-request:${requestKey}` : undefined);
   }
 
   async completeLinkRequest(requestId: string, globalIdentityId: string, actorRef?: string): Promise<unknown> {

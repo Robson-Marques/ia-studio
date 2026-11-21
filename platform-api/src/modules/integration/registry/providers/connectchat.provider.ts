@@ -176,7 +176,7 @@ export class ConnectchatProvider extends BaseProvider {
       case 'disconnectContactDirectly':
         return client.disconnectContactDirectly(this.required(p, 'globalIdentityId'), actorRef || undefined);
       case 'createLinkRequest':
-        return client.createLinkRequest(this.required(p, 'globalIdentityId'), this.required(p, 'purpose'), this.string(p, 'customerRef') || undefined, this.optionalNumber(p, 'ttlSeconds'), actorRef || undefined);
+        return client.createLinkRequest(this.required(p, 'globalIdentityId'), this.required(p, 'purpose'), this.string(p, 'customerRef') || undefined, this.optionalNumber(p, 'ttlSeconds'), actorRef || undefined, this.string(p, 'requestKey') || undefined);
       case 'completeLinkRequest':
         return client.completeLinkRequest(this.required(p, 'requestId'), this.required(p, 'globalIdentityId'), actorRef || undefined);
       case 'exchangeLinkProof':

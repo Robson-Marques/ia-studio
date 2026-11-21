@@ -27,16 +27,18 @@ export class IncidentLookupService {
    * ou null. Match por target incluido no incidente ATIVO.
    */
   async activeFor(customerRef: string): Promise<IncidentInfo | null> {
-    const ref = customerRef.trim().toLowerCase();
-    if (!ref) return null;
+    return (await this.activeForMany([customerRef]))[0] ?? null;
+  }
+
+  /** Uma leitura para vários logins do mesmo assinante, sem repetir queries. */
+  async activeForMany(customerRefs: string[]): Promise<IncidentInfo[]> {
+    const refs = new Set(customerRefs.map((ref) => ref.trim().toLowerCase()).filter(Boolean));
+    if (!refs.size) return [];
     const actives = await this.repository.findActive();
-    for (const incident of actives) {
-      const hit = incident.targets.some(
-        (t) => t.included && t.customer_ref.trim().toLowerCase() === ref,
-      );
-      if (hit) return this.toInfo(incident);
-    }
-    return null;
+    return actives
+      .filter((incident) => incident.targets.some((t) =>
+        t.included && refs.has(t.customer_ref.trim().toLowerCase())))
+      .map((incident) => this.toInfo(incident));
   }
 
   private toInfo(incident: {

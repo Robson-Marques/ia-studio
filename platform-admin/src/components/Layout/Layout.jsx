@@ -56,9 +56,6 @@ const NAV = [
     children: [
       { label: 'Configurações da IA', icon: 'bot', path: '/ia/agentes', perm: 'ai.agents.read' },
       { label: 'Conhecimento',      icon: 'book',         path: '/ia/conhecimento',         perm: 'ai.knowledge.read' },
-      { label: 'Pendências',     icon: 'check-circle', path: '/ia/aprovacoes',   perm: 'ai.approvals.read' },
-      { label: 'Análise de atendimento', icon: 'search', path: '/ia/analise',    perm: 'ai.analysis.read' },
-      { label: 'Ajustes gerais', icon: 'sliders',      path: '/ia/ajustes',      perm: ['ai.tools.read', 'ai.memory.read'] },
     ],
   },
   {
@@ -106,6 +103,7 @@ const NAV = [
     label: 'Desenvolvedor', icon: 'terminal',
     children: [
       { label: 'Bancada de testes', icon: 'code', path: '/desenvolvedor/bancada',  perm: 'devtools.use' },
+      { label: 'Memória e MCP', icon: 'settings', path: '/ia/ajustes?tab=memoria', perm: ['ai.memory.read', 'ai.tools.read'] },
       { label: 'Chaves de API',     icon: 'key',  path: '/desenvolvedor/api-keys', perm: 'developer.apikeys.read' },
     ],
   },

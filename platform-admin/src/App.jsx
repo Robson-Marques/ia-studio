@@ -141,7 +141,7 @@ export default function App() {
                 <Route path="/ia/conhecimento/:id" element={<PermissionRoute perm="ai.knowledge.read"><BaseConhecimentoDetalhe /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/:id/documentos/novo" element={<PermissionRoute perm="ai.knowledge.write"><BaseDocumentoEditor /></PermissionRoute>} />
                 <Route path="/ia/ajustes" element={<PermissionRoute perm={['ai.tools.read', 'ai.memory.read']}><AjustesGerais /></PermissionRoute>} />
-                <Route path="/ia/ferramentas" element={<Navigate to="/ia/ajustes?tab=habilidades" replace />} />
+                <Route path="/ia/ferramentas" element={<Navigate to="/ia/ajustes?tab=mcp" replace />} />
                 <Route path="/ia/memoria" element={<Navigate to="/ia/ajustes?tab=memoria" replace />} />
                 <Route path="/ia/memoria/perfis/nova" element={<PermissionRoute perm="ai.memory.write"><MemoriaPerfilEditor /></PermissionRoute>} />
                 <Route path="/ia/memoria/perfis/:id/editar" element={<PermissionRoute perm="ai.memory.write"><MemoriaPerfilEditor /></PermissionRoute>} />
