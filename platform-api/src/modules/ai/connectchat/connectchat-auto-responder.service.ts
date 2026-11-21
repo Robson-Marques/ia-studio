@@ -65,9 +65,12 @@ export class ConnectchatAutoResponderService {
           if (verified && pending.consent === true && pending.customerId === linkedId
             && pending.resumed !== true) {
             await this.respond(agent, conversation, typeof pending.reason === 'string' ? pending.reason : '');
-            // Resumo da conversa é retomado apenas uma vez; a confirmação
-            // autenticada do ConnectChat é a fonte da verdade, nunca o CPF.
-            await this.settings.set(pendingKey, { ...pending, resumed: true, linkedAt: new Date().toISOString() });
+            // Só marca como retomado quando a conversa teve seu checkpoint
+            // concluído; falha de rede ou LLM preserva a possibilidade de retry.
+            const resumeCursor = await this.settings.getValue(`ai.connectchat.resume.${conversation.id}`);
+            if (BigInt(this.state(resumeCursor).sequence) >= BigInt(conversation.lastSequence)) {
+              await this.settings.set(pendingKey, { ...pending, resumed: true, linkedAt: new Date().toISOString() });
+            }
           } else {
             await this.respond(agent, conversation);
           }
