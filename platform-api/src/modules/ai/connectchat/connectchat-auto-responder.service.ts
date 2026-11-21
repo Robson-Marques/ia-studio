@@ -118,10 +118,12 @@ export class ConnectchatAutoResponderService {
     const ref = `ixc:${connectionId}:${customerId}`;
     const existing = typeof pending.requestId === 'string' ? pending.requestId : null;
     if (!existing) {
-      // O pedido não é reemitido depois de erro de interpretação da resposta.
-      // O cliente pode ter recebido o primeiro pedido; sem ID verificável,
-      // repetição automática geraria vários pedidos ativos.
-      if (pending.requestOutcomeUnknown === true) return;
+      // Repetir somente com a MESMA chave idempotente, durante a validade
+      // original do pedido. Após três tentativas, encerrar sem vincular.
+      const attempts = typeof pending.requestAttempts === 'number' ? pending.requestAttempts : 0;
+      const firstAt = typeof pending.requestFirstAttemptAt === 'number'
+        ? pending.requestFirstAttemptAt : now;
+      if (attempts >= 3 || now - firstAt >= 600000) return;
       // Instalações podem admitir finalidades diferentes. A configuração é
       // uma decisão explícita do operador de instalação, não de cada chat.
       const rawPurpose = await this.settings.getValue('ai.connectchat.link_purpose');
@@ -133,6 +135,13 @@ export class ConnectchatAutoResponderService {
         await this.settings.set(key, { ...pending, nextAttemptAt: now + 300000 });
         return;
       }
+      const attemptState = {
+        ...pending, requestAttempts: attempts + 1,
+        requestFirstAttemptAt: firstAt, nextAttemptAt: now + 60000,
+      };
+      // Persistir ANTES da requisição para que outras execuções observem
+      // o avanço mesmo quando houver timeout ou erro de transporte.
+      await this.settings.set(key, attemptState);
       try {
         const requestKey = createHash('sha256').update(`newnet-link:${conversation.id}:${conversation.globalIdentityId}:${ref}:${String(pending.requestedAt ?? '')}`).digest('hex');
         const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose, requestKey);
@@ -149,11 +158,11 @@ export class ConnectchatAutoResponderService {
           typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)) as string | undefined;
         if (typeof requestId !== 'string' || !/^[0-9a-f-]{36}$/i.test(requestId)) {
           this.logger.warn('ConnectChat: resposta de criação do vínculo sem ID de pedido reconhecível.');
-          await this.settings.set(key, { ...pending, requestOutcomeUnknown: true });
+          await this.settings.set(key, { ...attemptState, nextAttemptAt: now + 60000 });
           return;
         }
         await this.settings.set(key, {
-          ...pending, requestId, requestIdentity: conversation.globalIdentityId,
+          ...attemptState, requestId, requestIdentity: conversation.globalIdentityId,
           requestCreatedAt: now, nextAttemptAt: now + 15000,
         });
         const token = createHash('sha256').update(`newnet-link-request:${conversation.id}:${requestId}`).digest('hex').slice(0, 32);
@@ -162,7 +171,7 @@ export class ConnectchatAutoResponderService {
           `newnet-link-request-${token}`);
       } catch (error) {
         this.logger.warn(`ConnectChat vínculo: ${(error as Error).message}`);
-        await this.settings.set(key, { ...pending, nextAttemptAt: now + 60000 });
+        await this.settings.set(key, { ...attemptState, nextAttemptAt: now + 60000 });
       }
       return;
     }
