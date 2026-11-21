@@ -419,6 +419,68 @@ export class ConnectchatAutoResponderService {
     }
   }
 
+  /**
+   * Sem vínculo permanente, a triagem geral continua. A preferência do cliente
+   * não autoriza leitura de cadastros/OS/sinal ou qualquer dado privado do IXC.
+   * A IA escreve a resposta; o backend determina escopo e permissões.
+   */
+  private async formulateUnlinkedContinuation(
+    agent: AiAgent,
+    conversation: ConnectchatConversation,
+    messages: ConnectchatMessage[],
+    incoming: string,
+    initialReason: string,
+    justDeclined: boolean,
+  ): Promise<string> {
+    const issue = this.classifyRequest(initialReason || incoming, messages);
+    const fallback = issue === 'SUPPORT'
+      ? justDeclined
+        ? 'Tudo bem, não vou manter o contato vinculado. Vamos cuidar da sua conexão: a falha acontece em todos os aparelhos?'
+        : 'Entendi. Essa dificuldade de conexão acontece em todos os aparelhos ou só em um?'
+      : justDeclined
+        ? 'Tudo bem, não vou manter o contato vinculado. Vamos continuar seu atendimento: como posso ajudar agora?'
+        : 'Pode me contar mais sobre o que está acontecendo?';
+    try {
+      const history = messages.filter((m) => typeof m.body === 'string' && m.body.trim())
+        .slice(-12, -1).map((m) => ({
+          role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: redactSubscriberDocuments(m.body).slice(0, 500),
+        }));
+      const instructions = [
+        'Você é Nete, da Newnet. Seja natural, acolhedora, breve e objetiva, sem jargão burocrático.',
+        'A pessoa não quer manter este contato vinculado para atendimentos futuros. Respeite. Isso NÃO encerra o atendimento atual.',
+        'Continue o atendimento a partir do problema já relatado, sem reiniciar saudação e sem pedir CPF novamente.',
+        'O motivo original foi: ' + redactSubscriberDocuments(initialReason).slice(0, 300),
+        justDeclined
+          ? 'Reconheça a escolha de não manter o vínculo em uma oração breve e, na mesma mensagem, conduza o próximo passo de triagem.'
+          : 'Responda à mensagem atual e faça avançar o diagnóstico geral em uma etapa. Não repita o aviso sobre vínculo.',
+        'Você NÃO consultou equipamentos, conexão, sinal, chamados, contrato, cadastro ou IXC. Não diga que consultou ou que vai consultar sem permissão.',
+        'Sem vínculo verificado, só orientações gerais. Não revele dados pessoais ou financeiros, nem invente medições ou diagnósticos.',
+        'Faça no máximo uma pergunta útil por resposta, adaptada ao assunto. Até 200 caracteres. Apenas a mensagem ao cliente.',
+      ].join('\n');
+      const result = await this.runner.run({
+        agentId: agent.id,
+        input: redactSubscriberDocuments(incoming).slice(0, 500),
+        history,
+        createdBy: null,
+        scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
+        allowedToolsOverride: [],
+        channelInstructions: instructions,
+        dryRun: false,
+      });
+      const output = result.status === 'COMPLETED' && typeof result.output === 'string'
+        ? result.output.replace(/\s+/g, ' ').trim() : '';
+      if (!output || output.length > 200
+        || /\b(CPF|CNPJ|cadastro confirmado|consultei|verifiquei no sistema|acesso ao IXC|sinal do seu modem|seu contrato)\b/i.test(output)) {
+        return fallback;
+      }
+      return output;
+    } catch (error) {
+      this.logger.warn(`Continuidade sem vínculo indisponível: ${(error as Error).message}`);
+      return fallback;
+    }
+  }
+
   private async respond(agent: AiAgent, conversation: ConnectchatConversation, resumeReason?: string): Promise<void> {
     const sequence = conversation.lastSequence;
     if (!/^\d+$/.test(sequence) || BigInt(sequence) === 0n) return;
@@ -511,7 +573,10 @@ export class ConnectchatAutoResponderService {
             });
             const answer = explicitYes
               ? 'Obrigado! Vou verificar a confirmação segura do vínculo para continuar seu atendimento.'
-              : 'Tudo bem, não vou vincular este contato. Para consultar informações particulares, será necessária uma identificação segura.';
+              : await this.formulateUnlinkedContinuation(
+                agent, conversation, context.messages, newest.body,
+                typeof pending.reason === 'string' ? pending.reason : '', true,
+              );
             const token = createHash('sha256').update(`newnet-consent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
           } else if (!explicitYes && !explicitNo) {
@@ -522,13 +587,16 @@ export class ConnectchatAutoResponderService {
                 ? 'Seu vínculo está aguardando confirmação na conta ConnectChat. Assim que for confirmado, continuo o atendimento.'
                 : 'Ainda não consegui iniciar a confirmação segura do vínculo. Você pode continuar me contando o problema; não vou consultar seus dados privados antes da confirmação.'
               : pending.consent === false
-                ? 'Respeitei sua escolha de não vincular. Posso dar orientações gerais, mas não consultar dados do seu cadastro.'
-                : 'Para vincular este atendimento ao cadastro, você autoriza a associação? Responda sim ou não.';
+                ? await this.formulateUnlinkedContinuation(
+                  agent, conversation, context.messages, newest.body,
+                  typeof pending.reason === 'string' ? pending.reason : '', false,
+                )
+                : 'Para vincular este contato aos próximos atendimentos, você autoriza? Responda sim ou não.';
             const token = createHash('sha256').update(`newnet-pending-link:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-pending-link-${token}`);
           }
-          // Enquanto não houver vínculo ACTIVE+CUSTOMER não há dados privados
-          // nem diagnóstico, mesmo com autorização expressa.
+          // Sem vínculo ACTIVE+CUSTOMER, a Nete pode orientar a triagem geral,
+          // mas NUNCA consultar dados privados, OS, faturas ou sinal individual.
           await this.complete(key, sequence, claim);
           return;
         }
