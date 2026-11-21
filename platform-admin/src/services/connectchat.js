@@ -114,3 +114,13 @@ export async function completeConnectchatCustomerLink(conversationId, requestId)
     return data;
   } catch (err) { throw new Error(extractErrorMessage(err, 'O cliente ainda não confirmou o vínculo')); }
 }
+
+/** Reinicia somente a memória/estado da Nete; não apaga mensagens do ConnectChat. */
+export async function resetConnectchatAiContext(conversationId) {
+  try {
+    const { data } = await api.post(`/ai/connectchat/conversations/${conversationId}/reset-context`);
+    return data;
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, 'Não foi possível reiniciar o contexto da Nete'));
+  }
+}

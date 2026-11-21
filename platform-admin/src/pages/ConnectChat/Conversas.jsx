@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping } from '../../services/connectchat';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, resetConnectchatAiContext, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -79,6 +79,7 @@ export default function ConnectchatConversas() {
   const { can } = usePermissions();
   const canLinkCustomer = can('comm.connectchat.link.customer');
   const canWriteChat = can('comm.connectchat.write');
+  const canResetNete = can('ai.agents.write');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -86,6 +87,7 @@ export default function ConnectchatConversas() {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendingAttachment, setSendingAttachment] = useState(false);
+  const [resettingNete, setResettingNete] = useState(false);
   const [customerActivity, setCustomerActivity] = useState(null);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
@@ -202,6 +204,23 @@ export default function ConnectchatConversas() {
     await loadMessages(conversation, true);
   }
 
+  async function resetNete() {
+    if (!selected || resettingNete) return;
+    if (!window.confirm('Limpar esta conversa no IA Studio e reiniciar a Nete? A conversa aparecerá vazia aqui e a próxima mensagem iniciará uma nova interação. O histórico original do ConnectChat não será alterado.')) return;
+    setResettingNete(true);
+    try {
+      await resetConnectchatAiContext(selected.id);
+      setMessages([]);
+      messagesRef.current = [];
+      setText('');
+      toast.success('Conversa local limpa e contexto da Nete reiniciado.');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setResettingNete(false);
+    }
+  }
+
   async function send() {
     const body = text.trim();
     if (!body || !selected) return;
@@ -284,6 +303,7 @@ export default function ConnectchatConversas() {
                 {selected.businessContact?.status === 'CUSTOMER' ? <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: 'var(--su-text-muted)' }}>Cliente vinculado</span> : null}
               </div>
               <div className="flex items-center gap-2">
+                {canResetNete ? <Button variant="secondary" size="sm" loading={resettingNete} onClick={resetNete}>Limpar conversa local</Button> : null}
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>
             </header>

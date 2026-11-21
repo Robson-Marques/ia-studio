@@ -213,6 +213,52 @@ export class ConnectchatAutoResponderService {
     }
   }
 
+  /**
+   * Reinicia somente o CONTEXTO desta conversa na Nete.
+   * O histórico físico no ConnectChat e o vínculo permanente ficam intactos.
+   * Mensagens até lastSequence não voltam a entrar no prompt nem no polling.
+   */
+  async resetConversationContext(conversationId: string): Promise<{ conversationId: string; resetThrough: string }> {
+    const conversation = (await this.inbox.listRawConversations())
+      .find((item) => item.id === conversationId);
+    if (!conversation) throw new Error('Conversa ConnectChat não encontrada.');
+    if (!/^\d+$/.test(conversation.lastSequence)) throw new Error('Cursor inválido do ConnectChat.');
+    const resetThrough = conversation.lastSequence;
+    const prefixes = [
+      'pending_identity', 'resume', 'cursor', 'document_attempts',
+      'identification_requested', 'greeting', 'technology_requested',
+      'contract_requested', 'selected_contract',
+    ];
+    await this.prisma.$transaction(async (tx) => {
+      await tx.systemSetting.deleteMany({
+        where: { key: { in: prefixes.map((name) => `ai.connectchat.${name}.${conversationId}`) } },
+      });
+      await tx.systemSetting.upsert({
+        where: { key: `ai.connectchat.reset_boundary.${conversationId}` },
+        create: {
+          key: `ai.connectchat.reset_boundary.${conversationId}`,
+          value: { sequence: resetThrough, resetAt: new Date().toISOString() },
+        },
+        update: { value: { sequence: resetThrough, resetAt: new Date().toISOString() } },
+      });
+      await tx.systemSetting.upsert({
+        where: { key: `ai.connectchat.cursor.${conversationId}` },
+        create: { key: `ai.connectchat.cursor.${conversationId}`, value: { sequence: resetThrough } },
+        update: { value: { sequence: resetThrough } },
+      });
+    });
+    return { conversationId, resetThrough };
+  }
+
+  private async aiContextScope(conversationId: string): Promise<string> {
+    const raw = await this.settings.getValue(`ai.connectchat.reset_boundary.${conversationId}`);
+    const record = raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? raw as Record<string, unknown> : {};
+    const sequence = typeof record.sequence === 'string' && /^\d+$/.test(record.sequence)
+      ? record.sequence : null;
+    return sequence ? `${conversationId}:after:${sequence}` : conversationId;
+  }
+
   private state(raw: unknown): Cursor {
     const row = raw && typeof raw === 'object' && !Array.isArray(raw)
       ? raw as Record<string, unknown> : {};
@@ -348,7 +394,7 @@ export class ConnectchatAutoResponderService {
         input: redactSubscriberDocuments(message).slice(0, 500),
         history,
         createdBy: null,
-        scopeKeys: { connectchat_conversation: conversation.id },
+        scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
         allowedToolsOverride: [],
         channelInstructions: instructions,
         dryRun: false,
@@ -382,7 +428,15 @@ export class ConnectchatAutoResponderService {
     const current = this.state(raw);
     if (BigInt(current.sequence) >= BigInt(sequence)) return;
     const after = BigInt(sequence) > 50n ? (BigInt(sequence) - 50n).toString() : '0';
-    const messages = await this.inbox.getMessages(conversation.id, after, 100) as ConnectchatMessage[];
+    const boundary = await this.settings.getValue(`ai.connectchat.reset_boundary.${conversation.id}`);
+    const boundaryRecord = boundary && typeof boundary === 'object' && !Array.isArray(boundary)
+      ? boundary as Record<string, unknown> : {};
+    const boundarySequence = typeof boundaryRecord.sequence === 'string' && /^\d+$/.test(boundaryRecord.sequence)
+      ? BigInt(boundaryRecord.sequence) : 0n;
+    if (BigInt(sequence) <= boundarySequence) return;
+    const messages = (await this.inbox.getMessages(conversation.id, after, 100) as ConnectchatMessage[])
+      .filter((message) => /^\d+$/.test(message.serverSequence)
+        && BigInt(message.serverSequence) > boundarySequence);
     const last = resume ? messages.filter((m) => m.senderKind === 'CUSTOMER').at(-1) : messages.at(-1);
     if (!last || (!resume && last.serverSequence !== sequence)) return;
     if (last.senderKind !== 'CUSTOMER' || (!resume && !last.body?.trim())) {
@@ -403,7 +457,12 @@ export class ConnectchatAutoResponderService {
     if (!(await this.claim(key, sequence, claim))) return;
 
     try {
-      const context = await this.inbox.contextForAgentPreview(conversation.id);
+      const fetchedContext = await this.inbox.contextForAgentPreview(conversation.id);
+      const context = {
+        ...fetchedContext,
+        messages: fetchedContext.messages.filter((m) => /^\d+$/.test(m.serverSequence)
+          && BigInt(m.serverSequence) > boundarySequence),
+      };
       const newest = resume
         ? { ...(context.messages.filter((m) => m.senderKind === 'CUSTOMER').at(-1) || last),
             body: resumeReason?.trim() || last.body }
@@ -612,7 +671,7 @@ export class ConnectchatAutoResponderService {
         ].join('\n');
         const result = await this.runner.run({
           agentId: agent.id, input: redactSubscriberDocuments(newest.body).slice(0, 8000), history,
-          createdBy: null, scopeKeys: { connectchat_conversation: conversation.id },
+          createdBy: null, scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
           allowedToolsOverride: [], channelInstructions: instructions, dryRun: false,
         });
         const message = result.status === 'COMPLETED' && typeof result.output === 'string'
@@ -790,7 +849,7 @@ export class ConnectchatAutoResponderService {
         input: redactSubscriberDocuments(newest.body).slice(0, 8000),
         history,
         createdBy: null,
-        scopeKeys: { connectchat_conversation: conversation.id },
+        scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
         allowedToolsOverride: [],
         channelInstructions: instructions,
         dryRun: false,
