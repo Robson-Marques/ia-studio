@@ -78,7 +78,21 @@ export class AgentsService {
       const savedId = (saved?.value as { id?: string } | null)?.id;
       if (savedId) {
         const existing = await tx.aiAgent.findUnique({ where: { id: savedId } });
-        if (existing) return existing;
+        if (existing) {
+          if (!existing.connection_id && existing.model === 'default') {
+            const codex = await tx.connection.findMany({
+              where: { provider_key: 'codex-cli', status: 'ACTIVE', is_active: true },
+              select: { id: true },
+            });
+            if (codex.length === 1) {
+              return tx.aiAgent.update({
+                where: { id: existing.id },
+                data: { connection_id: codex[0].id },
+              });
+            }
+          }
+          return existing;
+        }
       }
 
       const agents = await tx.aiAgent.findMany({ orderBy: { created_at: 'asc' } });
