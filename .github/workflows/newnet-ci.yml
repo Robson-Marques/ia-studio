@@ -39,6 +39,8 @@ jobs:
     name: Console Vite build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      GITLAB_PACKAGE_TOKEN: ${{ secrets.GITLAB_PACKAGE_TOKEN }}
     defaults:
       run:
         working-directory: platform-admin
@@ -47,6 +49,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Verify access to private Studio UX registry
+        run: |
+          if [ -z "$GITLAB_PACKAGE_TOKEN" ]; then
+            echo "::error::Configure the GitHub Actions secret GITLAB_PACKAGE_TOKEN with a read_package_registry token for git.nivoo.dev.br."
+            exit 1
+          fi
       - name: Install frontend dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Compile console
