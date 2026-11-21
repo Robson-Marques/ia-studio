@@ -472,47 +472,33 @@ export class ConnectchatAutoResponderService {
       if (support.openOs.length > 0) {
         const open = support.openOs[0];
         const osRef = String(open['id'] ?? open['protocolo'] ?? 'active');
-        const alreadyNotified = `ai.connectchat.os_notified.${conversation.id}.${osRef}`;
-        if (await this.settings.getValue(alreadyNotified)) {
-          await this.complete(key, sequence, claim);
-          return;
-        }
         const protocol = typeof open['protocolo'] === 'string' && open['protocolo']
           ? ` (protocolo ${open['protocolo']})` : '';
         const message = `Já existe uma ordem de serviço em andamento para este cadastro${protocol}. Não vou abrir outra. Nossa equipe poderá consultar o andamento do atendimento.`;
-        const token = createHash('sha256').update(`newnet-open-os:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+        const token = createHash('sha256').update(`newnet-open-os:${conversation.id}:${osRef}:${sequence}`).digest('hex').slice(0, 32);
         await this.inbox.sendAgentMessage(conversation.id, message, `newnet-open-os-${token}`);
-        await this.settings.set(alreadyNotified, { notified: true });
         await this.complete(key, sequence, claim);
         return;
       }
 
       const outage = support.incidents.find((item) => item.suppress_os);
       if (outage) {
-        const noticeKey = `ai.connectchat.incident_notified.${conversation.id}.${outage.incident_id}`;
-        if (!(await this.settings.getValue(noticeKey))) {
-          const publicInfo = String(outage.message || outage.title || 'Há uma ocorrência técnica registrada para seu acesso.').slice(0, 350);
-          const forecast = outage.inform_forecast && outage.forecast
-            ? ` Previsão informada pela equipe: ${String(outage.forecast).slice(0, 100)}.` : '';
-          const message = `Identifiquei uma ocorrência em andamento na sua conexão. ${publicInfo}${forecast} Não é necessário abrir outro chamado agora.`;
-          const token = createHash('sha256').update(`newnet-incident:${conversation.id}:${outage.incident_id}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, message, `newnet-incident-${token}`);
-          await this.settings.set(noticeKey, { notified: true });
-        }
+        const publicInfo = String(outage.message || outage.title || 'Há uma ocorrência técnica registrada para seu acesso.').slice(0, 350);
+        const forecast = outage.inform_forecast && outage.forecast
+          ? ` Previsão informada pela equipe: ${String(outage.forecast).slice(0, 100)}.` : '';
+        const message = `Identifiquei uma ocorrência em andamento na sua conexão. ${publicInfo}${forecast} Não é necessário abrir outro chamado agora.`;
+        const token = createHash('sha256').update(`newnet-incident:${conversation.id}:${outage.incident_id}:${sequence}`).digest('hex').slice(0, 32);
+        await this.inbox.sendAgentMessage(conversation.id, message, `newnet-incident-${token}`);
         await this.complete(key, sequence, claim);
         return;
       }
 
       if (support.openTickets.length > 0 || support.uncertainTickets) {
-        const noticeKey = `ai.connectchat.ticket_review.${conversation.id}`;
-        if (!(await this.settings.getValue(noticeKey))) {
-          const message = support.openTickets.length > 0
-            ? 'Já existe um atendimento registrado como aberto para este cadastro. Vou evitar um novo chamado; a equipe pode acompanhar o existente.'
-            : 'Encontrei um atendimento recente cuja situação precisa ser conferida pela equipe antes de criar outro.';
-          const token = createHash('sha256').update(`newnet-ticket-check:${conversation.id}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, message, `newnet-ticket-check-${token}`);
-          await this.settings.set(noticeKey, { notified: true });
-        }
+        const message = support.openTickets.length > 0
+          ? 'Já existe um atendimento registrado como aberto para este cadastro. Vou evitar um novo chamado; a equipe pode acompanhar o existente.'
+          : 'Encontrei um atendimento recente cuja situação precisa ser conferida antes de criar outro.';
+        const token = createHash('sha256').update(`newnet-ticket-check:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+        await this.inbox.sendAgentMessage(conversation.id, message, `newnet-ticket-check-${token}`);
         await this.complete(key, sequence, claim);
         return;
       }
