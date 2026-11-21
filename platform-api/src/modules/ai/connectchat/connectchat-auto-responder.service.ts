@@ -312,13 +312,15 @@ export class ConnectchatAutoResponderService {
     conversation: ConnectchatConversation,
     messages: ConnectchatMessage[],
     message: string,
-    step: 'OPENING' | 'IDENTIFICATION' | 'FOLLOW_UP',
+    step: 'OPENING' | 'REOPENING' | 'IDENTIFICATION' | 'FOLLOW_UP',
   ): Promise<string> {
     const fallback = step === 'OPENING'
       ? 'Oi! Sou Nete, da Newnet. Como posso ajudar?'
-      : step === 'FOLLOW_UP'
-        ? 'Ainda preciso do CPF ou CNPJ do titular para continuar. Pode me informar?'
-        : 'Por favor, informe o CPF ou CNPJ do titular.';
+      : step === 'REOPENING'
+        ? 'Como posso ajudar?'
+        : step === 'FOLLOW_UP'
+          ? 'Para continuar, você pode informar o CPF ou CNPJ do titular?'
+          : 'Por favor, informe o CPF ou CNPJ do titular.';
     try {
       const history = messages.filter((item) => typeof item.body === 'string' && item.body.trim())
         .slice(-12, -1).map((item) => ({
@@ -326,15 +328,18 @@ export class ConnectchatAutoResponderService {
           content: redactSubscriberDocuments(item.body).slice(0, 500),
         }));
       const task = step === 'OPENING'
-        ? 'O usuário apenas cumprimentou e ainda não explicou a necessidade. Cumprimente uma vez e pergunte como pode ajudar.'
-        : step === 'FOLLOW_UP'
-          ? 'Você já pediu CPF/CNPJ e o cliente mandou outra mensagem sem informar o documento. Responda naturalmente à nova mensagem e retome brevemente o pedido de CPF/CNPJ. Não recomece o atendimento e não fique em silêncio.'
-          : 'O usuário trouxe uma necessidade. Solicite objetivamente o CPF ou CNPJ do titular, sem repetir apresentação, sem justificar a solicitação, sem anunciar consultas e sem antecipar diagnóstico.';
+        ? 'Primeiro cumprimento sem motivo conhecido: apresente-se brevemente e pergunte como ajudar.'
+        : step === 'REOPENING'
+          ? 'O cliente cumprimentou outra vez, mas ainda não disse do que precisa. Não se apresente novamente; pergunte como pode ajudar.'
+          : step === 'FOLLOW_UP'
+            ? 'A necessidade já foi informada e o CPF/CNPJ ainda não. Reconheça a nova mensagem sem reabrir a saudação; convide gentilmente a informar o documento para continuar. Não pressione, não explique consultas internas e não faça múltiplas perguntas.'
+            : 'O cliente informou sua necessidade. Para prosseguir com atendimento individual, peça CPF/CNPJ do titular de forma simples, sem se reapresentar, sem justificar procedimentos internos ou antecipar diagnóstico.';
       const instructions = [
         'Você é Nete, atendente da Newnet. Conduza conversa natural, breve, contextual e sem frases burocráticas.',
         'O atendimento segue etapas: acolher -> entender a necessidade -> identificar o titular -> confirmar vínculo -> resolver.',
         'Não volte à saudação quando a necessidade já foi informada. Não repita perguntas já respondidas.',
-        'Uma pergunta por resposta. Sem promessas de ação, sem revelar dados de cadastro ou operação do IXC.',
+        'Uma pergunta por resposta; não seja insistente, invasiva nem burocrática. Não pressione quem não informou o documento.',
+        'Sem promessas de ação, sem revelar dados de cadastro, consultas internas ou operações do IXC.',
         task,
         'Responda em português brasileiro, em até 160 caracteres, sem explicações ou listas.',
       ].join('\n');
@@ -351,7 +356,7 @@ export class ConnectchatAutoResponderService {
       const output = result.status === 'COMPLETED' && typeof result.output === 'string'
         ? result.output.replace(/\s+/g, ' ').trim() : '';
       if (!output || output.length > 160) return fallback;
-      if (step !== 'OPENING') {
+      if (step === 'IDENTIFICATION' || step === 'FOLLOW_UP') {
         // Um texto fluente não pode omitir o documento obrigatório.
         // Nem informar que fará consulta antes da confirmação de vínculo.
         if (!/\bCPF\b/i.test(output) || !/\bCNPJ\b/i.test(output)
@@ -359,7 +364,8 @@ export class ConnectchatAutoResponderService {
           return fallback;
         }
       }
-      if (step === 'OPENING' && /\b(CPF|CNPJ|cadastro|boleto|fatura)\b/i.test(output)) return fallback;
+      if ((step === 'OPENING' || step === 'REOPENING')
+        && /\b(CPF|CNPJ|cadastro|boleto|fatura)\b/i.test(output)) return fallback;
       return output;
     } catch (error) {
       this.logger.warn(`Diálogo de identificação indisponível: ${(error as Error).message}`);
@@ -530,7 +536,7 @@ export class ConnectchatAutoResponderService {
           // "oi" quando já há uma identificação pendente. Não depende de
           // excluir a conversa ou apagar a chave da pergunta anterior.
           const step = waitingForDocument ? 'FOLLOW_UP' as const
-            : !greeted && isGreetingOnly ? 'OPENING' as const
+            : isGreetingOnly ? (greeted ? 'REOPENING' as const : 'OPENING' as const)
               : 'IDENTIFICATION' as const;
           const reply = await this.formulateIdentificationReply(
             agent, conversation, context.messages, newest.body, step);
