@@ -509,9 +509,7 @@ export class ConnectchatAutoResponderService {
         const instructions = [
           'Você é a Nete, assistente da Newnet. Responda em uma única mensagem curta.',
           'O cliente já está vinculado com segurança. Não peça CPF novamente.',
-          intent === 'FINANCE'
-            ? 'O contato trata de assunto financeiro. O canal de homologação não permite consultar nem enviar boleto. Informe brevemente que vai encaminhar à equipe responsável, sem divulgar débitos, valores ou status.'
-            : 'Se o motivo ainda não foi informado, pergunte de forma breve em que pode ajudar. Não inicie diagnóstico técnico.',
+          'Se o motivo ainda não foi informado, pergunte de forma breve em que pode ajudar. Não inicie diagnóstico técnico.',
           'Não execute ferramentas, não prometa operações e não repita perguntas respondidas.',
         ].join('\n');
         const result = await this.runner.run({
