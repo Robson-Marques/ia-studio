@@ -64,6 +64,46 @@ export class AgentsService {
     return this.findById(id).then(() => this.repository.listRuns(id, 50));
   }
 
+  /**
+   * Provisionamento idempotente do assistente nativo da instalação Newnet.
+   * Reutiliza um único agente legado quando possível, sem apagar outros.
+   * O lock transacional impede duplicações em acessos simultâneos.
+   * Nenhuma ferramenta que escreve dados é concedida automaticamente.
+   */
+  async ensureNativeAgent(createdBy: string | null) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(741192, 2026)`;
+      const settingKey = 'ai.native_agent_id';
+      const saved = await tx.systemSetting.findUnique({ where: { key: settingKey } });
+      const savedId = (saved?.value as { id?: string } | null)?.id;
+      if (savedId) {
+        const existing = await tx.aiAgent.findUnique({ where: { id: savedId } });
+        if (existing) return existing;
+      }
+
+      const agents = await tx.aiAgent.findMany({ orderBy: { created_at: 'asc' } });
+      const named = agents.find((a) => a.name === 'Assistente Newnet');
+      // Se há exatamente um assistente legado, preserva o ID, as conversas e os vínculos.
+      const existing = named || (agents.length === 1 ? agents[0] : null);
+      const agent = existing || await tx.aiAgent.create({
+        data: {
+          name: 'Assistente Newnet',
+          description: 'Assistente oficial da Newnet Telecom. Configure as fontes, os acessos e as habilidades autorizadas.',
+          model: 'default',
+          allowed_tools: [],
+          knowledge_base_ids: [],
+          created_by: createdBy,
+        },
+      });
+      await tx.systemSetting.upsert({
+        where: { key: settingKey },
+        create: { key: settingKey, value: { id: agent.id } },
+        update: { value: { id: agent.id } },
+      });
+      return agent;
+    });
+  }
+
   // ─── Anti-escalada de ações da IA ───────────────────
 
   /**
