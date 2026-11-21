@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CatalogTab, McpTab } from './Ferramentas';
+import { McpTab } from './Ferramentas';
 import Memoria from './Memoria';
 
 // IA/AjustesGerais — consolida os ajustes avançados dos assistentes numa entrada
@@ -14,22 +14,20 @@ import Memoria from './Memoria';
 // segments compartilhados. As rotas antigas (/ia/ferramentas, /ia/memoria)
 // redirecionam pra cá; os editores (tool, perfil de memória) seguem intactos.
 
-const TITLE = 'Ajustes gerais';
+const TITLE = 'Recursos internos da IA';
 const SEGMENTS = [
-  { id: 'habilidades', label: 'Habilidades' },
   { id: 'mcp',         label: 'Servidores MCP' },
   { id: 'memoria',     label: 'Memória' },
 ];
 const VALID = new Set(SEGMENTS.map((s) => s.id));
 const SUBTITLES = {
-  habilidades: 'O que os assistentes podem fazer — habilidades da plataforma, personalizadas e importadas de servidores MCP.',
   mcp:         'Servidores MCP que trazem habilidades externas para os assistentes.',
   memoria:     'O que os assistentes lembram, por escopo (sessão / contato / fluxo / assistente), com validade e limite de itens.',
 };
 
 export default function AjustesGerais() {
   const [params, setParams] = useSearchParams();
-  const [tab, setTab] = useState(() => (VALID.has(params.get('tab')) ? params.get('tab') : 'habilidades'));
+  const [tab, setTab] = useState(() => (VALID.has(params.get('tab')) ? params.get('tab') : 'memoria'));
 
   const onSegment = (id) => {
     setTab(id);
@@ -39,5 +37,5 @@ export default function AjustesGerais() {
 
   if (tab === 'mcp') return <McpTab {...shared} />;
   if (tab === 'memoria') return <Memoria {...shared} />;
-  return <CatalogTab {...shared} />;
+  return <Memoria {...shared} />;
 }
