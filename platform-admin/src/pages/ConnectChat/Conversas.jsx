@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -86,9 +86,6 @@ export default function ConnectchatConversas() {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendingAttachment, setSendingAttachment] = useState(false);
-  const [customerId, setCustomerId] = useState('');
-  const [linking, setLinking] = useState(false);
-  const [unlinking, setUnlinking] = useState(false);
   const [customerActivity, setCustomerActivity] = useState(null);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
@@ -202,7 +199,6 @@ export default function ConnectchatConversas() {
     setSelected(conversation);
     setMessages([]);
     setCustomerActivity(null);
-    setCustomerId('');
     await loadMessages(conversation, true);
   }
 
@@ -242,40 +238,6 @@ export default function ConnectchatConversas() {
       toast.error(error.message);
     } finally {
       setSendingAttachment(false);
-    }
-  }
-
-  async function requestCustomerLink() {
-    if (!selected || !/^[1-9]\d*$/.test(customerId.trim())) {
-      toast.error('Informe o código numérico do cliente no IXC.');
-      return;
-    }
-    setLinking(true);
-    try {
-      const request = await requestConnectchatCustomerLink(selected.id, customerId.trim());
-      setCustomerId('');
-      await loadConversations(true);
-      toast.success(`${request.customerName} foi vinculado ao atendimento.`);
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLinking(false);
-    }
-  }
-
-  async function unlinkCustomer() {
-    if (!selected) return;
-    setUnlinking(true);
-    try {
-      await unlinkConnectchatCustomer(selected.id);
-      stopTyping(selected.id);
-      await loadConversations(true);
-      await loadMessages(selected, true, true);
-      toast.success('Cliente desvinculado. A conversa permanece ativa e registrada.');
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setUnlinking(false);
     }
   }
 
@@ -322,15 +284,6 @@ export default function ConnectchatConversas() {
                 {selected.businessContact?.status === 'CUSTOMER' ? <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: 'var(--su-text-muted)' }}>Cliente vinculado</span> : null}
               </div>
               <div className="flex items-center gap-2">
-                {selected.businessContact?.status !== 'CUSTOMER' && can('comm.connectchat.link.customer') ? (
-                  <div className="flex items-center gap-2">
-                    <input aria-label="Código do cliente no IXC" className="su-input" value={customerId} onChange={(event) => setCustomerId(event.target.value)} inputMode="numeric" placeholder="Código IXC" disabled={linking} style={{ width: 118 }} />
-                    <Button variant="secondary" size="sm" loading={linking} onClick={requestCustomerLink}>Vincular cliente</Button>
-                  </div>
-                ) : null}
-                {selected.businessContact?.status === 'CUSTOMER' && can('comm.connectchat.link.customer') ? (
-                  <Button variant="ghost" size="sm" loading={unlinking} onClick={unlinkCustomer}>Desvincular cliente</Button>
-                ) : null}
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>
             </header>
