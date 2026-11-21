@@ -51,7 +51,7 @@ export class ConnectchatAutoResponderService {
       const agent = await this.repository.findById(native.id);
       if (!agent?.is_active || !parseConversation(agent.conversation).auto_reply) return;
       const conversations = await this.inbox.listRawConversations();
-      for (const conversation of conversations.filter((c) => c.status === 'OPEN').slice(0, 25)) {
+      for (const conversation of conversations.filter((c) => c.status === 'OPEN')) {
         try { await this.respond(agent, conversation); }
         catch (error) { this.logger.warn(`ConnectChat ${conversation.id}: ${(error as Error).message}`); }
       }
