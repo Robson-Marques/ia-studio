@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer, getConnectchatAgentBinding, setConnectchatAgentBinding, previewConnectchatAgent } from '../../services/connectchat';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -77,7 +77,6 @@ function MessageAttachment({ attachment }) {
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
-  const canReadAgents = can('ai.agents.read');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -85,11 +84,6 @@ export default function ConnectchatConversas() {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendingAttachment, setSendingAttachment] = useState(false);
-  const [agentBinding, setAgentBinding] = useState({ agentId: null, enabled: false, mode: 'SUPERVISED' });
-  const [includeTicketHistory, setIncludeTicketHistory] = useState(true);
-  const [savingAgent, setSavingAgent] = useState(false);
-  const [testingAgent, setTestingAgent] = useState(false);
-  const [agentPreview, setAgentPreview] = useState(null);
   const [customerId, setCustomerId] = useState('');
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
@@ -136,24 +130,9 @@ export default function ConnectchatConversas() {
     } catch (error) {
       if (!silent) toast.error(error.message);
     }
-  }, [canReadAgents, toast]);
+  }, [can, toast]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
-
-  // Vínculo do assistente é configuração desta instalação, nunca um webhook
-  // automático: nenhuma mensagem enviada pela IA sem ação humana.
-  useEffect(() => {
-    if (!canReadAgents) return;
-    let active = true;
-    getConnectchatAgentBinding()
-      .then((binding) => {
-        if (!active) return;
-        setAgentBinding(binding);
-        setIncludeTicketHistory(binding.includeTicketHistory !== false);
-      })
-      .catch((error) => { if (active) toast.error(error.message); });
-    return () => { active = false; };
-  }, [can, toast]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -222,35 +201,7 @@ export default function ConnectchatConversas() {
     setMessages([]);
     setCustomerActivity(null);
     setCustomerId('');
-    setAgentPreview(null);
     await loadMessages(conversation, true);
-  }
-
-  async function saveAgentBinding(enabled = !agentBinding.enabled) {
-    setSavingAgent(true);
-    try {
-      const updated = await setConnectchatAgentBinding(null, enabled, includeTicketHistory);
-      setAgentBinding(updated);
-      setAgentPreview(null);
-      toast.success(updated.enabled
-        ? 'Agente Newnet conectado ao ConnectChat para testes supervisionados.'
-        : 'ConnectChat desconectado do agente Newnet.');
-    } catch (error) { toast.error(error.message); }
-    finally { setSavingAgent(false); }
-  }
-
-  async function testAgent() {
-    if (!selected || !agentBinding.enabled) return;
-    setTestingAgent(true);
-    setAgentPreview(null);
-    try {
-      const preview = await previewConnectchatAgent(selected.id);
-      setAgentPreview(preview);
-      if (preview.status !== 'COMPLETED') {
-        toast.warn('O assistente não concluiu a resposta. Confira o registro de execução.');
-      }
-    } catch (error) { toast.error(error.message); }
-    finally { setTestingAgent(false); }
   }
 
   async function send() {
@@ -381,86 +332,9 @@ export default function ConnectchatConversas() {
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>
             </header>
-            {can('ai.agents.read') && (
-              <div className="space-y-2" style={{
-                padding: 'var(--su-space-3) var(--su-space-4)',
-                borderBottom: '1px solid var(--su-border-default)',
-                background: 'var(--su-surface-raised)',
-              }}>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <strong style={{ fontSize: 13, color: 'var(--su-text-primary)' }}>Assistente de IA</strong>
-                  <Badge tone={agentBinding.enabled ? 'info' : 'neutral'}>
-                    {agentBinding.enabled ? 'Teste supervisionado' : 'Desligado'}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--su-text-primary)' }}>Agente Newnet</span>
-                  {can('ai.agents.write') && (
-                    <Button variant="secondary" size="sm" loading={savingAgent}
-                      disabled={savingAgent} onClick={() => saveAgentBinding()}>
-                      {agentBinding.enabled ? 'Desconectar ConnectChat' : 'Conectar ConnectChat'}
-                    </Button>
-                  )}
-                  {can('ai.agents.write') && agentBinding.enabled &&
-                    includeTicketHistory !== (agentBinding.includeTicketHistory !== false) && (
-                    <Button variant="secondary" size="sm" loading={savingAgent}
-                      disabled={savingAgent} onClick={() => saveAgentBinding(true)}>
-                      Salvar consulta histórica
-                    </Button>
-                  )}
-                  {can('ai.agents.execute') && (
-                    <Button variant="primary" size="sm" loading={testingAgent}
-                      disabled={testingAgent || !agentBinding.enabled
-                        || includeTicketHistory !== (agentBinding.includeTicketHistory !== false)}
-                      onClick={testAgent}>
-                      Testar IA nesta conversa
-                    </Button>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-3" style={{ fontSize: 12, color: 'var(--su-text-secondary)' }}>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={includeTicketHistory}
-                      onChange={(event) => setIncludeTicketHistory(event.target.checked)}
-                      disabled={!can('ai.agents.write')} />
-                    Consultar últimos 5 chamados e 5 ordens de serviço do cliente confirmado
-                  </label>
-                  <span>Validação: confirmar vínculo · sem escrita no IXC · revisão humana obrigatória · WhatsApp para etapa posterior</span>
-                </div>
-                <p style={{ fontSize: 11, margin: 0, color: 'var(--su-text-muted)' }}>
-                  O assistente analisa a conversa e sugere uma resposta. Nunca envia automaticamente.
-                  Dados IXC só entram quando o vínculo do cliente está confirmado.
-                </p>
-                {agentPreview && (
-                  <div className="space-y-2" style={{ border: '1px solid var(--su-border-default)', borderRadius: 8, padding: 12 }}>
-                    <div className="flex items-center justify-between gap-2">
-                      <strong style={{ fontSize: 12, color: 'var(--su-text-primary)' }}>Prévia da IA — revisão humana</strong>
-                      <Badge tone={agentPreview.status === 'COMPLETED' ? 'success' : 'warning'}>
-                        {agentPreview.status === 'COMPLETED' ? 'Pronta para revisão' : 'Não concluída'}
-                      </Badge>
-                    </div>
-                    {agentPreview.draft ? (
-                      <>
-                        <p style={{ whiteSpace: 'pre-wrap', fontSize: 13, margin: 0, color: 'var(--su-text-primary)' }}>
-                          {agentPreview.draft}
-                        </p>
-                        {can('comm.connectchat.write') && selected.status === 'OPEN' && (
-                          <Button size="sm" variant="secondary" onClick={() => {
-                            setText(agentPreview.draft);
-                            toast.info('Resposta colocada no campo de mensagem. Revise antes de enviar.');
-                          }}>
-                            Usar como rascunho
-                          </Button>
-                        )}
-                      </>
-                    ) : (
-                      <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: 0 }}>
-                        O assistente não produziu uma resposta utilizável. Nenhuma mensagem foi enviada.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            <div style={{ padding: '6px 14px', fontSize: 12, borderBottom: '1px solid var(--su-border-default)', color: 'var(--su-text-secondary)' }}>
+              IA Newnet integrada ao ConnectChat · As mensagens recebem resposta automaticamente quando a opção está ligada em Configurações da IA.
+            </div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2" style={{ padding: 'var(--su-space-4)', background: 'var(--su-surface-subtle)' }}>
               {messages.length === 0 ? <EmptyState icon="message" title="Sem mensagens" description="Ainda não há mensagens para mostrar nesta conversa." /> : messages.map((message) => {
                 const outgoing = message.senderKind === 'BUSINESS';
