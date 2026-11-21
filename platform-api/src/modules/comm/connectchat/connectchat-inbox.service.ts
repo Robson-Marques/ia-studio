@@ -80,6 +80,10 @@ export class ConnectchatInboxService {
    * customerRef é opaco para o ConnectChat. Nesta vertente, o IA Studio emite
    * `ixc:<connection-id>:<customer-id>` e só ele pode interpretá-lo.
    */
+  async getLinkedCustomerName(conversation: ConnectchatConversation): Promise<string | null> {
+    return this.resolveCustomerDisplayName(conversation.customerRef);
+  }
+
   private async resolveCustomerDisplayName(customerRef: string | null): Promise<string | null> {
     if (!customerRef) return null;
     const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(customerRef);
