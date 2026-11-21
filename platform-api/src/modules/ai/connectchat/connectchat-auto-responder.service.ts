@@ -947,70 +947,21 @@ export class ConnectchatAutoResponderService {
         const existing = await this.settings.getValue(pendingKey);
         const pending = existing && typeof existing === 'object' && !Array.isArray(existing)
           ? existing as Record<string, unknown> : {};
-        const answerText = newest.body.trim().toLowerCase();
-        const explicitYes = /^(?:sim|autorizo|pode vincular|concordo|pode sim)[.!]?$/.test(answerText);
-        const explicitNo = /^(?:não|nao|não autorizo|nao autorizo|não quero|nao quero)[.!]?$/.test(answerText);
         const hasNewDocument = extractSubscriberDocument(newest.body) !== null;
-        // Depois da recusa ou da expiração, um novo documento inicia
-        // identificação limpa; nunca herdar autorização do cadastro anterior.
-        const restartIdentification = hasNewDocument;
-        // Um documento novo substitui o cadastro candidato e revoga a autorização
-        // anterior; pedidos de outras contas não serão concluídos neste fluxo.
-        if (typeof pending['customerId'] === 'string' && !restartIdentification) {
-          if ((explicitYes && pending['consent'] !== true)
-            || (explicitNo && pending['consent'] !== false)) {
-            // Uma nova autorização sempre gera um ciclo de prova novo.
-            // Recusa revoga localmente qualquer pedido anterior, ainda que a
-            // PWA tenha uma solicitação antiga visível.
-            await this.settings.set(pendingKey, {
-              customerId: pending.customerId,
-              connectionId: pending.connectionId,
-              reason: pending.reason,
-              operational: pending.operational,
-              osResult: pending.osResult,
-              consent: explicitYes,
-              requestedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              requestId: null,
-              requestAttempts: 0,
-              requestFirstAttemptAt: null,
-              nextAttemptAt: null,
-              revoked: explicitNo,
-            });
-            const answer = explicitYes
-              ? 'Obrigado! Vou verificar a confirmação segura do vínculo para continuar seu atendimento.'
-              : await this.formulateUnlinkedContinuation(
-                agent, conversation, context.messages, newest.body,
-                typeof pending.reason === 'string' ? pending.reason : '', true,
-                pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
-                  ? pending.operational as Record<string, unknown> : undefined,
-                pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
-                  ? pending.osResult as Record<string, unknown> : undefined,
-              );
-            const token = createHash('sha256').update(`newnet-consent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
-          } else if (!explicitYes && !explicitNo) {
-            // Enquanto espera a prova, não ignorar perguntas do assinante.
-            // Sem acesso a cadastro privado até ACTIVE/CUSTOMER.
-            const reply = pending.consent === true
-              ? typeof pending.requestId === 'string'
-                ? 'Seu vínculo está aguardando confirmação na conta ConnectChat. Assim que for confirmado, continuo o atendimento.'
-                : 'Ainda não consegui iniciar a confirmação segura do vínculo. Você pode continuar me contando o problema; não vou consultar seus dados privados antes da confirmação.'
-              : pending.consent === false
-                ? await this.formulateUnlinkedContinuation(
-                  agent, conversation, context.messages, newest.body,
-                  typeof pending.reason === 'string' ? pending.reason : '', false,
-                  pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
-                    ? pending.operational as Record<string, unknown> : undefined,
-                  pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
-                    ? pending.osResult as Record<string, unknown> : undefined,
-                )
-                : 'Para vincular este contato aos próximos atendimentos, você autoriza? Responda sim ou não.';
-            const token = createHash('sha256').update(`newnet-pending-link:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-pending-link-${token}`);
-          }
-          // Sem vínculo ACTIVE+CUSTOMER, a Nete pode orientar a triagem geral,
-          // mas NUNCA consultar dados privados, OS, faturas ou sinal individual.
+        // O CPF seleciona o cliente da sessão. Não existe mais pergunta
+        // Sim/Não sobre vínculo, nem uma espera que bloqueie o atendimento.
+        if (typeof pending['customerId'] === 'string' && !hasNewDocument) {
+          const reply = await this.formulateUnlinkedContinuation(
+            agent, conversation, context.messages, newest.body,
+            typeof pending.reason === 'string' ? pending.reason : '', false,
+            pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
+              ? pending.operational as Record<string, unknown> : undefined,
+            pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
+              ? pending.osResult as Record<string, unknown> : undefined,
+          );
+          const token = createHash('sha256').update(
+            `newnet-session-followup:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-session-followup-${token}`);
           await this.complete(key, sequence, claim);
           return;
         }
