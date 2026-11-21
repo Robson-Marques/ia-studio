@@ -846,10 +846,81 @@ export class ConnectchatAutoResponderService {
         return;
       }
 
+      // Reconhecimento do cliente habitual: confirme a assinatura antes de
+      // aproveitar o vínculo lembrado em um novo atendimento. Outro CPF
+      // escolhe um novo cadastro sem herdar contexto do titular anterior.
+      const recognitionKey = `ai.connectchat.recognition.${conversation.id}`;
+      const recognitionRaw = await this.settings.getValue(recognitionKey);
+      const recognition = recognitionRaw && typeof recognitionRaw === 'object'
+        && !Array.isArray(recognitionRaw) ? recognitionRaw as Record<string, unknown> : {};
+      const newDocument = extractSubscriberDocument(newest.body);
+      const linkedRef = context.conversation.customerRef;
+      const linkedMatch = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(linkedRef || '');
+      const normalizedReply = newest.body.trim().toLowerCase();
+      const affirmative = /^(?:sim|isso|isso mesmo|correto|é|eh|é sim|pode ser)[.!]?$/i.test(normalizedReply);
+      const negative = /^(?:não|nao|não é|nao é|outro|outra pessoa|outro cliente|não é esse|nao e esse)[.!]?$/i.test(normalizedReply);
+      const otherCustomerRequested = recognition.awaitingOther === true;
+      if (context.verified && linkedMatch && !newDocument && recognition.confirmed !== true) {
+        if (recognition.asked === true && affirmative && !otherCustomerRequested) {
+          await this.settings.set(recognitionKey, { confirmed: true, at: new Date().toISOString() });
+          // A confirmação do cadastro não substitui o problema já relatado.
+          const intentKey = `ai.connectchat.identification_requested.${conversation.id}`;
+          const initial = await this.settings.getValue(intentKey);
+          const prior = initial && typeof initial === 'object' && !Array.isArray(initial)
+            ? initial as Record<string, unknown> : {};
+          if (typeof prior.reason === 'string' && prior.reason.trim()) {
+            await this.settings.set(intentKey, { ...prior, requested: true });
+          }
+        } else if (negative || otherCustomerRequested) {
+          await this.settings.set(recognitionKey, {
+            asked: true, confirmed: false, awaitingOther: true,
+          });
+          const reply = await this.replyWithOperationalEvidence(
+            agent, conversation, context.messages, newest.body,
+            { etapa: 'troca_de_cliente', pedir_documento: true },
+            'Certo, de qual assinatura vamos cuidar? Me informe o CPF ou CNPJ desse cliente.',
+          );
+          const msg = /\b(CPF|CNPJ)\b/i.test(reply) ? reply
+            : 'Tudo bem, me informe o CPF ou CNPJ do outro cliente para continuar.';
+          const token = createHash('sha256').update(
+            `newnet-other-customer:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, msg, `newnet-other-${token}`);
+          await this.complete(key, sequence, claim);
+          return;
+        } else {
+          const customerName = await this.inbox.getLinkedCustomerName(context.conversation);
+          if (customerName) {
+            await this.settings.set(recognitionKey, {
+              asked: true, confirmed: false, awaitingOther: false,
+            });
+            const previousReason = this.classifyRequest(newest.body, context.messages) !== 'GENERAL'
+              ? newest.body.slice(0, 500) : null;
+            if (previousReason) await this.settings.set(
+              `ai.connectchat.identification_requested.${conversation.id}`,
+              { requested: true, reason: previousReason },
+            );
+            const question = await this.replyWithOperationalEvidence(
+              agent, conversation, context.messages, newest.body,
+              { etapa: 'confirmar_cliente_habitual', nome: customerName, resposta: 'sim_ou_nao' },
+              `É sobre a assinatura de ${customerName}?`,
+            );
+            const token = createHash('sha256').update(
+              `newnet-recognize:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id,
+              question.includes('?') ? question : `É sobre a assinatura de ${customerName}?`,
+              `newnet-recognize-${token}`);
+            await this.complete(key, sequence, claim);
+            return;
+          }
+          // Sem nome verificável, não atribuir um cliente errado na saudação.
+          await this.settings.set(recognitionKey, { confirmed: true });
+        }
+      }
+
       // IDENTIFICAÇÃO OBRIGATÓRIA: nunca escolher diagnóstico de fibra ou rádio
       // antes de confirmar o cliente no canal. Uma única solicitação por conversa;
       // mensagens seguintes não geram variações repetidas da mesma pergunta.
-      if (!context.verified) {
+      if (!context.verified || (newDocument !== null && context.verified)) {
         // CPF localiza cadastro; jamais comprova identidade nem vincula por si.
         const pendingKey = `ai.connectchat.pending_identity.${conversation.id}`;
         const existing = await this.settings.getValue(pendingKey);
