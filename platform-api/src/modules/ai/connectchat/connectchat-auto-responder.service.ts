@@ -14,6 +14,7 @@ import { AgentsRepository } from '../agents/agents.repository';
 import { parseConversation } from '../agents/agent-conversation';
 import { ConnectchatSupportContextService } from './connectchat-support-context.service';
 import { extractSubscriberDocument, redactSubscriberDocuments } from './subscriber-document';
+import { formatVerifiedInvoices } from './billing-response';
 
 type Cursor = {
   sequence: string;
@@ -37,9 +38,22 @@ export class ConnectchatAutoResponderService {
     private readonly support: ConnectchatSupportContextService,
   ) {}
 
-  // Um interruptor de emergência independente do WhatsApp.
+  // Produção segura por padrão: o bot só liga após opt-in explícito.
+  // Desligar a variável (ou defini-la como off) é o kill switch imediato.
   private enabled(): boolean {
-    return process.env['CONNECTCHAT_AI_AUTOREPLY'] !== 'off';
+    return process.env['CONNECTCHAT_AI_AUTOREPLY'] === 'on';
+  }
+
+  /**
+   * Piloto por identidade GLOBAL autenticada no ConnectChat.
+   * Quando a lista estiver configurada, NUNCA atender outras identidades.
+   * Não filtrar por telefone/CPF, pois esses valores são declarados pelo cliente.
+   */
+  private allowedForPilot(conversation: ConnectchatConversation): boolean {
+    const raw = process.env['CONNECTCHAT_AI_PILOT_IDENTITIES']?.trim();
+    if (!raw) return true;
+    const identities = raw.split(',').map((value) => value.trim()).filter(Boolean);
+    return !!conversation.globalIdentityId && identities.includes(conversation.globalIdentityId);
   }
 
   @Interval(5000)
@@ -54,16 +68,22 @@ export class ConnectchatAutoResponderService {
       const agent = await this.repository.findById(native.id);
       if (!agent?.is_active || !parseConversation(agent.conversation).auto_reply) return;
       const conversations = await this.inbox.listRawConversations();
-      for (const conversation of conversations.filter((c) => c.status === 'OPEN')) {
+      for (const conversation of conversations.filter((c) =>
+        c.status === 'OPEN' && this.allowedForPilot(c))) {
         try {
           const pendingKey = `ai.connectchat.pending_identity.${conversation.id}`;
           const rawPending = await this.settings.getValue(pendingKey);
           const pending = rawPending && typeof rawPending === 'object' && !Array.isArray(rawPending)
             ? rawPending as Record<string, unknown> : {};
-          const linkedId = /^ixc:[0-9a-f-]{36}:([1-9]\d*)$/i.exec(conversation.customerRef ?? '')?.[1];
+          const expectedRef = typeof pending.connectionId === 'string'
+            && typeof pending.customerId === 'string'
+            ? `ixc:${pending.connectionId}:${pending.customerId}` : null;
           const verified = conversation.businessContact?.status === 'CUSTOMER'
             && conversation.businessContact.linkStatus === 'ACTIVE';
-          if (verified && pending.consent === true && pending.customerId === linkedId
+          if (verified && pending.consent === true && expectedRef !== null
+            && conversation.customerRef?.toLowerCase() === expectedRef.toLowerCase()
+            && (pending.requestIdentity === undefined
+              || pending.requestIdentity === conversation.globalIdentityId)
             && pending.resumed !== true) {
             await this.respond(agent, conversation, typeof pending.reason === 'string' ? pending.reason : '');
             // Retomada só após checkpoint; não processar o mesmo turno duas vezes.
@@ -105,6 +125,9 @@ export class ConnectchatAutoResponderService {
     key: string,
     pending: Record<string, unknown>,
   ): Promise<void> {
+    // Ativar somente depois de validar que a aprovação da PWA comprova
+    // titularidade/representação do cadastro IXC correspondente.
+    if (process.env['CONNECTCHAT_AI_LINKING'] !== 'on') return;
     if (!conversation.globalIdentityId || conversation.status !== 'OPEN') return;
     if (conversation.businessContact?.status === 'CUSTOMER'
       && conversation.businessContact.linkStatus === 'ACTIVE') return;
@@ -144,7 +167,7 @@ export class ConnectchatAutoResponderService {
       await this.settings.set(key, attemptState);
       try {
         const requestKey = createHash('sha256').update(`newnet-link:${conversation.id}:${conversation.globalIdentityId}:${ref}:${String(pending.requestedAt ?? '')}`).digest('hex');
-        const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose, requestKey);
+        const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose, requestKey, conversation.globalIdentityId);
         const value = response && typeof response === 'object' ? response as Record<string, unknown> : {};
         const record = (input: unknown): Record<string, unknown> =>
           input && typeof input === 'object' && !Array.isArray(input)
@@ -163,7 +186,7 @@ export class ConnectchatAutoResponderService {
         }
         await this.settings.set(key, {
           ...attemptState, requestId, requestIdentity: conversation.globalIdentityId,
-          requestCreatedAt: now, nextAttemptAt: now + 15000,
+          requestCreatedAt: firstAt, nextAttemptAt: now + 15000,
         });
         const token = createHash('sha256').update(`newnet-link-request:${conversation.id}:${requestId}`).digest('hex').slice(0, 32);
         await this.inbox.sendAgentMessage(conversation.id,
@@ -193,7 +216,7 @@ export class ConnectchatAutoResponderService {
       return;
     }
     try {
-      await this.inbox.completeAuthenticatedLinkRequest(conversation.id, existing);
+      await this.inbox.completeAuthenticatedLinkRequest(conversation.id, existing, conversation.globalIdentityId);
       await this.settings.set(key, { ...pending, completedAt: now, nextAttemptAt: now + 60000 });
       // O estado autenticado ACTIVE/CUSTOMER é verificado no próximo poll.
     } catch {
@@ -482,6 +505,35 @@ export class ConnectchatAutoResponderService {
       // Um cliente já vinculado que diga "oi" ou peça segunda via não deve
       // receber perguntas sobre ONU, rádio, fibra ou OS de suporte.
       if (intent === 'GENERAL' || intent === 'FINANCE') {
+        if (intent === 'FINANCE') {
+          // Não entregar títulos financeiros espontaneamente quando o
+          // assinante só informou ter pago ou perguntou sobre um assunto geral.
+          const paymentCopyRequested = /\b(boleto|fatura|segunda via|2[ªa]? via|linha digit[aá]vel|c[oó]digo de barras|pix|t[ií]tulos? em aberto|contas? a pagar)\b/i.test(newest.body);
+          if (!paymentCopyRequested) {
+            const reply = 'Sobre o financeiro, você precisa da segunda via de uma fatura, do PIX para pagamento ou de ajuda com um pagamento já realizado?';
+            const token = createHash('sha256').update(`newnet-finance-clarify:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-finance-clarify-${token}`);
+            await this.complete(key, sequence, claim);
+            return;
+          }
+          // Consulta determinística, restrita à referência verificada,
+          // sem ferramenta executável ou CPF controlado pelo modelo.
+          const billing = await this.support.billingForVerifiedConversation(context.conversation);
+          const latest = await this.inbox.contextForAgentPreview(conversation.id);
+          if (!latest.verified || latest.conversation.customerRef !== context.conversation.customerRef
+            || latest.conversation.globalIdentityId !== context.conversation.globalIdentityId
+            || latest.conversation.lastSequence !== sequence || latest.conversation.status !== 'OPEN') {
+            await this.complete(key, sequence, claim);
+            return;
+          }
+          const answer = billing.available
+            ? formatVerifiedInvoices(billing.invoices, billing.total)
+            : 'Não consegui consultar seus títulos neste momento. Nenhum dado de pagamento foi alterado.';
+          const token = createHash('sha256').update(`newnet-billing:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-billing-${token}`);
+          await this.complete(key, sequence, claim);
+          return;
+        }
         const history = context.messages.filter((m) => typeof m.body === 'string' && m.body.trim())
           .slice(-25, -1).map((m) => ({
             role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -490,9 +542,7 @@ export class ConnectchatAutoResponderService {
         const instructions = [
           'Você é a Nete, assistente da Newnet. Responda em uma única mensagem curta.',
           'O cliente já está vinculado com segurança. Não peça CPF novamente.',
-          intent === 'FINANCE'
-            ? 'O contato trata de assunto financeiro. O canal de homologação não permite consultar nem enviar boleto. Informe brevemente que vai encaminhar à equipe responsável, sem divulgar débitos, valores ou status.'
-            : 'Se o motivo ainda não foi informado, pergunte de forma breve em que pode ajudar. Não inicie diagnóstico técnico.',
+          'Se o motivo ainda não foi informado, pergunte de forma breve em que pode ajudar. Não inicie diagnóstico técnico.',
           'Não execute ferramentas, não prometa operações e não repita perguntas respondidas.',
         ].join('\n');
         const result = await this.runner.run({
@@ -503,6 +553,16 @@ export class ConnectchatAutoResponderService {
         const message = result.status === 'COMPLETED' && typeof result.output === 'string'
           ? result.output.trim() : '';
         if (message && !this.isRepeat(message, context.messages)) {
+          // A inferência pode demorar e, nesse intervalo, o vínculo pode
+          // mudar. Revalidar escopo até para respostas gerais.
+          const fresh = await this.inbox.contextForAgentPreview(conversation.id);
+          if (!fresh.verified || fresh.conversation.status !== 'OPEN'
+            || fresh.conversation.lastSequence !== sequence
+            || fresh.conversation.customerRef !== context.conversation.customerRef
+            || fresh.conversation.globalIdentityId !== context.conversation.globalIdentityId) {
+            await this.complete(key, sequence, claim);
+            return;
+          }
           const token = createHash('sha256').update(`newnet-general:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
           await this.inbox.sendAgentMessage(conversation.id, message, `newnet-general-${token}`);
         }
@@ -570,22 +630,23 @@ export class ConnectchatAutoResponderService {
         } else {
           const number = /^([1-8])\s*[.)]?$/.exec(newest.body.trim());
           const option = number ? support.contracts[Number(number[1]) - 1] : undefined;
-          if (option && typeof option['id'] === 'string') {
-            selectedContractId = option['id'];
+          if (option && /^[1-9]\d*$/.test(String(option['id'] ?? ''))) {
+            selectedContractId = String(option['id']);
             await this.settings.set(selectionKey, {
               contractId: selectedContractId, customerRef: context.conversation.customerRef,
             });
           } else {
             const askKey = `ai.connectchat.contract_requested.${conversation.id}`;
-            if (!(await this.settings.getValue(askKey))) {
-              const options = support.contracts.slice(0, 8)
-                .map((item, index) => `${index + 1}. ${String(item['plano'] || 'Serviço')} (contrato ${String(item['id'])})`)
-                .join('\n');
-              const text = `Encontrei mais de um serviço ativo. Qual deles precisa de suporte? Responda com o número:\n${options}`;
-              const token = createHash('sha256').update(`newnet-pick-contract:${conversation.id}`).digest('hex').slice(0, 32);
-              await this.inbox.sendAgentMessage(conversation.id, text, `newnet-pick-contract-${token}`);
-              await this.settings.set(askKey, { requested: true });
-            }
+            const asked = await this.settings.getValue(askKey);
+            const options = support.contracts.slice(0, 8)
+              .map((item, index) => `${index + 1}. ${String(item['plano'] || 'Serviço')} (contrato ${String(item['id'])})`)
+              .join('\n');
+            const text = asked
+              ? `Para continuar o suporte, escolha o número de um destes serviços:\n${options}`
+              : `Encontrei mais de um serviço ativo. Qual deles precisa de suporte? Responda com o número:\n${options}`;
+            const token = createHash('sha256').update(`newnet-pick-contract:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, text, `newnet-pick-contract-${token}`);
+            if (!asked) await this.settings.set(askKey, { requested: true });
             await this.complete(key, sequence, claim);
             return;
           }
@@ -679,7 +740,10 @@ export class ConnectchatAutoResponderService {
       const fresh = await this.inbox.contextForAgentPreview(conversation.id);
       const finalMessage = fresh.messages.at(-1);
       if (!finalMessage || finalMessage.serverSequence !== sequence
-        || (!resume && finalMessage.senderKind !== 'CUSTOMER') || fresh.conversation.status !== 'OPEN') {
+        || (!resume && finalMessage.senderKind !== 'CUSTOMER')
+        || fresh.conversation.status !== 'OPEN'
+        || !fresh.verified || fresh.conversation.customerRef !== context.conversation.customerRef
+        || fresh.conversation.globalIdentityId !== context.conversation.globalIdentityId) {
         await this.complete(key, sequence, claim);
         return;
       }

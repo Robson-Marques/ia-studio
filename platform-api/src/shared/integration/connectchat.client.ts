@@ -258,7 +258,7 @@ export class ConnectchatClient {
 
   async createLinkRequest(globalIdentityId: string, purpose: string, customerRef?: string, ttlSeconds?: number, actorRef?: string, requestKey?: string): Promise<unknown> {
     return this.mutate('/integration/link-requests',
-      { globalIdentityId, purpose, ...(customerRef ? { customerRef } : {}), ...(ttlSeconds ? { ttlSeconds } : {}) },
+      { globalIdentityId, purpose, ...(customerRef ? { customerRef } : {}), ...(ttlSeconds ? { ttlMs: ttlSeconds * 1000 } : {}) },
       actorRef, requestKey ? `ystudio:link-request:${requestKey}` : undefined);
   }
 

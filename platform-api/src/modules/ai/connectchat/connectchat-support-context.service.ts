@@ -2,9 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConnectchatConversation } from '../../../shared/integration/connectchat.client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
-import { rows, projectChamado, projectOrdemServico, projectContrato, projectConexao } from '../../isp/isp-projections';
+import { rows, projectChamado, projectOrdemServico, projectContrato, projectConexao, projectBoleto, limitBoletos } from '../../isp/isp-projections';
 import { IncidentLookupService, IncidentInfo } from '../../isp/incident-lookup.service';
 import { isValidSubscriberDocument, normalizeSubscriberDocument } from './subscriber-document';
+import { scopeVerifiedInvoices } from './billing-response';
 
 /** Evidências restritas ao vínculo confirmado da conversa; nunca recebe
  * identificador escolhido pelo LLM ou CPF digitado como prova de titularidade. */
@@ -54,6 +55,53 @@ export class ConnectchatSupportContextService {
     } catch (error) {
       this.logger.warn(`Consulta CPF/CNPJ não concluída: ${(error as Error).message}`);
       return { status: 'UNAVAILABLE' };
+    }
+  }
+
+  /**
+   * Consulta FINANCEIRA de leitura, sempre pelo ID de cliente do vínculo
+   * ACTIVE/CUSTOMER emitido pelo ConnectChat. Nenhum CPF informado ao modelo
+   * é aceito como seletor, e nenhuma ferramenta de escrita é disponibilizada.
+   */
+  async billingForVerifiedConversation(conversation: ConnectchatConversation): Promise<{
+    available: boolean;
+    invoices: Record<string, unknown>[];
+    total: number;
+  }> {
+    if (conversation.businessContact?.status !== 'CUSTOMER'
+      || conversation.businessContact.linkStatus !== 'ACTIVE') {
+      return { available: false, invoices: [], total: 0 };
+    }
+    const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(conversation.customerRef ?? '');
+    if (!match) return { available: false, invoices: [], total: 0 };
+    const [, connectionId, customerId] = match;
+    const provider = await this.repository.findById(connectionId);
+    if (!provider || provider.provider_key !== 'ixc'
+      || provider.status !== 'ACTIVE' || !provider.is_active) {
+      return { available: false, invoices: [], total: 0 };
+    }
+    try {
+      const records = rows(await this.connections.execute(connectionId, 'ixc.listar', {
+        tabela: 'fn_areceber',
+        rp: '50',
+        sortname: 'fn_areceber.data_vencimento',
+        grid_param: [
+          { TB: 'fn_areceber.id_cliente', OP: '=', P: customerId },
+          { TB: 'fn_areceber.liberado', OP: '=', P: 'S' },
+          { TB: 'fn_areceber.status', OP: '!=', P: 'C' },
+          { TB: 'fn_areceber.status', OP: '!=', P: 'R' },
+        ],
+      }));
+      const scoped = scopeVerifiedInvoices(records, customerId);
+      if (!scoped) {
+        this.logger.error('IXC devolveu títulos fora do escopo do cliente; resposta financeira bloqueada.');
+        return { available: false, invoices: [], total: 0 };
+      }
+      const safe = scoped.map((item) => projectBoleto(item));
+      return { available: true, invoices: limitBoletos(safe, 5), total: safe.length };
+    } catch (error) {
+      this.logger.warn(`Consulta financeira do vínculo não concluída: ${(error as Error).message}`);
+      return { available: false, invoices: [], total: 0 };
     }
   }
 
