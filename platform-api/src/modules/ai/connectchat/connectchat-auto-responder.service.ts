@@ -147,7 +147,7 @@ export class ConnectchatAutoResponderService {
         ];
         const requestId = candidates.find((id) =>
           typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)) as string | undefined;
-        if (!/^[0-9a-f-]{36}$/i.test(requestId)) {
+        if (typeof requestId !== 'string' || !/^[0-9a-f-]{36}$/i.test(requestId)) {
           this.logger.warn('ConnectChat: resposta de criação do vínculo sem ID de pedido reconhecível.');
           await this.settings.set(key, { ...pending, requestOutcomeUnknown: true });
           return;
