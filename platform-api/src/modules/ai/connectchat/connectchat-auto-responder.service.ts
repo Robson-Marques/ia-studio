@@ -316,14 +316,19 @@ export class ConnectchatAutoResponderService {
         const answerText = newest.body.trim().toLowerCase();
         const explicitYes = /^(?:sim|autorizo|pode vincular|concordo|pode sim)[.!]?$/.test(answerText);
         const explicitNo = /^(?:não|nao|não autorizo|nao autorizo|não quero|nao quero)[.!]?$/.test(answerText);
-        if (typeof pending['customerId'] === 'string') {
+        const hasNewDocument = /(?:^|\D)(?:\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)/.test(newest.body);
+        // Depois da recusa ou da expiração, um novo documento inicia
+        // identificação limpa; nunca herdar autorização do cadastro anterior.
+        const restartIdentification = hasNewDocument && (
+          pending['consent'] === false || pending['expired'] === true);
+        if (typeof pending['customerId'] === 'string' && !restartIdentification) {
           if ((explicitYes || explicitNo) && typeof pending['consent'] !== 'boolean') {
             await this.settings.set(pendingKey, {
               ...pending, consent: explicitYes,
               updatedAt: new Date().toISOString(),
             });
             const answer = explicitYes
-              ? 'Obrigado! Para proteger seu cadastro, a vinculação precisa ser confirmada na sua sessão autenticada do ConnectChat. Assim que ela estiver confirmada, continuo por aqui.'
+              ? 'Obrigado! Vou solicitar a confirmação do vínculo na sua conta ConnectChat. Assim que for autorizada, continuo o atendimento.'
               : 'Tudo bem, não vou vincular este contato. Para consultar informações particulares, será necessária uma identificação segura.';
             const token = createHash('sha256').update(`newnet-consent:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
@@ -553,7 +558,7 @@ export class ConnectchatAutoResponderService {
         } else {
           const pendingKey = `ai.connectchat.technology_unresolved.${conversation.id}`;
           if (!(await this.settings.getValue(pendingKey))) {
-            const note = 'Entendi. Ainda não consegui confirmar se o acesso é por fibra ou rádio. Para evitar orientar um teste errado, precisamos que um atendente verifique a tecnologia do seu contrato.';
+            const note = 'Ainda não consegui identificar se o acesso é fibra ou rádio. Para não indicar um teste de equipamento errado, posso continuar com orientações gerais. Se houver uma etiqueta com o tipo de instalação, me informe quando puder.';
             const token = createHash('sha256').update(`newnet-tech-pending:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, note, `newnet-tech-pending-${token}`);
             await this.settings.set(pendingKey, { requested: true });
