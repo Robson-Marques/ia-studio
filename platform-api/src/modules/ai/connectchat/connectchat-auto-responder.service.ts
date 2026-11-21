@@ -341,7 +341,7 @@ export class ConnectchatAutoResponderService {
           return;
         }
 
-        const candidate = newest.body.match(/(?:^|\D)(\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)/);
+        const candidate = newest.body.match(/(?:^|[^A-Za-z0-9])([A-Za-z0-9]{2}[.\s]?[A-Za-z0-9]{3}[.\s]?[A-Za-z0-9]{3}[\/\s]?[A-Za-z0-9]{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?![A-Za-z0-9])/);
         if (candidate) {
           // CPF/CNPJ é dado de busca, mas a conversa não pode virar
           // um oráculo de enumeração de cadastros do IXC.
