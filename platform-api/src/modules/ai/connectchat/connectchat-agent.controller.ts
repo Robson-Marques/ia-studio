@@ -57,47 +57,6 @@ export class ConnectchatAgentController {
     }
   }
 
-  /**
-   * Pendência de vínculo encontrada pela Nete. Apenas operador autorizado
-   * recebe ID interno; nunca expor CPF ou dados privados ao visitante.
-   */
-  @Get('conversations/:conversationId/identity-pending')
-  @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER)
-  async pendingIdentity(@Param('conversationId', new ParseUUIDPipe()) conversationId: string) {
-    const raw = await this.settings.getValue(`ai.connectchat.pending_identity.${conversationId}`);
-    const pending = raw && typeof raw === 'object' && !Array.isArray(raw)
-      ? raw as Record<string, unknown> : {};
-    const customerId = typeof pending.customerId === 'string' && /^[1-9]\d*$/.test(pending.customerId)
-      ? pending.customerId : null;
-    return { customerId, consent: pending.consent === true ? 'YES' : pending.consent === false ? 'NO' : 'PENDING' };
-  }
-
-  /**
-   * Atendente valida identidade por procedimento externo e confirma a
-   * solicitação consentida. Reusa o vínculo direto já existente.
-   */
-  @Post('conversations/:conversationId/identity-confirm')
-  @RequirePermissions(PERMISSIONS.COMM_CONNECTCHAT_LINK_CUSTOMER)
-  async confirmIdentity(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('conversationId', new ParseUUIDPipe()) conversationId: string,
-    @Body() body: { identityVerified?: boolean },
-  ) {
-    if (body.identityVerified !== true) {
-      throw new BadRequestException('Confirme que a identidade foi validada fora do CPF informado.');
-    }
-    const pending = await this.pendingIdentity(conversationId);
-    if (!pending.customerId || pending.consent !== 'YES') {
-      throw new BadRequestException('É necessário localizar o cadastro e obter autorização do contato.');
-    }
-    const result = await this.inbox.requestCustomerLink(user, conversationId, pending.customerId);
-    await this.settings.set(`ai.connectchat.pending_identity.${conversationId}`, {
-      customerId: pending.customerId, consent: true,
-      confirmedBy: user.sub, confirmedAt: new Date().toISOString(),
-    });
-    return result;
-  }
-
   @Get('agent')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
   async getAgent() {
