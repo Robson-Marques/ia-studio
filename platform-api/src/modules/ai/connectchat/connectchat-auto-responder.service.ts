@@ -376,9 +376,14 @@ export class ConnectchatAutoResponderService {
             const noticed = await this.settings.getValue(`ai.connectchat.identification_requested.${conversation.id}`);
             const previous = noticed && typeof noticed === 'object' && !Array.isArray(noticed)
               ? noticed as Record<string, unknown> : {};
+            // Preserva o motivo informado junto com o documento sem guardar
+            // CPF/CNPJ no contexto que mais tarde será enviado ao modelo.
+            const reasonWithoutDocument = newest.body.replace(candidate, '').trim().slice(0, 500);
+            const identifiedReason = typeof previous.reason === 'string' && previous.reason.trim()
+              ? previous.reason : reasonWithoutDocument;
             await this.settings.set(pendingKey, {
               customerId: found.customerId, connectionId: found.connectionId, consent: null, requestedAt: new Date().toISOString(),
-              reason: typeof previous.reason === 'string' ? previous.reason : '',
+              reason: identifiedReason,
             });
             await this.inbox.sendAgentMessage(conversation.id,
               'Localizei um cadastro. Posso associar este contato a ele para os próximos atendimentos? Responda sim ou não.',
@@ -392,12 +397,11 @@ export class ConnectchatAutoResponderService {
         } else {
           // Motivo e CPF são duas etapas diferentes. "Oi" pede o motivo;
           // "estou sem internet" aproveita o motivo e pede CPF diretamente.
-          const hasReason = /internet|conex|suporte|sinal|lenta|caiu|caindo|boleto|fatura|pagamento|sem rede|sem wi.?fi|contratar|cancelar|mudança|mudanca|plano|endereço|endereco|financeiro/i.test(newest.body);
           const greetKey = `ai.connectchat.greeting.${conversation.id}`;
           const noticeKey = `ai.connectchat.identification_requested.${conversation.id}`;
           const greeted = !!(await this.settings.getValue(greetKey));
           const isGreetingOnly = /^(oi+|ol[aá]|bom dia|boa tarde|boa noite|opa|hello)[!., ]*$/i.test(newest.body.trim());
-          if (!hasReason && !greeted && isGreetingOnly) {
+          if (!greeted && isGreetingOnly) {
             const message = 'Oi! Sou Nete, da Newnet. Como posso ajudar?';
             const token = createHash('sha256').update(`newnet-greet:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-greet-${token}`);
@@ -409,11 +413,6 @@ export class ConnectchatAutoResponderService {
             const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
             await this.settings.set(noticeKey, { requested: true, reason: newest.body.slice(0, 500) });
-            await this.settings.set(greetKey, { sent: true });
-          } else if (!greeted && isGreetingOnly) {
-            const message = 'Oi! Sou Nete, da Newnet. Como posso ajudar?';
-            const token = createHash('sha256').update(`newnet-greet:${conversation.id}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, message, `newnet-greet-${token}`);
             await this.settings.set(greetKey, { sent: true });
           }
         }
