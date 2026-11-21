@@ -32,6 +32,13 @@ export class AgentsController {
     return this.agents.findAll();
   }
 
+  // POST explícito: provisionamento é uma escrita, nunca efeito colateral de GET.
+  @Post('native/ensure')
+  @RequirePermissions(PERMISSIONS.AI_AGENTS_WRITE)
+  ensureNative(@CurrentUser() user: AuthenticatedUser) {
+    return this.agents.ensureNativeAgent(user.sub);
+  }
+
   @Get(':id')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
   findById(
