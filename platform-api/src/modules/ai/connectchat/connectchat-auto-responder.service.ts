@@ -131,6 +131,28 @@ export class ConnectchatAutoResponderService {
       });
   }
 
+  private classifyRequest(text: string, history: ConnectchatMessage[]): 'SUPPORT' | 'FINANCE' | 'GENERAL' {
+    const normalize = (input: string) => input.toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const classify = (input: string) => {
+      const value = normalize(input);
+      if (/\b(boleto|fatura|pagamento|pagar|vencimento|pix|cobranca|debito|segunda via)\b/.test(value)) return 'FINANCE';
+      if (/\b(sem internet|sem conexao|sem sinal|nao conecta|caiu|caindo|lenta|lentidao|wifi|wi.fi|roteador|modem|suporte|rede caiu|internet ruim)\b/.test(value)) return 'SUPPORT';
+      return 'GENERAL';
+    };
+    const current = classify(text);
+    if (current !== 'GENERAL') return current;
+    // Resposta curta pode continuar o atendimento anterior, mas não inferir
+    // uma intenção antiga para uma solicitação completamente nova.
+    if (normalize(text).trim().length > 35) return 'GENERAL';
+    const recent = history.filter((m) => m.senderKind === 'CUSTOMER' && !!m.body).slice(-6, -1).reverse();
+    for (const msg of recent) {
+      const kind = classify(msg.body);
+      if (kind !== 'GENERAL') return kind;
+    }
+    return 'GENERAL';
+  }
+
   private async respond(agent: AiAgent, conversation: ConnectchatConversation): Promise<void> {
     const sequence = conversation.lastSequence;
     if (!/^\d+$/.test(sequence) || BigInt(sequence) === 0n) return;
@@ -230,8 +252,40 @@ export class ConnectchatAutoResponderService {
         return;
       }
 
-      // Verifica pendências e recorrência ANTES de escolher equipamento. A
-      // evidência vem exclusivamente do cliente vinculado pelo ConnectChat.
+      const intent = this.classifyRequest(newest.body, context.messages);
+      // Um cliente já vinculado que diga "oi" ou peça segunda via não deve
+      // receber perguntas sobre ONU, rádio, fibra ou OS de suporte.
+      if (intent === 'GENERAL' || intent === 'FINANCE') {
+        const history = context.messages.filter((m) => typeof m.body === 'string' && m.body.trim())
+          .slice(-25, -1).map((m) => ({
+            role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: m.body.slice(0, 4000),
+          }));
+        const instructions = [
+          'Você é a Nete, assistente da Newnet. Responda em uma única mensagem curta.',
+          'O cliente já está vinculado com segurança. Não peça CPF novamente.',
+          intent === 'FINANCE'
+            ? 'O contato trata de assunto financeiro. O canal de homologação não permite consultar nem enviar boleto. Informe brevemente que vai encaminhar à equipe responsável, sem divulgar débitos, valores ou status.'
+            : 'Se o motivo ainda não foi informado, pergunte de forma breve em que pode ajudar. Não inicie diagnóstico técnico.',
+          'Não execute ferramentas, não prometa operações e não repita perguntas respondidas.',
+        ].join('\n');
+        const result = await this.runner.run({
+          agentId: agent.id, input: newest.body.slice(0, 8000), history,
+          createdBy: null, scopeKeys: { connectchat_conversation: conversation.id },
+          allowedToolsOverride: [], channelInstructions: instructions, dryRun: false,
+        });
+        const message = result.status === 'COMPLETED' && typeof result.output === 'string'
+          ? result.output.trim() : '';
+        if (message && !this.isRepeat(message, context.messages)) {
+          const token = createHash('sha256').update(`newnet-general:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, message, `newnet-general-${token}`);
+        }
+        await this.complete(key, sequence, claim);
+        return;
+      }
+
+      // Verifica pendências e recorrência ANTES de escolher equipamento.
+      // A evidência vem exclusivamente do cliente vinculado pelo ConnectChat.
       const support = await this.support.byVerifiedConversation(context.conversation);
       if (!support.available) {
         const note = 'Seu cadastro está confirmado, mas não consegui consultar a situação dos atendimentos agora. Vou precisar do apoio da equipe para continuar com segurança.';
@@ -310,6 +364,9 @@ export class ConnectchatAutoResponderService {
         'Cliente já identificado pela plataforma. Não peça outra identificação e não repita perguntas já respondidas no histórico.',
         `Tecnologia disponível: ${technology}. Respeite a origem indicada e não declare confirmado no IXC quando vier apenas do cliente.`,
         `Contratos ativos projetados (uso interno, não publicar dados financeiros espontaneamente): ${JSON.stringify(support.contracts)}`,
+        `Número de contratos com estado de acesso bloqueado/suspenso (não divulgar causa ou débito): ${support.blockedContracts}`,
+        `Acessos ativos e estado registrado pelo IXC (somente vínculo confirmado): ${JSON.stringify(support.connections)}`,
+        'Se houver bloqueio/suspensão registrada, NÃO oriente reiniciar roteadores como correção definitiva. Encaminhe a verificação administrativa sem divulgar dados financeiros sem solicitação.',
         'Nunca suponha modem, ONU, luz LOS ou outros equipamentos. Pergunte apenas sobre equipamento comprovado ou indicado pelo cliente.',
         'Faça somente a próxima pergunta necessária, usando o que a pessoa já respondeu. Se uma informação estiver pendente, não reescreva a mesma pergunta.',
         'Não há ferramentas de escrita liberadas nesta conversa. Nunca prometa que abriu uma OS, realizou desbloqueio ou resolveu a conexão.',
