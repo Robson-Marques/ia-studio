@@ -12,6 +12,8 @@ export interface VerifiedSupportContext {
   openOs: Record<string, unknown>[];
   recentOs: Record<string, unknown>[];
   recentTickets: Record<string, unknown>[];
+  openTickets: Record<string, unknown>[];
+  uncertainTickets: boolean;
   recurrentWithin48h: boolean;
   recurrenceEvidence: string[];
   contracts: Record<string, unknown>[];
@@ -57,7 +59,7 @@ export class ConnectchatSupportContextService {
 
   async byVerifiedConversation(conversation: ConnectchatConversation): Promise<VerifiedSupportContext> {
     const empty: VerifiedSupportContext = {
-      available: false, openOs: [], recentOs: [], recentTickets: [],
+      available: false, openOs: [], recentOs: [], recentTickets: [], openTickets: [], uncertainTickets: false,
       recurrentWithin48h: false, recurrenceEvidence: [], contracts: [], connections: [], blockedContracts: 0, technology: null,
     };
     if (conversation.businessContact?.status !== 'CUSTOMER'
@@ -140,6 +142,18 @@ export class ConnectchatSupportContextService {
         { id_cliente: customerId }).then(rows).then((v) => v.slice(0, 5).map(projectChamado)).catch(() => []),
     ]);
 
+    // Estados conhecidos do ticket; situações não classificadas exigem revisão
+    // humana antes da criação de outro atendimento.
+    const openStatuses = new Set(['A', 'ABERTO', 'P', 'PENDENTE', 'EM ANDAMENTO', 'ANDAMENTO']);
+    const closedStatuses = new Set(['F', 'FINALIZADO', 'C', 'CANCELADO', 'ENCERRADO', 'FECHADO', 'RESOLVIDO']);
+    const openTickets = tickets.filter((t) => openStatuses.has(
+      String(t['situacao_interna'] ?? t['status'] ?? '').trim().toUpperCase(),
+    ));
+    const uncertainTickets = tickets.some((t) => {
+      const value = String(t['situacao_interna'] ?? t['status'] ?? '').trim().toUpperCase();
+      return !openStatuses.has(value) && !closedStatuses.has(value);
+    });
+
     const now = Date.now();
     const evidence: string[] = [];
     for (const item of [...os, ...tickets]) {
@@ -155,6 +169,7 @@ export class ConnectchatSupportContextService {
     }
     return {
       available: true, openOs, recentOs: os, recentTickets: tickets,
+      openTickets, uncertainTickets,
       recurrentWithin48h: evidence.length > 0, recurrenceEvidence: evidence.slice(0, 5),
       contracts, connections, blockedContracts, technology,
     };
