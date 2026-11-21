@@ -12,6 +12,7 @@ import { AutomationModule } from '../automation/automation.module';
 import { SettingsModule } from '../core/settings/settings.module';
 import { ConnectchatAgentController } from './connectchat/connectchat-agent.controller';
 import { ConnectchatAutoResponderService } from './connectchat/connectchat-auto-responder.service';
+import { ConnectchatSupportContextService } from './connectchat/connectchat-support-context.service';
 
 // Providers (LLM)
 import { LlmProviderRegistryService } from './providers/llm-provider-registry.service';
@@ -135,6 +136,7 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     AgentRunnerService,
     PromptSecurityService,
     ConnectchatAutoResponderService,
+    ConnectchatSupportContextService,
     // Análise de atendimento
     AttendanceAnalysisRepository,
     AttendanceAnalysisService,
