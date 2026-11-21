@@ -38,6 +38,7 @@ import TemplatesAutomacao from './pages/Automacao/TemplatesAutomacao';
 import TemplateEditor from './pages/Automacao/TemplateEditor';
 import Monitoramento from './pages/Automacao/Monitoramento';
 import Agentes from './pages/IA/Agentes';
+import ConfiguracoesIA from './pages/IA/ConfiguracoesIA';
 import AgenteEditor from './pages/IA/AgenteEditor';
 import AgenteImportar from './pages/IA/AgenteImportar';
 import BasesConhecimento from './pages/IA/BasesConhecimento';
@@ -131,7 +132,7 @@ export default function App() {
                 <Route path="/automacao/templates/:id" element={<PermissionRoute perm="automation.templates.read"><TemplateEditor /></PermissionRoute>} />
                 <Route path="/automacao/eventos" element={<Navigate to="/automacao/monitoramento?tab=eventos" replace />} />
                 <Route path="/automacao/notificacoes" element={<Navigate to="/automacao/monitoramento?tab=notificacoes" replace />} />
-                <Route path="/ia/agentes" element={<PermissionRoute perm="ai.agents.read"><Agentes /></PermissionRoute>} />
+                <Route path="/ia/agentes" element={<PermissionRoute perm="ai.agents.read"><ConfiguracoesIA /></PermissionRoute>} />
                 <Route path="/ia/agentes/nova" element={<Navigate to="/ia/agentes" replace />} />
                 <Route path="/ia/agentes/importar" element={<Navigate to="/ia/agentes" replace />} />
                 {/* `read` (não `write`): a aba Testar vive aqui, e quem só tem
