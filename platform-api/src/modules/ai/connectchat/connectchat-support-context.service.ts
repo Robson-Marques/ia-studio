@@ -110,7 +110,7 @@ export class ConnectchatSupportContextService {
       const active = records.filter((row) => String(row['status'] ?? '').toUpperCase() === 'A');
       const declared = active.map((row) => {
         const raw = String(row['tecnologia'] ?? row['tipo_tecnologia'] ?? row['tipo_conexao'] ?? '').trim().toUpperCase();
-        const known = /^(FIBRA|FIBRA OPTICA|FTTH|GPON)$/.test(raw) ? 'FIBRA'
+        const known: 'FIBRA' | 'RADIO' | null = /^(FIBRA|FIBRA OPTICA|FTTH|GPON)$/.test(raw) ? 'FIBRA'
           : /^(RADIO|RÁDIO|WIRELESS)$/.test(raw) ? 'RADIO' : null;
         if (known && /^[1-9]\d*$/.test(String(row['id'] ?? ''))) {
           technologyByContract[String(row['id'])] = known;
