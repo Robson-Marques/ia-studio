@@ -72,9 +72,14 @@ export function formatCpfCnpj(digits: string): string | null {
  */
 export function cpfCnpjCandidates(raw: string): string[] {
   const trimmed = raw.trim();
-  const digits = onlyDigits(trimmed);
-  const masked = formatCpfCnpj(digits);
-  const out = [trimmed, digits, masked].filter((v): v is string => !!v);
+  const normalized = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const numeric = /^\d+$/.test(normalized);
+  const masked = numeric ? formatCpfCnpj(normalized) : (
+    /^[A-Z0-9]{12}\d{2}$/.test(normalized)
+      ? `${normalized.slice(0, 2)}.${normalized.slice(2, 5)}.${normalized.slice(5, 8)}/${normalized.slice(8, 12)}-${normalized.slice(12)}`
+      : ''
+  );
+  const out = [trimmed, normalized, masked].filter((v): v is string => !!v);
   return [...new Set(out)];
 }
 

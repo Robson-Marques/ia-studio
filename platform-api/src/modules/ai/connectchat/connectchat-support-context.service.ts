@@ -4,6 +4,7 @@ import { ConnectionsRepository } from '../../integration/connections/connections
 import { ConnectionsService } from '../../integration/connections/connections.service';
 import { rows, projectChamado, projectOrdemServico, projectContrato, projectConexao } from '../../isp/isp-projections';
 import { IncidentLookupService, IncidentInfo } from '../../isp/incident-lookup.service';
+import { isValidSubscriberDocument, normalizeSubscriberDocument } from './subscriber-document';
 
 /** Evidências restritas ao vínculo confirmado da conversa; nunca recebe
  * identificador escolhido pelo LLM ou CPF digitado como prova de titularidade. */
@@ -39,28 +40,8 @@ export class ConnectchatSupportContextService {
    * posse ou autorização de acesso. Não retorna PII ao modelo nem ao chat. */
   /** CPF e CNPJ (somente dígitos para a consulta IXC). */
   async lookupDocument(document: string): Promise<{ status: 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE'; customerId?: string; connectionId?: string }> {
-    const digits = document.replace(/\D/g, '');
-    if (![11, 14].includes(digits.length) || /^(\d)\1+$/.test(digits)) return { status: 'NOT_FOUND' };
-    if (digits.length === 11) {
-      for (let position = 9; position <= 10; position += 1) {
-        const sum = [...digits.slice(0, position)].reduce((total, digit, index) =>
-          total + Number(digit) * (position + 1 - index), 0);
-        const calculated = (sum * 10) % 11;
-        if (Number(digits[position]) !== (calculated === 10 ? 0 : calculated)) return { status: 'NOT_FOUND' };
-      }
-    } else {
-      const weights = [
-        [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
-        [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
-      ];
-      for (let step = 0; step < 2; step += 1) {
-        const sum = weights[step].reduce((total, weight, index) =>
-          total + Number(digits[index]) * weight, 0);
-        const remainder = sum % 11;
-        const expected = remainder < 2 ? 0 : 11 - remainder;
-        if (Number(digits[12 + step]) !== expected) return { status: 'NOT_FOUND' };
-      }
-    }
+    const digits = normalizeSubscriberDocument(document);
+    if (!isValidSubscriberDocument(digits)) return { status: 'NOT_FOUND' };
     const providers = (await this.repository.findAll({ providerKey: 'ixc', status: 'ACTIVE' }))
       .filter((provider) => provider.is_active);
     if (providers.length !== 1) return { status: 'UNAVAILABLE' };
