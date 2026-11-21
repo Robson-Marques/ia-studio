@@ -3,12 +3,14 @@ import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { ConnectchatConversation, ConnectchatMention, ConnectchatMessage } from '../../../shared/integration/connectchat.client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
+import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 @Injectable()
 export class ConnectchatInboxService {
   constructor(
     private readonly connectionsRepository: ConnectionsRepository,
     private readonly connections: ConnectionsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async connectionId(): Promise<string> {
@@ -126,12 +128,28 @@ export class ConnectchatInboxService {
     return { conversation, messages, verified };
   }
 
-  getMessages(conversationId: string, afterSequence?: string, limit?: number) {
+  async getMessages(conversationId: string, afterSequence?: string, limit?: number): Promise<ConnectchatMessage[]> {
     if (afterSequence !== undefined && !/^\d+$/.test(afterSequence)) {
       throw new BadRequestException('A sequência de mensagens é inválida.');
     }
     const safeLimit = Number.isInteger(limit) && limit! >= 1 && limit! <= 100 ? limit! : 50;
-    return this.execute('getMessages', { conversationId, afterSequence: afterSequence ?? '0', limit: safeLimit });
+    // O corte é LOCAL ao IA Studio: evita reexibir mensagens anteriores
+    // ao reset, sem enviar nenhum DELETE para o ConnectChat de origem.
+    const reset = await this.prisma.systemSetting.findUnique({
+      where: { key: `ai.connectchat.reset_boundary.${conversationId}` },
+    });
+    const boundaryData = reset?.value && typeof reset.value === 'object' && !Array.isArray(reset.value)
+      ? reset.value as Record<string, unknown> : {};
+    const boundary = typeof boundaryData['sequence'] === 'string'
+      && /^\d+$/.test(boundaryData['sequence'])
+      ? BigInt(boundaryData['sequence'] as string) : 0n;
+    const requested = BigInt(afterSequence ?? '0');
+    const effectiveAfter = (requested > boundary ? requested : boundary).toString();
+    const messages = await this.execute('getMessages', {
+      conversationId, afterSequence: effectiveAfter, limit: safeLimit,
+    }) as ConnectchatMessage[];
+    return messages.filter((m) => /^\d+$/.test(m.serverSequence)
+      && BigInt(m.serverSequence) > boundary);
   }
 
   getTyping(conversationId: string) {
