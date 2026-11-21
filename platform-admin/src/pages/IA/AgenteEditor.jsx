@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Screen, PageHeader, Tabs, Card, FormGrid, Field, Input, Select, NumericInput, TextArea, Button, Checkbox, CheckGroup, Badge, EmptyState, useToast, Spinner } from '@studio-ux-ds/react';
 import {
   getAgent, createAgent, updateAgent, saveAgentVersion, executeAgent,
@@ -44,14 +44,12 @@ import ContentReviewTab from './editor/ContentReviewTab';
 // dobrado em "O que faz"; "Ajustes avançados" virou seção recolhível em "Visão
 // geral"; "Quem atende" (era um placeholder sem campos) saiu.
 const TABS = [
-  { id: 'sabe', label: 'Conhecimento' },
-  { id: 'faz', label: 'Habilidades' },
-  { id: 'testar', label: 'Testar' },
-];
-const ADMIN_TABS = [
-  { id: 'visao', label: 'Configurações técnicas' },
-  { id: 'quem', label: 'Identidade' },
+  { id: 'visao',  label: 'Visão geral' },
+  { id: 'quem',   label: 'Quem é' },
+  { id: 'faz',    label: 'O que faz' },
+  { id: 'sabe',   label: 'O que sabe' },
   { id: 'revisao', label: 'Revisão' },
+  { id: 'testar', label: 'Testar' },
 ];
 
 const EMPTY = {
@@ -68,7 +66,6 @@ const EMPTY = {
 export default function AgenteEditor() {
   const { id: routeId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const toast = useToast();
   const { can } = usePermissions();
 
@@ -83,10 +80,7 @@ export default function AgenteEditor() {
   // Guardado só para o AgentVersionsModal saber qual versão está em uso (e o que
   // é "voltar para" vs "publicar"). Sem isto o badge "Em uso" nunca aparece.
   const [currentVersion, setCurrentVersion] = useState(0);
-  const requestedSection = searchParams.get('secao');
-  const initialTab = [...TABS, ...ADMIN_TABS].some((item) => item.id === requestedSection) ? requestedSection : 'sabe';
-  const [tab, setTab] = useState(initialTab);
-  const [showAdminSections, setShowAdminSections] = useState(ADMIN_TABS.some((item) => item.id === initialTab));
+  const [tab, setTab] = useState('visao');
   const [advExpanded, setAdvExpanded] = useState(false);
   const [technicalExpanded, setTechnicalExpanded] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -379,14 +373,14 @@ export default function AgenteEditor() {
   return (
     <Screen as="div" className="space-y-6">
       <PageHeader
-        title={isEdit ? (agentName || 'Agente Newnet') : 'Agente Newnet'}
-        subtitle="Complete o conhecimento, autorize habilidades e teste o agente oficial."
+        title={isEdit ? (agentName || 'Assistente') : 'Novo assistente'}
+        subtitle="Quem atende: personalidade, o que faz, o que sabe e o que pode fazer."
         actions={
           <>
             <Button variant="secondary" onClick={() => navigate('/ia/agentes')} disabled={saving}>
               Voltar
             </Button>
-            {savedId && showAdminSections && (
+            {savedId && (
               <>
                 <Button variant="secondary" icon="refresh" title="Histórico de versões — publicar ou voltar a uma anterior" onClick={openVersions}>
                   Versões
@@ -395,18 +389,6 @@ export default function AgenteEditor() {
                   Exportar
                 </Button>
               </>
-            )}
-            {canWrite && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  const next = !showAdminSections;
-                  setShowAdminSections(next);
-                  setTab(next ? 'visao' : 'sabe');
-                }}
-              >
-                {showAdminSections ? 'Ocultar ajustes técnicos' : 'Ajustes técnicos'}
-              </Button>
             )}
             <Button
               variant="primary"
@@ -421,7 +403,7 @@ export default function AgenteEditor() {
         }
       />
 
-      <Tabs items={showAdminSections ? [...TABS, ...ADMIN_TABS] : TABS} value={tab} onChange={setTab} />
+      <Tabs items={TABS} value={tab} onChange={setTab} />
 
       {loadingRefs && (
         <div className="flex justify-center py-2">
@@ -631,7 +613,7 @@ export default function AgenteEditor() {
         </div>
       )}
 
-      {tab === 'faz' && showAdminSections && (
+      {tab === 'faz' && (
         <div className="space-y-4">
           <Card>
             <div style={{ padding: 20 }} className="space-y-3">
