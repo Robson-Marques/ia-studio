@@ -487,11 +487,22 @@ export class ConnectchatAutoResponderService {
       // receber perguntas sobre ONU, rádio, fibra ou OS de suporte.
       if (intent === 'GENERAL' || intent === 'FINANCE') {
         if (intent === 'FINANCE') {
+          // Não entregar títulos financeiros espontaneamente quando o
+          // assinante só informou ter pago ou perguntou sobre um assunto geral.
+          const paymentCopyRequested = /\b(boleto|fatura|segunda via|2[ªa]? via|linha digit[aá]vel|c[oó]digo de barras|pix|t[ií]tulos? em aberto|contas? a pagar)\b/i.test(newest.body);
+          if (!paymentCopyRequested) {
+            const reply = 'Sobre o financeiro, você precisa da segunda via de uma fatura, do PIX para pagamento ou de ajuda com um pagamento já realizado?';
+            const token = createHash('sha256').update(`newnet-finance-clarify:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-finance-clarify-${token}`);
+            await this.complete(key, sequence, claim);
+            return;
+          }
           // Consulta determinística, restrita à referência verificada,
           // sem ferramenta executável ou CPF controlado pelo modelo.
           const billing = await this.support.billingForVerifiedConversation(context.conversation);
           const latest = await this.inbox.contextForAgentPreview(conversation.id);
           if (!latest.verified || latest.conversation.customerRef !== context.conversation.customerRef
+            || latest.conversation.globalIdentityId !== context.conversation.globalIdentityId
             || latest.conversation.lastSequence !== sequence || latest.conversation.status !== 'OPEN') {
             await this.complete(key, sequence, claim);
             return;
