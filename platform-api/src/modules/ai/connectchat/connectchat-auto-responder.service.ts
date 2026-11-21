@@ -98,6 +98,8 @@ export class ConnectchatAutoResponderService {
     pending: Record<string, unknown>,
   ): Promise<void> {
     if (!conversation.globalIdentityId || conversation.status !== 'OPEN') return;
+    if (conversation.businessContact?.status === 'CUSTOMER'
+      && conversation.businessContact.linkStatus === 'ACTIVE') return;
     const customerId = pending.customerId;
     const connectionId = pending.connectionId;
     if (typeof customerId !== 'string' || !/^[1-9]\d*$/.test(customerId)
@@ -108,6 +110,10 @@ export class ConnectchatAutoResponderService {
     const ref = `ixc:${connectionId}:${customerId}`;
     const existing = typeof pending.requestId === 'string' ? pending.requestId : null;
     if (!existing) {
+      // O pedido não é reemitido depois de erro de interpretação da resposta.
+      // O cliente pode ter recebido o primeiro pedido; sem ID verificável,
+      // repetição automática geraria vários pedidos ativos.
+      if (pending.requestOutcomeUnknown === true) return;
       // Instalações podem admitir finalidades diferentes. A configuração é
       // uma decisão explícita do operador de instalação, não de cada chat.
       const rawPurpose = await this.settings.getValue('ai.connectchat.link_purpose');
@@ -130,7 +136,7 @@ export class ConnectchatAutoResponderService {
             : typeof nested.id === 'string' ? nested.id : '';
         if (!/^[0-9a-f-]{36}$/i.test(requestId)) {
           this.logger.warn('ConnectChat: resposta de criação do vínculo sem ID de pedido reconhecível.');
-          await this.settings.set(key, { ...pending, nextAttemptAt: now + 300000 });
+          await this.settings.set(key, { ...pending, requestOutcomeUnknown: true });
           return;
         }
         await this.settings.set(key, {
