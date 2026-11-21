@@ -592,7 +592,7 @@ export class ConnectchatAutoResponderService {
     const tool = this.toolRegistry.get('abrir_os');
     if (!tool || tool.requires_approval === true) return { attempted: false, result: null };
     const policy = await this.approvalPolicy.evaluate({
-      targetType: 'builtin_tool',
+      targetType: 'TOOL',
       context: { tool_key: 'abrir_os' },
     });
     if (policy.required) return { attempted: false, result: null };
@@ -997,7 +997,13 @@ export class ConnectchatAutoResponderService {
 
       // Verifica pendências e recorrência ANTES de escolher equipamento.
       // A evidência vem exclusivamente do cliente vinculado pelo ConnectChat.
-      const support = await this.support.byVerifiedConversation(context.conversation);
+      await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
+      let support;
+      try {
+        support = await this.support.byVerifiedConversation(context.conversation);
+      } finally {
+        await this.inbox.setAgentTyping(conversation.id, 'stopped').catch(() => undefined);
+      }
       if (!support.available) {
         const note = 'Seu cadastro está confirmado, mas não consegui consultar a situação dos atendimentos agora. Vou precisar do apoio da equipe para continuar com segurança.';
         const token = createHash('sha256').update(`newnet-support-unavailable:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
@@ -1010,7 +1016,11 @@ export class ConnectchatAutoResponderService {
         const osRef = String(open['id'] ?? open['protocolo'] ?? 'active');
         const protocol = typeof open['protocolo'] === 'string' && open['protocolo']
           ? ` (protocolo ${open['protocolo']})` : '';
-        const message = `Já existe uma ordem de serviço em andamento para este cadastro${protocol}. Não vou abrir outra. Nossa equipe poderá consultar o andamento do atendimento.`;
+        const message = await this.replyWithOperationalEvidence(
+          agent, conversation, context.messages, newest.body,
+          { etapa: 'os_ja_aberta', protocolo: typeof open['protocolo'] === 'string' ? open['protocolo'] : null },
+          `Já há uma OS em andamento${protocol}. Vou manter o atendimento nela para evitar duplicidade.`,
+        );
         const token = createHash('sha256').update(`newnet-open-os:${conversation.id}:${osRef}:${sequence}`).digest('hex').slice(0, 32);
         await this.inbox.sendAgentMessage(conversation.id, message, `newnet-open-os-${token}`);
         await this.complete(key, sequence, claim);
@@ -1022,7 +1032,11 @@ export class ConnectchatAutoResponderService {
         const publicInfo = String(outage.message || outage.title || 'Há uma ocorrência técnica registrada para seu acesso.').slice(0, 350);
         const forecast = outage.inform_forecast && outage.forecast
           ? ` Previsão informada pela equipe: ${String(outage.forecast).slice(0, 100)}.` : '';
-        const message = `Identifiquei uma ocorrência em andamento na sua conexão. ${publicInfo}${forecast} Não é necessário abrir outro chamado agora.`;
+        const message = await this.replyWithOperationalEvidence(
+          agent, conversation, context.messages, newest.body,
+          { etapa: 'incidente_regional', informativo: publicInfo, previsao_autorizada: forecast || null, os_suprimida: true },
+          `Há uma ocorrência técnica em andamento que pode afetar sua conexão. ${publicInfo}${forecast} Nossa equipe está tratando a situação.`,
+        );
         const token = createHash('sha256').update(`newnet-incident:${conversation.id}:${outage.incident_id}:${sequence}`).digest('hex').slice(0, 32);
         await this.inbox.sendAgentMessage(conversation.id, message, `newnet-incident-${token}`);
         await this.complete(key, sequence, claim);
@@ -1030,11 +1044,47 @@ export class ConnectchatAutoResponderService {
       }
 
       if (support.openTickets.length > 0 || support.uncertainTickets) {
-        const message = support.openTickets.length > 0
-          ? 'Já existe um atendimento registrado como aberto para este cadastro. Vou evitar um novo chamado; a equipe pode acompanhar o existente.'
-          : 'Encontrei um atendimento recente cuja situação precisa ser conferida antes de criar outro.';
+        const message = await this.replyWithOperationalEvidence(
+          agent, conversation, context.messages, newest.body,
+          { etapa: support.openTickets.length ? 'chamado_existente' : 'chamado_status_incerto', os_duplicada_bloqueada: true },
+          support.openTickets.length > 0
+            ? 'Já existe um chamado em andamento. Vou evitar abrir outro para o mesmo problema.'
+            : 'Encontrei um atendimento recente que precisa de confirmação antes de abrir outro.',
+        );
         const token = createHash('sha256').update(`newnet-ticket-check:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
         await this.inbox.sendAgentMessage(conversation.id, message, `newnet-ticket-check-${token}`);
+        await this.complete(key, sequence, claim);
+        return;
+      }
+
+      // Se o único acesso do titular está offline, sem bloqueio ou incidente,
+      // a ferramenta ISP existente pode abrir OS automaticamente. Nunca chama
+      // a tool sem prova de vínculo ativo ou quando alguma evidência é incerta.
+      const priorReasonSetting = await this.settings.getValue(
+        `ai.connectchat.identification_requested.${conversation.id}`);
+      const priorReasonData = priorReasonSetting && typeof priorReasonSetting === 'object'
+        && !Array.isArray(priorReasonSetting)
+        ? priorReasonSetting as Record<string, unknown> : {};
+      const supportReason = typeof priorReasonData['reason'] === 'string'
+        ? priorReasonData['reason'] : newest.body;
+      const osAttempt = await this.maybeOpenVerifiedOfflineOs(
+        agent, conversation, context.messages, supportReason, support);
+      if (osAttempt.attempted && osAttempt.result) {
+        const opened = osAttempt.result['os_aberta'] === true;
+        const message = await this.replyWithOperationalEvidence(
+          agent, conversation, context.messages, newest.body,
+          { etapa: opened ? 'os_aberta' : 'os_nao_aberta', resultado: {
+            os_aberta: opened,
+            duplicada: osAttempt.result['duplicada'] === true,
+            motivo: String(osAttempt.result['motivo'] ?? '').slice(0, 220),
+          } },
+          opened
+            ? 'Seu acesso está offline e a ordem de serviço foi registrada para a equipe técnica acompanhar.'
+            : 'Encontrei a falha de conexão, mas não consegui confirmar uma nova OS. Vou precisar do apoio da equipe para continuar.',
+        );
+        const token = createHash('sha256').update(
+          `newnet-os-result:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+        await this.inbox.sendAgentMessage(conversation.id, message, `newnet-os-result-${token}`);
         await this.complete(key, sequence, claim);
         return;
       }
