@@ -21,20 +21,6 @@ export async function previewConnectchatAgent(conversationId) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível testar o assistente nesta conversa')); }
 }
 
-export async function getConnectchatPendingIdentity(conversationId) {
-  try {
-    const { data } = await api.get(`/ai/connectchat/conversations/${conversationId}/identity-pending`);
-    return data;
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível consultar a identificação pendente')); }
-}
-
-export async function confirmConnectchatIdentity(conversationId) {
-  try {
-    const { data } = await api.post(`/ai/connectchat/conversations/${conversationId}/identity-confirm`, { identityVerified: true });
-    return data;
-  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível confirmar o vínculo')); }
-}
-
 export async function listConnectchatConversations() {
   try {
     const { data } = await api.get('/comm/connectchat/conversations');
