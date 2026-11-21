@@ -617,20 +617,22 @@ export class ConnectchatAutoResponderService {
         });
         const message = result.status === 'COMPLETED' && typeof result.output === 'string'
           ? result.output.trim() : '';
-        if (message && !this.isRepeat(message, context.messages)) {
-          // A inferência pode demorar e, nesse intervalo, o vínculo pode
-          // mudar. Revalidar escopo até para respostas gerais.
-          const fresh = await this.inbox.contextForAgentPreview(conversation.id);
-          if (!fresh.verified || fresh.conversation.status !== 'OPEN'
-            || fresh.conversation.lastSequence !== sequence
-            || fresh.conversation.customerRef !== context.conversation.customerRef
-            || fresh.conversation.globalIdentityId !== context.conversation.globalIdentityId) {
-            await this.complete(key, sequence, claim);
-            return;
-          }
-          const token = createHash('sha256').update(`newnet-general:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, message, `newnet-general-${token}`);
+        // Falha ou eco do modelo não pode transformar uma nova mensagem
+        // do assinante em um turno sem resposta.
+        const reply = !message || this.isRepeat(message, context.messages)
+          ? 'Estou aqui. Pode me contar o que você precisa agora?'
+          : message;
+        // A inferência pode demorar; revalidar vínculo antes de enviar.
+        const fresh = await this.inbox.contextForAgentPreview(conversation.id);
+        if (!fresh.verified || fresh.conversation.status !== 'OPEN'
+          || fresh.conversation.lastSequence !== sequence
+          || fresh.conversation.customerRef !== context.conversation.customerRef
+          || fresh.conversation.globalIdentityId !== context.conversation.globalIdentityId) {
+          await this.complete(key, sequence, claim);
+          return;
         }
+        const token = createHash('sha256').update(`newnet-general:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+        await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-general-${token}`);
         await this.complete(key, sequence, claim);
         return;
       }
@@ -795,13 +797,11 @@ export class ConnectchatAutoResponderService {
       });
       const answer = result.status === 'COMPLETED' && typeof result.output === 'string'
         ? result.output.trim() : '';
-      if (!answer) return;
-      // Não trocar palavras de uma pergunta antiga e enviá-la novamente.
-      if (this.isRepeat(answer, context.messages)) {
-        this.logger.debug(`Resposta redundante suprimida no ConnectChat ${conversation.id}`);
-        await this.complete(key, sequence, claim);
-        return;
-      }
+      // Se o modelo falhar ou repetir uma pergunta anterior, conduzir o
+      // atendimento com uma pergunta de recuperação, nunca silêncio.
+      const response = !answer || this.isRepeat(answer, context.messages)
+        ? 'Entendi. O que mudou na sua conexão desde a última mensagem?'
+        : answer;
       const fresh = await this.inbox.contextForAgentPreview(conversation.id);
       const finalMessage = fresh.messages.at(-1);
       if (!finalMessage || finalMessage.serverSequence !== sequence
@@ -813,7 +813,7 @@ export class ConnectchatAutoResponderService {
         return;
       }
       const token = createHash('sha256').update(`newnet-chat:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-      await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-ai-${token}`);
+      await this.inbox.sendAgentMessage(conversation.id, response, `newnet-ai-${token}`);
       await this.complete(key, sequence, claim);
     } catch (error) {
       // Sem checkpoint se falhar antes do envio; retries usam clientMessageId
