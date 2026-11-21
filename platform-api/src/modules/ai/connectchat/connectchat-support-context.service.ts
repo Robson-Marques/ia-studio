@@ -5,6 +5,7 @@ import { ConnectionsService } from '../../integration/connections/connections.se
 import { rows, projectChamado, projectOrdemServico, projectContrato, projectConexao, projectBoleto, limitBoletos } from '../../isp/isp-projections';
 import { IncidentLookupService, IncidentInfo } from '../../isp/incident-lookup.service';
 import { isValidSubscriberDocument, normalizeSubscriberDocument } from './subscriber-document';
+import { scopeVerifiedInvoices } from './billing-response';
 
 /** Evidências restritas ao vínculo confirmado da conversa; nunca recebe
  * identificador escolhido pelo LLM ou CPF digitado como prova de titularidade. */
@@ -91,18 +92,11 @@ export class ConnectchatSupportContextService {
           { TB: 'fn_areceber.status', OP: '!=', P: 'R' },
         ],
       }));
-      // Defesa em profundidade: se o IXC ignorar o filtro, jamais deixar
-      // títulos de outro assinante chegarem ao formatador/resposta.
-      const foreign = records.some((item) =>
-        String(item['id_cliente'] ?? '') !== customerId);
-      if (foreign) {
+      const scoped = scopeVerifiedInvoices(records, customerId);
+      if (!scoped) {
         this.logger.error('IXC devolveu títulos fora do escopo do cliente; resposta financeira bloqueada.');
         return { available: false, invoices: [], total: 0 };
       }
-      const scoped = records.filter((item) =>
-        String(item['id_cliente'] ?? '') === customerId
-        && String(item['liberado'] ?? '').toUpperCase() === 'S'
-        && !['C', 'R'].includes(String(item['status'] ?? '').toUpperCase()));
       const safe = scoped.map((item) => projectBoleto(item));
       return { available: true, invoices: limitBoletos(safe, 5), total: safe.length };
     } catch (error) {
