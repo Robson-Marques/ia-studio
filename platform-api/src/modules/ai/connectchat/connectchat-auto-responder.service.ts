@@ -13,6 +13,7 @@ import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsRepository } from '../agents/agents.repository';
 import { parseConversation } from '../agents/agent-conversation';
 import { ConnectchatSupportContextService } from './connectchat-support-context.service';
+import { extractSubscriberDocument } from './subscriber-document';
 
 type Cursor = {
   sequence: string;
@@ -316,7 +317,7 @@ export class ConnectchatAutoResponderService {
         const answerText = newest.body.trim().toLowerCase();
         const explicitYes = /^(?:sim|autorizo|pode vincular|concordo|pode sim)[.!]?$/.test(answerText);
         const explicitNo = /^(?:não|nao|não autorizo|nao autorizo|não quero|nao quero)[.!]?$/.test(answerText);
-        const hasNewDocument = /(?:^|\D)(?:\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)/.test(newest.body);
+        const hasNewDocument = extractSubscriberDocument(newest.body) !== null;
         // Depois da recusa ou da expiração, um novo documento inicia
         // identificação limpa; nunca herdar autorização do cadastro anterior.
         const restartIdentification = hasNewDocument;
@@ -341,7 +342,7 @@ export class ConnectchatAutoResponderService {
           return;
         }
 
-        const candidate = newest.body.match(/(?:^|[^A-Za-z0-9])([A-Za-z0-9]{2}[.\s]?[A-Za-z0-9]{3}[.\s]?[A-Za-z0-9]{3}[\/\s]?[A-Za-z0-9]{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?![A-Za-z0-9])/);
+        const candidate = extractSubscriberDocument(newest.body);
         if (candidate) {
           // CPF/CNPJ é dado de busca, mas a conversa não pode virar
           // um oráculo de enumeração de cadastros do IXC.
@@ -364,7 +365,7 @@ export class ConnectchatAutoResponderService {
           await this.settings.set(attemptsKey, {
             startedAt: withinWindow ? startedAt : Date.now(), count: count + 1,
           });
-          const found = await this.support.lookupDocument(candidate[1]);
+          const found = await this.support.lookupDocument(candidate);
           const token = createHash('sha256').update(`newnet-document:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
           if (found.status === 'FOUND' && found.customerId) {
             const noticed = await this.settings.getValue(`ai.connectchat.identification_requested.${conversation.id}`);
