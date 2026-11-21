@@ -20,6 +20,7 @@ export interface VerifiedSupportContext {
   connections: Record<string, unknown>[];
   blockedContracts: number;
   technology: 'FIBRA' | 'RADIO' | null;
+  technologyByContract: Record<string, 'FIBRA' | 'RADIO'>;
 }
 
 @Injectable()
@@ -60,7 +61,7 @@ export class ConnectchatSupportContextService {
   async byVerifiedConversation(conversation: ConnectchatConversation): Promise<VerifiedSupportContext> {
     const empty: VerifiedSupportContext = {
       available: false, openOs: [], recentOs: [], recentTickets: [], openTickets: [], uncertainTickets: false,
-      recurrentWithin48h: false, recurrenceEvidence: [], contracts: [], connections: [], blockedContracts: 0, technology: null,
+      recurrentWithin48h: false, recurrenceEvidence: [], contracts: [], connections: [], blockedContracts: 0, technology: null, technologyByContract: {},
     };
     if (conversation.businessContact?.status !== 'CUSTOMER'
       || conversation.businessContact.linkStatus !== 'ACTIVE') {
@@ -93,6 +94,7 @@ export class ConnectchatSupportContextService {
     let connections: Record<string, unknown>[] = [];
     let blockedContracts = 0;
     let technology: 'FIBRA' | 'RADIO' | null = null;
+    const technologyByContract: Record<string, 'FIBRA' | 'RADIO'> = {};
     try {
       const records = rows(await this.connections.execute(connectionId, 'ixc.listar', {
         tabela: 'cliente_contrato',
@@ -108,9 +110,12 @@ export class ConnectchatSupportContextService {
       const active = records.filter((row) => String(row['status'] ?? '').toUpperCase() === 'A');
       const declared = active.map((row) => {
         const raw = String(row['tecnologia'] ?? row['tipo_tecnologia'] ?? row['tipo_conexao'] ?? '').trim().toUpperCase();
-        if (/^(FIBRA|FIBRA OPTICA|FTTH|GPON)$/.test(raw)) return 'FIBRA';
-        if (/^(RADIO|RÁDIO|WIRELESS)$/.test(raw)) return 'RADIO';
-        return null;
+        const known = /^(FIBRA|FIBRA OPTICA|FTTH|GPON)$/.test(raw) ? 'FIBRA'
+          : /^(RADIO|RÁDIO|WIRELESS)$/.test(raw) ? 'RADIO' : null;
+        if (known && /^[1-9]\d*$/.test(String(row['id'] ?? ''))) {
+          technologyByContract[String(row['id'])] = known;
+        }
+        return known;
       });
       if (declared.length === 1 && declared[0]) technology = declared[0];
     } catch (error) {
@@ -171,7 +176,7 @@ export class ConnectchatSupportContextService {
       available: true, openOs, recentOs: os, recentTickets: tickets,
       openTickets, uncertainTickets,
       recurrentWithin48h: evidence.length > 0, recurrenceEvidence: evidence.slice(0, 5),
-      contracts, connections, blockedContracts, technology,
+      contracts, connections, blockedContracts, technology, technologyByContract,
     };
   }
 }
