@@ -484,6 +484,7 @@ export class ConnectchatAutoResponderService {
     initialReason: string,
     justDeclined: boolean,
     operational?: Record<string, unknown>,
+    osResult?: Record<string, unknown>,
   ): Promise<string> {
     const issue = this.classifyRequest(initialReason || incoming, messages);
     const regional = operational?.['incident'] && typeof operational['incident'] === 'object'
@@ -491,8 +492,13 @@ export class ConnectchatAutoResponderService {
     const safeIncident = regional && regional['suppressOs'] === true
       ? String(regional['publicMessage'] ?? 'Há uma ocorrência técnica em andamento na região.').slice(0, 250)
       : null;
-    const fallback = safeIncident
-      ? `Entendido, não vou manter o vínculo. Há uma ocorrência técnica em andamento na sua região: ${safeIncident}`
+    const opened = osResult?.['os_aberta'] === true;
+    const fallback = opened
+      ? justDeclined
+        ? 'Certo, não vou vincular este contato. Verifiquei a conexão e registrei a ordem de serviço para a equipe técnica.'
+        : 'A ordem de serviço já está registrada. A equipe técnica poderá acompanhar a falha.'
+      : safeIncident
+      ? `Há uma ocorrência técnica na região: ${safeIncident}. Nossa equipe está trabalhando nela.`
       : issue === 'SUPPORT'
       ? justDeclined
         ? 'Tudo bem, não vou manter o contato vinculado. Vamos cuidar da sua conexão: a falha acontece em todos os aparelhos?'
@@ -511,20 +517,26 @@ export class ConnectchatAutoResponderService {
         'A pessoa não quer manter este contato vinculado para atendimentos futuros. Respeite. Isso NÃO encerra o atendimento atual.',
         'Continue o atendimento a partir do problema já relatado, sem reiniciar saudação e sem pedir CPF novamente.',
         'O motivo original foi: ' + redactSubscriberDocuments(initialReason).slice(0, 300),
-        'Resumo operacional interno da consulta feita ANTES de perguntar: '
+        'Evidências operacionais da sessão (o cliente informou o documento): '
           + JSON.stringify({
             consultaConcluida: operational?.['status'] === 'READY',
-            incidenteRegionalComOSSuprimida: safeIncident,
-            // O estado individual de OS, contrato e acesso não é fornecido
-            // ao modelo antes da prova de titularidade.
-            precisaDeValidacaoAntesDeDadosPrivados: true,
+            incidenteAplicavel: safeIncident,
+            statusConexao: operational?.['online'] === false ? 'offline'
+              : operational?.['online'] === true ? 'online' : 'indeterminado',
+            osJaExistente: operational?.['hasOpenOs'] === true,
+            chamadoJaExistente: operational?.['hasOpenTicket'] === true,
+            osRegistradaNestaSessao: opened,
+            falhaNaAbertura: osResult && !opened
+              ? String(osResult['motivo'] ?? 'não confirmada').slice(0, 120) : null,
           }),
         'Se existe ocorrência regional aplicável, informe de forma breve que a equipe trata o incidente; não faça perguntas desnecessárias, não prometa retorno automático sem acompanhamento realmente agendado.',
         justDeclined
           ? 'Reconheça a escolha de não manter o vínculo em uma oração breve e, na mesma mensagem, conduza o próximo passo de triagem.'
           : 'Responda à mensagem atual e faça avançar o diagnóstico geral em uma etapa. Não repita o aviso sobre vínculo.',
-        'Você NÃO consultou equipamentos, conexão, sinal, chamados, contrato, cadastro ou IXC. Não diga que consultou ou que vai consultar sem permissão.',
-        'Sem vínculo verificado, só orientações gerais e incidentes públicos pertinentes. Não revele estado individual de login, bloqueio, OS, tickets ou dados pessoais, nem invente medições ou diagnósticos.',
+        'O backend já consultou IXC. Pode falar dos resultados reais fornecidos; nunca invente diagnóstico ou nova OS.',
+        'A escolha de manter este contato vinculado é INDEPENDENTE da identificação temporária pelo CPF nesta conversa.',
+        'Não informe dados financeiros, endereço, números de documentos ou informações de terceiros. Confirme OS somente quando osRegistradaNestaSessao for verdadeira.',
+        'Se a OS foi aberta ou há incidente relevante, informe a decisão e não faça perguntas técnicas sem necessidade.',
         'Faça no máximo uma pergunta útil por resposta, adaptada ao assunto. Até 200 caracteres. Apenas a mensagem ao cliente.',
       ].join('\n');
       const result = await this.runner.run({
@@ -540,7 +552,8 @@ export class ConnectchatAutoResponderService {
       const output = result.status === 'COMPLETED' && typeof result.output === 'string'
         ? result.output.replace(/\s+/g, ' ').trim() : '';
       if (!output || output.length > 200
-        || (safeIncident && output.includes('?'))
+        || ((safeIncident || opened) && output.includes('?'))
+        || (!opened && /\b(abri|registramos|foi registrada)\s+(?:uma\s+)?(?:os|ordem de servi[cç]o)/i.test(output))
         || /\b(CPF|CNPJ|cadastro confirmado|consultei|verifiquei no sistema|acesso ao IXC|sinal do seu modem|seu contrato)\b/i.test(output)) {
         return fallback;
       }
@@ -879,6 +892,8 @@ export class ConnectchatAutoResponderService {
                 typeof pending.reason === 'string' ? pending.reason : '', true,
                 pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
                   ? pending.operational as Record<string, unknown> : undefined,
+                pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
+                  ? pending.osResult as Record<string, unknown> : undefined,
               );
             const token = createHash('sha256').update(`newnet-consent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
@@ -895,6 +910,8 @@ export class ConnectchatAutoResponderService {
                   typeof pending.reason === 'string' ? pending.reason : '', false,
                   pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
                     ? pending.operational as Record<string, unknown> : undefined,
+                  pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
+                    ? pending.osResult as Record<string, unknown> : undefined,
                 )
                 : 'Para vincular este contato aos próximos atendimentos, você autoriza? Responda sim ou não.';
             const token = createHash('sha256').update(`newnet-pending-link:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
