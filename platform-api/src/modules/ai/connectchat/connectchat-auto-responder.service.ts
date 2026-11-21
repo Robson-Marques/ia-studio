@@ -120,7 +120,8 @@ export class ConnectchatAutoResponderService {
         return;
       }
       try {
-        const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose);
+        const requestKey = createHash('sha256').update(`newnet-link:${conversation.id}:${conversation.globalIdentityId}:${ref}:${String(pending.requestedAt ?? '')}`).digest('hex');
+        const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose, requestKey);
         const value = response && typeof response === 'object' ? response as Record<string, unknown> : {};
         const nested = value.request && typeof value.request === 'object'
           ? value.request as Record<string, unknown> : {};
