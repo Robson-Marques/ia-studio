@@ -34,19 +34,19 @@ O ConnectChat é o primeiro canal operacional da Nete; o WhatsApp somente após 
 
 - Mensagens iniciais curtas e coleta de CPF.
 - Localização segura por CPF com validação de dígitos (sem revelar cadastro).
-- Consentimento explícito solicitado e registrado, pendente de validação de identidade antes do vínculo.
+- Consentimento explícito solicitado e registrado; pendência aparece ao operador no ConnectChat, que confirma a validação da identidade e usa o vínculo direto já existente.
 - Checkpoints de identificação e tecnologia sem repetições.
-- Consulta de OS aberta, últimas cinco OS e últimos cinco chamados apenas por `customerRef` validado; cálculo de reincidência em 48 h usando datas reais.
-- Contratos ativos consultados por ID de cliente confirmado, com inferência de tecnologia proibida quando campo da fonte não é inequívoco.
-- Falhas de consulta bloqueiam conclusões e ações prematuras.
+- Consulta de OS aberta, tickets recentes (incluindo estados abertos e inconclusivos), últimas cinco OS e últimos cinco chamados apenas por `customerRef` validado; cálculo de reincidência em 48 h usando datas reais.
+- Contratos e acessos ativos consultados pelo ID de cliente confirmado, com seleção do ponto quando há vários contratos e inferência de tecnologia proibida quando campo da fonte não é inequívoco.
+- Incidentes ativos da conexão consultados pelo leitor ISP existente, agrupando logins em uma única leitura; respeita a supressão de OS e a autorização para divulgação de previsão.\n- Triagem separa suporte, financeiro e pedidos gerais. Falhas de consulta bloqueiam conclusões e ações prematuras.
 
 ## Ainda não implementado / aprovação necessária
 
-- Confirmação automática de identidade por OTP ou outro fator independente; no momento é necessária validação por operador.
-- Atribuição automática do cadastro ao contato após confirmação segura. Sem isso, não promover o estado para VINCULADO.
-- Consulta separada de incidentes regionais e rotinas de diagnóstico físico (fibra/radio).
+- Confirmação automática de identidade por OTP ou outro fator independente; no momento é necessária validação presencial/procedimental por operador.
+- Vinculação sem intervenção humana após confirmação forte: o vínculo atual é feito pelo operador autorizado, usando a API ConnectChat existente.
+- Rotinas profundas de diagnóstico físico (fibra/rádio), validação de mapeamentos tecnológicos reais do IXC, monitoramento contínuo e classificação completa dos status de tickets da instalação.
 - Regras completas de abertura/reabertura de tickets, tratamento de solicitações múltiplas por contrato e handoff automático.
-- Build, testes de integração IXC/ConnectChat, concorrência e homologação visual/operacional.
+- Build, testes de integração IXC/ConnectChat, concorrência e homologação visual/operacional. O serviço de resposta deve permanecer em ambiente controlado até validar.
 
 ## Cenários mínimos de homologação
 
