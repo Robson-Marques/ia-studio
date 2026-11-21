@@ -52,7 +52,7 @@ export function parseConversation(raw: unknown): AgentConversation {
   return {
     auto_reply: bool(c['auto_reply'], CONVERSATION_DEFAULTS.auto_reply),
     debounce_seconds: clampDebounce(c['debounce_seconds']),
-    split_paragraphs: bool(c['split_paragraphs'], CONVERSATION_DEFAULTS.split_paragraphs),
+    split_paragraphs: false, // Newnet: uma única bolha por resposta; quebras de linha internas são permitidas.
     supervised: bool(c['supervised'], CONVERSATION_DEFAULTS.supervised),
   };
 }
