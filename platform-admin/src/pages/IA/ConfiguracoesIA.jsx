@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@studio-ux-ds/react';
 import { ensureNativeAgent, listAgents, getAgent, updateAgent } from '../../services/ai';
-import { setConnectchatAgentBinding } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 import './configuracoes-ia.css';
 
@@ -23,7 +22,6 @@ export default function ConfiguracoesIA() {
   const [agent, setAgent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [openingChat, setOpeningChat] = useState(false);
   const [error, setError] = useState('');
   const [name, setName] = useState('');
   const [tone, setTone] = useState('amigável');
@@ -77,17 +75,9 @@ export default function ConfiguracoesIA() {
     finally { setSaving(false); }
   }
 
-  async function openConnectChat() {
+  function openConnectChat() {
     if (!agent || !can('comm.connectchat.read')) return;
-    setOpeningChat(true);
-    try {
-      // O operador não escolhe agente: o vínculo é sempre com o nativo Newnet.
-      // Falhas de conexão de IA são mostradas em vez de navegar com falsa
-      // indicação de canal pronto.
-      if (canWrite) await setConnectchatAgentBinding(null, true, true);
-      navigate('/connectchat/conversas');
-    } catch (err) { toast.error(err.message); }
-    finally { setOpeningChat(false); }
+    navigate('/connectchat/conversas');
   }
 
   const disabled = !canWrite || saving;
@@ -179,7 +169,7 @@ export default function ConfiguracoesIA() {
               )}
               {can('comm.connectchat.read') && (
                 <button type="button" className="newnet-ai__primary" onClick={openConnectChat}
-                  disabled={openingChat}>{openingChat ? 'Conectando…' : 'Testar no ConnectChat'}</button>
+                  >Abrir ConnectChat</button>
               )}
               <span className="newnet-ai__pending">WhatsApp · depois dos testes</span>
             </div>
