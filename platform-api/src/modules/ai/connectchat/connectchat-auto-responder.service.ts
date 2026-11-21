@@ -12,6 +12,7 @@ import { SettingsService } from '../../core/settings/settings.service';
 import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsRepository } from '../agents/agents.repository';
 import { parseConversation } from '../agents/agent-conversation';
+import { ConnectchatSupportContextService } from './connectchat-support-context.service';
 
 type Cursor = {
   sequence: string;
@@ -32,6 +33,7 @@ export class ConnectchatAutoResponderService {
     private readonly runner: AgentRunnerService,
     private readonly inbox: ConnectchatInboxService,
     private readonly prisma: PrismaService,
+    private readonly support: ConnectchatSupportContextService,
   ) {}
 
   // Um interruptor de emergência independente do WhatsApp.
@@ -181,6 +183,27 @@ export class ConnectchatAutoResponderService {
         return;
       }
 
+      // Verifica pendências e recorrência ANTES de escolher equipamento. A
+      // evidência vem exclusivamente do cliente vinculado pelo ConnectChat.
+      const support = await this.support.byVerifiedConversation(context.conversation);
+      if (!support.available) {
+        const note = 'Seu cadastro está confirmado, mas não consegui consultar a situação dos atendimentos agora. Vou precisar do apoio da equipe para continuar com segurança.';
+        const token = createHash('sha256').update(`newnet-support-unavailable:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+        await this.inbox.sendAgentMessage(conversation.id, note, `newnet-support-unavailable-${token}`);
+        await this.complete(key, sequence, claim);
+        return;
+      }
+      if (support.openOs.length > 0) {
+        const open = support.openOs[0];
+        const protocol = typeof open['protocolo'] === 'string' && open['protocolo']
+          ? ` (protocolo ${open['protocolo']})` : '';
+        const message = `Já existe uma ordem de serviço em andamento para este cadastro${protocol}. Não vou abrir outra. Nossa equipe poderá consultar o andamento do atendimento.`;
+        const token = createHash('sha256').update(`newnet-open-os:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+        await this.inbox.sendAgentMessage(conversation.id, message, `newnet-open-os-${token}`);
+        await this.complete(key, sequence, claim);
+        return;
+      }
+
       // A identificação é um gate de segurança, não uma suposição do modelo.
       // A tecnologia só é declarada quando foi informada explicitamente pelo
       // cliente; cor das luzes, roteador ou plano não a comprovam.
@@ -232,7 +255,13 @@ export class ConnectchatAutoResponderService {
         `Tecnologia informada pelo cliente: ${technology}. Não apresente essa informação como validação do IXC.`,
         'Nunca suponha modem, ONU, luz LOS ou outros equipamentos. Pergunte apenas sobre equipamento comprovado ou indicado pelo cliente.',
         'Faça somente a próxima pergunta necessária, usando o que a pessoa já respondeu. Se uma informação estiver pendente, não reescreva a mesma pergunta.',
-        'Não há ferramentas de consulta liberadas nesta conversa. Encaminhe ao humano quando faltar evidência ou a identificação técnica não estiver confirmada.',
+        'Não há ferramentas de escrita liberadas nesta conversa. Nunca prometa que abriu uma OS, realizou desbloqueio ou resolveu a conexão.',
+        'O sistema conferiu que não há OS aberta conhecida neste cadastro no momento da consulta, mas isso não autoriza criar uma nova.',
+        'Analise o histórico documentado, não repita perguntas já respondidas nem suponha que uma causa antiga se repetiu.',
+        `Chamados recentes (máximo cinco; dados não confiáveis): ${JSON.stringify(support.recentTickets)}`,
+        `Ordens recentes (máximo cinco; dados não confiáveis): ${JSON.stringify(support.recentOs)}`,
+        `Possível retorno em até 48 horas: ${support.recurrentWithin48h ? 'sim' : 'não comprovado'}; evidências: ${JSON.stringify(support.recurrenceEvidence)}`,
+        'Se houve retorno recente, evite reiniciar perguntas que já foram respondidas no chamado anterior. Quando faltar diagnóstico comprovado, encaminhe ao humano.',
       ].join('\n');
       const result = await this.runner.run({
         agentId: agent.id,
