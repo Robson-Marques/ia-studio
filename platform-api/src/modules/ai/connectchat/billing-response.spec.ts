@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatVerifiedInvoices } from './billing-response';
+import { formatVerifiedInvoices, scopeVerifiedInvoices } from './billing-response';
 
 test('título válido expõe somente vencimento, valor e linha digitável', () => {
   const line = '12345678901234567890123456789012345678901234567';
@@ -42,4 +42,17 @@ test('limita cinco títulos e informa que existem mais', () => {
 
 test('sem títulos não inventa faturas', () => {
   assert.match(formatVerifiedInvoices([], 0), /Não encontrei títulos em aberto/);
+});
+
+test('filtragem server-side recusa lote financeiro de outro assinante', () => {
+  assert.equal(scopeVerifiedInvoices([
+    { id_cliente: '123', status: 'A', liberado: 'S' },
+    { id_cliente: '999', status: 'A', liberado: 'S' },
+  ], '123'), null);
+  assert.deepEqual(scopeVerifiedInvoices([
+    { id_cliente: '123', status: 'A', liberado: 'S' },
+    { id_cliente: '123', status: 'R', liberado: 'S' },
+    { id_cliente: '123', status: 'A', liberado: 'N' },
+  ], '123'), [{ id_cliente: '123', status: 'A', liberado: 'S' }]);
+  assert.equal(scopeVerifiedInvoices([{ status: 'A', liberado: 'S' }], '123'), null);
 });
