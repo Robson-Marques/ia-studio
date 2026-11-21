@@ -888,7 +888,7 @@ export class ConnectchatAutoResponderService {
               `newnet-investigating-${progressToken}`,
             );
             await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
-            let operational;
+            let operational: Awaited<ReturnType<ConnectchatSupportContextService['triageIdentifiedCustomer']>>;
             try {
               operational = await this.support.triageIdentifiedCustomer(found.connectionId!, found.customerId);
             } finally {
@@ -1029,7 +1029,7 @@ export class ConnectchatAutoResponderService {
       // Verifica pendências e recorrência ANTES de escolher equipamento.
       // A evidência vem exclusivamente do cliente vinculado pelo ConnectChat.
       await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
-      let support;
+      let support: Awaited<ReturnType<ConnectchatSupportContextService['byVerifiedConversation']>>;
       try {
         support = await this.support.byVerifiedConversation(context.conversation);
       } finally {
