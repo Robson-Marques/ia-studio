@@ -613,6 +613,16 @@ export class ConnectchatAutoResponderService {
       result: { os_aberta: false, motivo: 'A política da instalação exige aprovação antes de abrir OS.' },
     };
 
+    // A pesquisa pode demorar; se a identidade ou a conversa mudaram durante
+    // a consulta, abandonar a escrita sem reutilizar o CPF antigo.
+    const fresh = await this.inbox.contextForAgentPreview(conversation.id);
+    if (!fresh.verified || fresh.conversation.status !== 'OPEN'
+      || fresh.conversation.customerRef !== conversation.customerRef
+      || fresh.conversation.globalIdentityId !== conversation.globalIdentityId
+      || fresh.conversation.lastSequence !== conversation.lastSequence) {
+      return { attempted: false, result: null };
+    }
+
     const idempotencyKey = `ai.connectchat.os_attempt.${conversation.id}`;
     const previous = await this.settings.getValue(idempotencyKey);
     const prior = previous && typeof previous === 'object' && !Array.isArray(previous)
