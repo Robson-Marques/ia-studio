@@ -556,6 +556,71 @@ export class ConnectchatAutoResponderService {
    * Reutiliza o handler ISP abrir_os (config/setor, incidentes e anti-duplicidade).
    * Não grava CPF na memória da Nete e não executa sem vínculo ACTIVE/CUSTOMER.
    */
+  /**
+   * Atendimento da SESSÃO, independente do vínculo de contato para o futuro.
+   * O CPF é usado somente como seletor do cadastro nesta execução, nunca
+   * associado ao globalIdentityId/telefone. Reutiliza abrir_os com todos os
+   * seus gates de incidente, setor, assunto e anti-duplicidade.
+   */
+  private async maybeOpenSessionOfflineOs(
+    agent: AiAgent,
+    conversation: ConnectchatConversation,
+    document: string,
+    connectionId: string,
+    customerId: string,
+    reason: string,
+    operational: Awaited<ReturnType<ConnectchatSupportContextService['triageIdentifiedCustomer']>>,
+  ): Promise<{ os_aberta: boolean; motivo?: string; duplicada?: boolean } | null> {
+    if (this.classifyRequest(reason, []) !== 'SUPPORT'
+      || operational.status !== 'READY'
+      || operational.hasOpenOs !== false || operational.hasOpenTicket !== false
+      || operational.incident !== null || operational.blocked !== false
+      || operational.online !== false || operational.multipleAccesses) return null;
+    const tool = this.toolRegistry.get('abrir_os');
+    const catalog = await this.toolsRepository.findByKey('abrir_os');
+    if (!tool || tool.requires_approval || !catalog?.is_active || catalog.requires_approval) {
+      return { os_aberta: false, motivo: 'A abertura automática não está habilitada.' };
+    }
+    const approval = await this.approvalPolicy.evaluate({
+      targetType: 'TOOL', context: { tool_key: 'abrir_os' },
+    });
+    if (approval.required) return { os_aberta: false, motivo: 'A abertura depende da aprovação da equipe.' };
+
+    const current = await this.inbox.contextForAgentPreview(conversation.id);
+    if (current.conversation.status !== 'OPEN'
+      || current.conversation.lastSequence !== conversation.lastSequence
+      || current.conversation.globalIdentityId !== conversation.globalIdentityId) return null;
+    // Deduplicação por conversa + cliente; um contato pode atender diversas pessoas.
+    const attemptKey = `ai.connectchat.session_os.${conversation.id}.${connectionId}.${customerId}`;
+    const earlier = await this.settings.getValue(attemptKey);
+    if (earlier) return null;
+    await this.settings.set(attemptKey, { status: 'STARTED', at: new Date().toISOString() });
+    try {
+      const raw = await tool.handler({
+        cpf: document,
+        descricao: `Atendimento ConnectChat: ${reason.slice(0, 400)}. Acesso único offline no IXC.`,
+        connection_id: connectionId,
+      }, {
+        agentId: agent.id, agentRunId: randomUUID(), traceId: randomUUID(),
+        scopeKeys: { connectchat_conversation: conversation.id },
+        permittedTools: ['abrir_os'], dryRun: false,
+      });
+      const result = raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? raw as Record<string, unknown> : {};
+      const outcome = {
+        os_aberta: result['os_aberta'] === true,
+        duplicada: result['duplicada'] === true,
+        motivo: typeof result['motivo'] === 'string' ? result['motivo'].slice(0, 200) : undefined,
+      };
+      await this.settings.set(attemptKey, { ...outcome, status: 'DONE', at: new Date().toISOString() });
+      return outcome;
+    } catch (error) {
+      this.logger.warn(`OS da sessão sem conclusão confirmada: ${(error as Error).message}`);
+      await this.settings.set(attemptKey, { status: 'UNKNOWN', at: new Date().toISOString() });
+      return { os_aberta: false, motivo: 'A abertura não pôde ser confirmada. A equipe deve conferir antes de repetir.' };
+    }
+  }
+
   private async maybeOpenVerifiedOfflineOs(
     agent: AiAgent,
     conversation: ConnectchatConversation,
@@ -797,6 +862,7 @@ export class ConnectchatAutoResponderService {
               connectionId: pending.connectionId,
               reason: pending.reason,
               operational: pending.operational,
+              osResult: pending.osResult,
               consent: explicitYes,
               requestedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
@@ -894,10 +960,16 @@ export class ConnectchatAutoResponderService {
             } finally {
               await this.inbox.setAgentTyping(conversation.id, 'stopped').catch(() => undefined);
             }
+            // Diagnóstico e eventual OS pertencem à sessão atual.
+            // A preferência de vínculo só decide se o contato ficará salvo.
+            const osResult = await this.maybeOpenSessionOfflineOs(
+              agent, conversation, candidate, found.connectionId!,
+              found.customerId, identifiedReason, operational,
+            );
             await this.settings.set(pendingKey, {
               customerId: found.customerId, connectionId: found.connectionId,
               consent: null, requestedAt: new Date().toISOString(),
-              reason: identifiedReason, operational,
+              reason: identifiedReason, operational, osResult,
             });
             const preferenceQuestion = await this.formulateLinkPreferenceQuestion(
               agent, conversation, context.messages, identifiedReason,
