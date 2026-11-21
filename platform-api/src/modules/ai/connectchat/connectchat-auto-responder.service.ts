@@ -130,11 +130,16 @@ export class ConnectchatAutoResponderService {
         const requestKey = createHash('sha256').update(`newnet-link:${conversation.id}:${conversation.globalIdentityId}:${ref}:${String(pending.requestedAt ?? '')}`).digest('hex');
         const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose, requestKey);
         const value = response && typeof response === 'object' ? response as Record<string, unknown> : {};
-        const nested = value.request && typeof value.request === 'object'
-          ? value.request as Record<string, unknown> : {};
-        const requestId = typeof value.id === 'string' ? value.id
-          : typeof value.requestId === 'string' ? value.requestId
-            : typeof nested.id === 'string' ? nested.id : '';
+        const record = (input: unknown): Record<string, unknown> =>
+          input && typeof input === 'object' && !Array.isArray(input)
+            ? input as Record<string, unknown> : {};
+        const candidates = [
+          value.id, value.requestId, value.linkRequestId,
+          record(value.request).id, record(value.linkRequest).id,
+          record(value.data).id, record(record(value.data).request).id,
+        ];
+        const requestId = candidates.find((id) =>
+          typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)) as string | undefined;
         if (!/^[0-9a-f-]{36}$/i.test(requestId)) {
           this.logger.warn('ConnectChat: resposta de criação do vínculo sem ID de pedido reconhecível.');
           await this.settings.set(key, { ...pending, requestOutcomeUnknown: true });
