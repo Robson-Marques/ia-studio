@@ -381,7 +381,19 @@ export class ConnectchatAutoResponderService {
         return;
       }
 
-      const intent = this.classifyRequest(newest.body, context.messages);
+      // Respostas curtas a perguntas técnicas (fibra, rádio, número do ponto,
+      // sim/não) pertencem à triagem anterior, não são uma nova saudação.
+      const normalizedAnswer = newest.body.trim().toLowerCase();
+      const isShortReply = /^(?:[1-8][.)]?|fibra(?: óptica)?|radio|rádio|não sei|nao sei|sim|não|nao)[.!]?$/i.test(normalizedAnswer);
+      const techAsked = await this.settings.getValue(`ai.connectchat.technology_requested.${conversation.id}`);
+      const contractAsked = await this.settings.getValue(`ai.connectchat.contract_requested.${conversation.id}`);
+      const savedReason = await this.settings.getValue(`ai.connectchat.identification_requested.${conversation.id}`);
+      const reason = savedReason && typeof savedReason === 'object' && !Array.isArray(savedReason)
+        ? String((savedReason as Record<string, unknown>).reason ?? '') : '';
+      const priorIntent = this.classifyRequest(reason, context.messages);
+      const intent = isShortReply && (techAsked || contractAsked || priorIntent === 'SUPPORT')
+        ? 'SUPPORT' as const
+        : this.classifyRequest(newest.body, context.messages);
       // Um cliente já vinculado que diga "oi" ou peça segunda via não deve
       // receber perguntas sobre ONU, rádio, fibra ou OS de suporte.
       if (intent === 'GENERAL' || intent === 'FINANCE') {
