@@ -322,13 +322,14 @@ export class ConnectchatAutoResponderService {
         const restartIdentification = hasNewDocument && (
           pending['consent'] === false || pending['expired'] === true);
         if (typeof pending['customerId'] === 'string' && !restartIdentification) {
-          if ((explicitYes || explicitNo) && typeof pending['consent'] !== 'boolean') {
+          if ((explicitYes && pending['consent'] !== true)
+            || (explicitNo && pending['consent'] !== false)) {
             await this.settings.set(pendingKey, {
               ...pending, consent: explicitYes,
               updatedAt: new Date().toISOString(),
             });
             const answer = explicitYes
-              ? 'Obrigado! Vou solicitar a confirmação do vínculo na sua conta ConnectChat. Assim que for autorizada, continuo o atendimento.'
+              ? 'Obrigado! Vou verificar a confirmação segura do vínculo para continuar seu atendimento.'
               : 'Tudo bem, não vou vincular este contato. Para consultar informações particulares, será necessária uma identificação segura.';
             const token = createHash('sha256').update(`newnet-consent:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
