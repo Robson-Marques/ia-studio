@@ -25,6 +25,32 @@ export class ConnectchatSupportContextService {
     private readonly repository: ConnectionsRepository,
   ) {}
 
+  /** Busca CPF somente em cadastro e jamais usa a existência como prova de
+   * posse ou autorização de acesso. Não retorna PII ao modelo nem ao chat. */
+  async lookupCpf(cpf: string): Promise<{ status: 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE'; customerId?: string }> {
+    const digits = cpf.replace(/\D/g, '');
+    if (!/^\d{11}$/.test(digits) || /^(\d)\1{10}$/.test(digits)) return { status: 'NOT_FOUND' };
+    for (let position = 9; position <= 10; position += 1) {
+      const sum = [...digits.slice(0, position)].reduce((total, digit, index) =>
+        total + Number(digit) * (position + 1 - index), 0);
+      const calculated = (sum * 10) % 11;
+      if (Number(digits[position]) !== (calculated === 10 ? 0 : calculated)) return { status: 'NOT_FOUND' };
+    }
+    const providers = (await this.repository.findAll({ providerKey: 'ixc', status: 'ACTIVE' }))
+      .filter((provider) => provider.is_active);
+    if (providers.length !== 1) return { status: 'UNAVAILABLE' };
+    try {
+      const data = rows(await this.connections.execute(providers[0].id, 'cliente.dados', { cpf: digits }));
+      if (data.length !== 1 || !/^\d+$/.test(String(data[0]['id'] ?? ''))) {
+        return { status: 'NOT_FOUND' };
+      }
+      return { status: 'FOUND', customerId: String(data[0]['id']) };
+    } catch (error) {
+      this.logger.warn(`Consulta CPF não concluída: ${(error as Error).message}`);
+      return { status: 'UNAVAILABLE' };
+    }
+  }
+
   async byVerifiedConversation(conversation: ConnectchatConversation): Promise<VerifiedSupportContext> {
     const empty: VerifiedSupportContext = {
       available: false, openOs: [], recentOs: [], recentTickets: [],
