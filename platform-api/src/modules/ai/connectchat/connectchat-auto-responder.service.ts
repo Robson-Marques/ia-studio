@@ -341,6 +341,27 @@ export class ConnectchatAutoResponderService {
 
         const candidate = newest.body.match(/(?:^|\D)(\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)/);
         if (candidate) {
+          // CPF/CNPJ é dado de busca, mas a conversa não pode virar
+          // um oráculo de enumeração de cadastros do IXC.
+          const attemptsKey = `ai.connectchat.document_attempts.${conversation.id}`;
+          const attemptRaw = await this.settings.getValue(attemptsKey);
+          const attemptState = attemptRaw && typeof attemptRaw === 'object' && !Array.isArray(attemptRaw)
+            ? attemptRaw as Record<string, unknown> : {};
+          const startedAt = typeof attemptState.startedAt === 'number' ? attemptState.startedAt : 0;
+          const withinWindow = Date.now() - startedAt < 15 * 60 * 1000;
+          const count = withinWindow && typeof attemptState.count === 'number'
+            ? attemptState.count : 0;
+          if (count >= 5) {
+            const token = createHash('sha256').update(`newnet-doc-limit:${conversation.id}:${startedAt}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id,
+              'Por segurança, não posso fazer mais consultas de cadastro agora. Tente novamente daqui a alguns minutos.',
+              `newnet-doc-limit-${token}`);
+            await this.complete(key, sequence, claim);
+            return;
+          }
+          await this.settings.set(attemptsKey, {
+            startedAt: withinWindow ? startedAt : Date.now(), count: count + 1,
+          });
           const found = await this.support.lookupDocument(candidate[1]);
           const token = createHash('sha256').update(`newnet-document:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
           if (found.status === 'FOUND' && found.customerId) {
