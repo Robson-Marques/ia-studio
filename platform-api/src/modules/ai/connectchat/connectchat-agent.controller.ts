@@ -13,6 +13,8 @@ import { rows, projectChamado, projectOrdemServico } from '../../isp/isp-project
 import { ConnectchatInboxService } from '../../comm/connectchat/connectchat-inbox.service';
 import { AgentsService } from '../agents/agents.service';
 import { AgentRunnerService } from '../agents/agent-runner.service';
+import { ConnectchatAutoResponderService } from './connectchat-auto-responder.service';
+import { Auditable } from '../../../shared/audit/auditable.decorator';
 
 const SETTING = 'ai.connectchat.agent.binding';
 // As habilidades de gravação, pagamento e automação de WhatsApp são
@@ -35,6 +37,7 @@ export class ConnectchatAgentController {
     private readonly connections: ConnectionsService,
     private readonly agents: AgentsService,
     private readonly runner: AgentRunnerService,
+    private readonly autoResponder: ConnectchatAutoResponderService,
   ) {}
 
   private async binding(): Promise<Binding> {
@@ -99,6 +102,15 @@ export class ConnectchatAgentController {
     };
     await this.settings.set(SETTING, binding);
     return binding;
+  }
+
+  @Post('conversations/:conversationId/reset-context')
+  @RequirePermissions(PERMISSIONS.AI_AGENTS_WRITE)
+  @Auditable({ action: 'ai.connectchat.context.reset', entityType: 'ConnectchatConversation', extractEntityId: (args) => args[0] as string })
+  async resetContext(
+    @Param('conversationId', new ParseUUIDPipe()) conversationId: string,
+  ) {
+    return this.autoResponder.resetConversationContext(conversationId);
   }
 
   @Post('conversations/:conversationId/preview')
