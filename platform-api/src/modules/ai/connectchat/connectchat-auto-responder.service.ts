@@ -17,6 +17,7 @@ import { ConnectchatSupportContextService } from './connectchat-support-context.
 import { extractSubscriberDocument, redactSubscriberDocuments } from './subscriber-document';
 import { formatVerifiedInvoices } from './billing-response';
 import { ToolRegistryService } from '../tools/tool-registry.service';
+import { ToolsRepository } from '../tools/tools.repository';
 import { ApprovalPolicyService } from '../approvals/approval-policy.service';
 
 type Cursor = {
@@ -40,6 +41,7 @@ export class ConnectchatAutoResponderService {
     private readonly prisma: PrismaService,
     private readonly support: ConnectchatSupportContextService,
     private readonly toolRegistry: ToolRegistryService,
+    private readonly toolsRepository: ToolsRepository,
     private readonly approvalPolicy: ApprovalPolicyService,
   ) {}
 
@@ -592,7 +594,9 @@ export class ConnectchatAutoResponderService {
     // O catálogo ISP já governa a abertura. Política de aprovação ativa
     // impede a execução direta neste canal até existir fluxo de aprovação.
     const tool = this.toolRegistry.get('abrir_os');
-    if (!tool || tool.requires_approval === true) return { attempted: false, result: null };
+    const catalogTool = await this.toolsRepository.findByKey('abrir_os');
+    if (!tool || tool.requires_approval === true || !catalogTool?.is_active
+      || catalogTool.requires_approval === true) return { attempted: false, result: null };
     const policy = await this.approvalPolicy.evaluate({
       targetType: 'TOOL',
       context: { tool_key: 'abrir_os' },
