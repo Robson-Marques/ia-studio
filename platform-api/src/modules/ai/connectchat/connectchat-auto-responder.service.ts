@@ -697,7 +697,10 @@ export class ConnectchatAutoResponderService {
       const fresh = await this.inbox.contextForAgentPreview(conversation.id);
       const finalMessage = fresh.messages.at(-1);
       if (!finalMessage || finalMessage.serverSequence !== sequence
-        || (!resume && finalMessage.senderKind !== 'CUSTOMER') || fresh.conversation.status !== 'OPEN') {
+        || (!resume && finalMessage.senderKind !== 'CUSTOMER')
+        || fresh.conversation.status !== 'OPEN'
+        || !fresh.verified || fresh.conversation.customerRef !== context.conversation.customerRef
+        || fresh.conversation.globalIdentityId !== context.conversation.globalIdentityId) {
         await this.complete(key, sequence, claim);
         return;
       }
