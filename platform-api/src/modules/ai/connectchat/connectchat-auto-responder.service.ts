@@ -1028,19 +1028,41 @@ export class ConnectchatAutoResponderService {
             const reasonWithoutDocument = newest.body.replace(candidate, '').trim().slice(0, 500);
             const identifiedReason = typeof previous.reason === 'string' && previous.reason.trim()
               ? previous.reason : reasonWithoutDocument;
+            // CPF informado pelo cliente escolhe o cadastro para esta sessão
+            // e associa a identidade do canal para facilitar novos contatos.
+            // Não perguntar sobre vínculo aqui.
+            let customerName: string | null = null;
+            let linked = false;
+            try {
+              const result = await this.inbox.autoLinkIdentifiedCustomer(
+                conversation.id, conversation.globalIdentityId || '',
+                sequence, found.connectionId!, found.customerId,
+              );
+              customerName = result.customerName;
+              linked = result.linked;
+            } catch (error) {
+              this.logger.warn(`Não foi possível associar o cadastro encontrado: ${(error as Error).message}`);
+              // A indisponibilidade do vínculo não impede a triagem operacional da sessão.
+            }
+            await this.settings.set(recognitionKey, {
+              asked: false, confirmed: linked, awaitingOther: false,
+              customerRef: `ixc:${found.connectionId}:${found.customerId}`,
+            });
             await this.settings.set(pendingKey, {
-              customerId: found.customerId, connectionId: found.connectionId, consent: null, requestedAt: new Date().toISOString(),
+              customerId: found.customerId, connectionId: found.connectionId,
+              consent: false, requestedAt: new Date().toISOString(),
               reason: identifiedReason,
             });
-            // Primeiro ler evidências. A preferência de vínculo para o futuro
-            // nunca substitui investigação técnica no atendimento corrente.
-            const progressToken = createHash('sha256')
-              .update(`newnet-investigating:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(
-              conversation.id,
-              'Certo, vou verificar as informações do atendimento e a situação da conexão.',
-              `newnet-investigating-${progressToken}`,
+            const token = createHash('sha256')
+              .update(`newnet-document:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            const receipt = await this.replyWithOperationalEvidence(
+              agent, conversation, context.messages, newest.body,
+              { etapa: 'cadastro_localizado', nome: customerName, proxima_acao: 'investigar_conexao' },
+              customerName
+                ? `Localizei o cadastro de ${customerName}. Vou analisar a situação da conexão.`
+                : 'Localizei o cadastro. Vou analisar a situação da conexão.',
             );
+            await this.inbox.sendAgentMessage(conversation.id, receipt, `newnet-document-${token}`);
             await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
             let operational: Awaited<ReturnType<ConnectchatSupportContextService['triageIdentifiedCustomer']>>;
             try {
@@ -1048,22 +1070,22 @@ export class ConnectchatAutoResponderService {
             } finally {
               await this.inbox.setAgentTyping(conversation.id, 'stopped').catch(() => undefined);
             }
-            // Diagnóstico e eventual OS pertencem à sessão atual.
-            // A preferência de vínculo só decide se o contato ficará salvo.
             const osResult = await this.maybeOpenSessionOfflineOs(
               agent, conversation, candidate, found.connectionId!,
               found.customerId, identifiedReason, operational,
             );
             await this.settings.set(pendingKey, {
               customerId: found.customerId, connectionId: found.connectionId,
-              consent: null, requestedAt: new Date().toISOString(),
+              consent: false, requestedAt: new Date().toISOString(),
               reason: identifiedReason, operational, osResult,
             });
-            const preferenceQuestion = await this.formulateLinkPreferenceQuestion(
-              agent, conversation, context.messages, identifiedReason,
+            const outcome = await this.formulateUnlinkedContinuation(
+              agent, conversation, context.messages, newest.body,
+              identifiedReason, false, operational, osResult || undefined,
             );
-            await this.inbox.sendAgentMessage(conversation.id,
-              preferenceQuestion, `newnet-document-${token}`);
+            const outcomeToken = createHash('sha256').update(
+              `newnet-diagnosis:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, outcome, `newnet-diagnosis-${outcomeToken}`);
           } else {
             const text = found.status === 'UNAVAILABLE'
               ? 'Não consegui consultar o cadastro agora. Vou precisar do apoio de um atendente.'
