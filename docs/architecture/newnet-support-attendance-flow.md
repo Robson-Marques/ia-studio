@@ -71,3 +71,14 @@ O ConnectChat é o primeiro canal operacional da Nete; o WhatsApp somente após 
 - Após o contato autorizar vínculo, a Nete não manda para operador; aguarda o contato ter sua identidade confirmada pelo mecanismo de sessão do ConnectChat.
 - Quando o ConnectChat relatar `status=CUSTOMER`, `linkStatus=ACTIVE` e `customerRef` com ID IXC igual ao cadastro localizado, a Nete retoma o motivo salvo automaticamente e não repete identificação.
 - **Falta integrar o disparo da prova e validar seu consumo**: o ConnectChat instalado dispõe de `/app/apps/api/dist/contact-link` e `integration.controller.js`, mas o contrato compilado e o fluxo PWA não estão disponíveis nesta sessão. Não presumir qual `purpose` ou quais campos de prova a API aceita.
+
+## Revisão de segurança e robustez — PR #30
+
+- Identificação aceita CPF e CNPJ com validação de dígitos verificadores e consulta interna ao IXC.
+- O pedido de vínculo é criado pela API existente com globalIdentityId, customerRef, TTL de 600 segundos e chave idempotente persistida por tentativa. Não há vínculo direto automático por CPF/CNPJ.
+- A Nete tenta concluir o pedido apenas pela operação de conclusão de pedido aprovado do ConnectChat. Aprovação do próprio assinante na PWA é indispensável; nenhum funcionário aprova cada atendimento.
+- Resposta não reconhecida de criação bloqueia reemissão automática para impedir vários pedidos ativos. Um vínculo ACTIVE/CUSTOMER interrompe tentativas.
+- A finalidade de vínculo precisa ser configurada na chave ai.connectchat.link_purpose, com um valor realmente aceito pelo ConnectChat. Sem configuração, a criação é bloqueada.
+- IMPORTANTE: login válido no ConnectChat não demonstra, sozinho, titularidade/representação legítima do CPF/CNPJ que foi digitado. A PWA precisa exigir e conferir uma prova adequada para esse cadastro antes de aprovar.
+- A integração da interface de aprovação na PWA e seus campos/retorno reais continuam sem homologação.
+- Build e testes ponta a ponta ainda não executados; não fazer merge/release em produção sem a verificação.
