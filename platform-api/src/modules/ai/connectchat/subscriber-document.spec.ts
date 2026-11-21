@@ -4,6 +4,7 @@ import {
   extractSubscriberDocument,
   isValidSubscriberDocument,
   normalizeSubscriberDocument,
+  redactSubscriberDocuments,
 } from './subscriber-document';
 
 test('CPF válido, com e sem máscara', () => {
@@ -35,4 +36,14 @@ test('extrai CPF e CNPJ de texto, sem capturar documento parcial', () => {
   assert.equal(extractSubscriberDocument('CNPJ: 12ABC34501DE35'), '12ABC34501DE35');
   assert.equal(extractSubscriberDocument('Não há documento.'), null);
   assert.equal(extractSubscriberDocument('PrefixoX12ABC34501DE35Sufixo'), null);
+});
+
+test('não envia CPF/CNPJ do histórico para o contexto da IA', () => {
+  const message = 'CPF 529.982.247-25 e CNPJ 12.ABC.345/01DE-35; também 04252011000110';
+  const redacted = redactSubscriberDocuments(message);
+  assert.equal(redacted.includes('529.982.247-25'), false);
+  assert.equal(redacted.includes('12.ABC.345/01DE-35'), false);
+  assert.equal(redacted.includes('04252011000110'), false);
+  assert.match(redacted, /\[documento protegido\]/);
+  assert.equal(redactSubscriberDocuments('Minha internet caiu'), 'Minha internet caiu');
 });
