@@ -14,6 +14,13 @@ export async function listAgents(params = {}) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar agentes')); }
 }
 
+export async function ensureNativeAgent() {
+  try {
+    const { data } = await api.post('/ai/agents/native/ensure');
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao preparar o assistente Newnet')); }
+}
+
 export async function getAgent(id) {
   try {
     const { data } = await api.get(`/ai/agents/${id}`);
