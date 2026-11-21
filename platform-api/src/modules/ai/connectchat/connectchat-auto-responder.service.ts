@@ -123,6 +123,9 @@ export class ConnectchatAutoResponderService {
     key: string,
     pending: Record<string, unknown>,
   ): Promise<void> {
+    // Ativar somente depois de validar que a aprovação da PWA comprova
+    // titularidade/representação do cadastro IXC correspondente.
+    if (process.env['CONNECTCHAT_AI_LINKING'] !== 'on') return;
     if (!conversation.globalIdentityId || conversation.status !== 'OPEN') return;
     if (conversation.businessContact?.status === 'CUSTOMER'
       && conversation.businessContact.linkStatus === 'ACTIVE') return;
