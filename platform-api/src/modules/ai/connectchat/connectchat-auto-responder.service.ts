@@ -176,14 +176,20 @@ export class ConnectchatAutoResponderService {
       return;
     }
 
+    // Pedido já consumido com sucesso: observar a mudança de estado no
+    // ConnectChat, sem fazer POST de conclusão a cada minuto.
+    if (typeof pending.completedAt === 'number') return;
     // NUNCA concluir pedido emitido para outra identidade ou outro cliente.
     if (pending.requestIdentity !== conversation.globalIdentityId) return;
     if (!/^[0-9a-f-]{36}$/i.test(existing)) return;
     const createdAt = typeof pending.requestCreatedAt === 'number' ? pending.requestCreatedAt : 0;
-    if (createdAt && now - createdAt > 600000) {
-      // O pedido expirou. Recriar só na mesma conversa após nova autorização,
-      // sem ficar fazendo consultas indefinidamente a cada 5 segundos.
-      await this.settings.set(key, { ...pending, requestId: null, consent: null, expired: true });
+    if (!createdAt || now - createdAt > 600000) {
+      // A expiração exige NOVA autorização. Não reutilizar um pedido antigo
+      // mesmo que a API tenha devolvido o mesmo identificador após retry.
+      await this.settings.set(key, {
+        ...pending, requestId: null, consent: null,
+        nextAttemptAt: null, expired: true,
+      });
       return;
     }
     try {
