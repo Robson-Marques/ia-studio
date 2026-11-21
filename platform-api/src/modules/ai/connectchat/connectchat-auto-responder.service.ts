@@ -392,22 +392,28 @@ export class ConnectchatAutoResponderService {
         } else {
           // Motivo e CPF são duas etapas diferentes. "Oi" pede o motivo;
           // "estou sem internet" aproveita o motivo e pede CPF diretamente.
-          const hasReason = /internet|conex|suporte|sinal|lenta|caiu|caindo|boleto|fatura|pagamento|sem rede|sem wi.?fi/i.test(newest.body);
+          const hasReason = /internet|conex|suporte|sinal|lenta|caiu|caindo|boleto|fatura|pagamento|sem rede|sem wi.?fi|contratar|cancelar|mudança|mudanca|plano|endereço|endereco|financeiro/i.test(newest.body);
           const greetKey = `ai.connectchat.greeting.${conversation.id}`;
           const noticeKey = `ai.connectchat.identification_requested.${conversation.id}`;
-          if (!hasReason && !(await this.settings.getValue(greetKey))) {
+          const greeted = !!(await this.settings.getValue(greetKey));
+          const isGreetingOnly = /^(oi+|ol[aá]|bom dia|boa tarde|boa noite|opa|hello)[!., ]*$/i.test(newest.body.trim());
+          if (!hasReason && !greeted && isGreetingOnly) {
             const message = 'Oi! Sou Nete, da Newnet. Como posso ajudar?';
             const token = createHash('sha256').update(`newnet-greet:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-greet-${token}`);
             await this.settings.set(greetKey, { sent: true });
-          } else if (hasReason && !(await this.settings.getValue(noticeKey))) {
-            const greeted = !!(await this.settings.getValue(greetKey));
+          } else if (!isGreetingOnly && !(await this.settings.getValue(noticeKey))) {
             const message = greeted
               ? 'Para consultar seu atendimento, pode informar o CPF ou CNPJ do titular?'
               : 'Oi! Sou Nete, da Newnet. Para consultar seu atendimento, pode informar o CPF ou CNPJ do titular?';
             const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
             await this.settings.set(noticeKey, { requested: true, reason: newest.body.slice(0, 500) });
+            await this.settings.set(greetKey, { sent: true });
+          } else if (!greeted && isGreetingOnly) {
+            const message = 'Oi! Sou Nete, da Newnet. Como posso ajudar?';
+            const token = createHash('sha256').update(`newnet-greet:${conversation.id}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, message, `newnet-greet-${token}`);
             await this.settings.set(greetKey, { sent: true });
           }
         }
