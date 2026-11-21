@@ -34,7 +34,7 @@ O ConnectChat é o primeiro canal operacional da Nete; o WhatsApp somente após 
 
 - Mensagens iniciais curtas e coleta de CPF.
 - Localização segura por CPF com validação de dígitos (sem revelar cadastro).
-- Consentimento explícito solicitado e registrado; pendência aparece ao operador no ConnectChat, que confirma a validação da identidade e usa o vínculo direto já existente.
+- Consentimento explícito solicitado e registrado. A Nete aguarda o estado autenticado ACTIVE/CUSTOMER emitido pelo ConnectChat e retoma o atendimento automaticamente após essa confirmação.
 - Checkpoints de identificação e tecnologia sem repetições.
 - Consulta de OS aberta, tickets recentes (incluindo estados abertos e inconclusivos), últimas cinco OS e últimos cinco chamados apenas por `customerRef` validado; cálculo de reincidência em 48 h usando datas reais.
 - Contratos e acessos ativos consultados pelo ID de cliente confirmado, com seleção do ponto quando há vários contratos e inferência de tecnologia proibida quando campo da fonte não é inequívoco.
@@ -42,8 +42,8 @@ O ConnectChat é o primeiro canal operacional da Nete; o WhatsApp somente após 
 
 ## Ainda não implementado / aprovação necessária
 
-- Confirmação automática de identidade por OTP ou outro fator independente; no momento é necessária validação presencial/procedimental por operador.
-- Vinculação sem intervenção humana após confirmação forte: o vínculo atual é feito pelo operador autorizado, usando a API ConnectChat existente.
+- Contrato de criação/consumo da prova autenticada na versão instalada do ConnectChat: o IA Studio já observa o vínculo confirmado, mas ainda não dispara a solicitação de prova pela PWA porque não temos o formato validado da API.
+- Vinculação iniciada pela Nete com prova independente, sem operador: aguarda inspeção da implementação de LinkProof/LinkRequest no ConnectChat. NÃO usar linkContactDirectly a partir de CPF+sim.
 - Rotinas profundas de diagnóstico físico (fibra/rádio), validação de mapeamentos tecnológicos reais do IXC, monitoramento contínuo e classificação completa dos status de tickets da instalação.
 - Regras completas de abertura/reabertura de tickets, tratamento de solicitações múltiplas por contrato e handoff automático.
 - Build, testes de integração IXC/ConnectChat, concorrência e homologação visual/operacional. O serviço de resposta deve permanecer em ambiente controlado até validar.
@@ -62,5 +62,12 @@ O ConnectChat é o primeiro canal operacional da Nete; o WhatsApp somente após 
 - A Nete não exige aprovação operacional para conversar, consultar dados de uma identidade **já confirmada** ou executar ações com permissão e controles técnicos pré-definidos. Ações de escrita precisam ter autorização de sistema, idempotência, auditoria, limites e verificação anti-duplicidade; não têm de exigir um humano a cada chamada.
 - CPF + consentimento não é prova de titularidade. O ConnectChat dispõe de APIs `createLinkRequest`, `exchangeLinkProof` e `completeLinkRequest`; **a semântica da prova deve ser verificada no código da API/PWA do ConnectChat antes de automatizar o vínculo**. Não chamar `linkContactDirectly` apenas com CPF digitado.
 - O módulo de menu IA fica reduzido às configurações e conhecimento; Memória/MCP migram para Desenvolvedor. Ferramentas e catálogo de ações deixam de ser configuração operacional visível; permissões e implementação continuam internas.
-- O caminho com conferência manual adicionado no piloto é transitório e **não atende ao requisito final** de autonomia. A substituição depende de entender a prova autentificada do ConnectChat; não simular que isso está pronto nem ativar bypass.
+- A interface operacional não oferece confirmação humana de vínculo. O gatilho automático atual é a transição autenticada para CUSTOMER/ACTIVE. A solicitação/aceitação da prova na PWA ainda precisa de contrato confirmado; não simular que esse acionamento já funciona.
 - Depois de confirmar o mecanismo, testar: contato com CPF correto de terceiro, prova expirou, prova de outra identidade, autorização revogada, repetição de proof, várias sessões e vínculo existente.
+
+## Estado atual do PR #30 (sem release)
+
+- Menu operacional: somente Configurações da IA e Conhecimento. Memória/MCP ficam em Desenvolvedor; catálogo de habilidades e decisões manuais retirados do fluxo operacional sem apagar o backend legado.
+- Após o contato autorizar vínculo, a Nete não manda para operador; aguarda o contato ter sua identidade confirmada pelo mecanismo de sessão do ConnectChat.
+- Quando o ConnectChat relatar `status=CUSTOMER`, `linkStatus=ACTIVE` e `customerRef` com ID IXC igual ao cadastro localizado, a Nete retoma o motivo salvo automaticamente e não repete identificação.
+- **Falta integrar o disparo da prova e validar seu consumo**: o ConnectChat instalado dispõe de `/app/apps/api/dist/contact-link` e `integration.controller.js`, mas o contrato compilado e o fluxo PWA não estão disponíveis nesta sessão. Não presumir qual `purpose` ou quais campos de prova a API aceita.
