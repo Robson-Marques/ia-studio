@@ -1,187 +1,123 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListScreen, Badge, Button, useToast } from '@studio-ux-ds/react';
-import { listAgents, exportAgent, listAgentVersions } from '../../services/ai';
+import { Screen, PageHeader, Card, Badge, Button, Spinner, useToast } from '@studio-ux-ds/react';
+import { ensureNativeAgent, listAgents } from '../../services/ai';
 import { usePermissions } from '../../hooks/usePermissions';
-import { formatDateTime } from './ia.constants';
-import AgentVersionsModal from './editor/AgentVersionsModal';
 
-// IA/Agentes — LISTAGEM no molde `ListScreen` do DS (v0.10.34): a tela passa a
-// ser `.su-screen`, então a preferência de largura do Personalizar vale aqui.
-// Antes era <div> comum + DataTable. Mesmo padrão do AquaPark. Comportamento
-// preservado: a linha abre o assistente; a barra de lote exporta N e, com 1
-// marcado, abre Versões; o modal de versões segue igual. Busca por nome dá
-// propósito à toolbar do molde.
-
+/**
+ * Newnet: agente único e nativo. Não há catálogo, wizard ou criação manual.
+ * O backend provisiona de forma idempotente para quem pode administrar.
+ * Perfis só de leitura consultam o agente existente sem fazer mutações.
+ */
 export default function Agentes() {
-  const toast = useToast();
   const navigate = useNavigate();
+  const toast = useToast();
   const { can } = usePermissions();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
-  const [versionsAgent, setVersionsAgent] = useState(null);
-  const [versions, setVersions] = useState([]);
-  const [q, setQ] = useState('');
-
   const canWrite = can('ai.agents.write');
+  const [agent, setAgent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  async function load() {
-    setLoading(true);
-    try {
-      const { items: list } = await listAgents();
-      setItems(list);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const byId = (agentId) => items.find((a) => a.id === agentId);
-
-  const rows = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (!term) return items;
-    return items.filter((a) => (a.name || '').toLowerCase().includes(term));
-  }, [items, q]);
-
-  // Exporta N assistentes — um arquivo por assistente, em sequência.
-  async function handleExport(ids) {
-    setExporting(true);
-    let ok = 0;
-    try {
-      for (const agentId of ids) {
-        const agent = byId(agentId);
-        const data = await exportAgent(agentId);
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `agente-${(agent?.name || 'export').toLowerCase().replace(/\s+/g, '-')}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        ok += 1;
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const result = canWrite
+          ? await ensureNativeAgent()
+          : await listAgents().then(({ items }) =>
+              items.find((a) => a.name === 'Assistente Newnet') || (items.length === 1 ? items[0] : null));
+        if (alive) setAgent(result);
+      } catch (err) {
+        if (alive) { setError(err.message); toast.error(err.message); }
+      } finally {
+        if (alive) setLoading(false);
       }
-      toast.success(ok > 1
-        ? `${ok} assistentes exportados (sem segredos).`
-        : 'Assistente exportado (sem segredos).');
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setExporting(false);
-    }
-  }
+    })();
+    return () => { alive = false; };
+  }, [canWrite]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function openVersions(agentId) {
-    try {
-      const { items: vs } = await listAgentVersions(agentId);
-      setVersions(vs);
-      setVersionsAgent(byId(agentId) || null);
-    } catch (err) { toast.error(err.message); }
-  }
-
-  const columns = [
-    { key: 'name', header: 'Nome', render: (a) => (
-      <div>
-        <div style={{ fontWeight: 500, color: 'var(--su-text-primary)' }}>{a.name}</div>
-        {a.description && (
-          <div style={{ fontSize: 11, color: 'var(--su-text-muted)', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {a.description}
-          </div>
-        )}
-      </div>
-    ) },
-    { key: 'model', header: 'Modelo', render: (a) => (
-      <span style={{ fontFamily: 'var(--su-font-mono, monospace)', fontSize: 12, color: 'var(--su-text-muted)' }}>{a.model}</span>
-    ) },
-    { key: 'version', header: 'Versão publicada', render: (a) => a.current_version > 0 ? `v${a.current_version}` : 'nenhuma ainda' },
-    { key: 'status', header: 'Status', render: (a) => a.is_active === false
-      ? <Badge tone="neutral">Inativo</Badge>
-      : <Badge tone="success">Ativo</Badge>
-    },
-    { key: 'updated_at', header: 'Atualizado', render: (a) => formatDateTime(a.updated_at) },
-  ];
-
-  const newAgentBtn = canWrite ? (
-    <Button variant="primary" icon="plus" onClick={() => navigate('/ia/agentes/nova')}>
-      Novo assistente
-    </Button>
-  ) : null;
-
-  const importBtn = canWrite ? (
-    <Button
-      variant="secondary"
-      icon="arrow-up-right"
-      title="Recriar um assistente a partir de um arquivo exportado"
-      onClick={() => navigate('/ia/agentes/importar')}
-    >
-      Importar
-    </Button>
-  ) : null;
+  const openSection = (section) => {
+    if (agent) navigate(`/ia/agentes/${agent.id}?secao=${section}`);
+  };
 
   return (
-    <>
-      <ListScreen
-        title="Assistentes"
-        subtitle="Quem atende: personalidade, o que faz, o que sabe e o que pode fazer. Cada mudança vira uma versão."
-        primaryAction={<>{importBtn}{newAgentBtn}</>}
-        search={q}
-        onSearch={setQ}
-        searchPlaceholder="Buscar assistente…"
-        loading={loading}
-        columns={columns}
-        rows={rows}
-        getRowId={(a) => a.id}
-        onRowClick={(a) => navigate(`/ia/agentes/${a.id}`)}
-        getRowLabel={(a) => `Abrir ${a.name}`}
-        selectionMode="multiple"
-        filterActive={!!q.trim()}
-        emptyNew={{
-          icon: 'user',
-          title: 'Nenhum assistente nesta instalação',
-          description: 'Crie um assistente e configure quem ele é, o que faz e o que pode fazer.',
-          action: newAgentBtn,
-        }}
-        emptyFiltered={{ title: 'Nenhum assistente encontrado', description: 'Nenhum assistente com esse nome.', onClear: () => setQ('') }}
-        bulkActions={(ids, clear) => (
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon="download"
-              loading={exporting}
-              title={ids.length > 1
-                ? `Baixar a configuração dos ${ids.length} assistentes (sem segredos)`
-                : 'Baixar a configuração deste assistente (sem segredos)'}
-              onClick={async () => { await handleExport(ids); clear(); }}
-            >
-              {ids.length > 1 ? `Exportar ${ids.length}` : 'Exportar'}
-            </Button>
-            {ids.length === 1 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                icon="refresh"
-                title="Histórico de versões — publicar ou voltar a uma anterior"
-                onClick={() => openVersions(ids[0])}
-              >
-                Versões
-              </Button>
+    <Screen as="div" className="space-y-4">
+      <PageHeader
+        title="Agente Newnet"
+        subtitle="Assistente oficial da Newnet Telecom. Complete seu conhecimento e escolha as funções autorizadas."
+      />
+      {loading ? <Spinner size="lg" center /> : error ? (
+        <Card><div style={{ padding: 20 }}>
+          <strong>Não foi possível carregar o agente.</strong>
+          <p style={{ marginTop: 8 }}>{error}</p>
+        </div></Card>
+      ) : !agent ? (
+        <Card><div style={{ padding: 20 }}>
+          O agente ainda não foi provisionado. Solicite ao administrador a permissão para configurá-lo.
+        </div></Card>
+      ) : (
+        <>
+          <Card>
+            <div style={{ padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span aria-hidden="true" style={{ fontSize: 26 }}>✦</span>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 16 }}>{agent.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--su-text-secondary)' }}>Agente oficial desta instalação</div>
+                </div>
+              </div>
+              <Badge tone={agent.is_active === false ? 'neutral' : 'success'}>
+                {agent.is_active === false ? 'Desativado' : 'Disponível'}
+              </Badge>
+            </div>
+          </Card>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Card>
+              <div style={{ padding: 20 }} className="space-y-3">
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Conhecimento</h2>
+                <p style={{ fontSize: 13, color: 'var(--su-text-secondary)' }}>
+                  Vincule documentos e bases para que o agente responda com informações da Newnet.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="primary" onClick={() => openSection('sabe')}>Configurar conhecimento</Button>
+                  {can('ai.knowledge.read') && (
+                    <Button variant="secondary" onClick={() => navigate('/ia/conhecimento')}>Gerenciar bases</Button>
+                  )}
+                </div>
+              </div>
+            </Card>
+            <Card>
+              <div style={{ padding: 20 }} className="space-y-3">
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Habilidades e acessos</h2>
+                <p style={{ fontSize: 13, color: 'var(--su-text-secondary)' }}>
+                  Escolha as consultas permitidas. Ações que alteram dados exigem autorização específica.
+                </p>
+                <Button variant="secondary" onClick={() => openSection('faz')}>Configurar habilidades</Button>
+              </div>
+            </Card>
+            <Card>
+              <div style={{ padding: 20 }} className="space-y-3">
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Testar agente</h2>
+                <p style={{ fontSize: 13, color: 'var(--su-text-secondary)' }}>
+                  Verifique respostas e acessos antes de liberar o uso operacional.
+                </p>
+                <Button variant="secondary" onClick={() => openSection('testar')}>Abrir teste</Button>
+              </div>
+            </Card>
+            {canWrite && (
+              <Card>
+                <div style={{ padding: 20 }} className="space-y-3">
+                  <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Administração</h2>
+                  <p style={{ fontSize: 13, color: 'var(--su-text-secondary)' }}>
+                    Identidade, modelo de IA, versões e demais parâmetros técnicos.
+                  </p>
+                  <Button variant="secondary" onClick={() => openSection('visao')}>Configurações administrativas</Button>
+                </div>
+              </Card>
             )}
-          </>
-        )}
-      />
-
-      <AgentVersionsModal
-        open={!!versionsAgent}
-        agent={versionsAgent}
-        versions={versions}
-        onClose={() => setVersionsAgent(null)}
-        onPublished={() => { setVersionsAgent(null); load(); }}
-      />
-    </>
+          </div>
+        </>
+      )}
+    </Screen>
   );
 }
