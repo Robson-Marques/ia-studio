@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, getConnectchatPendingIdentity, confirmConnectchatIdentity, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -86,6 +86,9 @@ export default function ConnectchatConversas() {
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [linking, setLinking] = useState(false);
+  const [pendingIdentity, setPendingIdentity] = useState(null);
+  const [identityChecked, setIdentityChecked] = useState(false);
+  const [confirmingIdentity, setConfirmingIdentity] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [customerActivity, setCustomerActivity] = useState(null);
   const selectedRef = useRef(null);
@@ -131,6 +134,23 @@ export default function ConnectchatConversas() {
       if (!silent) toast.error(error.message);
     }
   }, [can, toast]);
+
+  useEffect(() => {
+    const id = selected?.id;
+    setPendingIdentity(null);
+    setIdentityChecked(false);
+    if (!id || !can('comm.connectchat.link.customer') || selected.businessContact?.status === 'CUSTOMER') return undefined;
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const data = await getConnectchatPendingIdentity(id);
+        if (alive) setPendingIdentity(data);
+      } catch { /* Sem permissão/indisponível: não expõe informação de outro cadastro. */ }
+    };
+    void refresh();
+    const timer = setInterval(refresh, 10000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [selected?.id, selected?.businessContact?.status, can]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
@@ -202,6 +222,19 @@ export default function ConnectchatConversas() {
     setCustomerActivity(null);
     setCustomerId('');
     await loadMessages(conversation, true);
+  }
+
+  async function confirmPendingIdentity() {
+    if (!selected || !identityChecked || pendingIdentity?.consent !== 'YES') return;
+    setConfirmingIdentity(true);
+    try {
+      await confirmConnectchatIdentity(selected.id);
+      setPendingIdentity(null);
+      setIdentityChecked(false);
+      await loadConversations(true);
+      toast.success('Vínculo confirmado. A Nete poderá continuar o atendimento pelo cadastro identificado.');
+    } catch (error) { toast.error(error.message); }
+    finally { setConfirmingIdentity(false); }
   }
 
   async function send() {
@@ -332,6 +365,25 @@ export default function ConnectchatConversas() {
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>
             </header>
+            {can('comm.connectchat.link.customer') && pendingIdentity?.customerId && selected.businessContact?.status !== 'CUSTOMER' && (
+              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--su-border-default)', background: 'var(--su-surface-raised)' }}>
+                <strong style={{ fontSize: 12 }}>Cadastro localizado pela Nete · IXC #{pendingIdentity.customerId}</strong>
+                <p style={{ margin: '5px 0', fontSize: 12 }}>
+                  {pendingIdentity.consent === 'YES' ? 'Contato autorizou vínculo. Confirme a identidade antes de associar.' :
+                    pendingIdentity.consent === 'NO' ? 'Contato recusou o vínculo. Não associar.' : 'Aguardando autorização do contato.'}
+                </p>
+                {pendingIdentity.consent === 'YES' && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="flex items-center gap-2" style={{ fontSize: 12 }}>
+                      <input type="checkbox" checked={identityChecked} onChange={(e) => setIdentityChecked(e.target.checked)} />
+                      Confirmei a identidade por procedimento seguro, além do CPF
+                    </label>
+                    <Button variant="primary" size="sm" disabled={!identityChecked || confirmingIdentity}
+                      loading={confirmingIdentity} onClick={confirmPendingIdentity}>Confirmar vínculo</Button>
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ padding: '6px 14px', fontSize: 12, borderBottom: '1px solid var(--su-border-default)', color: 'var(--su-text-secondary)' }}>
               IA Newnet integrada ao ConnectChat · As mensagens recebem resposta automaticamente quando a opção está ligada em Configurações da IA.
             </div>
