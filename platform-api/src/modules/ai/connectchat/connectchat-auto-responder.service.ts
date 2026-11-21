@@ -155,8 +155,8 @@ export class ConnectchatAutoResponderService {
           record(value.data).id, record(record(value.data).request).id,
         ];
         const requestId = candidates.find((id) =>
-          typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)) as string | undefined;
-        if (typeof requestId !== 'string' || !/^[0-9a-f-]{36}$/i.test(requestId)) {
+          typeof id === 'string' && /^[A-Za-z0-9_-]{8,120}$/.test(id)) as string | undefined;
+        if (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,120}$/.test(requestId)) {
           this.logger.warn('ConnectChat: resposta de criação do vínculo sem ID de pedido reconhecível.');
           await this.settings.set(key, { ...attemptState, nextAttemptAt: now + 60000 });
           return;
@@ -181,7 +181,7 @@ export class ConnectchatAutoResponderService {
     if (typeof pending.completedAt === 'number') return;
     // NUNCA concluir pedido emitido para outra identidade ou outro cliente.
     if (pending.requestIdentity !== conversation.globalIdentityId) return;
-    if (!/^[0-9a-f-]{36}$/i.test(existing)) return;
+    if (!/^[A-Za-z0-9_-]{8,120}$/.test(existing)) return;
     const createdAt = typeof pending.requestCreatedAt === 'number' ? pending.requestCreatedAt : 0;
     if (!createdAt || now - createdAt > 600000) {
       // A expiração exige NOVA autorização. Não reutilizar um pedido antigo
