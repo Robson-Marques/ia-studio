@@ -188,9 +188,13 @@ export class ConnectchatInboxService {
    * Não confunde consentimento/CPF com prova de identidade. A aprovação é
    * feita pelo próprio assinante na PWA; este método não conclui vínculo.
    */
-  async createAuthenticatedLinkRequest(conversationId: string, customerRef: string, purpose: string, requestKey: string) {
+  async createAuthenticatedLinkRequest(conversationId: string, customerRef: string, purpose: string, requestKey: string, expectedIdentityId: string) {
     const conversation = await this.conversation(conversationId);
-    if (conversation.status !== 'OPEN') throw new ConflictException('A conversa precisa estar aberta.');
+    if (conversation.status !== 'OPEN' || !expectedIdentityId
+      || conversation.globalIdentityId !== expectedIdentityId
+      || conversation.businessContact?.linkStatus === 'ACTIVE') {
+      throw new ConflictException('Identidade ou situação da conversa mudou; pedido não emitido.');
+    }
     if (!/^ixc:[0-9a-f-]{36}:[1-9]\d*$/i.test(customerRef)) {
       throw new BadRequestException('Referência do assinante inválida.');
     }
@@ -210,9 +214,13 @@ export class ConnectchatInboxService {
    * Apenas conclui pedido APROVADO pelo ConnectChat; o próprio ConnectChat
    * rejeita pedidos pendentes, expirados ou pertencentes a outra identidade.
    */
-  async completeAuthenticatedLinkRequest(conversationId: string, requestId: string) {
+  async completeAuthenticatedLinkRequest(conversationId: string, requestId: string, expectedIdentityId: string) {
     const conversation = await this.conversation(conversationId);
-    if (conversation.status !== 'OPEN') throw new ConflictException('Conversa encerrada.');
+    if (conversation.status !== 'OPEN' || !expectedIdentityId
+      || conversation.globalIdentityId !== expectedIdentityId
+      || conversation.businessContact?.linkStatus === 'ACTIVE') {
+      throw new ConflictException('Identidade ou situação da conversa mudou; vínculo não concluído.');
+    }
     if (!/^[A-Za-z0-9_-]{8,120}$/.test(requestId)) throw new BadRequestException('Pedido de vínculo inválido.');
     return this.execute('completeLinkRequest', {
       globalIdentityId: conversation.globalIdentityId,
