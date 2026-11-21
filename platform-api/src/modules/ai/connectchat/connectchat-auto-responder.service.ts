@@ -134,7 +134,7 @@ export class ConnectchatAutoResponderService {
   private classifyRequest(text: string, history: ConnectchatMessage[]): 'SUPPORT' | 'FINANCE' | 'GENERAL' {
     const normalize = (input: string) => input.toLowerCase().normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
-    const classify = (input: string) => {
+    const classify = (input: string): 'SUPPORT' | 'FINANCE' | 'GENERAL' => {
       const value = normalize(input);
       if (/\b(boleto|fatura|pagamento|pagar|vencimento|pix|cobranca|debito|segunda via)\b/.test(value)) return 'FINANCE';
       if (/\b(sem internet|sem conexao|sem sinal|nao conecta|caiu|caindo|lenta|lentidao|wifi|wi.fi|roteador|modem|suporte|rede caiu|internet ruim)\b/.test(value)) return 'SUPPORT';
@@ -340,7 +340,7 @@ export class ConnectchatAutoResponderService {
         if (valid) {
           selectedContractId = String(saved.contractId);
         } else {
-          const number = /^([1-8])\\s*[.)]?$/.exec(newest.body.trim());
+          const number = /^([1-8])\s*[.)]?$/.exec(newest.body.trim());
           const option = number ? support.contracts[Number(number[1]) - 1] : undefined;
           if (option && typeof option['id'] === 'string') {
             selectedContractId = option['id'];
