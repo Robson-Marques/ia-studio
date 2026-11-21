@@ -156,7 +156,14 @@ export class ConnectchatSupportContextService {
     ));
     const uncertainTickets = tickets.some((t) => {
       const value = String(t['situacao_interna'] ?? t['status'] ?? '').trim().toUpperCase();
-      return !openStatuses.has(value) && !closedStatuses.has(value);
+      const closed = t['encerrado_em'];
+      if (closed && Number.isFinite(Date.parse(String(closed)))) return false;
+      const opened = Date.parse(String(t['aberto_em'] ?? ''));
+      const recent = Number.isFinite(opened) && opened <= Date.now()
+        && Date.now() - opened <= 48 * 3600000;
+      // Situação desconhecida só impede novo chamado se o registro pode
+      // estar realmente ativo; não bloquear diagnósticos por ticket antigo.
+      return recent && !openStatuses.has(value) && !closedStatuses.has(value);
     });
 
     const now = Date.now();
