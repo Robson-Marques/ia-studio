@@ -77,6 +77,8 @@ function MessageAttachment({ attachment }) {
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
+  const canLinkCustomer = can('comm.connectchat.link.customer');
+  const canWriteChat = can('comm.connectchat.write');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -127,19 +129,19 @@ export default function ConnectchatConversas() {
       if (selectedRef.current?.id !== conversation.id) return;
       setMessages((current) => mergeMessages(initial ? [] : current, incoming));
       const lastSequence = incoming.at(-1)?.serverSequence ?? (initial ? undefined : afterSequence);
-      if (lastSequence && lastSequence !== '0' && can('comm.connectchat.write')) {
+      if (lastSequence && lastSequence !== '0' && canWriteChat) {
         void markConnectchatDelivered(conversation.id, lastSequence).then(() => markConnectchatRead(conversation.id, lastSequence));
       }
     } catch (error) {
       if (!silent) toast.error(error.message);
     }
-  }, [can, toast]);
+  }, [canWriteChat, toast]);
 
   useEffect(() => {
     const id = selected?.id;
     setPendingIdentity(null);
     setIdentityChecked(false);
-    if (!id || !can('comm.connectchat.link.customer') || selected.businessContact?.status === 'CUSTOMER') return undefined;
+    if (!id || !canLinkCustomer || (selected.businessContact?.status === 'CUSTOMER' && selected.businessContact?.linkStatus === 'ACTIVE')) return undefined;
     let alive = true;
     const refresh = async () => {
       try {
@@ -150,7 +152,7 @@ export default function ConnectchatConversas() {
     void refresh();
     const timer = setInterval(refresh, 10000);
     return () => { alive = false; clearInterval(timer); };
-  }, [selected?.id, selected?.businessContact?.status, can]);
+  }, [selected?.id, selected?.businessContact?.status, selected?.businessContact?.linkStatus, canLinkCustomer]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
