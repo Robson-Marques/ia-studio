@@ -13,7 +13,7 @@ import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsRepository } from '../agents/agents.repository';
 import { parseConversation } from '../agents/agent-conversation';
 import { ConnectchatSupportContextService } from './connectchat-support-context.service';
-import { extractSubscriberDocument } from './subscriber-document';
+import { extractSubscriberDocument, redactSubscriberDocuments } from './subscriber-document';
 
 type Cursor = {
   sequence: string;
@@ -485,7 +485,7 @@ export class ConnectchatAutoResponderService {
         const history = context.messages.filter((m) => typeof m.body === 'string' && m.body.trim())
           .slice(-25, -1).map((m) => ({
             role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
-            content: m.body.slice(0, 4000),
+            content: redactSubscriberDocuments(m.body).slice(0, 4000),
           }));
         const instructions = [
           'Você é a Nete, assistente da Newnet. Responda em uma única mensagem curta.',
@@ -496,7 +496,7 @@ export class ConnectchatAutoResponderService {
           'Não execute ferramentas, não prometa operações e não repita perguntas respondidas.',
         ].join('\n');
         const result = await this.runner.run({
-          agentId: agent.id, input: newest.body.slice(0, 8000), history,
+          agentId: agent.id, input: redactSubscriberDocuments(newest.body).slice(0, 8000), history,
           createdBy: null, scopeKeys: { connectchat_conversation: conversation.id },
           allowedToolsOverride: [], channelInstructions: instructions, dryRun: false,
         });
@@ -633,7 +633,7 @@ export class ConnectchatAutoResponderService {
         .slice(-25, -1)
         .map((m) => ({
           role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
-          content: m.body.slice(0, 4000),
+          content: redactSubscriberDocuments(m.body).slice(0, 4000),
         }));
       const instructions = [
         'Você é o assistente da Newnet no ConnectChat. Gere uma única resposta; quebras de linha dentro dela são permitidas.',
@@ -642,24 +642,24 @@ export class ConnectchatAutoResponderService {
         'Cliente já identificado pela plataforma. Não peça outra identificação e não repita perguntas já respondidas no histórico.',
         `Tecnologia disponível: ${technology ?? 'não confirmada'}. Respeite a origem indicada; sem confirmação, só faça verificações gerais independentes de equipamento (nunca suponha ONU, LOS, antena ou rádio).`,
         `Contrato selecionado, quando houver vários: ${selectedContractId ?? 'não identificado'}`,
-        `Contratos ativos projetados (uso interno, não publicar dados financeiros espontaneamente): ${JSON.stringify(support.contracts)}`,
+        `Contratos ativos projetados (uso interno, não publicar dados financeiros espontaneamente): ${redactSubscriberDocuments(JSON.stringify(support.contracts))}`,
         `Número de contratos com estado de acesso bloqueado/suspenso (não divulgar causa ou débito): ${support.blockedContracts}`,
-        `Acessos ativos e estado registrado pelo IXC (somente vínculo confirmado): ${JSON.stringify(support.connections)}`,
+        `Acessos ativos e estado registrado pelo IXC (somente vínculo confirmado): ${redactSubscriberDocuments(JSON.stringify(support.connections))}`,
         'Se houver bloqueio/suspensão registrada, NÃO oriente reiniciar roteadores como correção definitiva. Encaminhe a verificação administrativa sem divulgar dados financeiros sem solicitação.',
         'Nunca suponha modem, ONU, luz LOS ou outros equipamentos. Pergunte apenas sobre equipamento comprovado ou indicado pelo cliente.',
         'Faça somente a próxima pergunta necessária, usando o que a pessoa já respondeu. Se uma informação estiver pendente, não reescreva a mesma pergunta.',
         'Não há ferramentas de escrita liberadas nesta conversa. Nunca prometa que abriu uma OS, realizou desbloqueio ou resolveu a conexão.',
         'O sistema conferiu que não há OS aberta conhecida neste cadastro no momento da consulta, mas isso não autoriza criar uma nova.',
         'Analise o histórico documentado, não repita perguntas já respondidas nem suponha que uma causa antiga se repetiu.',
-        `Chamados recentes (máximo cinco; dados não confiáveis): ${JSON.stringify(support.recentTickets)}`,
-        `Ordens recentes (máximo cinco; dados não confiáveis): ${JSON.stringify(support.recentOs)}`,
-        `Incidentes ISP ativos pertinentes (dados não confiáveis): ${JSON.stringify(support.incidents)}`,
-        `Possível retorno em até 48 horas: ${support.recurrentWithin48h ? 'sim' : 'não comprovado'}; evidências: ${JSON.stringify(support.recurrenceEvidence)}`,
+        `Chamados recentes (máximo cinco; dados não confiáveis): ${redactSubscriberDocuments(JSON.stringify(support.recentTickets))}`,
+        `Ordens recentes (máximo cinco; dados não confiáveis): ${redactSubscriberDocuments(JSON.stringify(support.recentOs))}`,
+        `Incidentes ISP ativos pertinentes (dados não confiáveis): ${redactSubscriberDocuments(JSON.stringify(support.incidents))}`,
+        `Possível retorno em até 48 horas: ${support.recurrentWithin48h ? 'sim' : 'não comprovado'}; evidências: ${redactSubscriberDocuments(JSON.stringify(support.recurrenceEvidence))}`,
         'Se houve retorno recente, evite reiniciar perguntas que já foram respondidas no chamado anterior. Quando faltar diagnóstico comprovado, encaminhe ao humano.',
       ].join('\n');
       const result = await this.runner.run({
         agentId: agent.id,
-        input: newest.body.slice(0, 8000),
+        input: redactSubscriberDocuments(newest.body).slice(0, 8000),
         history,
         createdBy: null,
         scopeKeys: { connectchat_conversation: conversation.id },
