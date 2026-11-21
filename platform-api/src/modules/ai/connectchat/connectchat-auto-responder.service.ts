@@ -62,6 +62,9 @@ export class ConnectchatAutoResponderService {
           const linkedId = /^ixc:[0-9a-f-]{36}:([1-9]\d*)$/i.exec(conversation.customerRef ?? '')?.[1];
           const verified = conversation.businessContact?.status === 'CUSTOMER'
             && conversation.businessContact.linkStatus === 'ACTIVE';
+          if (!verified && pending.consent === true) {
+            await this.progressAuthenticatedLink(conversation, pendingKey, pending);
+          }
           if (verified && pending.consent === true && pending.customerId === linkedId
             && pending.resumed !== true) {
             await this.respond(agent, conversation, typeof pending.reason === 'string' ? pending.reason : '');
@@ -80,6 +83,88 @@ export class ConnectchatAutoResponderService {
       this.logger.warn(`ConnectChat IA: ${(error as Error).message}`);
     } finally {
       this.polling = false;
+    }
+  }
+
+  /**
+   * A Nete inicia o pedido; o ASSINANTE aprova na sessão da PWA. Nenhum
+   * operador, CPF isolado ou resposta de texto pode substituir a prova.
+   * `purpose` é parametrizado porque o enum efetivo é da API ConnectChat,
+   * não devemos adivinhá-lo no serviço consumidor.
+   */
+  private async progressAuthenticatedLink(
+    conversation: ConnectchatConversation,
+    key: string,
+    pending: Record<string, unknown>,
+  ): Promise<void> {
+    if (!conversation.globalIdentityId || conversation.status !== 'OPEN') return;
+    const customerId = pending.customerId;
+    const connectionId = pending.connectionId;
+    if (typeof customerId !== 'string' || !/^[1-9]\d*$/.test(customerId)
+      || typeof connectionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(connectionId)) return;
+
+    const now = Date.now();
+    if (typeof pending.nextAttemptAt === 'number' && pending.nextAttemptAt > now) return;
+    const ref = `ixc:${connectionId}:${customerId}`;
+    const existing = typeof pending.requestId === 'string' ? pending.requestId : null;
+    if (!existing) {
+      // Instalações podem admitir finalidades diferentes. A configuração é
+      // uma decisão explícita do operador de instalação, não de cada chat.
+      const rawPurpose = await this.settings.getValue('ai.connectchat.link_purpose');
+      const purpose = typeof rawPurpose === 'string' ? rawPurpose.trim()
+        : rawPurpose && typeof rawPurpose === 'object' && !Array.isArray(rawPurpose)
+          ? String((rawPurpose as Record<string, unknown>).value ?? '').trim() : '';
+      if (!purpose) {
+        this.logger.warn('ConnectChat: finalidade ai.connectchat.link_purpose ausente; vínculo automático não iniciado.');
+        await this.settings.set(key, { ...pending, nextAttemptAt: now + 300000 });
+        return;
+      }
+      try {
+        const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose);
+        const value = response && typeof response === 'object' ? response as Record<string, unknown> : {};
+        const nested = value.request && typeof value.request === 'object'
+          ? value.request as Record<string, unknown> : {};
+        const requestId = typeof value.id === 'string' ? value.id
+          : typeof value.requestId === 'string' ? value.requestId
+            : typeof nested.id === 'string' ? nested.id : '';
+        if (!/^[0-9a-f-]{36}$/i.test(requestId)) {
+          this.logger.warn('ConnectChat: resposta de criação do vínculo sem ID de pedido reconhecível.');
+          await this.settings.set(key, { ...pending, nextAttemptAt: now + 300000 });
+          return;
+        }
+        await this.settings.set(key, {
+          ...pending, requestId, requestIdentity: conversation.globalIdentityId,
+          requestCreatedAt: now, nextAttemptAt: now + 15000,
+        });
+        const token = createHash('sha256').update(`newnet-link-request:${conversation.id}:${requestId}`).digest('hex').slice(0, 32);
+        await this.inbox.sendAgentMessage(conversation.id,
+          'Enviei a solicitação de vínculo ao ConnectChat. Confirme na sua conta para continuar o atendimento.',
+          `newnet-link-request-${token}`);
+      } catch (error) {
+        this.logger.warn(`ConnectChat vínculo: ${(error as Error).message}`);
+        await this.settings.set(key, { ...pending, nextAttemptAt: now + 60000 });
+      }
+      return;
+    }
+
+    // NUNCA concluir pedido emitido para outra identidade ou outro cliente.
+    if (pending.requestIdentity !== conversation.globalIdentityId) return;
+    if (!/^[0-9a-f-]{36}$/i.test(existing)) return;
+    const createdAt = typeof pending.requestCreatedAt === 'number' ? pending.requestCreatedAt : 0;
+    if (createdAt && now - createdAt > 600000) {
+      // O pedido expirou. Recriar só na mesma conversa após nova autorização,
+      // sem ficar fazendo consultas indefinidamente a cada 5 segundos.
+      await this.settings.set(key, { ...pending, requestId: null, consent: null, expired: true });
+      return;
+    }
+    try {
+      await this.inbox.completeAuthenticatedLinkRequest(conversation.id, existing);
+      await this.settings.set(key, { ...pending, completedAt: now, nextAttemptAt: now + 60000 });
+      // O estado autenticado ACTIVE/CUSTOMER é verificado no próximo poll.
+    } catch {
+      // Pedido ainda não aprovado, expirado ou indisponível.
+      // Não forçar, não tentar vínculo direto, não bloquear servidor com polling.
+      await this.settings.set(key, { ...pending, nextAttemptAt: now + 15000 });
     }
   }
 
@@ -251,7 +336,7 @@ export class ConnectchatAutoResponderService {
             const previous = noticed && typeof noticed === 'object' && !Array.isArray(noticed)
               ? noticed as Record<string, unknown> : {};
             await this.settings.set(pendingKey, {
-              customerId: found.customerId, consent: null, requestedAt: new Date().toISOString(),
+              customerId: found.customerId, connectionId: found.connectionId, consent: null, requestedAt: new Date().toISOString(),
               reason: typeof previous.reason === 'string' ? previous.reason : '',
             });
             await this.inbox.sendAgentMessage(conversation.id,
