@@ -302,6 +302,67 @@ export class ConnectchatAutoResponderService {
     return 'GENERAL';
   }
 
+  /**
+   * Camada de diálogo: comportamento, não texto fixo para cada exemplo.
+   * A decisão de identidade/documento é determinística; somente a formulação
+   * da pergunta é delegada ao agente, sem acesso a ferramentas ou dados do IXC.
+   */
+  private async formulateIdentificationReply(
+    agent: AiAgent,
+    conversation: ConnectchatConversation,
+    messages: ConnectchatMessage[],
+    message: string,
+    step: 'OPENING' | 'IDENTIFICATION',
+  ): Promise<string> {
+    const fallback = step === 'OPENING'
+      ? 'Oi! Sou Nete, da Newnet. Como posso ajudar?'
+      : 'Por favor, informe o CPF ou CNPJ do titular.';
+    try {
+      const history = messages.filter((item) => typeof item.body === 'string' && item.body.trim())
+        .slice(-12, -1).map((item) => ({
+          role: (item.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: redactSubscriberDocuments(item.body).slice(0, 500),
+        }));
+      const task = step === 'OPENING'
+        ? 'O usuário apenas cumprimentou. Cumprimente uma vez e pergunte como pode ajudar, sem pedir CPF agora.'
+        : 'O usuário trouxe uma necessidade. Solicite objetivamente o CPF ou CNPJ do titular, sem repetir apresentação, sem justificar a solicitação, sem anunciar consultas e sem antecipar diagnóstico.';
+      const instructions = [
+        'Você é Nete, atendente da Newnet. Conduza conversa natural, breve, contextual e sem frases burocráticas.',
+        'O atendimento segue etapas: acolher -> entender a necessidade -> identificar o titular -> confirmar vínculo -> resolver.',
+        'Não volte à saudação quando a necessidade já foi informada. Não repita perguntas já respondidas.',
+        'Uma pergunta por resposta. Sem promessas de ação, sem revelar dados de cadastro ou operação do IXC.',
+        task,
+        'Responda em português brasileiro, em até 160 caracteres, sem explicações ou listas.',
+      ].join('\n');
+      const result = await this.runner.run({
+        agentId: agent.id,
+        input: redactSubscriberDocuments(message).slice(0, 500),
+        history,
+        createdBy: null,
+        scopeKeys: { connectchat_conversation: conversation.id },
+        allowedToolsOverride: [],
+        channelInstructions: instructions,
+        dryRun: false,
+      });
+      const output = result.status === 'COMPLETED' && typeof result.output === 'string'
+        ? result.output.replace(/\s+/g, ' ').trim() : '';
+      if (!output || output.length > 160) return fallback;
+      if (step === 'IDENTIFICATION') {
+        // Um texto fluente não pode omitir o documento obrigatório.
+        // Nem informar que fará consulta antes da confirmação de vínculo.
+        if (!/\bCPF\b/i.test(output) || !/\bCNPJ\b/i.test(output)
+          || /\b(consultar|consulta|pesquisar|busca|verificar cadastro|acessar dados|encontrei)\b/i.test(output)) {
+          return fallback;
+        }
+      }
+      if (step === 'OPENING' && /\b(CPF|CNPJ|cadastro|boleto|fatura)\b/i.test(output)) return fallback;
+      return output;
+    } catch (error) {
+      this.logger.warn(`Diálogo de identificação indisponível: ${(error as Error).message}`);
+      return fallback;
+    }
+  }
+
   private async respond(agent: AiAgent, conversation: ConnectchatConversation, resumeReason?: string): Promise<void> {
     const sequence = conversation.lastSequence;
     if (!/^\d+$/.test(sequence) || BigInt(sequence) === 0n) return;
@@ -458,12 +519,12 @@ export class ConnectchatAutoResponderService {
           const greeted = !!(await this.settings.getValue(greetKey));
           const isGreetingOnly = /^(oi+|ol[aá]|bom dia|boa tarde|boa noite|opa|hello)[!., ]*$/i.test(newest.body.trim());
           if (!greeted && isGreetingOnly) {
-            const message = 'Oi! Sou Nete, da Newnet. Como posso ajudar?';
+            const message = await this.formulateIdentificationReply(agent, conversation, context.messages, newest.body, 'OPENING');
             const token = createHash('sha256').update(`newnet-greet:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-greet-${token}`);
             await this.settings.set(greetKey, { sent: true });
           } else if (!isGreetingOnly && !(await this.settings.getValue(noticeKey))) {
-            const message = 'Por favor, informe o CPF ou CNPJ do titular.';
+            const message = await this.formulateIdentificationReply(agent, conversation, context.messages, newest.body, 'IDENTIFICATION');
             const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
             await this.settings.set(noticeKey, { requested: true, reason: newest.body.slice(0, 500) });
