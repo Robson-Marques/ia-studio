@@ -319,8 +319,9 @@ export class ConnectchatAutoResponderService {
         const hasNewDocument = /(?:^|\D)(?:\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)/.test(newest.body);
         // Depois da recusa ou da expiração, um novo documento inicia
         // identificação limpa; nunca herdar autorização do cadastro anterior.
-        const restartIdentification = hasNewDocument && (
-          pending['consent'] === false || pending['expired'] === true);
+        const restartIdentification = hasNewDocument;
+        // Um documento novo substitui o cadastro candidato e revoga a autorização
+        // anterior; pedidos de outras contas não serão concluídos neste fluxo.
         if (typeof pending['customerId'] === 'string' && !restartIdentification) {
           if ((explicitYes && pending['consent'] !== true)
             || (explicitNo && pending['consent'] !== false)) {
@@ -331,7 +332,7 @@ export class ConnectchatAutoResponderService {
             const answer = explicitYes
               ? 'Obrigado! Vou verificar a confirmação segura do vínculo para continuar seu atendimento.'
               : 'Tudo bem, não vou vincular este contato. Para consultar informações particulares, será necessária uma identificação segura.';
-            const token = createHash('sha256').update(`newnet-consent:${conversation.id}`).digest('hex').slice(0, 32);
+            const token = createHash('sha256').update(`newnet-consent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
           }
           // Enquanto não houver vínculo ACTIVE+CUSTOMER não há dados privados
