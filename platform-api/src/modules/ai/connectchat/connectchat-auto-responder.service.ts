@@ -82,6 +82,8 @@ export class ConnectchatAutoResponderService {
             && conversation.businessContact.linkStatus === 'ACTIVE';
           if (verified && pending.consent === true && expectedRef !== null
             && conversation.customerRef?.toLowerCase() === expectedRef.toLowerCase()
+            && (pending.requestIdentity === undefined
+              || pending.requestIdentity === conversation.globalIdentityId)
             && pending.resumed !== true) {
             await this.respond(agent, conversation, typeof pending.reason === 'string' ? pending.reason : '');
             // Retomada só após checkpoint; não processar o mesmo turno duas vezes.
