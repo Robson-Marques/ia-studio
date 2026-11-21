@@ -23,7 +23,8 @@ function safeBoletoUrl(raw: unknown): string | null {
 }
 export function formatVerifiedInvoices(invoices: Record<string, unknown>[], total: number): string {
   if (invoices.length === 0) return 'Não encontrei títulos em aberto neste cadastro neste momento.';
-  const lines = invoices.slice(0, 5).map((invoice, index) => {
+  const visibleCount = Math.min(invoices.length, 5);
+  const lines = invoices.slice(0, visibleCount).map((invoice, index) => {
     const value = safeValue(invoice['valor_aberto']) ?? safeValue(invoice['valor']);
     const due = dueDate(invoice['vencimento']);
     const barcode = typeof invoice['linha_digitavel'] === 'string'
@@ -35,8 +36,8 @@ export function formatVerifiedInvoices(invoices: Record<string, unknown>[], tota
     return [title, digitLine ? 'Linha digitável: ' + digitLine : '',
       url ? 'Boleto: ' + url : ''].filter(Boolean).join('\n');
   });
-  const remaining = Number.isFinite(total) && total > invoices.length
-    ? '\nExistem mais ' + Math.trunc(total - invoices.length) + ' títulos; mostrei os cinco primeiros.' : '';
+  const remaining = Number.isFinite(total) && total > visibleCount
+    ? '\nExistem mais ' + Math.trunc(total - visibleCount) + ' títulos; mostrei os primeiros.' : '';
   return 'Estes são os títulos em aberto encontrados para o seu cadastro:\n'
     + lines.join('\n\n') + remaining + '\n\nConfirme os dados do beneficiário antes de pagar.';
 }
