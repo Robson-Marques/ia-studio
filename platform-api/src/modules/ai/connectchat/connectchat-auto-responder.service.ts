@@ -174,9 +174,11 @@ export class ConnectchatAutoResponderService {
       const explicit = recentCustomer
         .map((m) => m.body.toLowerCase().trim())
         .reverse()
-        .find((body) => /(?:^|\\b)(?:uso|tenho|é|eh|utilizo|internet de|conexão de|conexao de)\\s+(?:internet\\s+)?(?:fibra(?:\\s+óptica)?|rádio|radio)(?:\\b|$)/i.test(body));
+        .find((body) =>
+          !/\b(não sei|nao sei|talvez|acho que|não tenho certeza|nao tenho certeza)\b/i.test(body)
+          && /(?:\b(?:uso|tenho|é|eh|utilizo|internet de|conexão de|conexao de)\s+(?:internet\s+)?(?:fibra(?:\s+óptica)?|rádio|radio)\b|^(?:fibra(?:\s+óptica)?|rádio|radio)[.!]?$)/i.test(body));
       const technology = explicit
-        ? /\\b(?:rádio|radio)\\b/i.test(explicit) ? 'rádio (informado pelo cliente)' : 'fibra (informada pelo cliente)'
+        ? /\b(?:rádio|radio)\b/i.test(explicit) ? 'rádio (informado pelo cliente)' : 'fibra (informada pelo cliente)'
         : null;
       if (!technology) {
         const techKey = `ai.connectchat.technology_requested.${conversation.id}`;
