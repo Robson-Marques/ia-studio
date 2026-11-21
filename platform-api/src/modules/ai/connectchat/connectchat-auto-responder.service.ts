@@ -476,9 +476,17 @@ export class ConnectchatAutoResponderService {
     incoming: string,
     initialReason: string,
     justDeclined: boolean,
+    operational?: Record<string, unknown>,
   ): Promise<string> {
     const issue = this.classifyRequest(initialReason || incoming, messages);
-    const fallback = issue === 'SUPPORT'
+    const regional = operational?.['incident'] && typeof operational['incident'] === 'object'
+      ? operational['incident'] as Record<string, unknown> : null;
+    const safeIncident = regional && regional['suppressOs'] === true
+      ? String(regional['publicMessage'] ?? 'Há uma ocorrência técnica em andamento na região.').slice(0, 250)
+      : null;
+    const fallback = safeIncident
+      ? `Entendido, não vou manter o vínculo. Há uma ocorrência técnica em andamento na sua região: ${safeIncident}`
+      : issue === 'SUPPORT'
       ? justDeclined
         ? 'Tudo bem, não vou manter o contato vinculado. Vamos cuidar da sua conexão: a falha acontece em todos os aparelhos?'
         : 'Entendi. Essa dificuldade de conexão acontece em todos os aparelhos ou só em um?'
@@ -496,11 +504,19 @@ export class ConnectchatAutoResponderService {
         'A pessoa não quer manter este contato vinculado para atendimentos futuros. Respeite. Isso NÃO encerra o atendimento atual.',
         'Continue o atendimento a partir do problema já relatado, sem reiniciar saudação e sem pedir CPF novamente.',
         'O motivo original foi: ' + redactSubscriberDocuments(initialReason).slice(0, 300),
+        'Resumo operacional interno da consulta feita ANTES de perguntar: '
+          + JSON.stringify({
+            consultaConcluida: operational?.['status'] === 'READY',
+            incidenteRegionalComOSSuprimida: safeIncident,
+            registrosAbertos: operational?.['hasOpenOs'] === true || operational?.['hasOpenTicket'] === true,
+            variosAcessos: operational?.['multipleAccesses'] === true,
+          }),
+        'Se existe ocorrência regional aplicável, informe de forma breve que a equipe trata o incidente; não faça perguntas desnecessárias, não prometa retorno automático sem acompanhamento realmente agendado.',
         justDeclined
           ? 'Reconheça a escolha de não manter o vínculo em uma oração breve e, na mesma mensagem, conduza o próximo passo de triagem.'
           : 'Responda à mensagem atual e faça avançar o diagnóstico geral em uma etapa. Não repita o aviso sobre vínculo.',
         'Você NÃO consultou equipamentos, conexão, sinal, chamados, contrato, cadastro ou IXC. Não diga que consultou ou que vai consultar sem permissão.',
-        'Sem vínculo verificado, só orientações gerais. Não revele dados pessoais ou financeiros, nem invente medições ou diagnósticos.',
+        'Sem vínculo verificado, só orientações gerais e incidentes públicos pertinentes. Não revele estado individual de login, bloqueio, OS, tickets ou dados pessoais, nem invente medições ou diagnósticos.',
         'Faça no máximo uma pergunta útil por resposta, adaptada ao assunto. Até 200 caracteres. Apenas a mensagem ao cliente.',
       ].join('\n');
       const result = await this.runner.run({
@@ -621,6 +637,8 @@ export class ConnectchatAutoResponderService {
               : await this.formulateUnlinkedContinuation(
                 agent, conversation, context.messages, newest.body,
                 typeof pending.reason === 'string' ? pending.reason : '', true,
+                pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
+                  ? pending.operational as Record<string, unknown> : undefined,
               );
             const token = createHash('sha256').update(`newnet-consent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
@@ -635,6 +653,8 @@ export class ConnectchatAutoResponderService {
                 ? await this.formulateUnlinkedContinuation(
                   agent, conversation, context.messages, newest.body,
                   typeof pending.reason === 'string' ? pending.reason : '', false,
+                  pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
+                    ? pending.operational as Record<string, unknown> : undefined,
                 )
                 : 'Para vincular este contato aos próximos atendimentos, você autoriza? Responda sim ou não.';
             const token = createHash('sha256').update(`newnet-pending-link:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
@@ -683,6 +703,27 @@ export class ConnectchatAutoResponderService {
             await this.settings.set(pendingKey, {
               customerId: found.customerId, connectionId: found.connectionId, consent: null, requestedAt: new Date().toISOString(),
               reason: identifiedReason,
+            });
+            // Primeiro ler evidências. A preferência de vínculo para o futuro
+            // nunca substitui investigação técnica no atendimento corrente.
+            const progressToken = createHash('sha256')
+              .update(`newnet-investigating:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(
+              conversation.id,
+              'Certo, vou verificar as informações do atendimento e a situação da conexão.',
+              `newnet-investigating-${progressToken}`,
+            );
+            await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
+            let operational;
+            try {
+              operational = await this.support.triageIdentifiedCustomer(found.connectionId!, found.customerId);
+            } finally {
+              await this.inbox.setAgentTyping(conversation.id, 'stopped').catch(() => undefined);
+            }
+            await this.settings.set(pendingKey, {
+              customerId: found.customerId, connectionId: found.connectionId,
+              consent: null, requestedAt: new Date().toISOString(),
+              reason: identifiedReason, operational,
             });
             const preferenceQuestion = await this.formulateLinkPreferenceQuestion(
               agent, conversation, context.messages, identifiedReason,
