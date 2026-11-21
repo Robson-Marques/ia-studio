@@ -39,8 +39,9 @@ export class ConnectchatSupportContextService {
    * posse ou autorização de acesso. Não retorna PII ao modelo nem ao chat. */
   /** CPF e CNPJ (somente dígitos para a consulta IXC). */
   async lookupDocument(document: string): Promise<{ status: 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE'; customerId?: string; connectionId?: string }> {
-    const digits = document.replace(/\D/g, '');
-    if (![11, 14].includes(digits.length) || /^(\d)\1+$/.test(digits)) return { status: 'NOT_FOUND' };
+    const digits = document.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!((/^\d{11}$/).test(digits) || (/^[A-Z0-9]{12}\d{2}$/).test(digits))
+      || /^([A-Z0-9])\1+$/.test(digits)) return { status: 'NOT_FOUND' };
     if (digits.length === 11) {
       for (let position = 9; position <= 10; position += 1) {
         const sum = [...digits.slice(0, position)].reduce((total, digit, index) =>
@@ -55,7 +56,7 @@ export class ConnectchatSupportContextService {
       ];
       for (let step = 0; step < 2; step += 1) {
         const sum = weights[step].reduce((total, weight, index) =>
-          total + Number(digits[index]) * weight, 0);
+          total + (digits.charCodeAt(index) - 48) * weight, 0);
         const remainder = sum % 11;
         const expected = remainder < 2 ? 0 : 11 - remainder;
         if (Number(digits[12 + step]) !== expected) return { status: 'NOT_FOUND' };
