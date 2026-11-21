@@ -59,8 +59,16 @@ export class ConnectchatAgentController {
 
   @Get('agent')
   @RequirePermissions(PERMISSIONS.AI_AGENTS_READ)
-  getAgent() {
-    return this.binding();
+  async getAgent() {
+    const binding = await this.binding();
+    // Um vínculo legado com outro agente não pode parecer ativo na UI da Newnet.
+    const nativeSetting = await this.settings.getValue('ai.native_agent_id');
+    const native = nativeSetting && typeof nativeSetting === 'object' && !Array.isArray(nativeSetting)
+      ? nativeSetting as Record<string, unknown> : {};
+    if (typeof native.id === 'string' && binding.agentId !== native.id) {
+      return { ...binding, enabled: false, agentId: null };
+    }
+    return binding;
   }
 
   @Put('agent')
@@ -100,7 +108,7 @@ export class ConnectchatAgentController {
     @Param('conversationId', new ParseUUIDPipe()) conversationId: string,
   ) {
     this.assertCanReadConnectChat(user);
-    const binding = await this.binding();
+    const binding = await this.getAgent();
     if (!binding.enabled || !binding.agentId) {
       throw new BadRequestException('Vincule e habilite um assistente para testar no ConnectChat.');
     }
