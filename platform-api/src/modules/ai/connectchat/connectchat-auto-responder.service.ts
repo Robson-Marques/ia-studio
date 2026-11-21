@@ -61,10 +61,13 @@ export class ConnectchatAutoResponderService {
           const rawPending = await this.settings.getValue(pendingKey);
           const pending = rawPending && typeof rawPending === 'object' && !Array.isArray(rawPending)
             ? rawPending as Record<string, unknown> : {};
-          const linkedId = /^ixc:[0-9a-f-]{36}:([1-9]\d*)$/i.exec(conversation.customerRef ?? '')?.[1];
+          const expectedRef = typeof pending.connectionId === 'string'
+            && typeof pending.customerId === 'string'
+            ? `ixc:${pending.connectionId}:${pending.customerId}` : null;
           const verified = conversation.businessContact?.status === 'CUSTOMER'
             && conversation.businessContact.linkStatus === 'ACTIVE';
-          if (verified && pending.consent === true && pending.customerId === linkedId
+          if (verified && pending.consent === true && expectedRef !== null
+            && conversation.customerRef?.toLowerCase() === expectedRef.toLowerCase()
             && pending.resumed !== true) {
             await this.respond(agent, conversation, typeof pending.reason === 'string' ? pending.reason : '');
             // Retomada só após checkpoint; não processar o mesmo turno duas vezes.
