@@ -515,8 +515,9 @@ export class ConnectchatAutoResponderService {
           + JSON.stringify({
             consultaConcluida: operational?.['status'] === 'READY',
             incidenteRegionalComOSSuprimida: safeIncident,
-            registrosAbertos: operational?.['hasOpenOs'] === true || operational?.['hasOpenTicket'] === true,
-            variosAcessos: operational?.['multipleAccesses'] === true,
+            // O estado individual de OS, contrato e acesso não é fornecido
+            // ao modelo antes da prova de titularidade.
+            precisaDeValidacaoAntesDeDadosPrivados: true,
           }),
         'Se existe ocorrência regional aplicável, informe de forma breve que a equipe trata o incidente; não faça perguntas desnecessárias, não prometa retorno automático sem acompanhamento realmente agendado.',
         justDeclined
@@ -589,19 +590,28 @@ export class ConnectchatAutoResponderService {
         break;
       }
     }
-    if (!document) return { attempted: false, result: null };
+    if (!document) return {
+      attempted: true,
+      result: { os_aberta: false, motivo: 'Documento do titular não disponível neste contexto; a OS exige validação adicional.' },
+    };
 
     // O catálogo ISP já governa a abertura. Política de aprovação ativa
     // impede a execução direta neste canal até existir fluxo de aprovação.
     const tool = this.toolRegistry.get('abrir_os');
     const catalogTool = await this.toolsRepository.findByKey('abrir_os');
     if (!tool || tool.requires_approval === true || !catalogTool?.is_active
-      || catalogTool.requires_approval === true) return { attempted: false, result: null };
+      || catalogTool.requires_approval === true) return {
+      attempted: true,
+      result: { os_aberta: false, motivo: 'A abertura automática de OS está desabilitada ou requer aprovação.' },
+    };
     const policy = await this.approvalPolicy.evaluate({
       targetType: 'TOOL',
       context: { tool_key: 'abrir_os' },
     });
-    if (policy.required) return { attempted: false, result: null };
+    if (policy.required) return {
+      attempted: true,
+      result: { os_aberta: false, motivo: 'A política da instalação exige aprovação antes de abrir OS.' },
+    };
 
     const idempotencyKey = `ai.connectchat.os_attempt.${conversation.id}`;
     const previous = await this.settings.getValue(idempotencyKey);
