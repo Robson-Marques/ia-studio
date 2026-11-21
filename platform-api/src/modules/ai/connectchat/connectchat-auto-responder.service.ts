@@ -463,9 +463,7 @@ export class ConnectchatAutoResponderService {
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-greet-${token}`);
             await this.settings.set(greetKey, { sent: true });
           } else if (!isGreetingOnly && !(await this.settings.getValue(noticeKey))) {
-            const message = greeted
-              ? 'Por favor, informe o CPF ou CNPJ do titular.'
-              : 'Oi! Sou Nete, da Newnet. Por favor, informe o CPF ou CNPJ do titular.';
+            const message = 'Por favor, informe o CPF ou CNPJ do titular.';
             const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
             await this.settings.set(noticeKey, { requested: true, reason: newest.body.slice(0, 500) });
