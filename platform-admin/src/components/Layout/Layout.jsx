@@ -56,7 +56,6 @@ const NAV = [
     children: [
       { label: 'Configurações da IA', icon: 'bot', path: '/ia/agentes', perm: 'ai.agents.read' },
       { label: 'Conhecimento',      icon: 'book',         path: '/ia/conhecimento',         perm: 'ai.knowledge.read' },
-      { label: 'Análise de atendimento', icon: 'search', path: '/ia/analise',    perm: 'ai.analysis.read' },
     ],
   },
   {
