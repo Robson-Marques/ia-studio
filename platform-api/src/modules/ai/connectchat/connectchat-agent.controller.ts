@@ -70,17 +70,21 @@ export class ConnectchatAgentController {
       && (typeof input.agentId !== 'string' || !/^[0-9a-f-]{36}$/i.test(input.agentId))) {
       throw new BadRequestException('Selecione um assistente válido.');
     }
-    const id = input.agentId || null;
-    if (id) {
-      const agent = await this.agents.findById(id);
-      if (!agent.is_active) throw new BadRequestException('O assistente está desativado.');
-      if (!agent.connection_id) {
-        throw new BadRequestException('Configure uma conexão de IA explícita no assistente antes de usá-lo no ConnectChat.');
-      }
+    // O ConnectChat vincula exclusivamente o agente interno da instalação.
+    // Provisionamento e configuração são administrativos; não se escolhe agente
+    // por canal e não se ativa um segundo agente genérico acidentalmente.
+    const native = await this.agents.ensureNativeAgent(null);
+    if (input.agentId && input.agentId !== native.id) {
+      throw new BadRequestException('O ConnectChat utiliza somente o agente oficial Newnet.');
     }
+    if (!native.is_active) throw new BadRequestException('O agente Newnet está desativado.');
+    if (input.enabled === true && !native.connection_id) {
+      throw new BadRequestException('Configure a conexão de IA do agente Newnet antes de ativar o ConnectChat.');
+    }
+    const id = native.id;
     const binding: Binding = {
       agentId: id,
-      enabled: input.enabled === true && !!id,
+      enabled: input.enabled === true,
       includeTicketHistory: input.includeTicketHistory !== false,
       channel: 'CONNECTCHAT',
       mode: 'SUPERVISED',
