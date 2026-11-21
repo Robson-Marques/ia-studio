@@ -250,6 +250,15 @@ export class ConnectchatAutoResponderService {
     return { conversationId, resetThrough };
   }
 
+  private async aiContextScope(conversationId: string): Promise<string> {
+    const raw = await this.settings.getValue(`ai.connectchat.reset_boundary.${conversationId}`);
+    const record = raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? raw as Record<string, unknown> : {};
+    const sequence = typeof record.sequence === 'string' && /^\d+$/.test(record.sequence)
+      ? record.sequence : null;
+    return sequence ? `${conversationId}:after:${sequence}` : conversationId;
+  }
+
   private state(raw: unknown): Cursor {
     const row = raw && typeof raw === 'object' && !Array.isArray(raw)
       ? raw as Record<string, unknown> : {};
@@ -385,7 +394,7 @@ export class ConnectchatAutoResponderService {
         input: redactSubscriberDocuments(message).slice(0, 500),
         history,
         createdBy: null,
-        scopeKeys: { connectchat_conversation: conversation.id },
+        scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
         allowedToolsOverride: [],
         channelInstructions: instructions,
         dryRun: false,
@@ -662,7 +671,7 @@ export class ConnectchatAutoResponderService {
         ].join('\n');
         const result = await this.runner.run({
           agentId: agent.id, input: redactSubscriberDocuments(newest.body).slice(0, 8000), history,
-          createdBy: null, scopeKeys: { connectchat_conversation: conversation.id },
+          createdBy: null, scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
           allowedToolsOverride: [], channelInstructions: instructions, dryRun: false,
         });
         const message = result.status === 'COMPLETED' && typeof result.output === 'string'
@@ -840,7 +849,7 @@ export class ConnectchatAutoResponderService {
         input: redactSubscriberDocuments(newest.body).slice(0, 8000),
         history,
         createdBy: null,
-        scopeKeys: { connectchat_conversation: conversation.id },
+        scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
         allowedToolsOverride: [],
         channelInstructions: instructions,
         dryRun: false,
