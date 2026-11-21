@@ -312,11 +312,13 @@ export class ConnectchatAutoResponderService {
     conversation: ConnectchatConversation,
     messages: ConnectchatMessage[],
     message: string,
-    step: 'OPENING' | 'IDENTIFICATION',
+    step: 'OPENING' | 'IDENTIFICATION' | 'FOLLOW_UP',
   ): Promise<string> {
     const fallback = step === 'OPENING'
       ? 'Oi! Sou Nete, da Newnet. Como posso ajudar?'
-      : 'Por favor, informe o CPF ou CNPJ do titular.';
+      : step === 'FOLLOW_UP'
+        ? 'Ainda preciso do CPF ou CNPJ do titular para continuar. Pode me informar?'
+        : 'Por favor, informe o CPF ou CNPJ do titular.';
     try {
       const history = messages.filter((item) => typeof item.body === 'string' && item.body.trim())
         .slice(-12, -1).map((item) => ({
@@ -324,8 +326,10 @@ export class ConnectchatAutoResponderService {
           content: redactSubscriberDocuments(item.body).slice(0, 500),
         }));
       const task = step === 'OPENING'
-        ? 'O usuário apenas cumprimentou. Cumprimente uma vez e pergunte como pode ajudar, sem pedir CPF agora.'
-        : 'O usuário trouxe uma necessidade. Solicite objetivamente o CPF ou CNPJ do titular, sem repetir apresentação, sem justificar a solicitação, sem anunciar consultas e sem antecipar diagnóstico.';
+        ? 'O usuário apenas cumprimentou e ainda não explicou a necessidade. Cumprimente uma vez e pergunte como pode ajudar.'
+        : step === 'FOLLOW_UP'
+          ? 'Você já pediu CPF/CNPJ e o cliente mandou outra mensagem sem informar o documento. Responda naturalmente à nova mensagem e retome brevemente o pedido de CPF/CNPJ. Não recomece o atendimento e não fique em silêncio.'
+          : 'O usuário trouxe uma necessidade. Solicite objetivamente o CPF ou CNPJ do titular, sem repetir apresentação, sem justificar a solicitação, sem anunciar consultas e sem antecipar diagnóstico.';
       const instructions = [
         'Você é Nete, atendente da Newnet. Conduza conversa natural, breve, contextual e sem frases burocráticas.',
         'O atendimento segue etapas: acolher -> entender a necessidade -> identificar o titular -> confirmar vínculo -> resolver.',
@@ -347,7 +351,7 @@ export class ConnectchatAutoResponderService {
       const output = result.status === 'COMPLETED' && typeof result.output === 'string'
         ? result.output.replace(/\s+/g, ' ').trim() : '';
       if (!output || output.length > 160) return fallback;
-      if (step === 'IDENTIFICATION') {
+      if (step !== 'OPENING') {
         // Um texto fluente não pode omitir o documento obrigatório.
         // Nem informar que fará consulta antes da confirmação de vínculo.
         if (!/\bCPF\b/i.test(output) || !/\bCNPJ\b/i.test(output)
@@ -518,18 +522,27 @@ export class ConnectchatAutoResponderService {
           const noticeKey = `ai.connectchat.identification_requested.${conversation.id}`;
           const greeted = !!(await this.settings.getValue(greetKey));
           const isGreetingOnly = /^(oi+|ol[aá]|bom dia|boa tarde|boa noite|opa|hello)[!., ]*$/i.test(newest.body.trim());
-          if (!greeted && isGreetingOnly) {
-            const message = await this.formulateIdentificationReply(agent, conversation, context.messages, newest.body, 'OPENING');
-            const token = createHash('sha256').update(`newnet-greet:${conversation.id}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, message, `newnet-greet-${token}`);
-            await this.settings.set(greetKey, { sent: true });
-          } else if (!isGreetingOnly && !(await this.settings.getValue(noticeKey))) {
-            const message = await this.formulateIdentificationReply(agent, conversation, context.messages, newest.body, 'IDENTIFICATION');
-            const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
-            await this.settings.set(noticeKey, { requested: true, reason: newest.body.slice(0, 500) });
-            await this.settings.set(greetKey, { sent: true });
+          const priorNotice = await this.settings.getValue(noticeKey);
+          const noticed = priorNotice && typeof priorNotice === 'object' && !Array.isArray(priorNotice)
+            ? priorNotice as Record<string, unknown> : {};
+          const waitingForDocument = noticed.requested === true;
+          // Cada nova mensagem do cliente gera UMA resposta, inclusive
+          // "oi" quando já há uma identificação pendente. Não depende de
+          // excluir a conversa ou apagar a chave da pergunta anterior.
+          const step = waitingForDocument ? 'FOLLOW_UP' as const
+            : !greeted && isGreetingOnly ? 'OPENING' as const
+              : 'IDENTIFICATION' as const;
+          const reply = await this.formulateIdentificationReply(
+            agent, conversation, context.messages, newest.body, step);
+          const token = createHash('sha256').update(
+            `newnet-identification:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-identification-${token}`);
+          if (!waitingForDocument && step === 'IDENTIFICATION') {
+            await this.settings.set(noticeKey, {
+              requested: true, reason: newest.body.slice(0, 500),
+            });
           }
+          if (!greeted) await this.settings.set(greetKey, { sent: true });
         }
         await this.complete(key, sequence, claim);
         return;
