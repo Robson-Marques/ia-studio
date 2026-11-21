@@ -43,3 +43,11 @@ const DOCUMENT_PATTERN = /(?:^|[^A-Za-z0-9])([A-Za-z0-9]{2}[.\s]?[A-Za-z0-9]{3}[
 export function extractSubscriberDocument(message: string): string | null {
   return message.match(DOCUMENT_PATTERN)?.[1] ?? null;
 }
+
+/** Não transportar CPF/CNPJ do histórico bruto para o contexto do LLM. */
+const DOCUMENT_IN_TEXT = /(^|[^A-Za-z0-9])([A-Za-z0-9]{2}[.\s]?[A-Za-z0-9]{3}[.\s]?[A-Za-z0-9]{3}[\/\s]?[A-Za-z0-9]{4}[-\s]?\d{2}|\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?![A-Za-z0-9])/gi;
+
+export function redactSubscriberDocuments(text: string): string {
+  return text.replace(DOCUMENT_IN_TEXT, (_match, prefix: string) =>
+    prefix + '[documento protegido]');
+}
