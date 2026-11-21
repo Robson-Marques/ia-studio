@@ -80,6 +80,10 @@ export class ConnectchatInboxService {
    * customerRef é opaco para o ConnectChat. Nesta vertente, o IA Studio emite
    * `ixc:<connection-id>:<customer-id>` e só ele pode interpretá-lo.
    */
+  async getLinkedCustomerName(conversation: ConnectchatConversation): Promise<string | null> {
+    return this.resolveCustomerDisplayName(conversation.customerRef);
+  }
+
   private async resolveCustomerDisplayName(customerRef: string | null): Promise<string | null> {
     if (!customerRef) return null;
     const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(customerRef);
@@ -249,6 +253,48 @@ export class ConnectchatInboxService {
       globalIdentityId: conversation.globalIdentityId,
       requestId,
     });
+  }
+
+  /**
+   * Associação automática solicitada pelo fluxo Nete depois que o CPF foi
+   * informado no chat e retornou um único cliente IXC. Nunca aceita ID do LLM.
+   * Este método não altera outros cadastros ou identidade de outras sessões.
+   */
+  async autoLinkIdentifiedCustomer(
+    conversationId: string, expectedIdentityId: string, expectedSequence: string,
+    connectionId: string, customerId: string,
+  ): Promise<{ linked: boolean; customerName: string | null }> {
+    if (!/^[0-9a-f-]{36}$/i.test(connectionId) || !/^[1-9]\d*$/.test(customerId)) {
+      throw new BadRequestException('Cadastro inválido para associação.');
+    }
+    const conversations = await this.listRawConversations();
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (!conversation || conversation.status !== 'OPEN'
+      || !expectedIdentityId || conversation.globalIdentityId !== expectedIdentityId
+      || conversation.lastSequence !== expectedSequence) {
+      throw new ConflictException('A identidade ou conversa mudou durante a identificação.');
+    }
+    const ixc = await this.connections.findById(connectionId);
+    if (!ixc || ixc.provider_key !== 'ixc' || ixc.status !== 'ACTIVE' || !ixc.is_active) {
+      throw new ConflictException('Conexão IXC indisponível para associação.');
+    }
+    const identification = await this.connections.execute(connectionId, 'cliente.identificacao', { customerId }) as {
+      data?: Array<{ name?: unknown }>;
+    };
+    const name = identification.data?.[0]?.name;
+    const customerName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 100) : null;
+    if (!customerName) throw new ConflictException('Nome do cadastro não confirmado pelo IXC.');
+    const customerRef = `ixc:${connectionId}:${customerId}`;
+    if (conversation.customerRef === customerRef && conversation.businessContact?.linkStatus === 'ACTIVE') {
+      return { linked: true, customerName };
+    }
+    await this.execute('linkContactDirectly', {
+      globalIdentityId: expectedIdentityId,
+      customerRef,
+      customerDisplayName: customerName,
+      actorRef: 'ystudio:nete:automatic-identification',
+    });
+    return { linked: true, customerName };
   }
 
   async requestCustomerLink(user: AuthenticatedUser, conversationId: string, customerId: string) {

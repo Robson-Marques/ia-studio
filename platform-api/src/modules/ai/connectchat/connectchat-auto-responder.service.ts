@@ -234,11 +234,14 @@ export class ConnectchatAutoResponderService {
     const prefixes = [
       'pending_identity', 'resume', 'cursor', 'document_attempts',
       'identification_requested', 'greeting', 'technology_requested',
-      'contract_requested', 'selected_contract',
+      'contract_requested', 'selected_contract', 'recognition',
     ];
     await this.prisma.$transaction(async (tx) => {
       await tx.systemSetting.deleteMany({
         where: { key: { in: prefixes.map((name) => `ai.connectchat.${name}.${conversationId}`) } },
+      });
+      await tx.systemSetting.deleteMany({
+        where: { key: { startsWith: `ai.connectchat.session_os.${conversationId}.` } },
       });
       await tx.systemSetting.upsert({
         where: { key: `ai.connectchat.reset_boundary.${conversationId}` },
@@ -263,7 +266,11 @@ export class ConnectchatAutoResponderService {
       ? raw as Record<string, unknown> : {};
     const sequence = typeof record.sequence === 'string' && /^\d+$/.test(record.sequence)
       ? record.sequence : null;
-    return sequence ? `${conversationId}:after:${sequence}` : conversationId;
+    const recogRaw = await this.settings.getValue(`ai.connectchat.recognition.${conversationId}`);
+    const recog = recogRaw && typeof recogRaw === 'object' && !Array.isArray(recogRaw)
+      ? recogRaw as Record<string, unknown> : {};
+    const base = sequence ? `${conversationId}:after:${sequence}` : conversationId;
+    return typeof recog.scopeId === 'string' ? `${base}:customer:${recog.scopeId}` : base;
   }
 
   private state(raw: unknown): Cursor {
@@ -431,51 +438,6 @@ export class ConnectchatAutoResponderService {
    * não autoriza leitura de cadastros/OS/sinal ou qualquer dado privado do IXC.
    * A IA escreve a resposta; o backend determina escopo e permissões.
    */
-  private async formulateLinkPreferenceQuestion(
-    agent: AiAgent,
-    conversation: ConnectchatConversation,
-    messages: ConnectchatMessage[],
-    reason: string,
-  ): Promise<string> {
-    const fallback = 'Encontrei o cadastro. Quer deixar este contato vinculado para facilitar os próximos atendimentos? Sim ou não?';
-    try {
-      const history = messages.filter((m) => typeof m.body === 'string' && m.body.trim())
-        .slice(-10, -1).map((m) => ({
-          role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
-          content: redactSubscriberDocuments(m.body).slice(0, 500),
-        }));
-      const result = await this.runner.run({
-        agentId: agent.id,
-        input: 'Cadastro localizado; consultar preferência de vínculo futuro. Motivo: '
-          + redactSubscriberDocuments(reason).slice(0, 250),
-        history,
-        createdBy: null,
-        scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
-        allowedToolsOverride: [],
-        channelInstructions: [
-          'Você é Nete, da Newnet. Seja breve e humana, sem frases de sistema ou explicações burocráticas.',
-          'A busca por documento encontrou um cadastro, mas o cliente NÃO está autenticado.',
-          'Pergunte se ele deseja manter ESTE contato vinculado para facilitar FUTUROS atendimentos.',
-          'Explique implicitamente pela escolha que NÃO vincular NÃO cancela o atendimento atual.',
-          'A escolha é sim ou não. Uma pergunta apenas. Não exiba CPF/CNPJ, nome nem dados cadastrais.',
-          'Não diga que o vínculo foi realizado nem que a identidade foi comprovada.',
-          'Não anuncie consulta técnica, sinal, contrato ou ordem de serviço.',
-          'Responda em português brasileiro com até 180 caracteres e uma única pergunta.',
-        ].join('\n'),
-        dryRun: false,
-      });
-      const output = result.status === 'COMPLETED' && typeof result.output === 'string'
-        ? result.output.replace(/\s+/g, ' ').trim() : '';
-      if (!output || output.length > 180 || !/\b(vinculad|associad|vincular|associar)\w*/i.test(output)
-        || !/\b(sim|autoriza|quer|deseja|pode)\b/i.test(output)
-        || /\b(CPF|CNPJ|contrato|fatura|comprovad)\b/i.test(output)) return fallback;
-      return output;
-    } catch (error) {
-      this.logger.warn(`Pergunta de preferência de vínculo indisponível: ${(error as Error).message}`);
-      return fallback;
-    }
-  }
-
   private async formulateUnlinkedContinuation(
     agent: AiAgent,
     conversation: ConnectchatConversation,
@@ -514,7 +476,7 @@ export class ConnectchatAutoResponderService {
         }));
       const instructions = [
         'Você é Nete, da Newnet. Seja natural, acolhedora, breve e objetiva, sem jargão burocrático.',
-        'A pessoa não quer manter este contato vinculado para atendimentos futuros. Respeite. Isso NÃO encerra o atendimento atual.',
+        'A associação do contato é administrada pelo sistema. NÃO ofereça nem pergunte sobre vinculação: continue o atendimento atual.',
         'Continue o atendimento a partir do problema já relatado, sem reiniciar saudação e sem pedir CPF novamente.',
         'O motivo original foi: ' + redactSubscriberDocuments(initialReason).slice(0, 300),
         'Evidências operacionais da sessão (o cliente informou o documento): '
@@ -534,9 +496,9 @@ export class ConnectchatAutoResponderService {
           ? 'Reconheça a escolha de não manter o vínculo em uma oração breve e, na mesma mensagem, conduza o próximo passo de triagem.'
           : 'Responda à mensagem atual e faça avançar o diagnóstico geral em uma etapa. Não repita o aviso sobre vínculo.',
         'O backend já consultou IXC. Pode falar dos resultados reais fornecidos; nunca invente diagnóstico ou nova OS.',
-        'A escolha de manter este contato vinculado é INDEPENDENTE da identificação temporária pelo CPF nesta conversa.',
+        'O CPF já selecionou o cadastro atendido nesta sessão; a associação do contato para próximos atendimentos ocorre separadamente.',
         'Não informe dados financeiros, endereço, números de documentos ou informações de terceiros. Confirme OS somente quando osRegistradaNestaSessao for verdadeira.',
-        'Se a OS foi aberta ou há incidente relevante, informe a decisão e não faça perguntas técnicas sem necessidade.',
+        'Se uma OS foi aberta, já existe chamado, ou há incidente relevante, comunique isso e não faça perguntas técnicas sem necessidade.',
         'Faça no máximo uma pergunta útil por resposta, adaptada ao assunto. Até 200 caracteres. Apenas a mensagem ao cliente.',
       ].join('\n');
       const result = await this.runner.run({
@@ -600,8 +562,9 @@ export class ConnectchatAutoResponderService {
     if (approval.required) return { os_aberta: false, motivo: 'A abertura depende da aprovação da equipe.' };
 
     const current = await this.inbox.contextForAgentPreview(conversation.id);
+    const lastCustomer = current.messages.filter((m) => m.senderKind === 'CUSTOMER').at(-1);
     if (current.conversation.status !== 'OPEN'
-      || current.conversation.lastSequence !== conversation.lastSequence
+      || !lastCustomer || lastCustomer.serverSequence !== conversation.lastSequence
       || current.conversation.globalIdentityId !== conversation.globalIdentityId) return null;
     // Deduplicação por conversa + cliente; um contato pode atender diversas pessoas.
     const attemptKey = `ai.connectchat.session_os.${conversation.id}.${connectionId}.${customerId}`;
@@ -846,79 +809,114 @@ export class ConnectchatAutoResponderService {
         return;
       }
 
+      // Reconhecimento do cliente habitual: confirme a assinatura antes de
+      // aproveitar o vínculo lembrado em um novo atendimento. Outro CPF
+      // escolhe um novo cadastro sem herdar contexto do titular anterior.
+      const recognitionKey = `ai.connectchat.recognition.${conversation.id}`;
+      const recognitionRaw = await this.settings.getValue(recognitionKey);
+      const recognition = recognitionRaw && typeof recognitionRaw === 'object'
+        && !Array.isArray(recognitionRaw) ? recognitionRaw as Record<string, unknown> : {};
+      const customerStart = typeof recognition.customerStartSequence === 'string'
+        && /^\d+$/.test(recognition.customerStartSequence)
+        ? BigInt(recognition.customerStartSequence) : null;
+      if (customerStart !== null) {
+        context.messages = context.messages.filter((m) => /^\d+$/.test(m.serverSequence)
+          && BigInt(m.serverSequence) >= customerStart);
+      }
+      const newDocument = extractSubscriberDocument(newest.body);
+      const linkedRef = context.conversation.customerRef;
+      const linkedMatch = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(linkedRef || '');
+      const normalizedReply = newest.body.trim().toLowerCase();
+      const affirmative = /^(?:sim|isso|isso mesmo|correto|é|eh|é sim|pode ser)[.!]?$/i.test(normalizedReply);
+      const negative = /^(?:não|nao|não é|nao é|outro|outra pessoa|outro cliente|não é esse|nao e esse)[.!]?$/i.test(normalizedReply);
+      const otherCustomerRequested = recognition.awaitingOther === true;
+      const correctionRequested = /\b(n[aã]o (?:[eé]|era|sou)|outr[oa] (?:cliente|pessoa|assinatura)|cliente errado|cadastro errado)\b/i
+        .test(newest.body.trim());
+      if (context.verified && linkedMatch && !newDocument
+        && (recognition.confirmed !== true || correctionRequested)) {
+        if (recognition.asked === true && affirmative && !otherCustomerRequested) {
+          await this.settings.set(recognitionKey, {
+            ...recognition, confirmed: true, awaitingOther: false,
+            at: new Date().toISOString(),
+          });
+          // A confirmação do cadastro não substitui o problema já relatado.
+          const intentKey = `ai.connectchat.identification_requested.${conversation.id}`;
+          const initial = await this.settings.getValue(intentKey);
+          const prior = initial && typeof initial === 'object' && !Array.isArray(initial)
+            ? initial as Record<string, unknown> : {};
+          if (typeof prior.reason === 'string' && prior.reason.trim()) {
+            await this.settings.set(intentKey, { ...prior, requested: true });
+          }
+        } else if (negative || correctionRequested || otherCustomerRequested) {
+          await this.settings.set(recognitionKey, {
+            ...recognition, asked: true, confirmed: false, awaitingOther: true,
+          });
+          const reply = await this.replyWithOperationalEvidence(
+            agent, conversation, context.messages, newest.body,
+            { etapa: 'troca_de_cliente', pedir_documento: true },
+            'Certo, de qual assinatura vamos cuidar? Me informe o CPF ou CNPJ desse cliente.',
+          );
+          const msg = /\b(CPF|CNPJ)\b/i.test(reply) ? reply
+            : 'Tudo bem, me informe o CPF ou CNPJ do outro cliente para continuar.';
+          const token = createHash('sha256').update(
+            `newnet-other-customer:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, msg, `newnet-other-${token}`);
+          await this.complete(key, sequence, claim);
+          return;
+        } else {
+          const customerName = await this.inbox.getLinkedCustomerName(context.conversation);
+          if (customerName) {
+            await this.settings.set(recognitionKey, {
+              asked: true, confirmed: false, awaitingOther: false,
+            });
+            const previousReason = this.classifyRequest(newest.body, context.messages) !== 'GENERAL'
+              ? newest.body.slice(0, 500) : null;
+            if (previousReason) await this.settings.set(
+              `ai.connectchat.identification_requested.${conversation.id}`,
+              { requested: true, reason: previousReason },
+            );
+            const question = await this.replyWithOperationalEvidence(
+              agent, conversation, context.messages, newest.body,
+              { etapa: 'confirmar_cliente_habitual', nome: customerName, resposta: 'sim_ou_nao' },
+              `É sobre a assinatura de ${customerName}?`,
+            );
+            const token = createHash('sha256').update(
+              `newnet-recognize:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id,
+              question.includes('?') ? question : `É sobre a assinatura de ${customerName}?`,
+              `newnet-recognize-${token}`);
+            await this.complete(key, sequence, claim);
+            return;
+          }
+          // Sem nome verificável, não atribuir um cliente errado na saudação.
+          await this.settings.set(recognitionKey, { confirmed: true });
+        }
+      }
+
       // IDENTIFICAÇÃO OBRIGATÓRIA: nunca escolher diagnóstico de fibra ou rádio
       // antes de confirmar o cliente no canal. Uma única solicitação por conversa;
       // mensagens seguintes não geram variações repetidas da mesma pergunta.
-      if (!context.verified) {
+      if (!context.verified || (newDocument !== null && context.verified)) {
         // CPF localiza cadastro; jamais comprova identidade nem vincula por si.
         const pendingKey = `ai.connectchat.pending_identity.${conversation.id}`;
         const existing = await this.settings.getValue(pendingKey);
         const pending = existing && typeof existing === 'object' && !Array.isArray(existing)
           ? existing as Record<string, unknown> : {};
-        const answerText = newest.body.trim().toLowerCase();
-        const explicitYes = /^(?:sim|autorizo|pode vincular|concordo|pode sim)[.!]?$/.test(answerText);
-        const explicitNo = /^(?:não|nao|não autorizo|nao autorizo|não quero|nao quero)[.!]?$/.test(answerText);
         const hasNewDocument = extractSubscriberDocument(newest.body) !== null;
-        // Depois da recusa ou da expiração, um novo documento inicia
-        // identificação limpa; nunca herdar autorização do cadastro anterior.
-        const restartIdentification = hasNewDocument;
-        // Um documento novo substitui o cadastro candidato e revoga a autorização
-        // anterior; pedidos de outras contas não serão concluídos neste fluxo.
-        if (typeof pending['customerId'] === 'string' && !restartIdentification) {
-          if ((explicitYes && pending['consent'] !== true)
-            || (explicitNo && pending['consent'] !== false)) {
-            // Uma nova autorização sempre gera um ciclo de prova novo.
-            // Recusa revoga localmente qualquer pedido anterior, ainda que a
-            // PWA tenha uma solicitação antiga visível.
-            await this.settings.set(pendingKey, {
-              customerId: pending.customerId,
-              connectionId: pending.connectionId,
-              reason: pending.reason,
-              operational: pending.operational,
-              osResult: pending.osResult,
-              consent: explicitYes,
-              requestedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              requestId: null,
-              requestAttempts: 0,
-              requestFirstAttemptAt: null,
-              nextAttemptAt: null,
-              revoked: explicitNo,
-            });
-            const answer = explicitYes
-              ? 'Obrigado! Vou verificar a confirmação segura do vínculo para continuar seu atendimento.'
-              : await this.formulateUnlinkedContinuation(
-                agent, conversation, context.messages, newest.body,
-                typeof pending.reason === 'string' ? pending.reason : '', true,
-                pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
-                  ? pending.operational as Record<string, unknown> : undefined,
-                pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
-                  ? pending.osResult as Record<string, unknown> : undefined,
-              );
-            const token = createHash('sha256').update(`newnet-consent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
-          } else if (!explicitYes && !explicitNo) {
-            // Enquanto espera a prova, não ignorar perguntas do assinante.
-            // Sem acesso a cadastro privado até ACTIVE/CUSTOMER.
-            const reply = pending.consent === true
-              ? typeof pending.requestId === 'string'
-                ? 'Seu vínculo está aguardando confirmação na conta ConnectChat. Assim que for confirmado, continuo o atendimento.'
-                : 'Ainda não consegui iniciar a confirmação segura do vínculo. Você pode continuar me contando o problema; não vou consultar seus dados privados antes da confirmação.'
-              : pending.consent === false
-                ? await this.formulateUnlinkedContinuation(
-                  agent, conversation, context.messages, newest.body,
-                  typeof pending.reason === 'string' ? pending.reason : '', false,
-                  pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
-                    ? pending.operational as Record<string, unknown> : undefined,
-                  pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
-                    ? pending.osResult as Record<string, unknown> : undefined,
-                )
-                : 'Para vincular este contato aos próximos atendimentos, você autoriza? Responda sim ou não.';
-            const token = createHash('sha256').update(`newnet-pending-link:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-pending-link-${token}`);
-          }
-          // Sem vínculo ACTIVE+CUSTOMER, a Nete pode orientar a triagem geral,
-          // mas NUNCA consultar dados privados, OS, faturas ou sinal individual.
+        // O CPF seleciona o cliente da sessão. Não existe mais pergunta
+        // Sim/Não sobre vínculo, nem uma espera que bloqueie o atendimento.
+        if (typeof pending['customerId'] === 'string' && !hasNewDocument) {
+          const reply = await this.formulateUnlinkedContinuation(
+            agent, conversation, context.messages, newest.body,
+            typeof pending.reason === 'string' ? pending.reason : '', false,
+            pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
+              ? pending.operational as Record<string, unknown> : undefined,
+            pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
+              ? pending.osResult as Record<string, unknown> : undefined,
+          );
+          const token = createHash('sha256').update(
+            `newnet-session-followup:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-session-followup-${token}`);
           await this.complete(key, sequence, claim);
           return;
         }
@@ -957,19 +955,43 @@ export class ConnectchatAutoResponderService {
             const reasonWithoutDocument = newest.body.replace(candidate, '').trim().slice(0, 500);
             const identifiedReason = typeof previous.reason === 'string' && previous.reason.trim()
               ? previous.reason : reasonWithoutDocument;
+            // CPF informado pelo cliente escolhe o cadastro para esta sessão
+            // e associa a identidade do canal para facilitar novos contatos.
+            // Não perguntar sobre vínculo aqui.
+            let customerName: string | null = null;
+            let linked = false;
+            try {
+              const result = await this.inbox.autoLinkIdentifiedCustomer(
+                conversation.id, conversation.globalIdentityId || '',
+                sequence, found.connectionId!, found.customerId,
+              );
+              customerName = result.customerName;
+              linked = result.linked;
+            } catch (error) {
+              this.logger.warn(`Não foi possível associar o cadastro encontrado: ${(error as Error).message}`);
+              // A indisponibilidade do vínculo não impede a triagem operacional da sessão.
+            }
+            await this.settings.set(recognitionKey, {
+              asked: false, confirmed: linked, awaitingOther: false,
+              customerRef: `ixc:${found.connectionId}:${found.customerId}`,
+              customerStartSequence: sequence,
+              scopeId: randomUUID(),
+            });
             await this.settings.set(pendingKey, {
-              customerId: found.customerId, connectionId: found.connectionId, consent: null, requestedAt: new Date().toISOString(),
+              customerId: found.customerId, connectionId: found.connectionId,
+              consent: false, requestedAt: new Date().toISOString(),
               reason: identifiedReason,
             });
-            // Primeiro ler evidências. A preferência de vínculo para o futuro
-            // nunca substitui investigação técnica no atendimento corrente.
-            const progressToken = createHash('sha256')
-              .update(`newnet-investigating:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(
-              conversation.id,
-              'Certo, vou verificar as informações do atendimento e a situação da conexão.',
-              `newnet-investigating-${progressToken}`,
+            const token = createHash('sha256')
+              .update(`newnet-document:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            const receipt = await this.replyWithOperationalEvidence(
+              agent, conversation, context.messages, newest.body,
+              { etapa: 'cadastro_localizado', nome: customerName, proxima_acao: 'investigar_conexao' },
+              customerName
+                ? `Localizei o cadastro de ${customerName}. Vou analisar a situação da conexão.`
+                : 'Localizei o cadastro. Vou analisar a situação da conexão.',
             );
+            await this.inbox.sendAgentMessage(conversation.id, receipt, `newnet-document-${token}`);
             await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
             let operational: Awaited<ReturnType<ConnectchatSupportContextService['triageIdentifiedCustomer']>>;
             try {
@@ -977,27 +999,33 @@ export class ConnectchatAutoResponderService {
             } finally {
               await this.inbox.setAgentTyping(conversation.id, 'stopped').catch(() => undefined);
             }
-            // Diagnóstico e eventual OS pertencem à sessão atual.
-            // A preferência de vínculo só decide se o contato ficará salvo.
             const osResult = await this.maybeOpenSessionOfflineOs(
               agent, conversation, candidate, found.connectionId!,
               found.customerId, identifiedReason, operational,
             );
             await this.settings.set(pendingKey, {
               customerId: found.customerId, connectionId: found.connectionId,
-              consent: null, requestedAt: new Date().toISOString(),
+              consent: false, requestedAt: new Date().toISOString(),
               reason: identifiedReason, operational, osResult,
             });
-            const preferenceQuestion = await this.formulateLinkPreferenceQuestion(
-              agent, conversation, context.messages, identifiedReason,
+            const outcome = await this.formulateUnlinkedContinuation(
+              agent, conversation, context.messages, newest.body,
+              identifiedReason, false, operational, osResult || undefined,
             );
-            await this.inbox.sendAgentMessage(conversation.id,
-              preferenceQuestion, `newnet-document-${token}`);
+            const outcomeToken = createHash('sha256').update(
+              `newnet-diagnosis:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, outcome, `newnet-diagnosis-${outcomeToken}`);
           } else {
-            const text = found.status === 'UNAVAILABLE'
-              ? 'Não consegui consultar o cadastro agora. Vou precisar do apoio de um atendente.'
-              : 'Não localizei um cadastro com esses dados. Confira o CPF ou CNPJ do titular, por favor.';
-            await this.inbox.sendAgentMessage(conversation.id, text, `newnet-document-${token}`);
+            const fallback = found.status === 'UNAVAILABLE'
+              ? 'Não consegui acessar o cadastro agora. Podemos tentar novamente em instantes?'
+              : 'Não encontrei esse CPF ou CNPJ no cadastro. Pode conferir os números e me enviar novamente?';
+            const text = await this.replyWithOperationalEvidence(
+              agent, conversation, context.messages, newest.body,
+              { etapa: 'documento_nao_localizado', consulta: found.status, solicitar_conferencia: true },
+              fallback,
+            );
+            const safeText = /\b(CPF|CNPJ|n[uú]meros|dados)\b/i.test(text) ? text : fallback;
+            await this.inbox.sendAgentMessage(conversation.id, safeText, `newnet-document-${token}`);
           }
         } else {
           // Motivo e CPF são duas etapas diferentes. "Oi" pede o motivo;
