@@ -37,9 +37,7 @@ import ExecucaoDetalhe from './pages/Automacao/ExecucaoDetalhe';
 import TemplatesAutomacao from './pages/Automacao/TemplatesAutomacao';
 import TemplateEditor from './pages/Automacao/TemplateEditor';
 import Monitoramento from './pages/Automacao/Monitoramento';
-import Agentes from './pages/IA/Agentes';
-import AgenteEditor from './pages/IA/AgenteEditor';
-import AgenteImportar from './pages/IA/AgenteImportar';
+import ConfiguracoesIA from './pages/IA/ConfiguracoesIA';
 import BasesConhecimento from './pages/IA/BasesConhecimento';
 import BaseConhecimentoEditor from './pages/IA/BaseConhecimentoEditor';
 import BaseConhecimentoDetalhe from './pages/IA/BaseConhecimentoDetalhe';
@@ -131,13 +129,13 @@ export default function App() {
                 <Route path="/automacao/templates/:id" element={<PermissionRoute perm="automation.templates.read"><TemplateEditor /></PermissionRoute>} />
                 <Route path="/automacao/eventos" element={<Navigate to="/automacao/monitoramento?tab=eventos" replace />} />
                 <Route path="/automacao/notificacoes" element={<Navigate to="/automacao/monitoramento?tab=notificacoes" replace />} />
-                <Route path="/ia/agentes" element={<PermissionRoute perm="ai.agents.read"><Agentes /></PermissionRoute>} />
+                <Route path="/ia/agentes" element={<PermissionRoute perm="ai.agents.read"><ConfiguracoesIA /></PermissionRoute>} />
                 <Route path="/ia/agentes/nova" element={<Navigate to="/ia/agentes" replace />} />
                 <Route path="/ia/agentes/importar" element={<Navigate to="/ia/agentes" replace />} />
                 {/* `read` (não `write`): a aba Testar vive aqui, e quem só tem
                     ai.agents.execute precisa alcançá-la. O Salvar é gateado por
                     can('ai.agents.write') dentro do editor. */}
-                <Route path="/ia/agentes/:id" element={<PermissionRoute perm="ai.agents.read"><AgenteEditor /></PermissionRoute>} />
+                <Route path="/ia/agentes/:id" element={<Navigate to="/ia/agentes" replace />} />
                 <Route path="/ia/conhecimento" element={<PermissionRoute perm="ai.knowledge.read"><BasesConhecimento /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/nova" element={<PermissionRoute perm="ai.knowledge.write"><BaseConhecimentoEditor /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/:id" element={<PermissionRoute perm="ai.knowledge.read"><BaseConhecimentoDetalhe /></PermissionRoute>} />

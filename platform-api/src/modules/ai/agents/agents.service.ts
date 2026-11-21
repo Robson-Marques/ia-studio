@@ -72,7 +72,7 @@ export class AgentsService {
    */
   async ensureNativeAgent(createdBy: string | null) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(741192, 2026)`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(741192, 2026)::text AS acquired`;
       const settingKey = 'ai.native_agent_id';
       const saved = await tx.systemSetting.findUnique({ where: { key: settingKey } });
       const savedId = (saved?.value as { id?: string } | null)?.id;
@@ -83,8 +83,15 @@ export class AgentsService {
 
       const agents = await tx.aiAgent.findMany({ orderBy: { created_at: 'asc' } });
       const named = agents.find((a) => a.name === 'Assistente Newnet');
-      // Se há exatamente um assistente legado, preserva o ID, as conversas e os vínculos.
-      const existing = named || (agents.length === 1 ? agents[0] : null);
+      // Prioridade para o agente já testado no ConnectChat: preservar modelo,
+      // ferramentas, versões e conversas mesmo se houver outros agentes legados.
+      const chatSetting = await tx.systemSetting.findUnique({
+        where: { key: 'ai.connectchat.agent.binding' },
+      });
+      const chatBinding = chatSetting?.value as { agentId?: string } | null;
+      const linked = agents.find((a) => a.id === chatBinding?.agentId);
+      // Não escolhe arbitrariamente entre múltiplos agentes sem vínculo.
+      const existing = named || linked || (agents.length === 1 ? agents[0] : null);
       const agent = existing || await tx.aiAgent.create({
         data: {
           name: 'Assistente Newnet',

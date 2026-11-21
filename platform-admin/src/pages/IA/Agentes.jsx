@@ -97,6 +97,20 @@ export default function Agentes() {
             </Card>
             <Card>
               <div style={{ padding: 20 }} className="space-y-3">
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>ConnectChat — primeira validação</h2>
+                <p style={{ fontSize: 13, color: 'var(--su-text-secondary)' }}>
+                  Conecte o canal web ao agente Newnet e teste conversas reais em modo supervisionado,
+                  sem envio automático ou alteração dos dados no IXC.
+                </p>
+                {can('comm.connectchat.read') ? (
+                  <Button variant="primary" onClick={() => navigate('/connectchat/conversas')}>Abrir ConnectChat</Button>
+                ) : (
+                  <p style={{ fontSize: 12, color: 'var(--su-text-secondary)' }}>Solicite acesso de leitura ao ConnectChat.</p>
+                )}
+              </div>
+            </Card>
+            <Card>
+              <div style={{ padding: 20 }} className="space-y-3">
                 <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Testar agente</h2>
                 <p style={{ fontSize: 13, color: 'var(--su-text-secondary)' }}>
                   Verifique respostas e acessos antes de liberar o uso operacional.
