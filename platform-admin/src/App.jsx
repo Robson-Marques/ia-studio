@@ -37,10 +37,7 @@ import ExecucaoDetalhe from './pages/Automacao/ExecucaoDetalhe';
 import TemplatesAutomacao from './pages/Automacao/TemplatesAutomacao';
 import TemplateEditor from './pages/Automacao/TemplateEditor';
 import Monitoramento from './pages/Automacao/Monitoramento';
-import Agentes from './pages/IA/Agentes';
 import ConfiguracoesIA from './pages/IA/ConfiguracoesIA';
-import AgenteEditor from './pages/IA/AgenteEditor';
-import AgenteImportar from './pages/IA/AgenteImportar';
 import BasesConhecimento from './pages/IA/BasesConhecimento';
 import BaseConhecimentoEditor from './pages/IA/BaseConhecimentoEditor';
 import BaseConhecimentoDetalhe from './pages/IA/BaseConhecimentoDetalhe';
@@ -138,7 +135,7 @@ export default function App() {
                 {/* `read` (não `write`): a aba Testar vive aqui, e quem só tem
                     ai.agents.execute precisa alcançá-la. O Salvar é gateado por
                     can('ai.agents.write') dentro do editor. */}
-                <Route path="/ia/agentes/:id" element={<PermissionRoute perm="ai.agents.read"><AgenteEditor /></PermissionRoute>} />
+                <Route path="/ia/agentes/:id" element={<Navigate to="/ia/agentes" replace />} />
                 <Route path="/ia/conhecimento" element={<PermissionRoute perm="ai.knowledge.read"><BasesConhecimento /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/nova" element={<PermissionRoute perm="ai.knowledge.write"><BaseConhecimentoEditor /></PermissionRoute>} />
                 <Route path="/ia/conhecimento/:id" element={<PermissionRoute perm="ai.knowledge.read"><BaseConhecimentoDetalhe /></PermissionRoute>} />
