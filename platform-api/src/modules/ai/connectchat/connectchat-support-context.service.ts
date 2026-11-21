@@ -147,14 +147,11 @@ export class ConnectchatSupportContextService {
       this.logger.warn(`Consulta de acessos não concluída: ${(error as Error).message}`);
     }
 
-    const incidents: IncidentInfo[] = [];
-    for (const login of [...new Set(incidentLogins)].slice(0, 8)) {
-      try {
-        const match = await this.incidentLookup.activeFor(login);
-        if (match && !incidents.some((item) => item.incident_id === match.incident_id)) incidents.push(match);
-      } catch (error) {
-        this.logger.warn(`Consulta de incidentes não concluída: ${(error as Error).message}`);
-      }
+    let incidents: IncidentInfo[] = [];
+    try {
+      incidents = await this.incidentLookup.activeForMany([...new Set(incidentLogins)].slice(0, 8));
+    } catch (error) {
+      this.logger.warn(`Consulta de incidentes não concluída: ${(error as Error).message}`);
     }
 
     // Histórico complementar: falha não apaga a evidência de OS em andamento.
