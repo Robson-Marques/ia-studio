@@ -171,13 +171,60 @@ export class ConnectchatAutoResponderService {
       // antes de confirmar o cliente no canal. Uma única solicitação por conversa;
       // mensagens seguintes não geram variações repetidas da mesma pergunta.
       if (!context.verified) {
-        const noticeKey = `ai.connectchat.identification_requested.${conversation.id}`;
-        const already = await this.settings.getValue(noticeKey);
-        if (!already) {
-          const message = 'Olá! Sou a assistente virtual da Newnet. Antes de verificar sua conexão, preciso confirmar seu cadastro. A validação do vínculo deve ser feita por um atendente autorizado. Assim que estiver identificado, continuo com o suporte.';
-          const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
-          await this.settings.set(noticeKey, { requested: true });
+        // CPF localiza cadastro; jamais comprova identidade nem vincula por si.
+        const pendingKey = `ai.connectchat.pending_identity.${conversation.id}`;
+        const existing = await this.settings.getValue(pendingKey);
+        const pending = existing && typeof existing === 'object' && !Array.isArray(existing)
+          ? existing as Record<string, unknown> : {};
+        const answerText = newest.body.trim().toLowerCase();
+        const explicitYes = /^(?:sim|autorizo|pode vincular|concordo|pode sim)[.!]?$/.test(answerText);
+        const explicitNo = /^(?:não|nao|não autorizo|nao autorizo|não quero|nao quero)[.!]?$/.test(answerText);
+        if (typeof pending['customerId'] === 'string') {
+          if ((explicitYes || explicitNo) && typeof pending['consent'] !== 'boolean') {
+            await this.settings.set(pendingKey, {
+              customerId: pending['customerId'], consent: explicitYes,
+              updatedAt: new Date().toISOString(),
+            });
+            const answer = explicitYes
+              ? 'Obrigado! Sua autorização foi registrada. Um atendente vai confirmar sua identidade antes de concluir o vínculo.'
+              : 'Tudo bem. Não vou vincular este contato ao cadastro. Um atendente pode ajudar com o atendimento.';
+            const token = createHash('sha256').update(`newnet-consent:${conversation.id}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
+          }
+          // Enquanto não houver vínculo ACTIVE+CUSTOMER não há dados privados
+          // nem diagnóstico, mesmo com autorização expressa.
+          await this.complete(key, sequence, claim);
+          return;
+        }
+
+        const candidate = newest.body.match(/(?:^|\D)(\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)/);
+        if (candidate) {
+          const found = await this.support.lookupCpf(candidate[1]);
+          const token = createHash('sha256').update(`newnet-cpf:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          if (found.status === 'FOUND' && found.customerId) {
+            await this.settings.set(pendingKey, {
+              customerId: found.customerId, consent: null, requestedAt: new Date().toISOString(),
+            });
+            await this.inbox.sendAgentMessage(conversation.id,
+              'Encontrei um cadastro. Você autoriza vincular este contato para os próximos atendimentos? Responda sim ou não. A identidade ainda será confirmada com segurança.',
+              `newnet-cpf-${token}`);
+          } else {
+            const text = found.status === 'UNAVAILABLE'
+              ? 'Não consegui consultar o cadastro agora. Vou precisar do apoio de um atendente.'
+              : 'Não consegui localizar um cadastro com esses dados. Confira o CPF do titular ou peça ajuda a um atendente.';
+            await this.inbox.sendAgentMessage(conversation.id, text, `newnet-cpf-${token}`);
+          }
+        } else {
+          const noticeKey = `ai.connectchat.identification_requested.${conversation.id}`;
+          if (!(await this.settings.getValue(noticeKey))) {
+            const hasReason = /internet|conex|suporte|sinal|lenta|caiu|caindo|boleto|fatura|pagamento|sem rede|sem wi.?fi/i.test(newest.body);
+            const message = hasReason
+              ? 'Oi! Sou Nete, da Newnet. Para consultar seu atendimento, pode informar o CPF do titular?'
+              : 'Oi! Sou Nete, da Newnet. Como posso ajudar? Para localizar seu cadastro, informe o CPF do titular, por favor.';
+            const token = createHash('sha256').update(`newnet-identify:${conversation.id}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, message, `newnet-identify-${token}`);
+            await this.settings.set(noticeKey, { requested: true });
+          }
         }
         await this.complete(key, sequence, claim);
         return;
