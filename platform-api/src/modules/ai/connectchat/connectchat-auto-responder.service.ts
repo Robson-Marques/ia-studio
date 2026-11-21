@@ -570,22 +570,23 @@ export class ConnectchatAutoResponderService {
         } else {
           const number = /^([1-8])\s*[.)]?$/.exec(newest.body.trim());
           const option = number ? support.contracts[Number(number[1]) - 1] : undefined;
-          if (option && typeof option['id'] === 'string') {
-            selectedContractId = option['id'];
+          if (option && /^[1-9]\d*$/.test(String(option['id'] ?? ''))) {
+            selectedContractId = String(option['id']);
             await this.settings.set(selectionKey, {
               contractId: selectedContractId, customerRef: context.conversation.customerRef,
             });
           } else {
             const askKey = `ai.connectchat.contract_requested.${conversation.id}`;
-            if (!(await this.settings.getValue(askKey))) {
-              const options = support.contracts.slice(0, 8)
-                .map((item, index) => `${index + 1}. ${String(item['plano'] || 'Serviço')} (contrato ${String(item['id'])})`)
-                .join('\n');
-              const text = `Encontrei mais de um serviço ativo. Qual deles precisa de suporte? Responda com o número:\n${options}`;
-              const token = createHash('sha256').update(`newnet-pick-contract:${conversation.id}`).digest('hex').slice(0, 32);
-              await this.inbox.sendAgentMessage(conversation.id, text, `newnet-pick-contract-${token}`);
-              await this.settings.set(askKey, { requested: true });
-            }
+            const asked = await this.settings.getValue(askKey);
+            const options = support.contracts.slice(0, 8)
+              .map((item, index) => `${index + 1}. ${String(item['plano'] || 'Serviço')} (contrato ${String(item['id'])})`)
+              .join('\n');
+            const text = asked
+              ? `Para continuar o suporte, escolha o número de um destes serviços:\n${options}`
+              : `Encontrei mais de um serviço ativo. Qual deles precisa de suporte? Responda com o número:\n${options}`;
+            const token = createHash('sha256').update(`newnet-pick-contract:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, text, `newnet-pick-contract-${token}`);
+            if (!asked) await this.settings.set(askKey, { requested: true });
             await this.complete(key, sequence, claim);
             return;
           }
