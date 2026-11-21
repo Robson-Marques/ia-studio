@@ -10,7 +10,9 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "start:worker": "node dist/worker.js",
-    "test:newnet:documents": "node --require ts-node/register --test src/modules/ai/connectchat/subscriber-document.spec.ts"
+    "test:newnet:documents": "node --require ts-node/register --test src/modules/ai/connectchat/subscriber-document.spec.ts",
+    "test:newnet:billing": "node --require ts-node/register --test src/modules/ai/connectchat/billing-response.spec.ts",
+    "test:newnet": "node --require ts-node/register --test src/modules/ai/connectchat/subscriber-document.spec.ts src/modules/ai/connectchat/billing-response.spec.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
