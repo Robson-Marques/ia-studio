@@ -102,7 +102,14 @@ export class ConnectchatSupportContextService {
           forecast: outage.inform_forecast ? String(outage.forecast || '').slice(0, 90) || null : null,
           suppressOs: outage.suppress_os,
         } : null,
-        online: activeAccess.length === 1 ? activeAccess[0]['online'] === true : null,
+        online: activeAccess.length === 1
+          ? (() => {
+            const raw = accesses.find((row) => String(row['login'] ?? '') === String(activeAccess[0]['login'] ?? ''));
+            const status = raw?.['online'];
+            if (status === true || /^(S|SIM|ONLINE)$/i.test(String(status ?? '').trim())) return true;
+            if (status === false || /^(N|NAO|NÃO|OFFLINE)$/i.test(String(status ?? '').trim())) return false;
+            return null;
+          })() : null,
         blocked,
         multipleAccesses: activeAccess.length > 1,
       };
@@ -254,10 +261,16 @@ export class ConnectchatSupportContextService {
         rp: '30', sortname: 'radusuarios.id',
       }));
       const active = records.map(projectConexao).filter((row) => row['ativo'] === true);
-      connections = active.slice(0, 8).map((row) => ({
-        id_contrato: row['id_contrato'], online: row['online'],
-        status: row['status'], referencia: row['referencia'],
-      }));
+      connections = active.slice(0, 8).map((row) => {
+        const original = records.find((raw) => String(raw['login'] ?? '') === String(row['login'] ?? ''));
+        const onlineRaw = original?.['online'];
+        const known = onlineRaw === true || onlineRaw === false
+          || /^(S|N|SIM|NAO|NÃO|ONLINE|OFFLINE)$/i.test(String(onlineRaw ?? '').trim());
+        return {
+          id_contrato: row['id_contrato'], online: known ? row['online'] : null,
+          status: row['status'], referencia: row['referencia'],
+        };
+      });
       for (const row of active) {
         const login = typeof row['login'] === 'string' ? row['login'] : '';
         if (login) incidentLogins.push(login);
