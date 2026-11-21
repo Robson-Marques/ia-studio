@@ -226,10 +226,10 @@ export default function ConnectchatConversas() {
     await loadMessages(conversation, true);
   }
 
-  async function saveAgentBinding() {
+  async function saveAgentBinding(enabled = !agentBinding.enabled) {
     setSavingAgent(true);
     try {
-      const updated = await setConnectchatAgentBinding(null, !agentBinding.enabled, includeTicketHistory);
+      const updated = await setConnectchatAgentBinding(null, enabled, includeTicketHistory);
       setAgentBinding(updated);
       setAgentPreview(null);
       toast.success(updated.enabled
@@ -397,8 +397,15 @@ export default function ConnectchatConversas() {
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--su-text-primary)' }}>Agente Newnet</span>
                   {can('ai.agents.write') && (
                     <Button variant="secondary" size="sm" loading={savingAgent}
-                      disabled={savingAgent} onClick={saveAgentBinding}>
+                      disabled={savingAgent} onClick={() => saveAgentBinding()}>
                       {agentBinding.enabled ? 'Desconectar ConnectChat' : 'Conectar ConnectChat'}
+                    </Button>
+                  )}
+                  {can('ai.agents.write') && agentBinding.enabled &&
+                    includeTicketHistory !== (agentBinding.includeTicketHistory !== false) && (
+                    <Button variant="secondary" size="sm" loading={savingAgent}
+                      disabled={savingAgent} onClick={() => saveAgentBinding(true)}>
+                      Salvar consulta histórica
                     </Button>
                   )}
                   {can('ai.agents.execute') && (
