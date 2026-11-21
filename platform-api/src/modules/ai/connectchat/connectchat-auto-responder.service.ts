@@ -536,6 +536,7 @@ export class ConnectchatAutoResponderService {
       const output = result.status === 'COMPLETED' && typeof result.output === 'string'
         ? result.output.replace(/\s+/g, ' ').trim() : '';
       if (!output || output.length > 200
+        || (safeIncident && output.includes('?'))
         || /\b(CPF|CNPJ|cadastro confirmado|consultei|verifiquei no sistema|acesso ao IXC|sinal do seu modem|seu contrato)\b/i.test(output)) {
         return fallback;
       }
@@ -677,7 +678,11 @@ export class ConnectchatAutoResponderService {
       });
       const output = result.status === 'COMPLETED' && typeof result.output === 'string'
         ? result.output.replace(/\s+/g, ' ').trim() : '';
-      if (!output || output.length > 350 || /\b(CPF|CNPJ)\b/i.test(output)) return fallback;
+      if (!output || output.length > 350 || /\b(CPF|CNPJ)\b/i.test(output)
+        || (facts['etapa'] === 'os_nao_aberta'
+          && /\b(abri|foi aberta|foi registrada|registre(i|mos)|abertura conclu[ií]da)\b/i.test(output))
+        || (facts['etapa'] === 'incidente_regional' && /\b(abri|abertura conclu[ií]da)\s+(?:uma\s+)?(?:os|ordem)/i.test(output))
+        || /\b(garanto|vou avisar assim que|entrarei em contato quando normalizar)\b/i.test(output)) return fallback;
       return output;
     } catch (error) {
       this.logger.warn(`Resposta operacional indisponível: ${(error as Error).message}`);
@@ -766,6 +771,7 @@ export class ConnectchatAutoResponderService {
               customerId: pending.customerId,
               connectionId: pending.connectionId,
               reason: pending.reason,
+              operational: pending.operational,
               consent: explicitYes,
               requestedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
