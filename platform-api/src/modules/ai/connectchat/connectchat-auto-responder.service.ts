@@ -553,6 +553,16 @@ export class ConnectchatAutoResponderService {
         const message = result.status === 'COMPLETED' && typeof result.output === 'string'
           ? result.output.trim() : '';
         if (message && !this.isRepeat(message, context.messages)) {
+          // A inferência pode demorar e, nesse intervalo, o vínculo pode
+          // mudar. Revalidar escopo até para respostas gerais.
+          const fresh = await this.inbox.contextForAgentPreview(conversation.id);
+          if (!fresh.verified || fresh.conversation.status !== 'OPEN'
+            || fresh.conversation.lastSequence !== sequence
+            || fresh.conversation.customerRef !== context.conversation.customerRef
+            || fresh.conversation.globalIdentityId !== context.conversation.globalIdentityId) {
+            await this.complete(key, sequence, claim);
+            return;
+          }
           const token = createHash('sha256').update(`newnet-general:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
           await this.inbox.sendAgentMessage(conversation.id, message, `newnet-general-${token}`);
         }
