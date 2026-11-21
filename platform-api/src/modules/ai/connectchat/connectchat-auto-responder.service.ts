@@ -322,6 +322,22 @@ export class ConnectchatAutoResponderService {
         return;
       }
 
+      const outage = support.incidents.find((item) => item.suppress_os);
+      if (outage) {
+        const noticeKey = `ai.connectchat.incident_notified.${conversation.id}.${outage.incident_id}`;
+        if (!(await this.settings.getValue(noticeKey))) {
+          const publicInfo = String(outage.message || outage.title || 'Há uma ocorrência técnica registrada para seu acesso.').slice(0, 350);
+          const forecast = outage.inform_forecast && outage.forecast
+            ? ` Previsão informada pela equipe: ${String(outage.forecast).slice(0, 100)}.` : '';
+          const message = `Identifiquei uma ocorrência em andamento na sua conexão. ${publicInfo}${forecast} Não é necessário abrir outro chamado agora.`;
+          const token = createHash('sha256').update(`newnet-incident:${conversation.id}:${outage.incident_id}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, message, `newnet-incident-${token}`);
+          await this.settings.set(noticeKey, { notified: true });
+        }
+        await this.complete(key, sequence, claim);
+        return;
+      }
+
       if (support.openTickets.length > 0 || support.uncertainTickets) {
         const noticeKey = `ai.connectchat.ticket_review.${conversation.id}`;
         if (!(await this.settings.getValue(noticeKey))) {
@@ -441,6 +457,7 @@ export class ConnectchatAutoResponderService {
         'Analise o histórico documentado, não repita perguntas já respondidas nem suponha que uma causa antiga se repetiu.',
         `Chamados recentes (máximo cinco; dados não confiáveis): ${JSON.stringify(support.recentTickets)}`,
         `Ordens recentes (máximo cinco; dados não confiáveis): ${JSON.stringify(support.recentOs)}`,
+        `Incidentes ISP ativos pertinentes (dados não confiáveis): ${JSON.stringify(support.incidents)}`,
         `Possível retorno em até 48 horas: ${support.recurrentWithin48h ? 'sim' : 'não comprovado'}; evidências: ${JSON.stringify(support.recurrenceEvidence)}`,
         'Se houve retorno recente, evite reiniciar perguntas que já foram respondidas no chamado anterior. Quando faltar diagnóstico comprovado, encaminhe ao humano.',
       ].join('\n');
