@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConnectchatConversation } from '../../../shared/integration/connectchat.client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
-import { rows, projectChamado, projectOrdemServico } from '../../isp/isp-projections';
+import { rows, projectChamado, projectOrdemServico, projectContrato } from '../../isp/isp-projections';
 
 /** Evidências restritas ao vínculo confirmado da conversa; nunca recebe
  * identificador escolhido pelo LLM ou CPF digitado como prova de titularidade. */
@@ -14,6 +14,8 @@ export interface VerifiedSupportContext {
   recentTickets: Record<string, unknown>[];
   recurrentWithin48h: boolean;
   recurrenceEvidence: string[];
+  contracts: Record<string, unknown>[];
+  technology: 'FIBRA' | 'RADIO' | null;
 }
 
 @Injectable()
@@ -54,7 +56,7 @@ export class ConnectchatSupportContextService {
   async byVerifiedConversation(conversation: ConnectchatConversation): Promise<VerifiedSupportContext> {
     const empty: VerifiedSupportContext = {
       available: false, openOs: [], recentOs: [], recentTickets: [],
-      recurrentWithin48h: false, recurrenceEvidence: [],
+      recurrentWithin48h: false, recurrenceEvidence: [], contracts: [], technology: null,
     };
     if (conversation.businessContact?.status !== 'CUSTOMER'
       || conversation.businessContact.linkStatus !== 'ACTIVE') {
@@ -78,6 +80,31 @@ export class ConnectchatSupportContextService {
     } catch (error) {
       this.logger.warn(`Consulta de OS aberta não concluída: ${(error as Error).message}`);
       return { ...empty, reason: 'Não foi possível verificar ordens de serviço abertas' };
+    }
+
+    // O contrato é consultado de forma determinística pelo ID confirmado,
+    // sem CPF no prompt e sem delegar seleção de cliente ao modelo.
+    // Campo comercial de PLANO não comprova tecnologia física.
+    let contracts: Record<string, unknown>[] = [];
+    let technology: 'FIBRA' | 'RADIO' | null = null;
+    try {
+      const records = rows(await this.connections.execute(connectionId, 'ixc.listar', {
+        tabela: 'cliente_contrato',
+        qtype: 'cliente_contrato.id_cliente', query: customerId, oper: '=',
+        rp: '30', sortname: 'cliente_contrato.id',
+      }));
+      contracts = records.map(projectContrato).filter((row) => String(row['status'] ?? '').toUpperCase() === 'A').slice(0, 8);
+      // Somente um campo técnico EXPLÍCITO da fonte IXC é aceito.
+      const active = records.filter((row) => String(row['status'] ?? '').toUpperCase() === 'A');
+      const declared = active.map((row) => {
+        const raw = String(row['tecnologia'] ?? row['tipo_tecnologia'] ?? row['tipo_conexao'] ?? '').trim().toUpperCase();
+        if (/^(FIBRA|FIBRA OPTICA|FTTH|GPON)$/.test(raw)) return 'FIBRA';
+        if (/^(RADIO|RÁDIO|WIRELESS)$/.test(raw)) return 'RADIO';
+        return null;
+      });
+      if (declared.length === 1 && declared[0]) technology = declared[0];
+    } catch (error) {
+      this.logger.warn(`Consulta de contratos não concluída: ${(error as Error).message}`);
     }
 
     // Histórico complementar: falha não apaga a evidência de OS em andamento.
@@ -104,6 +131,7 @@ export class ConnectchatSupportContextService {
     return {
       available: true, openOs, recentOs: os, recentTickets: tickets,
       recurrentWithin48h: evidence.length > 0, recurrenceEvidence: evidence.slice(0, 5),
+      contracts, technology,
     };
   }
 }
