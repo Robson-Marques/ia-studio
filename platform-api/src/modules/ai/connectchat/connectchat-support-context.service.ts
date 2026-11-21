@@ -7,6 +7,21 @@ import { IncidentLookupService, IncidentInfo } from '../../isp/incident-lookup.s
 import { isValidSubscriberDocument, normalizeSubscriberDocument } from './subscriber-document';
 import { scopeVerifiedInvoices } from './billing-response';
 
+/**
+ * Triagem operacional interna feita após localizar o cadastro pelo documento.
+ * Não devolve nome, endereço, IDs, login, faturas ou registros de chamados ao LLM.
+ * Nunca confundir esta leitura com prova de titularidade.
+ */
+export interface IdentifiedOperationalSnapshot {
+  status: 'READY' | 'UNAVAILABLE';
+  hasOpenOs: boolean | null;
+  hasOpenTicket: boolean | null;
+  incident: { publicMessage: string; forecast: string | null; suppressOs: boolean } | null;
+  online: boolean | null;
+  blocked: boolean | null;
+  multipleAccesses: boolean;
+}
+
 /** Evidências restritas ao vínculo confirmado da conversa; nunca recebe
  * identificador escolhido pelo LLM ou CPF digitado como prova de titularidade. */
 export interface VerifiedSupportContext {
@@ -36,6 +51,73 @@ export class ConnectchatSupportContextService {
     private readonly repository: ConnectionsRepository,
     private readonly incidentLookup: IncidentLookupService,
   ) {}
+
+  /** Leitura operacional do registro localizado. Não autentica quem digitou o CPF. */
+  async triageIdentifiedCustomer(connectionId: string, customerId: string): Promise<IdentifiedOperationalSnapshot> {
+    const unavailable: IdentifiedOperationalSnapshot = {
+      status: 'UNAVAILABLE', hasOpenOs: null, hasOpenTicket: null,
+      incident: null, online: null, blocked: null, multipleAccesses: false,
+    };
+    if (!/^[0-9a-f-]{36}$/i.test(connectionId) || !/^[1-9]\d*$/.test(customerId)) return unavailable;
+    const provider = await this.repository.findById(connectionId);
+    if (!provider || provider.provider_key !== 'ixc' || provider.status !== 'ACTIVE' || !provider.is_active) return unavailable;
+    try {
+      // Falha ao ler OS é bloqueante: nunca concluir "não há OS" por ausência de dados.
+      const openOs = rows(await this.connections.execute(connectionId, 'os.listar_abertas', {
+        id_cliente: customerId,
+      }));
+      const [contracts, accesses, recent] = await Promise.all([
+        this.connections.execute(connectionId, 'ixc.listar', {
+          tabela: 'cliente_contrato', qtype: 'cliente_contrato.id_cliente',
+          query: customerId, oper: '=', rp: '30', sortname: 'cliente_contrato.id',
+        }).then(rows),
+        this.connections.execute(connectionId, 'ixc.listar', {
+          tabela: 'radusuarios', qtype: 'radusuarios.id_cliente',
+          query: customerId, oper: '=', rp: '30', sortname: 'radusuarios.id',
+        }).then(rows),
+        this.connections.execute(connectionId, 'atendimento.listar_chamados_recentes', {
+          id_cliente: customerId,
+        }).then(rows).catch(() => null),
+      ]);
+      const activeContracts = contracts.map(projectContrato).filter((c) =>
+        String(c['status'] ?? '').toUpperCase() === 'A');
+      const blocked = activeContracts.length === 0 ? null
+        : activeContracts.some((c) => {
+          const state = String(c['status_internet'] ?? '').toUpperCase().trim();
+          return !!state && state !== 'A';
+        });
+      const activeAccess = accesses.map(projectConexao).filter((a) => a['ativo'] === true);
+      const logins = activeAccess.map((a) => String(a['login'] ?? '')).filter(Boolean);
+      const incidents = await this.incidentLookup.activeForMany(logins.slice(0, 8));
+      const outage = incidents.find((i) => i.suppress_os) ?? incidents[0];
+      const opened = new Set(['A', 'ABERTO', 'P', 'PENDENTE', 'EM ANDAMENTO', 'ANDAMENTO']);
+      const hasOpenTicket = recent === null ? null : recent.map(projectChamado)
+        .some((t) => opened.has(String(t['situacao_interna'] ?? t['status'] ?? '').toUpperCase().trim()));
+      return {
+        status: 'READY',
+        hasOpenOs: openOs.length > 0,
+        hasOpenTicket,
+        incident: outage ? {
+          publicMessage: String(outage.message || outage.title || 'Ocorrência técnica registrada').slice(0, 250),
+          forecast: outage.inform_forecast ? String(outage.forecast || '').slice(0, 90) || null : null,
+          suppressOs: outage.suppress_os,
+        } : null,
+        online: activeAccess.length === 1
+          ? (() => {
+            const raw = accesses.find((row) => String(row['login'] ?? '') === String(activeAccess[0]['login'] ?? ''));
+            const status = raw?.['online'];
+            if (status === true || /^(S|SIM|ONLINE)$/i.test(String(status ?? '').trim())) return true;
+            if (status === false || /^(N|NAO|NÃO|OFFLINE)$/i.test(String(status ?? '').trim())) return false;
+            return null;
+          })() : null,
+        blocked,
+        multipleAccesses: activeAccess.length > 1,
+      };
+    } catch (error) {
+      this.logger.warn(`Triagem de cadastro identificado indisponível: ${(error as Error).message}`);
+      return unavailable;
+    }
+  }
 
   /** Busca CPF somente em cadastro e jamais usa a existência como prova de
    * posse ou autorização de acesso. Não retorna PII ao modelo nem ao chat. */
@@ -179,10 +261,16 @@ export class ConnectchatSupportContextService {
         rp: '30', sortname: 'radusuarios.id',
       }));
       const active = records.map(projectConexao).filter((row) => row['ativo'] === true);
-      connections = active.slice(0, 8).map((row) => ({
-        id_contrato: row['id_contrato'], online: row['online'],
-        status: row['status'], referencia: row['referencia'],
-      }));
+      connections = active.slice(0, 8).map((row) => {
+        const original = records.find((raw) => String(raw['login'] ?? '') === String(row['login'] ?? ''));
+        const onlineRaw = original?.['online'];
+        const known = onlineRaw === true || onlineRaw === false
+          || /^(S|N|SIM|NAO|NÃO|ONLINE|OFFLINE)$/i.test(String(onlineRaw ?? '').trim());
+        return {
+          id_contrato: row['id_contrato'], online: known ? row['online'] : null,
+          status: row['status'], referencia: row['referencia'],
+        };
+      });
       for (const row of active) {
         const login = typeof row['login'] === 'string' ? row['login'] : '';
         if (login) incidentLogins.push(login);
