@@ -1,3 +1,18 @@
+/**
+ * Camada adicional de isolamento, mesmo se a API IXC ignorar filtros.
+ * Retorno null = qualquer registro de outro cliente (bloquear TODO o lote).
+ */
+export function scopeVerifiedInvoices(
+  records: Record<string, unknown>[],
+  customerId: string,
+): Record<string, unknown>[] | null {
+  if (!/^[1-9]\d*$/.test(customerId)) return null;
+  if (records.some((item) => String(item['id_cliente'] ?? '') !== customerId)) return null;
+  return records.filter((item) =>
+    String(item['liberado'] ?? '').trim().toUpperCase() === 'S'
+    && !['C', 'R'].includes(String(item['status'] ?? '').trim().toUpperCase()));
+}
+
 /** Resposta determinística: não expor objetos brutos ou URLs inseguras. */
 function safeValue(raw: unknown): string | null {
   if (typeof raw !== 'string' && typeof raw !== 'number') return null;
