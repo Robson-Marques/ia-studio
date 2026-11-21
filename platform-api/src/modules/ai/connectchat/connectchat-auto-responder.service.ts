@@ -208,8 +208,8 @@ export class ConnectchatAutoResponderService {
               updatedAt: new Date().toISOString(),
             });
             const answer = explicitYes
-              ? 'Obrigado! Sua autorização foi registrada. Um atendente vai confirmar sua identidade antes de concluir o vínculo.'
-              : 'Tudo bem. Não vou vincular este contato ao cadastro. Um atendente pode ajudar com o atendimento.';
+              ? 'Obrigado! Para proteger seu cadastro, a vinculação precisa ser confirmada na sua sessão autenticada do ConnectChat. Assim que ela estiver confirmada, continuo por aqui.'
+              : 'Tudo bem, não vou vincular este contato. Para consultar informações particulares, será necessária uma identificação segura.';
             const token = createHash('sha256').update(`newnet-consent:${conversation.id}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
           }
@@ -228,7 +228,7 @@ export class ConnectchatAutoResponderService {
               customerId: found.customerId, consent: null, requestedAt: new Date().toISOString(),
             });
             await this.inbox.sendAgentMessage(conversation.id,
-              'Encontrei um cadastro. Você autoriza vincular este contato para os próximos atendimentos? Responda sim ou não. A identidade ainda será confirmada com segurança.',
+              'Localizei um cadastro. Posso associar este contato a ele para os próximos atendimentos? Responda sim ou não.',
               `newnet-cpf-${token}`);
           } else {
             const text = found.status === 'UNAVAILABLE'
