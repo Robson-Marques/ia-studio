@@ -861,7 +861,10 @@ export class ConnectchatAutoResponderService {
       const affirmative = /^(?:sim|isso|isso mesmo|correto|é|eh|é sim|pode ser)[.!]?$/i.test(normalizedReply);
       const negative = /^(?:não|nao|não é|nao é|outro|outra pessoa|outro cliente|não é esse|nao e esse)[.!]?$/i.test(normalizedReply);
       const otherCustomerRequested = recognition.awaitingOther === true;
-      if (context.verified && linkedMatch && !newDocument && recognition.confirmed !== true) {
+      const correctionRequested = /\b(n[aã]o (?:[eé]|era|sou)|outr[oa] (?:cliente|pessoa|assinatura)|cliente errado|cadastro errado)\b/i
+        .test(newest.body.trim());
+      if (context.verified && linkedMatch && !newDocument
+        && (recognition.confirmed !== true || correctionRequested)) {
         if (recognition.asked === true && affirmative && !otherCustomerRequested) {
           await this.settings.set(recognitionKey, { confirmed: true, at: new Date().toISOString() });
           // A confirmação do cadastro não substitui o problema já relatado.
@@ -872,7 +875,7 @@ export class ConnectchatAutoResponderService {
           if (typeof prior.reason === 'string' && prior.reason.trim()) {
             await this.settings.set(intentKey, { ...prior, requested: true });
           }
-        } else if (negative || otherCustomerRequested) {
+        } else if (negative || correctionRequested || otherCustomerRequested) {
           await this.settings.set(recognitionKey, {
             asked: true, confirmed: false, awaitingOther: true,
           });
@@ -1088,10 +1091,16 @@ export class ConnectchatAutoResponderService {
               `newnet-diagnosis:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, outcome, `newnet-diagnosis-${outcomeToken}`);
           } else {
-            const text = found.status === 'UNAVAILABLE'
-              ? 'Não consegui consultar o cadastro agora. Vou precisar do apoio de um atendente.'
-              : 'Não localizei um cadastro com esses dados. Confira o CPF ou CNPJ do titular, por favor.';
-            await this.inbox.sendAgentMessage(conversation.id, text, `newnet-document-${token}`);
+            const fallback = found.status === 'UNAVAILABLE'
+              ? 'Não consegui acessar o cadastro agora. Podemos tentar novamente em instantes?'
+              : 'Não encontrei esse CPF ou CNPJ no cadastro. Pode conferir os números e me enviar novamente?';
+            const text = await this.replyWithOperationalEvidence(
+              agent, conversation, context.messages, newest.body,
+              { etapa: 'documento_nao_localizado', consulta: found.status, solicitar_conferencia: true },
+              fallback,
+            );
+            const safeText = /\b(CPF|CNPJ|n[uú]meros|dados)\b/i.test(text) ? text : fallback;
+            await this.inbox.sendAgentMessage(conversation.id, safeText, `newnet-document-${token}`);
           }
         } else {
           // Motivo e CPF são duas etapas diferentes. "Oi" pede o motivo;
