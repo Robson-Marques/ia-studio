@@ -514,7 +514,7 @@ export class ConnectchatAutoResponderService {
         }));
       const instructions = [
         'Você é Nete, da Newnet. Seja natural, acolhedora, breve e objetiva, sem jargão burocrático.',
-        'A pessoa não quer manter este contato vinculado para atendimentos futuros. Respeite. Isso NÃO encerra o atendimento atual.',
+        'A associação do contato é administrada pelo sistema. NÃO ofereça nem pergunte sobre vinculação: continue o atendimento atual.',
         'Continue o atendimento a partir do problema já relatado, sem reiniciar saudação e sem pedir CPF novamente.',
         'O motivo original foi: ' + redactSubscriberDocuments(initialReason).slice(0, 300),
         'Evidências operacionais da sessão (o cliente informou o documento): '
@@ -534,9 +534,9 @@ export class ConnectchatAutoResponderService {
           ? 'Reconheça a escolha de não manter o vínculo em uma oração breve e, na mesma mensagem, conduza o próximo passo de triagem.'
           : 'Responda à mensagem atual e faça avançar o diagnóstico geral em uma etapa. Não repita o aviso sobre vínculo.',
         'O backend já consultou IXC. Pode falar dos resultados reais fornecidos; nunca invente diagnóstico ou nova OS.',
-        'A escolha de manter este contato vinculado é INDEPENDENTE da identificação temporária pelo CPF nesta conversa.',
+        'O CPF já selecionou o cadastro atendido nesta sessão; a associação do contato para próximos atendimentos ocorre separadamente.',
         'Não informe dados financeiros, endereço, números de documentos ou informações de terceiros. Confirme OS somente quando osRegistradaNestaSessao for verdadeira.',
-        'Se a OS foi aberta ou há incidente relevante, informe a decisão e não faça perguntas técnicas sem necessidade.',
+        'Se uma OS foi aberta, já existe chamado, ou há incidente relevante, comunique isso e não faça perguntas técnicas sem necessidade.',
         'Faça no máximo uma pergunta útil por resposta, adaptada ao assunto. Até 200 caracteres. Apenas a mensagem ao cliente.',
       ].join('\n');
       const result = await this.runner.run({
@@ -600,8 +600,9 @@ export class ConnectchatAutoResponderService {
     if (approval.required) return { os_aberta: false, motivo: 'A abertura depende da aprovação da equipe.' };
 
     const current = await this.inbox.contextForAgentPreview(conversation.id);
+    const lastCustomer = current.messages.filter((m) => m.senderKind === 'CUSTOMER').at(-1);
     if (current.conversation.status !== 'OPEN'
-      || current.conversation.lastSequence !== conversation.lastSequence
+      || !lastCustomer || lastCustomer.serverSequence !== conversation.lastSequence
       || current.conversation.globalIdentityId !== conversation.globalIdentityId) return null;
     // Deduplicação por conversa + cliente; um contato pode atender diversas pessoas.
     const attemptKey = `ai.connectchat.session_os.${conversation.id}.${connectionId}.${customerId}`;
