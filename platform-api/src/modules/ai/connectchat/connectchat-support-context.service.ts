@@ -37,7 +37,7 @@ export class ConnectchatSupportContextService {
 
   /** Busca CPF somente em cadastro e jamais usa a existência como prova de
    * posse ou autorização de acesso. Não retorna PII ao modelo nem ao chat. */
-  async lookupCpf(cpf: string): Promise<{ status: 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE'; customerId?: string }> {
+  async lookupCpf(cpf: string): Promise<{ status: 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE'; customerId?: string; connectionId?: string }> {
     const digits = cpf.replace(/\D/g, '');
     if (!/^\d{11}$/.test(digits) || /^(\d)\1{10}$/.test(digits)) return { status: 'NOT_FOUND' };
     for (let position = 9; position <= 10; position += 1) {
@@ -54,7 +54,7 @@ export class ConnectchatSupportContextService {
       if (data.length !== 1 || !/^\d+$/.test(String(data[0]['id'] ?? ''))) {
         return { status: 'NOT_FOUND' };
       }
-      return { status: 'FOUND', customerId: String(data[0]['id']) };
+      return { status: 'FOUND', customerId: String(data[0]['id']), connectionId: providers[0].id };
     } catch (error) {
       this.logger.warn(`Consulta CPF não concluída: ${(error as Error).message}`);
       return { status: 'UNAVAILABLE' };
