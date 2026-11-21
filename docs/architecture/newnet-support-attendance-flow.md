@@ -56,3 +56,11 @@ O ConnectChat é o primeiro canal operacional da Nete; o WhatsApp somente após 
 - Serviço fibra, rádio, tecnologia desconhecida e cliente com mais de um contrato ativo.
 - OS aberta, OS recente encerrada há 12h/36h/72h, múltiplas OS, IXC indisponível e histórico incompleto.
 - Sem repetição da mesma pergunta; uma bolha; mensagens simultâneas; reinício de worker; ausência de envio duplicado.
+
+## Diretriz adicional: operação 100% autônoma (pendente de prova de vínculo)
+
+- A Nete não exige aprovação operacional para conversar, consultar dados de uma identidade **já confirmada** ou executar ações com permissão e controles técnicos pré-definidos. Ações de escrita precisam ter autorização de sistema, idempotência, auditoria, limites e verificação anti-duplicidade; não têm de exigir um humano a cada chamada.
+- CPF + consentimento não é prova de titularidade. O ConnectChat dispõe de APIs `createLinkRequest`, `exchangeLinkProof` e `completeLinkRequest`; **a semântica da prova deve ser verificada no código da API/PWA do ConnectChat antes de automatizar o vínculo**. Não chamar `linkContactDirectly` apenas com CPF digitado.
+- O módulo de menu IA fica reduzido às configurações e conhecimento; Memória/MCP migram para Desenvolvedor. Ferramentas e catálogo de ações deixam de ser configuração operacional visível; permissões e implementação continuam internas.
+- O caminho com conferência manual adicionado no piloto é transitório e **não atende ao requisito final** de autonomia. A substituição depende de entender a prova autentificada do ConnectChat; não simular que isso está pronto nem ativar bypass.
+- Depois de confirmar o mecanismo, testar: contato com CPF correto de terceiro, prova expirou, prova de outra identidade, autorização revogada, repetição de proof, várias sessões e vínculo existente.
