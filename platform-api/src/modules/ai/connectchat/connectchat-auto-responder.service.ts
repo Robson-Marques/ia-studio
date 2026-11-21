@@ -63,20 +63,27 @@ export class ConnectchatAutoResponderService {
           const linkedId = /^ixc:[0-9a-f-]{36}:([1-9]\d*)$/i.exec(conversation.customerRef ?? '')?.[1];
           const verified = conversation.businessContact?.status === 'CUSTOMER'
             && conversation.businessContact.linkStatus === 'ACTIVE';
-          if (!verified && pending.consent === true) {
-            await this.progressAuthenticatedLink(conversation, pendingKey, pending);
-          }
           if (verified && pending.consent === true && pending.customerId === linkedId
             && pending.resumed !== true) {
             await this.respond(agent, conversation, typeof pending.reason === 'string' ? pending.reason : '');
-            // Só marca como retomado quando a conversa teve seu checkpoint
-            // concluído; falha de rede ou LLM preserva a possibilidade de retry.
+            // Retomada só após checkpoint; não processar o mesmo turno duas vezes.
             const resumeCursor = await this.settings.getValue(`ai.connectchat.resume.${conversation.id}`);
             if (BigInt(this.state(resumeCursor).sequence) >= BigInt(conversation.lastSequence)) {
               await this.settings.set(pendingKey, { ...pending, resumed: true, linkedAt: new Date().toISOString() });
             }
           } else {
+            // A última mensagem pode ser uma REVOGAÇÃO ("não") ou outro CPF.
+            // Processá-la ANTES de solicitar/concluir o vínculo evita utilizar
+            // autorização antiga num intervalo de polling.
             await this.respond(agent, conversation);
+            if (!verified) {
+              const currentRaw = await this.settings.getValue(pendingKey);
+              const current = currentRaw && typeof currentRaw === 'object' && !Array.isArray(currentRaw)
+                ? currentRaw as Record<string, unknown> : {};
+              if (current.consent === true) {
+                await this.progressAuthenticatedLink(conversation, pendingKey, current);
+              }
+            }
           }
         } catch (error) { this.logger.warn(`ConnectChat ${conversation.id}: ${(error as Error).message}`); }
       }
