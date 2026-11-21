@@ -234,11 +234,14 @@ export class ConnectchatAutoResponderService {
     const prefixes = [
       'pending_identity', 'resume', 'cursor', 'document_attempts',
       'identification_requested', 'greeting', 'technology_requested',
-      'contract_requested', 'selected_contract',
+      'contract_requested', 'selected_contract', 'recognition',
     ];
     await this.prisma.$transaction(async (tx) => {
       await tx.systemSetting.deleteMany({
         where: { key: { in: prefixes.map((name) => `ai.connectchat.${name}.${conversationId}`) } },
+      });
+      await tx.systemSetting.deleteMany({
+        where: { key: { startsWith: `ai.connectchat.session_os.${conversationId}.` } },
       });
       await tx.systemSetting.upsert({
         where: { key: `ai.connectchat.reset_boundary.${conversationId}` },
@@ -263,7 +266,11 @@ export class ConnectchatAutoResponderService {
       ? raw as Record<string, unknown> : {};
     const sequence = typeof record.sequence === 'string' && /^\d+$/.test(record.sequence)
       ? record.sequence : null;
-    return sequence ? `${conversationId}:after:${sequence}` : conversationId;
+    const recogRaw = await this.settings.getValue(`ai.connectchat.recognition.${conversationId}`);
+    const recog = recogRaw && typeof recogRaw === 'object' && !Array.isArray(recogRaw)
+      ? recogRaw as Record<string, unknown> : {};
+    const base = sequence ? `${conversationId}:after:${sequence}` : conversationId;
+    return typeof recog.scopeId === 'string' ? `${base}:customer:${recog.scopeId}` : base;
   }
 
   private state(raw: unknown): Cursor {
@@ -854,6 +861,13 @@ export class ConnectchatAutoResponderService {
       const recognitionRaw = await this.settings.getValue(recognitionKey);
       const recognition = recognitionRaw && typeof recognitionRaw === 'object'
         && !Array.isArray(recognitionRaw) ? recognitionRaw as Record<string, unknown> : {};
+      const customerStart = typeof recognition.customerStartSequence === 'string'
+        && /^\d+$/.test(recognition.customerStartSequence)
+        ? BigInt(recognition.customerStartSequence) : null;
+      if (customerStart !== null) {
+        context.messages = context.messages.filter((m) => /^\d+$/.test(m.serverSequence)
+          && BigInt(m.serverSequence) >= customerStart);
+      }
       const newDocument = extractSubscriberDocument(newest.body);
       const linkedRef = context.conversation.customerRef;
       const linkedMatch = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(linkedRef || '');
@@ -866,7 +880,10 @@ export class ConnectchatAutoResponderService {
       if (context.verified && linkedMatch && !newDocument
         && (recognition.confirmed !== true || correctionRequested)) {
         if (recognition.asked === true && affirmative && !otherCustomerRequested) {
-          await this.settings.set(recognitionKey, { confirmed: true, at: new Date().toISOString() });
+          await this.settings.set(recognitionKey, {
+            ...recognition, confirmed: true, awaitingOther: false,
+            at: new Date().toISOString(),
+          });
           // A confirmação do cadastro não substitui o problema já relatado.
           const intentKey = `ai.connectchat.identification_requested.${conversation.id}`;
           const initial = await this.settings.getValue(intentKey);
@@ -877,7 +894,7 @@ export class ConnectchatAutoResponderService {
           }
         } else if (negative || correctionRequested || otherCustomerRequested) {
           await this.settings.set(recognitionKey, {
-            asked: true, confirmed: false, awaitingOther: true,
+            ...recognition, asked: true, confirmed: false, awaitingOther: true,
           });
           const reply = await this.replyWithOperationalEvidence(
             agent, conversation, context.messages, newest.body,
@@ -1051,6 +1068,8 @@ export class ConnectchatAutoResponderService {
             await this.settings.set(recognitionKey, {
               asked: false, confirmed: linked, awaitingOther: false,
               customerRef: `ixc:${found.connectionId}:${found.customerId}`,
+              customerStartSequence: sequence,
+              scopeId: randomUUID(),
             });
             await this.settings.set(pendingKey, {
               customerId: found.customerId, connectionId: found.connectionId,
