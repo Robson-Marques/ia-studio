@@ -78,7 +78,21 @@ export class AgentsService {
       const savedId = (saved?.value as { id?: string } | null)?.id;
       if (savedId) {
         const existing = await tx.aiAgent.findUnique({ where: { id: savedId } });
-        if (existing) return existing;
+        if (existing) {
+          if (!existing.connection_id && existing.model === 'default') {
+            const codex = await tx.connection.findMany({
+              where: { provider_key: 'codex-cli', status: 'ACTIVE', is_active: true },
+              select: { id: true },
+            });
+            if (codex.length === 1) {
+              return tx.aiAgent.update({
+                where: { id: existing.id },
+                data: { connection_id: codex[0].id },
+              });
+            }
+          }
+          return existing;
+        }
       }
 
       const agents = await tx.aiAgent.findMany({ orderBy: { created_at: 'asc' } });
@@ -102,12 +116,28 @@ export class AgentsService {
           created_by: createdBy,
         },
       });
+      // Para o agente nativo recém-provisionado (model=default), usar a única
+      // conexão Codex ativa quando disponível. Não adivinhar uma conta entre
+      // várias nem sobrescrever conexão explicitamente escolhida anteriormente.
+      let readyAgent = agent;
+      if (!agent.connection_id && agent.model === 'default') {
+        const codex = await tx.connection.findMany({
+          where: { provider_key: 'codex-cli', status: 'ACTIVE', is_active: true },
+          select: { id: true },
+        });
+        if (codex.length === 1) {
+          readyAgent = await tx.aiAgent.update({
+            where: { id: agent.id },
+            data: { connection_id: codex[0].id },
+          });
+        }
+      }
       await tx.systemSetting.upsert({
         where: { key: settingKey },
         create: { key: settingKey, value: { id: agent.id } },
         update: { value: { id: agent.id } },
       });
-      return agent;
+      return readyAgent;
     });
   }
 

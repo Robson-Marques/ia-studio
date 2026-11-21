@@ -1,0 +1,73 @@
+/* Piloto Studio Workflow: densidade proporcional, identidade do sistema
+   preservada via tokens semânticos. Sem dependência de componentes Studio X/UX. */
+.newnet-ai {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(12px, 2vw, 24px);
+  color: var(--su-text-primary, #182337);
+  font-size: 13px;
+}
+.newnet-ai * { box-sizing: border-box; }
+.newnet-ai__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 16px; }
+.newnet-ai h1 { font-size: 19px; line-height: 1.25; font-weight: 650; margin: 0 0 3px; }
+.newnet-ai h2 { font-size: 14px; line-height: 1.4; font-weight: 650; margin: 0; }
+.newnet-ai p { margin: 0; }
+.newnet-ai__header p, .newnet-ai__channel-text p { color: var(--su-text-secondary, #62718b); font-size: 12px; line-height: 1.5; }
+.newnet-ai__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.newnet-ai__section, .newnet-ai__channels {
+  background: var(--su-surface-raised, #fff);
+  border: 1px solid var(--su-border-default, #d9e1eb);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgb(17 34 57 / 4%);
+}
+.newnet-ai__section { padding: 16px; min-width: 0; }
+.newnet-ai__section-title { min-height: 22px; display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.newnet-ai__status { font-size: 11px; color: var(--su-success, #178452); }
+.newnet-ai__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.newnet-ai label { min-width: 0; font-size: 12px; font-weight: 500; display: flex; flex-direction: column; gap: 5px; }
+.newnet-ai label input:not([type="checkbox"]), .newnet-ai label select {
+  width: 100%; height: 36px; min-width: 0; background: var(--su-surface-base, #fff);
+  color: var(--su-text-primary, #182337); font: inherit;
+  border: 1px solid var(--su-border-default, #d9e1eb); border-radius: 7px;
+  padding: 0 10px; outline-offset: 2px;
+}
+.newnet-ai select { cursor: pointer; }
+.newnet-ai label input:focus-visible, .newnet-ai label select:focus-visible,
+.newnet-ai button:focus-visible { outline: 2px solid var(--su-action-primary, #514be0); outline-offset: 2px; }
+.newnet-ai__number { display: flex; align-items: center; position: relative; }
+.newnet-ai__number input { padding-right: 66px !important; }
+.newnet-ai__number span { position: absolute; right: 10px; pointer-events: none; color: var(--su-text-secondary, #62718b); font-weight: 400; }
+.newnet-ai__toggle { flex-direction: row !important; align-items: center; gap: 9px !important; margin-top: 17px; line-height: 1.4; cursor: pointer; }
+.newnet-ai__toggle input { width: 17px; height: 17px; margin: 0; accent-color: var(--su-action-primary, #514be0); }
+.newnet-ai__note { color: var(--su-text-secondary, #62718b); font-size: 11px; line-height: 1.5; margin-top: 9px !important; }
+.newnet-ai__channels { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 16px; margin-top: 12px; flex-wrap: wrap; }
+.newnet-ai__channel-text { display: grid; gap: 2px; }
+.newnet-ai__channel-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.newnet-ai button {
+  min-height: 36px; padding: 7px 12px; font-size: 12px; font-weight: 600;
+  border-radius: 7px; border: 1px solid var(--su-border-default, #d9e1eb);
+  background: var(--su-surface-base, #fff); color: var(--su-text-primary, #182337);
+  cursor: pointer; white-space: nowrap;
+}
+.newnet-ai button:hover:not(:disabled) { filter: brightness(.97); }
+.newnet-ai button:disabled { cursor: not-allowed; opacity: .55; }
+.newnet-ai button.newnet-ai__primary {
+  background: var(--su-action-primary, #514be0); color: #fff; border-color: transparent;
+}
+.newnet-ai__pending { color: var(--su-text-secondary, #62718b); font-size: 11px; white-space: nowrap; }
+.newnet-ai__error { color: #b42318; }
+@media (max-width: 850px) {
+  .newnet-ai__grid { grid-template-columns: minmax(0, 1fr); }
+  .newnet-ai__channels { align-items: flex-start; }
+}
+@media (max-width: 450px) {
+  .newnet-ai { padding: 12px; }
+  .newnet-ai__header { align-items: flex-start; }
+  .newnet-ai__header .newnet-ai__primary { align-self: flex-start; }
+  .newnet-ai__fields { grid-template-columns: 1fr; }
+  .newnet-ai__channel-actions { width: 100%; }
+  .newnet-ai__pending { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .newnet-ai * { scroll-behavior: auto !important; transition: none !important; }
+}
