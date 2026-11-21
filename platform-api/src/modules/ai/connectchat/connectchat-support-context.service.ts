@@ -3,6 +3,7 @@ import { ConnectchatConversation } from '../../../shared/integration/connectchat
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
 import { rows, projectChamado, projectOrdemServico, projectContrato, projectConexao } from '../../isp/isp-projections';
+import { IncidentLookupService, IncidentInfo } from '../../isp/incident-lookup.service';
 
 /** Evidências restritas ao vínculo confirmado da conversa; nunca recebe
  * identificador escolhido pelo LLM ou CPF digitado como prova de titularidade. */
@@ -13,6 +14,7 @@ export interface VerifiedSupportContext {
   recentOs: Record<string, unknown>[];
   recentTickets: Record<string, unknown>[];
   openTickets: Record<string, unknown>[];
+  incidents: IncidentInfo[];
   uncertainTickets: boolean;
   recurrentWithin48h: boolean;
   recurrenceEvidence: string[];
@@ -30,6 +32,7 @@ export class ConnectchatSupportContextService {
   constructor(
     private readonly connections: ConnectionsService,
     private readonly repository: ConnectionsRepository,
+    private readonly incidentLookup: IncidentLookupService,
   ) {}
 
   /** Busca CPF somente em cadastro e jamais usa a existência como prova de
@@ -60,7 +63,7 @@ export class ConnectchatSupportContextService {
 
   async byVerifiedConversation(conversation: ConnectchatConversation): Promise<VerifiedSupportContext> {
     const empty: VerifiedSupportContext = {
-      available: false, openOs: [], recentOs: [], recentTickets: [], openTickets: [], uncertainTickets: false,
+      available: false, openOs: [], recentOs: [], recentTickets: [], openTickets: [], incidents: [], uncertainTickets: false,
       recurrentWithin48h: false, recurrenceEvidence: [], contracts: [], connections: [], blockedContracts: 0, technology: null, technologyByContract: {},
     };
     if (conversation.businessContact?.status !== 'CUSTOMER'
@@ -92,6 +95,7 @@ export class ConnectchatSupportContextService {
     // Campo comercial de PLANO não comprova tecnologia física.
     let contracts: Record<string, unknown>[] = [];
     let connections: Record<string, unknown>[] = [];
+    const incidentLogins: string[] = [];
     let blockedContracts = 0;
     let technology: 'FIBRA' | 'RADIO' | null = null;
     const technologyByContract: Record<string, 'FIBRA' | 'RADIO'> = {};
@@ -135,8 +139,22 @@ export class ConnectchatSupportContextService {
         id_contrato: row['id_contrato'], online: row['online'],
         status: row['status'], referencia: row['referencia'],
       }));
+      for (const row of active) {
+        const login = typeof row['login'] === 'string' ? row['login'] : '';
+        if (login) incidentLogins.push(login);
+      }
     } catch (error) {
       this.logger.warn(`Consulta de acessos não concluída: ${(error as Error).message}`);
+    }
+
+    const incidents: IncidentInfo[] = [];
+    for (const login of [...new Set(incidentLogins)].slice(0, 8)) {
+      try {
+        const match = await this.incidentLookup.activeFor(login);
+        if (match && !incidents.some((item) => item.incident_id === match.incident_id)) incidents.push(match);
+      } catch (error) {
+        this.logger.warn(`Consulta de incidentes não concluída: ${(error as Error).message}`);
+      }
     }
 
     // Histórico complementar: falha não apaga a evidência de OS em andamento.
@@ -181,7 +199,7 @@ export class ConnectchatSupportContextService {
     }
     return {
       available: true, openOs, recentOs: os, recentTickets: tickets,
-      openTickets, uncertainTickets,
+      openTickets, uncertainTickets, incidents,
       recurrentWithin48h: evidence.length > 0, recurrenceEvidence: evidence.slice(0, 5),
       contracts, connections, blockedContracts, technology, technologyByContract,
     };
