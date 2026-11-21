@@ -91,7 +91,19 @@ export class ConnectchatSupportContextService {
           { TB: 'fn_areceber.status', OP: '!=', P: 'R' },
         ],
       }));
-      const safe = records.map((item) => projectBoleto(item));
+      // Defesa em profundidade: se o IXC ignorar o filtro, jamais deixar
+      // títulos de outro assinante chegarem ao formatador/resposta.
+      const foreign = records.some((item) =>
+        String(item['id_cliente'] ?? '') !== customerId);
+      if (foreign) {
+        this.logger.error('IXC devolveu títulos fora do escopo do cliente; resposta financeira bloqueada.');
+        return { available: false, invoices: [], total: 0 };
+      }
+      const scoped = records.filter((item) =>
+        String(item['id_cliente'] ?? '') === customerId
+        && String(item['liberado'] ?? '').toUpperCase() === 'S'
+        && !['C', 'R'].includes(String(item['status'] ?? '').toUpperCase()));
+      const safe = scoped.map((item) => projectBoleto(item));
       return { available: true, invoices: limitBoletos(safe, 5), total: safe.length };
     } catch (error) {
       this.logger.warn(`Consulta financeira do vínculo não concluída: ${(error as Error).message}`);
