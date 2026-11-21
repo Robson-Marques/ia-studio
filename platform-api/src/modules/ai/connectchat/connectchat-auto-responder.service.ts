@@ -347,9 +347,21 @@ export class ConnectchatAutoResponderService {
         if (typeof pending['customerId'] === 'string' && !restartIdentification) {
           if ((explicitYes && pending['consent'] !== true)
             || (explicitNo && pending['consent'] !== false)) {
+            // Uma nova autorização sempre gera um ciclo de prova novo.
+            // Recusa revoga localmente qualquer pedido anterior, ainda que a
+            // PWA tenha uma solicitação antiga visível.
             await this.settings.set(pendingKey, {
-              ...pending, consent: explicitYes,
+              customerId: pending.customerId,
+              connectionId: pending.connectionId,
+              reason: pending.reason,
+              consent: explicitYes,
+              requestedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
+              requestId: null,
+              requestAttempts: 0,
+              requestFirstAttemptAt: null,
+              nextAttemptAt: null,
+              revoked: explicitNo,
             });
             const answer = explicitYes
               ? 'Obrigado! Vou verificar a confirmação segura do vínculo para continuar seu atendimento.'
