@@ -72,7 +72,7 @@ export class AgentsService {
    */
   async ensureNativeAgent(createdBy: string | null) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(741192, 2026)`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(741192, 2026)::text AS acquired`;
       const settingKey = 'ai.native_agent_id';
       const saved = await tx.systemSetting.findUnique({ where: { key: settingKey } });
       const savedId = (saved?.value as { id?: string } | null)?.id;
