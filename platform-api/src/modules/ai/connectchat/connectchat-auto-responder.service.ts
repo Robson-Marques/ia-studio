@@ -14,6 +14,7 @@ import { AgentsRepository } from '../agents/agents.repository';
 import { parseConversation } from '../agents/agent-conversation';
 import { ConnectchatSupportContextService } from './connectchat-support-context.service';
 import { extractSubscriberDocument, redactSubscriberDocuments } from './subscriber-document';
+import { formatVerifiedInvoices } from './billing-response';
 
 type Cursor = {
   sequence: string;
@@ -482,6 +483,24 @@ export class ConnectchatAutoResponderService {
       // Um cliente já vinculado que diga "oi" ou peça segunda via não deve
       // receber perguntas sobre ONU, rádio, fibra ou OS de suporte.
       if (intent === 'GENERAL' || intent === 'FINANCE') {
+        if (intent === 'FINANCE') {
+          // Consulta determinística, restrita à referência verificada,
+          // sem ferramenta executável ou CPF controlado pelo modelo.
+          const billing = await this.support.billingForVerifiedConversation(context.conversation);
+          const latest = await this.inbox.contextForAgentPreview(conversation.id);
+          if (!latest.verified || latest.conversation.customerRef !== context.conversation.customerRef
+            || latest.conversation.lastSequence !== sequence || latest.conversation.status !== 'OPEN') {
+            await this.complete(key, sequence, claim);
+            return;
+          }
+          const answer = billing.available
+            ? formatVerifiedInvoices(billing.invoices, billing.total)
+            : 'Não consegui consultar seus títulos neste momento. Nenhum dado de pagamento foi alterado.';
+          const token = createHash('sha256').update(`newnet-billing:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+          await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-billing-${token}`);
+          await this.complete(key, sequence, claim);
+          return;
+        }
         const history = context.messages.filter((m) => typeof m.body === 'string' && m.body.trim())
           .slice(-25, -1).map((m) => ({
             role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
