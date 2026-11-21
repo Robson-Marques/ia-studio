@@ -206,11 +206,14 @@ export default function ConnectchatConversas() {
 
   async function resetNete() {
     if (!selected || resettingNete) return;
-    if (!window.confirm('Reiniciar o contexto da Nete nesta conversa? A próxima mensagem será tratada como um atendimento novo. As mensagens antigas permanecerão no ConnectChat.')) return;
+    if (!window.confirm('Limpar esta conversa no IA Studio e reiniciar a Nete? A conversa aparecerá vazia aqui e a próxima mensagem iniciará uma nova interação. O histórico original do ConnectChat não será alterado.')) return;
     setResettingNete(true);
     try {
       await resetConnectchatAiContext(selected.id);
-      toast.success('Contexto da Nete reiniciado. A próxima mensagem inicia uma nova interação.');
+      setMessages([]);
+      messagesRef.current = [];
+      setText('');
+      toast.success('Conversa local limpa e contexto da Nete reiniciado.');
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -300,7 +303,7 @@ export default function ConnectchatConversas() {
                 {selected.businessContact?.status === 'CUSTOMER' ? <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: 'var(--su-text-muted)' }}>Cliente vinculado</span> : null}
               </div>
               <div className="flex items-center gap-2">
-                {canResetNete ? <Button variant="secondary" size="sm" loading={resettingNete} onClick={resetNete}>Reiniciar Nete</Button> : null}
+                {canResetNete ? <Button variant="secondary" size="sm" loading={resettingNete} onClick={resetNete}>Limpar conversa local</Button> : null}
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>
             </header>
