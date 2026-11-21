@@ -585,12 +585,9 @@ export class IspTools implements OnModuleInit {
           };
         }
 
-        // 3) Anti-duplicidade ESCOPADA POR SETOR: sempre checa se já existe OS
-        //    aberta pra este cliente NO MESMO SETOR da abertura — uma OS de outro
-        //    setor/assunto (ex.: financeiro) NÃO deve bloquear um chamado de
-        //    suporte. Rede de segurança: se a LISTAGEM falhar, NÃO trava a abertura
-        //    (melhor abrir do que deixar sem chamado por erro de consulta), mas
-        //    loga o warn — erro silencioso é pior.
+        // 3) Anti-duplicidade ESCOPADA POR SETOR: não reabrir atendimento
+        //    no mesmo setor. Falha de leitura é BLOQUEANTE: sem evidência de
+        //    ausência de OS não é seguro escrever no IXC autonomamente.
         let abertas: Record<string, unknown>[] = [];
         try {
           abertas = rows(
@@ -601,7 +598,11 @@ export class IspTools implements OnModuleInit {
             }),
           );
         } catch (e) {
-          this.logger.warn(`abrir_os: anti-duplicidade falhou (segue e abre): ${(e as Error).message}`);
+          this.logger.warn(`abrir_os: consulta anti-duplicidade indisponível, abertura bloqueada: ${(e as Error).message}`);
+          return {
+            os_aberta: false,
+            motivo: 'Não consegui verificar se já existe uma OS aberta. Por segurança, não abri outra. Tente novamente quando a consulta estiver disponível.',
+          };
         }
         if (abertas.length > 0) {
           const ja = abertas[0];
