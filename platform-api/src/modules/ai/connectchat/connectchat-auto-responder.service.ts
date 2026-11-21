@@ -13,7 +13,7 @@ import { SettingsService } from '../../core/settings/settings.service';
 import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsRepository } from '../agents/agents.repository';
 import { parseConversation } from '../agents/agent-conversation';
-import { ConnectchatSupportContextService } from './connectchat-support-context.service';
+import { ConnectchatSupportContextService, IdentifiedOperationalSnapshot } from './connectchat-support-context.service';
 import { extractSubscriberDocument, redactSubscriberDocuments } from './subscriber-document';
 import { formatVerifiedInvoices } from './billing-response';
 import { ToolRegistryService } from '../tools/tool-registry.service';
@@ -445,7 +445,7 @@ export class ConnectchatAutoResponderService {
     incoming: string,
     initialReason: string,
     justDeclined: boolean,
-    operational?: Record<string, unknown>,
+    operational?: IdentifiedOperationalSnapshot | Record<string, unknown>,
     osResult?: Record<string, unknown>,
   ): Promise<string> {
     const issue = this.classifyRequest(initialReason || incoming, messages);
