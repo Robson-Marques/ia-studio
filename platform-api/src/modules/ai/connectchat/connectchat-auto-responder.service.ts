@@ -198,11 +198,20 @@ export class ConnectchatAutoResponderService {
         : null;
       if (!technology) {
         const techKey = `ai.connectchat.technology_requested.${conversation.id}`;
-        if (!(await this.settings.getValue(techKey))) {
+        const asked = await this.settings.getValue(techKey);
+        if (!asked) {
           const question = 'Cadastro confirmado. Para orientar o suporte corretamente, você sabe se sua conexão da Newnet é por fibra óptica ou por rádio? Se não souber, pode me dizer que verificamos com a equipe.';
           const token = createHash('sha256').update(`newnet-technology:${conversation.id}`).digest('hex').slice(0, 32);
           await this.inbox.sendAgentMessage(conversation.id, question, `newnet-tech-${token}`);
           await this.settings.set(techKey, { requested: true });
+        } else {
+          const pendingKey = `ai.connectchat.technology_unresolved.${conversation.id}`;
+          if (!(await this.settings.getValue(pendingKey))) {
+            const note = 'Entendi. Ainda não consegui confirmar se o acesso é por fibra ou rádio. Para evitar orientar um teste errado, precisamos que um atendente verifique a tecnologia do seu contrato.';
+            const token = createHash('sha256').update(`newnet-tech-pending:${conversation.id}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, note, `newnet-tech-pending-${token}`);
+            await this.settings.set(pendingKey, { requested: true });
+          }
         }
         await this.complete(key, sequence, claim);
         return;
