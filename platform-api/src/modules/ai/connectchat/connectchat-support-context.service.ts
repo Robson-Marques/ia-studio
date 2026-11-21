@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConnectchatConversation } from '../../../shared/integration/connectchat.client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
-import { rows, projectChamado, projectOrdemServico, projectContrato } from '../../isp/isp-projections';
+import { rows, projectChamado, projectOrdemServico, projectContrato, projectConexao } from '../../isp/isp-projections';
 
 /** Evidências restritas ao vínculo confirmado da conversa; nunca recebe
  * identificador escolhido pelo LLM ou CPF digitado como prova de titularidade. */
@@ -15,6 +15,8 @@ export interface VerifiedSupportContext {
   recurrentWithin48h: boolean;
   recurrenceEvidence: string[];
   contracts: Record<string, unknown>[];
+  connections: Record<string, unknown>[];
+  blockedContracts: number;
   technology: 'FIBRA' | 'RADIO' | null;
 }
 
@@ -56,7 +58,7 @@ export class ConnectchatSupportContextService {
   async byVerifiedConversation(conversation: ConnectchatConversation): Promise<VerifiedSupportContext> {
     const empty: VerifiedSupportContext = {
       available: false, openOs: [], recentOs: [], recentTickets: [],
-      recurrentWithin48h: false, recurrenceEvidence: [], contracts: [], technology: null,
+      recurrentWithin48h: false, recurrenceEvidence: [], contracts: [], connections: [], blockedContracts: 0, technology: null,
     };
     if (conversation.businessContact?.status !== 'CUSTOMER'
       || conversation.businessContact.linkStatus !== 'ACTIVE') {
@@ -86,6 +88,8 @@ export class ConnectchatSupportContextService {
     // sem CPF no prompt e sem delegar seleção de cliente ao modelo.
     // Campo comercial de PLANO não comprova tecnologia física.
     let contracts: Record<string, unknown>[] = [];
+    let connections: Record<string, unknown>[] = [];
+    let blockedContracts = 0;
     let technology: 'FIBRA' | 'RADIO' | null = null;
     try {
       const records = rows(await this.connections.execute(connectionId, 'ixc.listar', {
@@ -94,6 +98,10 @@ export class ConnectchatSupportContextService {
         rp: '30', sortname: 'cliente_contrato.id',
       }));
       contracts = records.map(projectContrato).filter((row) => String(row['status'] ?? '').toUpperCase() === 'A').slice(0, 8);
+      blockedContracts = contracts.filter((contract) => {
+        const state = String(contract['status_internet'] ?? '').trim().toUpperCase();
+        return !!state && state !== 'A';
+      }).length;
       // Somente um campo técnico EXPLÍCITO da fonte IXC é aceito.
       const active = records.filter((row) => String(row['status'] ?? '').toUpperCase() === 'A');
       const declared = active.map((row) => {
@@ -105,6 +113,23 @@ export class ConnectchatSupportContextService {
       if (declared.length === 1 && declared[0]) technology = declared[0];
     } catch (error) {
       this.logger.warn(`Consulta de contratos não concluída: ${(error as Error).message}`);
+    }
+
+    // Estado do acesso do cliente, pela mesma conexão IXC confirmada.
+    // Nunca usa "conectividade" genérica sem escopo para evitar expor terceiros.
+    try {
+      const records = rows(await this.connections.execute(connectionId, 'ixc.listar', {
+        tabela: 'radusuarios',
+        qtype: 'radusuarios.id_cliente', query: customerId, oper: '=',
+        rp: '30', sortname: 'radusuarios.id',
+      }));
+      const active = records.map(projectConexao).filter((row) => row['ativo'] === true);
+      connections = active.slice(0, 8).map((row) => ({
+        id_contrato: row['id_contrato'], online: row['online'],
+        status: row['status'], referencia: row['referencia'],
+      }));
+    } catch (error) {
+      this.logger.warn(`Consulta de acessos não concluída: ${(error as Error).message}`);
     }
 
     // Histórico complementar: falha não apaga a evidência de OS em andamento.
@@ -131,7 +156,7 @@ export class ConnectchatSupportContextService {
     return {
       available: true, openOs, recentOs: os, recentTickets: tickets,
       recurrentWithin48h: evidence.length > 0, recurrenceEvidence: evidence.slice(0, 5),
-      contracts, technology,
+      contracts, connections, blockedContracts, technology,
     };
   }
 }
