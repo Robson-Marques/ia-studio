@@ -24,6 +24,7 @@ type Cursor = {
 export class ConnectchatAutoResponderService {
   private readonly logger = new Logger(ConnectchatAutoResponderService.name);
   private polling = false;
+  private readonly bootTime = Date.now();
 
   constructor(
     private readonly settings: SettingsService,
@@ -117,9 +118,6 @@ export class ConnectchatAutoResponderService {
     if (!/^\d+$/.test(sequence) || BigInt(sequence) === 0n) return;
     const key = `ai.connectchat.cursor.${conversation.id}`;
     const raw = await this.settings.getValue(key);
-    // Começa a acompanhar a conversa existente a partir do momento em que
-    // esta versão entra em operação: não responde histórico antigo em lote.
-    if (!raw) { await this.checkpoint(key, sequence); return; }
     const current = this.state(raw);
     if (BigInt(current.sequence) >= BigInt(sequence)) return;
     const after = BigInt(sequence) > 50n ? (BigInt(sequence) - 50n).toString() : '0';
@@ -132,6 +130,12 @@ export class ConnectchatAutoResponderService {
     }
     const createdAt = Date.parse(last.createdAt);
     if (!Number.isFinite(createdAt)) return;
+    // Ignora somente o passado anterior à subida do serviço, não a primeira
+    // mensagem de uma conversa nova. Assim o primeiro contato é respondido.
+    if (!raw && createdAt < this.bootTime - 2000) {
+      await this.checkpoint(key, sequence);
+      return;
+    }
     const delay = parseConversation(agent.conversation).debounce_seconds * 1000;
     if (Date.now() - createdAt < delay) return;
     const claim = randomUUID();
