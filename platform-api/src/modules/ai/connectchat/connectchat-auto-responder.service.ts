@@ -148,7 +148,7 @@ export class ConnectchatAutoResponderService {
       await this.settings.set(key, attemptState);
       try {
         const requestKey = createHash('sha256').update(`newnet-link:${conversation.id}:${conversation.globalIdentityId}:${ref}:${String(pending.requestedAt ?? '')}`).digest('hex');
-        const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose, requestKey);
+        const response = await this.inbox.createAuthenticatedLinkRequest(conversation.id, ref, purpose, requestKey, conversation.globalIdentityId);
         const value = response && typeof response === 'object' ? response as Record<string, unknown> : {};
         const record = (input: unknown): Record<string, unknown> =>
           input && typeof input === 'object' && !Array.isArray(input)
@@ -167,7 +167,7 @@ export class ConnectchatAutoResponderService {
         }
         await this.settings.set(key, {
           ...attemptState, requestId, requestIdentity: conversation.globalIdentityId,
-          requestCreatedAt: now, nextAttemptAt: now + 15000,
+          requestCreatedAt: firstAt, nextAttemptAt: now + 15000,
         });
         const token = createHash('sha256').update(`newnet-link-request:${conversation.id}:${requestId}`).digest('hex').slice(0, 32);
         await this.inbox.sendAgentMessage(conversation.id,
@@ -197,7 +197,7 @@ export class ConnectchatAutoResponderService {
       return;
     }
     try {
-      await this.inbox.completeAuthenticatedLinkRequest(conversation.id, existing);
+      await this.inbox.completeAuthenticatedLinkRequest(conversation.id, existing, conversation.globalIdentityId);
       await this.settings.set(key, { ...pending, completedAt: now, nextAttemptAt: now + 60000 });
       // O estado autenticado ACTIVE/CUSTOMER é verificado no próximo poll.
     } catch {
