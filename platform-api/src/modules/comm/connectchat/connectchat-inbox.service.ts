@@ -196,6 +196,42 @@ export class ConnectchatInboxService {
     return this.execute('acknowledgeDelivered', { conversationId, sequence, actorRef: this.actor(user) });
   }
 
+  /**
+   * Cria pedido de vínculo na identidade REAL da sessão ConnectChat.
+   * Não confunde consentimento/CPF com prova de identidade. A aprovação é
+   * feita pelo próprio assinante na PWA; este método não conclui vínculo.
+   */
+  async createAuthenticatedLinkRequest(conversationId: string, customerRef: string, purpose: string) {
+    const conversation = await this.conversation(conversationId);
+    if (conversation.status !== 'OPEN') throw new ConflictException('A conversa precisa estar aberta.');
+    if (!/^ixc:[0-9a-f-]{36}:[1-9]\d*$/i.test(customerRef)) {
+      throw new BadRequestException('Referência do assinante inválida.');
+    }
+    if (!purpose || purpose.length > 80 || !/^[A-Za-z0-9._:-]+$/.test(purpose)) {
+      throw new BadRequestException('Finalidade de vínculo não configurada.');
+    }
+    return this.execute('createLinkRequest', {
+      globalIdentityId: conversation.globalIdentityId,
+      purpose,
+      customerRef,
+      ttlSeconds: 600,
+    });
+  }
+
+  /**
+   * Apenas conclui pedido APROVADO pelo ConnectChat; o próprio ConnectChat
+   * rejeita pedidos pendentes, expirados ou pertencentes a outra identidade.
+   */
+  async completeAuthenticatedLinkRequest(conversationId: string, requestId: string) {
+    const conversation = await this.conversation(conversationId);
+    if (conversation.status !== 'OPEN') throw new ConflictException('Conversa encerrada.');
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) throw new BadRequestException('Pedido de vínculo inválido.');
+    return this.execute('completeLinkRequest', {
+      globalIdentityId: conversation.globalIdentityId,
+      requestId,
+    });
+  }
+
   async requestCustomerLink(user: AuthenticatedUser, conversationId: string, customerId: string) {
     const [conversation, ixc] = await Promise.all([
       this.conversation(conversationId),
