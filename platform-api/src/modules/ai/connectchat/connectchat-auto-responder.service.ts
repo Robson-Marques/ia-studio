@@ -374,6 +374,18 @@ export class ConnectchatAutoResponderService {
               : 'Tudo bem, não vou vincular este contato. Para consultar informações particulares, será necessária uma identificação segura.';
             const token = createHash('sha256').update(`newnet-consent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-consent-${token}`);
+          } else if (!explicitYes && !explicitNo) {
+            // Enquanto espera a prova, não ignorar perguntas do assinante.
+            // Sem acesso a cadastro privado até ACTIVE/CUSTOMER.
+            const reply = pending.consent === true
+              ? typeof pending.requestId === 'string'
+                ? 'Seu vínculo está aguardando confirmação na conta ConnectChat. Assim que for confirmado, continuo o atendimento.'
+                : 'Ainda não consegui iniciar a confirmação segura do vínculo. Você pode continuar me contando o problema; não vou consultar seus dados privados antes da confirmação.'
+              : pending.consent === false
+                ? 'Respeitei sua escolha de não vincular. Posso dar orientações gerais, mas não consultar dados do seu cadastro.'
+                : 'Para vincular este atendimento ao cadastro, você autoriza a associação? Responda sim ou não.';
+            const token = createHash('sha256').update(`newnet-pending-link:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-pending-link-${token}`);
           }
           // Enquanto não houver vínculo ACTIVE+CUSTOMER não há dados privados
           // nem diagnóstico, mesmo com autorização expressa.
