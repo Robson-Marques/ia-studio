@@ -23,6 +23,7 @@ import { ApprovalPolicyService } from '../approvals/approval-policy.service';
 import { TechnicalCaseService } from './technical-case.service';
 import { TechnicalCasePlannerService } from './technical-case-planner.service';
 import { communicateTechnicalPlan } from './technical-case-planner';
+import { analyzeTechnicalConversation } from './technical-conversation-state';
 import {
   decideTechnicalGovernance,
   shouldInterruptTechnicalExperiment,
@@ -61,6 +62,29 @@ export class ConnectchatAutoResponderService {
     return process.env['CONNECTCHAT_AI_AUTOREPLY'] !== 'off';
   }
 
+  private async isPausedForHuman(conversation: ConnectchatConversation): Promise<boolean> {
+    const raw = await this.settings.getValue(`ai.connectchat.human_handoff.${conversation.id}`);
+    const state = raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? raw as Record<string, unknown> : {};
+    return state.active === true
+      && state.customerRef === conversation.customerRef
+      && state.globalIdentityId === conversation.globalIdentityId;
+  }
+
+  private async pauseForHuman(
+    conversation: ConnectchatConversation,
+    reason: string,
+  ): Promise<void> {
+    await this.settings.set(`ai.connectchat.human_handoff.${conversation.id}`, {
+      active: true,
+      customerRef: conversation.customerRef,
+      globalIdentityId: conversation.globalIdentityId,
+      pausedAtSequence: conversation.lastSequence,
+      reason: reason.slice(0, 300),
+      pausedAt: new Date().toISOString(),
+    });
+  }
+
   @Interval(5000)
   async poll(): Promise<void> {
     if (!this.enabled() || this.polling) return;
@@ -75,6 +99,9 @@ export class ConnectchatAutoResponderService {
       const conversations = await this.inbox.listRawConversations();
       for (const conversation of conversations.filter((c) => c.status === 'OPEN')) {
         try {
+          // Escalonamento real neste canal significa: o atendimento continua
+          // aberto para o operador e a Nete para de responder até o reset local.
+          if (await this.isPausedForHuman(conversation)) continue;
           const pendingKey = `ai.connectchat.pending_identity.${conversation.id}`;
           const rawPending = await this.settings.getValue(pendingKey);
           const pending = rawPending && typeof rawPending === 'object' && !Array.isArray(rawPending)
@@ -245,6 +272,7 @@ export class ConnectchatAutoResponderService {
       'pending_identity', 'resume', 'cursor', 'document_attempts',
       'identification_requested', 'greeting', 'technology_requested',
       'contract_requested', 'selected_contract', 'selected_access', 'recognition',
+      'human_handoff',
     ];
     await this.prisma.$transaction(async (tx) => {
       await tx.systemSetting.deleteMany({
@@ -632,8 +660,8 @@ export class ConnectchatAutoResponderService {
     const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(conversation.customerRef || '');
     if (!match) return { attempted: false, result: null };
 
-    // A única fonte do documento é a mensagem do assinante nesta conversa.
-    // Confirmar que o cadastro encontrado corresponde EXATAMENTE ao vínculo.
+    // Se houver documento nesta conversa, ele precisa corresponder exatamente
+    // ao vínculo. Sem documento, o customer_id autenticado é usado backend-only.
     let document: string | null = null;
     for (const message of [...messages].reverse()) {
       if (message.senderKind !== 'CUSTOMER') continue;
@@ -646,10 +674,8 @@ export class ConnectchatAutoResponderService {
         break;
       }
     }
-    if (!document) return {
-      attempted: true,
-      result: { os_aberta: false, motivo: 'Documento do titular não disponível neste contexto; a OS exige validação adicional.' },
-    };
+    // Cliente habitual pode não repetir CPF nesta conversa. O vínculo
+    // ACTIVE/CUSTOMER já traz o customer_id verificado; o ID fica backend-only.
 
     // O catálogo ISP já governa a abertura. Política de aprovação ativa
     // impede a execução direta neste canal até existir fluxo de aprovação.
@@ -694,7 +720,7 @@ export class ConnectchatAutoResponderService {
     });
     try {
       const output = await tool.handler({
-        cpf: document,
+        ...(document ? { cpf: document } : { customer_id: match[2] }),
         descricao: diagnosticSummary
           ? `${diagnosticSummary.slice(0, 700)} Relato atual: ${reason.slice(0, 250)}.`
           : confirmedNavigationFailure
@@ -1631,6 +1657,10 @@ export class ConnectchatAutoResponderService {
           const token = createHash('sha256').update(
             `newnet-recurrence:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
           await this.inbox.sendAgentMessage(conversation.id, message, `newnet-recurrence-${token}`);
+          await this.pauseForHuman(
+            conversation,
+            opened ? 'Reincidência com nova OS confirmada.' : 'Reincidência exige avaliação humana.',
+          );
           await this.complete(key, sequence, claim);
           return;
         }
@@ -1680,6 +1710,8 @@ export class ConnectchatAutoResponderService {
             conversation.id, response, `newnet-technical-case-scoped-${token}`);
           if (decision.kind === 'RESOLVE_CASE') {
             await this.closeResolvedConversation(conversation.id);
+          } else if (decision.kind === 'ESCALATE_CASE') {
+            await this.pauseForHuman(conversation, 'Experimento concluído sem restabelecer a navegação.');
           }
           await this.complete(key, sequence, claim);
           return;
@@ -1703,6 +1735,10 @@ export class ConnectchatAutoResponderService {
         const token = createHash('sha256').update(
           `newnet-scoped-os-result:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
         await this.inbox.sendAgentMessage(conversation.id, message, `newnet-scoped-os-result-${token}`);
+        await this.pauseForHuman(
+          conversation,
+          opened ? 'Acesso offline com OS confirmada.' : 'Acesso offline sem confirmação de nova OS.',
+        );
         await this.complete(key, sequence, claim);
         return;
       }
@@ -1716,10 +1752,39 @@ export class ConnectchatAutoResponderService {
         recentCustomerMessages: context.messages
           .filter((message) => message.senderKind === 'CUSTOMER')
           .slice(-50).map((message) => message.body),
+        recentAssistantMessages: context.messages
+          .filter((message) => message.senderKind === 'BUSINESS')
+          .slice(-20).map((message) => message.body),
         observation: planObservation,
         historyAnalysis: support.historyAnalysis,
       });
-      const customerPlanMessage = communicateTechnicalPlan(plan, planObservation);
+      const conversationState = analyzeTechnicalConversation(
+        [
+          ...context.messages.filter((message) => message.senderKind === 'CUSTOMER')
+            .slice(-50).map((message) => message.body),
+          newest.body,
+        ],
+        context.messages.filter((message) => message.senderKind === 'BUSINESS')
+          .slice(-20).map((message) => message.body),
+      );
+      const escalationOs = plan.action === 'ESCALATE_WITH_EVIDENCE'
+        && conversationState.scope === 'ALL'
+        && ['NO_CONNECTIVITY', 'SLOWNESS', 'INTERMITTENCE'].includes(conversationState.symptom)
+        ? await this.maybeOpenVerifiedOfflineOs(
+          agent, conversation, context.messages, supportReason, scopedSupport, true,
+          { login: selectedAccessRef ?? undefined, contract: selectedContractId ?? undefined },
+          `Diagnóstico conversacional concluído. Sintoma: ${conversationState.symptom}. `
+            + `Escopo: ${conversationState.scope}. Luzes: ${conversationState.equipmentLights}. `
+            + `Motivo técnico: ${plan.reasoning}`,
+        )
+        : { attempted: false, result: null };
+      const escalationOpened = escalationOs.result?.['os_aberta'] === true;
+      const communicatedPlan = communicateTechnicalPlan(plan, planObservation);
+      const customerPlanMessage = plan.action === 'ESCALATE_WITH_EVIDENCE'
+        ? escalationOpened
+          ? `${communicatedPlan} A ordem de serviço foi registrada, e o atendimento ficará aberto para a equipe continuar por aqui.`
+          : `${communicatedPlan} O atendimento ficará aberto para a equipe continuar por aqui; não vou repetir os mesmos testes.`
+        : communicatedPlan;
       await this.technicalCases.recordGovernedAction(
         conversation.id, plan.action,
         plan.action === 'ESCALATE_WITH_EVIDENCE' ? 'ESCALATED' : 'WAITING_CUSTOMER',
@@ -1728,6 +1793,9 @@ export class ConnectchatAutoResponderService {
           pendingQuestion: plan.action === 'ESCALATE_WITH_EVIDENCE' ? null : customerPlanMessage,
           symptoms: plan.symptoms,
           modelSelected: plan.modelSelected,
+          osAttempted: escalationOs.attempted,
+          osOpened: escalationOpened,
+          humanHandoff: plan.action === 'ESCALATE_WITH_EVIDENCE',
         },
       );
       const freshPlanContext = await this.inbox.contextForAgentPreview(conversation.id);
@@ -1745,6 +1813,9 @@ export class ConnectchatAutoResponderService {
         `newnet-plan:${conversation.id}:${sequence}:${plan.action}`).digest('hex').slice(0, 32);
       await this.inbox.sendAgentMessage(
         conversation.id, customerPlanMessage, `newnet-plan-${planToken}`);
+      if (plan.action === 'ESCALATE_WITH_EVIDENCE') {
+        await this.pauseForHuman(conversation, plan.reasoning);
+      }
       await this.complete(key, sequence, claim);
       return;
 

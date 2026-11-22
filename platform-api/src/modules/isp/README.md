@@ -169,7 +169,9 @@ e nunca convertida em “não existe”.
 O primeiro experimento suportado é a reinicialização assistida do roteador
 identificado pelo cliente. O sistema compara o estado IXC antes/depois do
 desligamento, agenda observações após o religamento e só conclui resolução após
-confirmação de navegação. Sessão online, ONU online, roteador online e navegação
+confirmação de navegação. O investigador preserva também início/fim da sessão e
+motivo de desconexão devolvidos pelo IXC, sem enviar IP ou MAC ao modelo. Sessão
+online, ONU online, roteador online e navegação
 continuam estados distintos; este corte não possui telemetria de ONU/OLT,
 potência, ping, DNS ou tráfego e não simula esses dados.
 
@@ -183,10 +185,11 @@ termos significativos e preserva a solução documentada. Um registro apenas
 recente não vira reincidência automaticamente. Múltiplos contratos e acessos
 exigem escolha explícita; a referência interna fica somente no backend.
 
-Quando os bloqueadores determinísticos permitem continuar, o planejador por IA
-escolhe uma única próxima ação entre perguntar alcance nos aparelhos, solicitar
-um teste local isolado, pedir um sintoma observável ou escalar com evidências. O
-runtime valida o JSON, a compatibilidade da mensagem e a ausência de CPF/CNPJ;
+Quando os bloqueadores determinísticos permitem continuar, o playbook classifica
+falta total, lentidão, intermitência, cobertura Wi-Fi ou falha isolada e define a
+única próxima ação segura. O planejador por IA pode redigir essa ação, mas não
+pode escolher outra etapa. O runtime valida o JSON, a compatibilidade da mensagem
+e a ausência de CPF/CNPJ;
 tools e operações sensíveis não são expostas ao planejador. Abertura de OS,
 supressão por incidente, idempotência, timeout e encerramento permanecem sob o
 motor governado.
@@ -196,6 +199,14 @@ determinístico apresenta antes a leitura operacional confirmada e seu limite �
 por exemplo, `online` sem tratá-lo como navegação funcional — e só depois faz a
 pergunta necessária. O escopo atual considera as respostas anteriores do cliente
 para não repetir a pergunta sobre um ou vários aparelhos.
+
+Ao escalar, o runtime grava `ai.connectchat.human_handoff.<conversationId>` e
+interrompe novas respostas automáticas para o mesmo cliente. A conversa continua
+aberta para o operador; limpar o contexto local, trocar ou desvincular cliente
+remove esse estado. O canal ainda não possui atribuição de fila na API externa.
+Cliente habitual não precisa repetir CPF para a OS: o condutor usa internamente
+o `customer_id` do vínculo `ACTIVE/CUSTOMER`, revalida conversa e identidade
+imediatamente antes da escrita e nunca inclui esse ID no schema do modelo.
 
 Após confirmação explícita de navegação, a Nete envia a resposta final e chama
 o fechamento remoto idempotente do ConnectChat. O evento `conversation.closed`

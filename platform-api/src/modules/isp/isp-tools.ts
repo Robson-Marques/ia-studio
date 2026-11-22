@@ -545,14 +545,20 @@ export class IspTools implements OnModuleInit {
         required: ['cpf', 'descricao'],
       },
       handler: async (args, ctx) => {
-        const cpf = asString(args['cpf'], 'cpf');
+        const cpf = typeof args['cpf'] === 'string' && args['cpf'].trim()
+          ? args['cpf'].trim() : undefined;
+        // Porta interna para o condutor ConnectChat: nasce somente do vínculo
+        // ACTIVE/CUSTOMER validado pelo backend e não existe no schema do modelo.
+        const customerId = typeof args['customer_id'] === 'string'
+          && /^[1-9]\d*$/.test(args['customer_id']) ? args['customer_id'] : undefined;
+        if (!cpf && !customerId) throw new Error('Informe o cliente verificado.');
         const descricao = asString(args['descricao'], 'descricao');
         const login = typeof args['login'] === 'string' && args['login'].trim() ? args['login'].trim() : undefined;
         const contrato = typeof args['contrato'] === 'string' && args['contrato'].trim() ? args['contrato'].trim() : undefined;
 
         // 1) Incidente ativo com supressão → não abre OS duplicada de região.
         const ref = login ?? cpf;
-        const incident = await this.lookup.activeFor(ref);
+        const incident = ref ? await this.lookup.activeFor(ref) : null;
         if (incident && incident.suppress_os) {
           return {
             os_aberta: false,
@@ -592,7 +598,7 @@ export class IspTools implements OnModuleInit {
         try {
           abertas = rows(
             await this.connections.execute(connectionId, 'os.listar_abertas', {
-              cpf,
+              ...(customerId ? { id_cliente: customerId } : { cpf }),
               setor,
               ...(login ? { id_login: login } : {}),
             }),
@@ -616,7 +622,7 @@ export class IspTools implements OnModuleInit {
 
         // 4) Abre a OS com o que a IA sabe + a config.
         const os = await this.connections.execute(connectionId, 'os.cadastrar', {
-          cpf,
+          ...(customerId ? { id_cliente: customerId } : { cpf }),
           descricao,
           setor,
           id_assunto: idAssunto,

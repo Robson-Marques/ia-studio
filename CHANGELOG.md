@@ -1,5 +1,25 @@
 # Changelog — IA Studio
 
+## v0.12.37 - 2026-11-22 (playbooks N2 e escalonamento real)
+
+- A investigação deixa de depender de uma pergunta genérica escolhida pelo
+  modelo. Um estado determinístico conduz falta total, lentidão, intermitência,
+  cobertura Wi-Fi e falha isolada, sem repetir teste já respondido.
+- Reinicialização do roteador só começa depois de confirmar falha em vários
+  aparelhos, estado de conexão ao Wi-Fi e luzes normais. Relato de LOS/luz
+  vermelha é preservado como evidência e não recebe reinício genérico.
+- O investigador passa a guardar início/fim da sessão e motivo da última
+  desconexão já devolvidos pelo IXC, sem expor IP ou MAC ao modelo/cliente.
+- Cliente habitual já vinculado pode abrir a OS pelo `customer_id` confirmado
+  no backend, sem exigir que repita o CPF no chat e sem expor o ID ao modelo.
+- Escalonamento deixa de ser apenas uma frase: o atendimento permanece aberto
+  para o operador e a resposta automática da Nete é pausada até a limpeza local
+  do contexto. Quando os gates permitem, a OS é tentada com o resumo técnico e
+  seu resultado fica auditado.
+- A revisão contra TM Forum, OpenAI Agents/LangGraph e GenieACS documenta o
+  limite atual: telemetria de ONU/OLT, potência, ping, DNS e CPE remoto exige
+  uma fonte ACS/NMS real e não pode ser substituída por prompt.
+
 ## v0.12.36 - 2026-11-22 (investigação visível antes da pergunta técnica)
 
 - A Nete deixa de enviar uma pergunta diagnóstica isolada depois do relato de

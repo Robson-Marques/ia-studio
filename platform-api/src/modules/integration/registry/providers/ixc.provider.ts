@@ -490,6 +490,22 @@ export class IxcProvider extends BaseProvider {
     return row;
   }
 
+  /** Cadastro por ID já verificado pelo backend. Nunca é exposto ao modelo. */
+  private async clienteRowById(
+    ctx: ProviderContext,
+    token: string,
+    idCliente: string,
+  ): Promise<Record<string, unknown>> {
+    if (!/^[1-9]\d*$/.test(idCliente)) throw new BadRequestException('Cliente IXC inválido.');
+    const rows = await this.list(ctx, token, T.cliente,
+      this.eq(`${T.cliente}.id`, idCliente, `${T.cliente}.id`));
+    const row = rows[0];
+    if (!row || String(row['id'] ?? '') !== idCliente) {
+      throw new BadRequestException('Cliente IXC não encontrado pelo vínculo confirmado.');
+    }
+    return row;
+  }
+
   private async clienteId(ctx: ProviderContext, token: string, cpf?: string): Promise<string> {
     return String((await this.clienteRow(ctx, token, cpf))['id']);
   }
@@ -798,7 +814,10 @@ export class IxcProvider extends BaseProvider {
    * da config; `extra` sobrescreve qualquer campo do ticket.
    */
   private async abrirAtendimento(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
-    const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true));
+    const idCliente = this.str(args, 'id_cliente');
+    const cliente = idCliente
+      ? await this.clienteRowById(ctx, token, idCliente)
+      : await this.clienteRow(ctx, token, this.str(args, 'cpf', true));
     const assunto = this.str(args, 'id_assunto') ?? this.str(args, 'motivo');
     const setor = this.str(args, 'setor'); // id_ticket_setor (departamento)
     // Conexao: id_login NUMERICO + contrato do login + se tem endereco proprio.

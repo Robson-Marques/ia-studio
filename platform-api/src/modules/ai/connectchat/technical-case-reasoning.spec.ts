@@ -28,8 +28,8 @@ function experiment(status: ActiveDiagnosticExperiment['status'], baselineOnline
 
 test('inicia reinicializacao quando todos os aparelhos falham e a sessao segue online', () => {
   const result = decideTechnicalTurn({
-    currentMessage: 'Em todos os aparelhos.',
-    recentCustomerMessages: ['Estou sem internet'],
+    currentMessage: 'As luzes estão normais e não tem luz vermelha.',
+    recentCustomerMessages: ['Estou sem internet em todos os aparelhos', 'Conecta no Wi-Fi, mas fica sem internet'],
     observation: readyOnline,
     activeExperiment: null,
     now: new Date('2026-11-21T15:00:00Z'),
@@ -39,13 +39,33 @@ test('inicia reinicializacao quando todos os aparelhos falham e a sessao segue o
 
 test('nao inicia experimento se consulta de chamados falhou', () => {
   const result = decideTechnicalTurn({
-    currentMessage: 'Em todos.',
-    recentCustomerMessages: [],
+    currentMessage: 'As luzes estão normais.',
+    recentCustomerMessages: ['Sem internet em todos', 'Conecta no Wi-Fi sem internet'],
     observation: {
       ...readyOnline,
       hasOpenTicket: null,
       sourceStatus: { ...readyOnline.sourceStatus, recentTickets: 'UNAVAILABLE' },
     },
+    activeExperiment: null,
+  });
+  assert.equal(result, null);
+});
+
+test('nao reinicia antes de conhecer associacao e luzes do equipamento', () => {
+  const result = decideTechnicalTurn({
+    currentMessage: 'Em todos os aparelhos',
+    recentCustomerMessages: ['Estou sem internet'],
+    observation: readyOnline,
+    activeExperiment: null,
+  });
+  assert.equal(result, null);
+});
+
+test('lentidao nao entra no experimento de indisponibilidade', () => {
+  const result = decideTechnicalTurn({
+    currentMessage: 'As luzes estão normais',
+    recentCustomerMessages: ['A internet está lenta em todos', 'Acontece no Wi-Fi'],
+    observation: readyOnline,
     activeExperiment: null,
   });
   assert.equal(result, null);

@@ -34,7 +34,11 @@ test('01 cliente novo recebe próxima pergunta útil validada', () => {
   assert.equal(validateTechnicalPlan({ action: 'ASK_DEVICE_SCOPE', reasoning: 'Falta alcance.', customerMessage: 'Acontece em todos os aparelhos ou só em um deles?', symptoms: [] })?.action, 'ASK_DEVICE_SCOPE');
 });
 test('02 online sem navegação em todos inicia experimento', () => {
-  assert.equal(decideTechnicalTurn({ currentMessage: 'Em todos', recentCustomerMessages: ['sem internet'], observation, activeExperiment: null })?.kind, 'REQUEST_POWER_OFF');
+  assert.equal(decideTechnicalTurn({
+    currentMessage: 'As luzes estão normais e não há luz vermelha',
+    recentCustomerMessages: ['sem internet em todos', 'conecta no Wi-Fi mas fica sem internet'],
+    observation, activeExperiment: null,
+  })?.kind, 'REQUEST_POWER_OFF');
 });
 test('03 reincidência exige correlação e solução documentada', () => {
   assert.equal(decideTechnicalGovernance({ ...governanceBase, recurrentWithin48h: true, documentedPriorResolution: true }).action, 'ESCALATE_RECURRENT_FAILURE');

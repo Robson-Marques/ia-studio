@@ -6,17 +6,18 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-11-22 (correção candidata `v0.12.36`; interação real mostrou que a pergunta técnica ocultava a investigação já executada).
+> Última atualização: 2026-11-22 (candidata `v0.12.37`; revisão aberta mostrou que o planner era raso e o escalonamento não pausava a automação).
 
 ## Frente em validação: Nete como suporte técnico N2
 
 A auditoria confirmou que o condutor ConnectChat guardava snapshots em
 `SystemSetting` e entregava contexto textual ao modelo com tools desabilitadas;
 não existia caso técnico, hipótese nem experimento persistente. A branch agora
-implementa o núcleo N2 completo: caso/evidência/hipótese/ação, investigação por
+implementa o núcleo N2 disponível com as fontes atuais: caso/evidência/hipótese/ação, investigação por
 fonte, correlação de histórico por sintoma, seleção de contrato e acesso,
-planejador por IA com catálogo restrito, reinicialização assistida com observação
-agendada, reincidência, abertura de OS governada e encerramento remoto. O contrato vivo está em
+playbooks determinísticos por sintoma, planejador por IA com catálogo restrito,
+reinicialização assistida com observação agendada, reincidência, abertura de OS
+governada, handoff local persistente e encerramento remoto. O contrato vivo está em
 `docs/capabilities/nete-autonomous-technical-support.md`.
 
 Na validação real de 2026-11-22, após “Estou sem conexão”, o backend consultou o
@@ -24,19 +25,29 @@ contexto técnico, mas o cliente recebeu somente “um aparelho ou vários?”. 
 `v0.12.36` corrige a fronteira do comunicador: a resposta passa a informar antes
 o resultado confirmado da consulta e o limite da leitura, e amplia para 50
 mensagens do escopo atual a detecção de uma resposta anterior sobre aparelhos.
-O modelo continua escolhendo apenas a ação catalogada; não pode remover a
-evidência operacional da mensagem final.
+Na revisão seguinte, o planejador deixou de poder escolher uma etapa diferente
+do playbook. Falta total, lentidão, intermitência, cobertura e aparelho isolado
+possuem progressão própria; LOS vermelha não recebe reinício genérico. O IXC já
+fornece início/fim de sessão e motivo de desconexão, agora preservados como
+evidência minimizada. Ao escalar, a Nete grava handoff local e para de responder
+até o operador limpar o contexto ou o cliente ser trocado/desvinculado.
 
 Também foi restaurada na tela de conversas a ação **Desvincular cliente**, que
 o commit `ca1e56a` havia ocultado embora backend e permissão continuassem
 existindo. O desvínculo mantém as mensagens, limpa o escopo local da Nete e
 cancela caso/experimento ativo. A limpeza inclui contrato e acesso selecionados.
-Build, Prisma generate/db push e testes integrados ainda precisam rodar no
-servidor/CI antes de tag ou deploy. Os 20 cenários obrigatórios do contrato N2,
-mais a seleção de múltiplos contratos (21 decisões puras no total), foram
-executados com o Node 24 local e passaram; o comando
+Build oficial, Prisma generate/db push e testes integrados ainda precisam rodar
+no servidor/CI antes do deploy. As decisões de governança e os diálogos
+regressivos somam 59 testes puros aprovados; o bundle estático do entrypoint da
+API também passou. O comando
 oficial `npm run test:newnet` continua pendente porque este Windows não possui
 npm/ts-node/Prisma instalados.
+
+Pesquisa primária registrada em `docs/research/nete-n2-open-source-benchmark.md`:
+TMF621/TMF656, demos oficiais de suporte da OpenAI, HITL do LangGraph e GenieACS.
+Conclusão operacional: potência ONU/OLT, ping, DNS, tráfego e atuação remota em
+CPE dependem de ACS/NMS/synthetic probes reais. A Capability permanece
+`in-progress` até integrar essas fontes e executar o smoke real pós-deploy.
 
 No companion do ConnectChat, a rota de fechamento idempotente, o evento
 `conversation.closed` e o bloqueio realtime do compositor do cliente estão
@@ -44,7 +55,8 @@ implementados. Build da API e do PWA passaram; os três testes unitários do
 fechamento passaram. A suíte completa tem uma falha preexistente e não relacionada
 em `environment.spec` (fixture não contempla `MEDIA_STORAGE_PATH`) e 28 testes de
 integração foram pulados por ausência de banco. IA Studio e ConnectChat entram
-juntos na candidata `v0.12.35`; a aceitação real continua condicionada ao
+juntos na candidata `v0.12.37` (o código do companion não mudou desde a
+`v0.12.36`); a aceitação real continua condicionada ao
 atualizador concluir backup, Prisma, builds, reinícios e smoke com IXC.
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)

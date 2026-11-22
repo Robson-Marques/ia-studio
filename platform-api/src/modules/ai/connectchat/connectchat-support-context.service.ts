@@ -319,6 +319,11 @@ export class ConnectchatSupportContextService {
         return {
           id_contrato: row['id_contrato'], online: known ? row['online'] : null,
           status: row['status'], referencia: row['referencia'], access_ref: row['login'],
+          connected_since: row['conectado_desde'] ?? null,
+          disconnected_at: row['desconectado_em'] ?? null,
+          disconnect_reason: row['motivo_desconexao'] ?? null,
+          ip_present: typeof row['ip'] === 'string' && row['ip'].length > 0,
+          mac_present: typeof row['mac'] === 'string' && row['mac'].length > 0,
         };
       });
       for (const row of active) {
@@ -419,6 +424,14 @@ export class ConnectchatSupportContextService {
       multipleAccesses: context.connections.length > 1,
       contractCount: context.sourceStatus.contracts === 'AVAILABLE' ? context.contracts.length : null,
       accessCount: context.sourceStatus.accesses === 'AVAILABLE' ? context.connections.length : null,
+      session: context.connections.length === 1 ? {
+        connectedSince: typeof context.connections[0]?.['connected_since'] === 'string'
+          ? context.connections[0]['connected_since'] as string : null,
+        disconnectedAt: typeof context.connections[0]?.['disconnected_at'] === 'string'
+          ? context.connections[0]['disconnected_at'] as string : null,
+        disconnectReason: typeof context.connections[0]?.['disconnect_reason'] === 'string'
+          ? String(context.connections[0]['disconnect_reason']).slice(0, 180) : null,
+      } : null,
       sourceStatus: context.sourceStatus,
     };
   }

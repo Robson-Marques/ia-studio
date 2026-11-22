@@ -1,3 +1,5 @@
+import { analyzeTechnicalConversation } from './technical-conversation-state';
+
 export type TechnicalSourceState = 'AVAILABLE' | 'UNAVAILABLE' | 'NOT_APPLICABLE';
 
 export interface TechnicalObservation {
@@ -10,6 +12,11 @@ export interface TechnicalObservation {
   multipleAccesses: boolean;
   contractCount: number | null;
   accessCount: number | null;
+  session?: {
+    connectedSince: string | null;
+    disconnectedAt: string | null;
+    disconnectReason: string | null;
+  } | null;
   sourceStatus: Record<string, TechnicalSourceState>;
 }
 
@@ -88,14 +95,6 @@ function reportsRestored(message: string): boolean {
 function reportsStillFailing(message: string): boolean {
   return /\b(nao voltou|continua sem|ainda sem|nao funciona|nao resolveu|segue sem|continua igual)\b/
     .test(normalize(message));
-}
-
-function reportsAllDevices(messages: string[]): boolean {
-  return messages.slice(-8).some((message) => {
-    const value = normalize(message);
-    return /\b(todos|todas|nenhum aparelho|em tudo|todos os aparelhos|todos os dispositivos)\b/.test(value)
-      || /\b(celular|telefone)\b.*\b(tv|televisao|computador|notebook)\b/.test(value);
-  });
 }
 
 function canStartRestart(observation: TechnicalObservation): boolean {
@@ -219,7 +218,13 @@ export function decideTechnicalTurn(input: DecideTechnicalTurnInput): TechnicalD
     }
   }
 
-  if (!reportsAllDevices([...input.recentCustomerMessages, input.currentMessage])) return null;
+  const conversation = analyzeTechnicalConversation(
+    [...input.recentCustomerMessages, input.currentMessage],
+  );
+  if (conversation.symptom !== 'NO_CONNECTIVITY'
+    || conversation.scope !== 'ALL'
+    || conversation.connectionState === 'UNKNOWN'
+    || conversation.equipmentLights !== 'NORMAL') return null;
   if (!canStartRestart(input.observation)) return null;
 
   return {

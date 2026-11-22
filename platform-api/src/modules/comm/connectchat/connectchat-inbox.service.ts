@@ -341,7 +341,7 @@ export class ConnectchatInboxService {
     const settingNames = [
       'pending_identity', 'document_attempts', 'identification_requested',
       'technology_requested', 'contract_requested', 'selected_contract', 'selected_access',
-      'greeting',
+      'greeting', 'human_handoff',
     ];
     await this.prisma.$transaction(async (tx) => {
       await tx.systemSetting.deleteMany({
