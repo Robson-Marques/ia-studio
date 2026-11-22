@@ -1,6 +1,10 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { validateTechnicalPlan } from './technical-case-planner';
+import {
+  communicateTechnicalPlan,
+  hasReportedDeviceScope,
+  validateTechnicalPlan,
+} from './technical-case-planner';
 
 test('aceita ação estruturada com mensagem compatível', () => {
   const plan = validateTechnicalPlan({
@@ -25,4 +29,34 @@ test('rejeita mensagem que não preserva a ação escolhida', () => {
     action: 'ESCALATE_WITH_EVIDENCE', reasoning: 'Sem telemetria suficiente.',
     customerMessage: 'Está tudo resolvido.', symptoms: [],
   }), null);
+});
+
+test('comunica a investigação confirmada antes da pergunta técnica', () => {
+  const message = communicateTechnicalPlan({
+    action: 'ASK_DEVICE_SCOPE',
+    reasoning: 'Falta conhecer o alcance.',
+    customerMessage: 'A falha acontece em todos os aparelhos ou somente em um?',
+    symptoms: ['sem_navegacao'],
+    modelSelected: false,
+  }, {
+    status: 'READY', online: true, hasOpenOs: false, hasOpenTicket: false,
+    incident: false,
+    sourceStatus: {
+      openOs: 'AVAILABLE', recentTickets: 'AVAILABLE', incidents: 'AVAILABLE',
+      contracts: 'AVAILABLE', accesses: 'AVAILABLE',
+    },
+  });
+  assert.match(message, /^Consultei sua conexão:/);
+  assert.match(message, /online no sistema/i);
+  assert.match(message, /não comprova/i);
+  assert.match(message, /todos os aparelhos/i);
+});
+
+test('não repete pergunta de alcance respondida anteriormente no caso', () => {
+  const messages = [
+    'Estou sem conexão',
+    'Acontece em todos os aparelhos aqui de casa',
+    ...Array.from({ length: 20 }, (_, index) => `mensagem de acompanhamento ${index + 1}`),
+  ];
+  assert.equal(hasReportedDeviceScope(messages), true);
 });

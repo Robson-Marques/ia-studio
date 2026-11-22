@@ -191,6 +191,12 @@ tools e operações sensíveis não são expostas ao planejador. Abertura de OS,
 supressão por incidente, idempotência, timeout e encerramento permanecem sob o
 motor governado.
 
+O texto enviado ao cliente não é a pergunta crua do planejador. Um comunicador
+determinístico apresenta antes a leitura operacional confirmada e seu limite —
+por exemplo, `online` sem tratá-lo como navegação funcional — e só depois faz a
+pergunta necessária. O escopo atual considera as respostas anteriores do cliente
+para não repetir a pergunta sobre um ou vários aparelhos.
+
 Após confirmação explícita de navegação, a Nete envia a resposta final e chama
 o fechamento remoto idempotente do ConnectChat. O evento `conversation.closed`
 preserva o histórico e bloqueia novos envios naquele atendimento; falha de canal

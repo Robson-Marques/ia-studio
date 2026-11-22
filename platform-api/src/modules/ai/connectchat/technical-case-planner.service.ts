@@ -5,7 +5,8 @@ import { redactSubscriberDocuments } from './subscriber-document';
 import type { TechnicalHistoryAnalysis } from './technical-history-analysis';
 import type { TechnicalObservation } from './technical-case-reasoning';
 import {
-  normalizeTechnicalText,
+  hasReportedDeviceScope,
+  hasReportedIsolatedDevice,
   validateTechnicalPlan,
 } from './technical-case-planner';
 import type { TechnicalPlan } from './technical-case-planner';
@@ -78,9 +79,9 @@ export class TechnicalCasePlannerService {
   }
 
   private compatible(plan: TechnicalPlan, input: PlannerInput): boolean {
-    const messages = normalizeTechnicalText([...input.recentCustomerMessages, input.currentMessage].join(' '));
-    const scopeKnown = /\b(todos|todas|nenhum|um aparelho|um dispositivo|so no|apenas no|celular|tv|computador|notebook)\b/.test(messages);
-    const isolated = /\b(so no|apenas no|um aparelho|um dispositivo)\b/.test(messages);
+    const messages = [...input.recentCustomerMessages, input.currentMessage];
+    const scopeKnown = hasReportedDeviceScope(messages);
+    const isolated = hasReportedIsolatedDevice(messages);
     if (plan.action === 'ASK_DEVICE_SCOPE' && scopeKnown) return false;
     if (plan.action === 'REQUEST_SINGLE_DEVICE_CHECK' && !isolated) return false;
     if (plan.action !== 'ESCALATE_WITH_EVIDENCE'
@@ -100,8 +101,8 @@ export class TechnicalCasePlannerService {
         modelSelected: false,
       };
     }
-    const messages = normalizeTechnicalText([...input.recentCustomerMessages, input.currentMessage].join(' '));
-    if (!/\b(todos|todas|nenhum|um aparelho|um dispositivo|so no|apenas no|celular|tv|computador|notebook)\b/.test(messages)) {
+    const messages = [...input.recentCustomerMessages, input.currentMessage];
+    if (!hasReportedDeviceScope(messages)) {
       return {
         action: 'ASK_DEVICE_SCOPE',
         reasoning: 'Ainda não há evidência sobre o alcance do sintoma nos dispositivos.',
@@ -110,7 +111,7 @@ export class TechnicalCasePlannerService {
         modelSelected: false,
       };
     }
-    if (/\b(so no|apenas no|um aparelho|um dispositivo)\b/.test(messages)) {
+    if (hasReportedIsolatedDevice(messages)) {
       return {
         action: 'REQUEST_SINGLE_DEVICE_CHECK',
         reasoning: 'O relato indica falha isolada e ainda não justifica alterar o equipamento compartilhado.',

@@ -6,7 +6,7 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-11-21 (release coordenada candidata `v0.12.35`; núcleo N2 validado localmente, build/Prisma/smoke reais pertencem ao atualizador do host).
+> Última atualização: 2026-11-22 (correção candidata `v0.12.36`; interação real mostrou que a pergunta técnica ocultava a investigação já executada).
 
 ## Frente em validação: Nete como suporte técnico N2
 
@@ -18,6 +18,14 @@ fonte, correlação de histórico por sintoma, seleção de contrato e acesso,
 planejador por IA com catálogo restrito, reinicialização assistida com observação
 agendada, reincidência, abertura de OS governada e encerramento remoto. O contrato vivo está em
 `docs/capabilities/nete-autonomous-technical-support.md`.
+
+Na validação real de 2026-11-22, após “Estou sem conexão”, o backend consultou o
+contexto técnico, mas o cliente recebeu somente “um aparelho ou vários?”. A
+`v0.12.36` corrige a fronteira do comunicador: a resposta passa a informar antes
+o resultado confirmado da consulta e o limite da leitura, e amplia para 50
+mensagens do escopo atual a detecção de uma resposta anterior sobre aparelhos.
+O modelo continua escolhendo apenas a ação catalogada; não pode remover a
+evidência operacional da mensagem final.
 
 Também foi restaurada na tela de conversas a ação **Desvincular cliente**, que
 o commit `ca1e56a` havia ocultado embora backend e permissão continuassem

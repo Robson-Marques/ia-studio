@@ -22,6 +22,7 @@ import { ToolsRepository } from '../tools/tools.repository';
 import { ApprovalPolicyService } from '../approvals/approval-policy.service';
 import { TechnicalCaseService } from './technical-case.service';
 import { TechnicalCasePlannerService } from './technical-case-planner.service';
+import { communicateTechnicalPlan } from './technical-case-planner';
 import {
   decideTechnicalGovernance,
   shouldInterruptTechnicalExperiment,
@@ -966,7 +967,7 @@ export class ConnectchatAutoResponderService {
             currentMessage: newest.body,
             recentCustomerMessages: context.messages
               .filter((message) => message.senderKind === 'CUSTOMER')
-              .slice(-12).map((message) => message.body),
+              .slice(-50).map((message) => message.body),
             customerSequence: sequence,
             observation: this.support.observationFromIdentified(operational),
           }) : null;
@@ -1100,7 +1101,7 @@ export class ConnectchatAutoResponderService {
               currentMessage: newest.body,
               recentCustomerMessages: context.messages
                 .filter((message) => message.senderKind === 'CUSTOMER')
-                .slice(-12).map((message) => message.body),
+                .slice(-50).map((message) => message.body),
               customerSequence: sequence,
               observation: this.support.observationFromIdentified(operational),
             });
@@ -1646,7 +1647,7 @@ export class ConnectchatAutoResponderService {
           currentMessage: newest.body,
           recentCustomerMessages: context.messages
             .filter((message) => message.senderKind === 'CUSTOMER')
-            .slice(-12).map((message) => message.body),
+            .slice(-50).map((message) => message.body),
           customerSequence: sequence,
           observation: this.support.observationFromVerified(scopedSupport),
           selectedContractRef: selectedContractId,
@@ -1706,6 +1707,7 @@ export class ConnectchatAutoResponderService {
         return;
       }
 
+      const planObservation = this.support.observationFromVerified(scopedSupport);
       const plan = await this.technicalPlanner.plan({
         agentId: agent.id,
         conversationScope: await this.aiContextScope(conversation.id),
@@ -1713,16 +1715,17 @@ export class ConnectchatAutoResponderService {
         currentMessage: newest.body,
         recentCustomerMessages: context.messages
           .filter((message) => message.senderKind === 'CUSTOMER')
-          .slice(-12).map((message) => message.body),
-        observation: this.support.observationFromVerified(scopedSupport),
+          .slice(-50).map((message) => message.body),
+        observation: planObservation,
         historyAnalysis: support.historyAnalysis,
       });
+      const customerPlanMessage = communicateTechnicalPlan(plan, planObservation);
       await this.technicalCases.recordGovernedAction(
         conversation.id, plan.action,
         plan.action === 'ESCALATE_WITH_EVIDENCE' ? 'ESCALATED' : 'WAITING_CUSTOMER',
         plan.reasoning,
         {
-          pendingQuestion: plan.action === 'ESCALATE_WITH_EVIDENCE' ? null : plan.customerMessage,
+          pendingQuestion: plan.action === 'ESCALATE_WITH_EVIDENCE' ? null : customerPlanMessage,
           symptoms: plan.symptoms,
           modelSelected: plan.modelSelected,
         },
@@ -1741,7 +1744,7 @@ export class ConnectchatAutoResponderService {
       const planToken = createHash('sha256').update(
         `newnet-plan:${conversation.id}:${sequence}:${plan.action}`).digest('hex').slice(0, 32);
       await this.inbox.sendAgentMessage(
-        conversation.id, plan.customerMessage, `newnet-plan-${planToken}`);
+        conversation.id, customerPlanMessage, `newnet-plan-${planToken}`);
       await this.complete(key, sequence, claim);
       return;
 

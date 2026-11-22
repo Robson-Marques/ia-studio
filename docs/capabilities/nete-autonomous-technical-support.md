@@ -2,7 +2,7 @@
 schema: prompt-framework/v1
 id: ia-studio.capability.nete-autonomous-technical-support
 kind: capability
-version: 1.1.0
+version: 1.1.1
 status: in-progress
 title: Suporte técnico autônomo N2 da Nete
 policy_refs:
@@ -12,7 +12,7 @@ baseline_ref: docs/architecture-baseline.md
 owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-11-21"
-change_reason: Completa o núcleo N2 com investigador, correlação, planejamento restrito, OS governada e fechamento coordenado do canal.
+change_reason: Torna a investigação operacional visível antes da próxima pergunta e preserva respostas anteriores do escopo atual.
 ---
 
 # Capability Contract: suporte técnico autônomo N2 da Nete
@@ -58,6 +58,12 @@ restrito e comunicador. A IA escolhe a próxima pergunta ou teste somente entre
 ações de leitura e diagnóstico seguro; autorização, seleção de escopo,
 duplicidade, abertura de OS e encerramento continuam sob regras determinísticas.
 
+O comunicador não envia a pergunta escolhida de forma isolada: primeiro apresenta
+o resultado operacional comprovado que fundamentou a decisão e explicita o limite
+da leitura. Uma sessão `online`, por exemplo, é informada como estado do sistema,
+nunca como prova de que a navegação funciona. O histórico do escopo atual evita
+perguntar novamente algo que o cliente já respondeu.
+
 ## Slices e progresso
 
 | Slice | Conteúdo | Estado |
@@ -90,4 +96,6 @@ produção.
 - Timeout, conversa encerrada, troca e desvínculo de cliente cancelam com segurança.
 - OS só é afirmada após confirmação do IXC.
 - Falhas e limitações de telemetria são comunicadas sem fabricação de resultado.
+- A próxima pergunta técnica vem depois da evidência consultada, não como roteiro genérico.
+- Uma resposta anterior sobre o alcance da falha nos aparelhos não é perguntada novamente no mesmo escopo.
 

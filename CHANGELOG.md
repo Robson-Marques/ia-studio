@@ -1,5 +1,16 @@
 # Changelog — IA Studio
 
+## v0.12.36 - 2026-11-22 (investigação visível antes da pergunta técnica)
+
+- A Nete deixa de enviar uma pergunta diagnóstica isolada depois do relato de
+  falta de conexão. Antes da pergunta, comunica o estado realmente consultado
+  no IXC, a inexistência confirmada de ordem/chamado/incidente e o limite da
+  leitura `online`, sem apresentar esse estado como navegação funcional.
+- O comunicador determinístico impede que o planejador por IA apague da resposta
+  a evidência operacional já obtida. Respostas sobre o alcance nos aparelhos
+  passam a ser consideradas em até 50 mensagens do escopo atual para evitar
+  repetir uma pergunta que o cliente já respondeu.
+
 ## v0.12.35 - 2026-11-21 (suporte técnico autônomo N2 e desvínculo ConnectChat)
 
 - A Nete passa a manter caso técnico persistente com evidências, hipóteses,

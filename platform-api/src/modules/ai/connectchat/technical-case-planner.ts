@@ -12,6 +12,15 @@ export interface TechnicalPlan {
   modelSelected: boolean;
 }
 
+interface CustomerTechnicalObservation {
+  status: 'READY' | 'UNAVAILABLE';
+  online: boolean | null;
+  hasOpenOs: boolean | null;
+  hasOpenTicket: boolean | null;
+  incident: boolean;
+  sourceStatus: Record<string, 'AVAILABLE' | 'UNAVAILABLE' | 'NOT_APPLICABLE'>;
+}
+
 const ACTIONS = new Set<PlannedTechnicalAction>([
   'ASK_DEVICE_SCOPE',
   'REQUEST_SINGLE_DEVICE_CHECK',
@@ -21,6 +30,16 @@ const ACTIONS = new Set<PlannedTechnicalAction>([
 
 export const normalizeTechnicalText = (value: string): string => value.toLowerCase().normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+
+export function hasReportedDeviceScope(messages: string[]): boolean {
+  const value = normalizeTechnicalText(messages.join(' '));
+  return /\b(todos|todas|nenhum|um aparelho|um dispositivo|so no|apenas no|celular|tv|computador|notebook)\b/.test(value);
+}
+
+export function hasReportedIsolatedDevice(messages: string[]): boolean {
+  const value = normalizeTechnicalText(messages.join(' '));
+  return /\b(so no|apenas no|um aparelho|um dispositivo)\b/.test(value);
+}
 
 function safeMessage(action: PlannedTechnicalAction, message: unknown): string | null {
   if (typeof message !== 'string') return null;
@@ -52,5 +71,32 @@ export function validateTechnicalPlan(raw: unknown): TechnicalPlan | null {
       .map((item) => item.slice(0, 120)).slice(0, 8)
     : [];
   return { action, reasoning, customerMessage, symptoms, modelSelected: true };
+}
+
+export function communicateTechnicalPlan(
+  plan: TechnicalPlan,
+  observation: CustomerTechnicalObservation,
+): string {
+  if (plan.action === 'ESCALATE_WITH_EVIDENCE' || observation.status !== 'READY') {
+    return plan.customerMessage;
+  }
+
+  const requiredSources = ['openOs', 'recentTickets', 'incidents', 'contracts', 'accesses'];
+  if (!requiredSources.every((source) => observation.sourceStatus[source] === 'AVAILABLE')) {
+    return plan.customerMessage;
+  }
+
+  const noActiveAttendance = observation.hasOpenOs === false
+    && observation.hasOpenTicket === false
+    && observation.incident === false;
+  const attendance = noActiveAttendance
+    ? ' Não há ordem de serviço, chamado ou incidente ativo para esse acesso.'
+    : '';
+  const access = observation.online === true
+    ? `Consultei sua conexão: ela aparece online no sistema.${attendance} Esse estado não comprova que a internet esteja funcionando.`
+    : observation.online === false
+      ? `Consultei sua conexão: o acesso aparece offline no sistema.${attendance}`
+      : `Consultei sua conexão, mas o estado do acesso não veio conclusivo.${attendance}`;
+  return `${access} ${plan.customerMessage}`.replace(/\s+/g, ' ').trim();
 }
 
