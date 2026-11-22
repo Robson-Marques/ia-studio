@@ -158,6 +158,44 @@ não do modelo: prioridade da Connection → tag/filial (`filial`) → `connecti
 explícito no contexto curado do workflow. Esses valores não fazem parte do
 schema exposto à IA.
 
+## Caso técnico persistente da Nete
+
+O atendimento ConnectChat mantém o caso N2 em `ai_technical_cases`, separado
+do histórico de mensagens e da memória genérica do assistente. Evidências,
+hipóteses, experimentos e ações ficam em tabelas próprias; CPF/CNPJ não é
+persistido nesse núcleo. Falha de uma fonte é registrada como indisponibilidade
+e nunca convertida em “não existe”.
+
+O primeiro experimento suportado é a reinicialização assistida do roteador
+identificado pelo cliente. O sistema compara o estado IXC antes/depois do
+desligamento, agenda observações após o religamento e só conclui resolução após
+confirmação de navegação. Sessão online, ONU online, roteador online e navegação
+continuam estados distintos; este corte não possui telemetria de ONU/OLT,
+potência, ping, DNS ou tráfego e não simula esses dados.
+
+Desvincular um cliente no painel mantém o histórico da conversa, mas cancela o
+caso/experimento técnico e cria novo escopo local para impedir que a Nete use o
+cadastro anterior.
+
+Antes de decidir, o investigador registra cada fonte como `AVAILABLE`,
+`UNAVAILABLE` ou `STALE`, correlaciona OS/chamados anteriores por categoria e
+termos significativos e preserva a solução documentada. Um registro apenas
+recente não vira reincidência automaticamente. Múltiplos contratos e acessos
+exigem escolha explícita; a referência interna fica somente no backend.
+
+Quando os bloqueadores determinísticos permitem continuar, o planejador por IA
+escolhe uma única próxima ação entre perguntar alcance nos aparelhos, solicitar
+um teste local isolado, pedir um sintoma observável ou escalar com evidências. O
+runtime valida o JSON, a compatibilidade da mensagem e a ausência de CPF/CNPJ;
+tools e operações sensíveis não são expostas ao planejador. Abertura de OS,
+supressão por incidente, idempotência, timeout e encerramento permanecem sob o
+motor governado.
+
+Após confirmação explícita de navegação, a Nete envia a resposta final e chama
+o fechamento remoto idempotente do ConnectChat. O evento `conversation.closed`
+preserva o histórico e bloqueia novos envios naquele atendimento; falha de canal
+é registrada no caso e não apaga a resolução técnica.
+
 ### Diagnóstico determinístico contrato→login (`diagnosticar_conexao`)
 
 A tool tira do modelo a lógica de vários passos (ver `isp-diagnosis.service.ts`).

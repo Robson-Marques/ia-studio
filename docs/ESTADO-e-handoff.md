@@ -6,7 +6,38 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-11-18 (`v0.12.8` reconcilia e recupera mídia WAHA de todos os tipos).
+> Última atualização: 2026-11-21 (release coordenada candidata `v0.12.35`; núcleo N2 validado localmente, build/Prisma/smoke reais pertencem ao atualizador do host).
+
+## Frente em validação: Nete como suporte técnico N2
+
+A auditoria confirmou que o condutor ConnectChat guardava snapshots em
+`SystemSetting` e entregava contexto textual ao modelo com tools desabilitadas;
+não existia caso técnico, hipótese nem experimento persistente. A branch agora
+implementa o núcleo N2 completo: caso/evidência/hipótese/ação, investigação por
+fonte, correlação de histórico por sintoma, seleção de contrato e acesso,
+planejador por IA com catálogo restrito, reinicialização assistida com observação
+agendada, reincidência, abertura de OS governada e encerramento remoto. O contrato vivo está em
+`docs/capabilities/nete-autonomous-technical-support.md`.
+
+Também foi restaurada na tela de conversas a ação **Desvincular cliente**, que
+o commit `ca1e56a` havia ocultado embora backend e permissão continuassem
+existindo. O desvínculo mantém as mensagens, limpa o escopo local da Nete e
+cancela caso/experimento ativo. A limpeza inclui contrato e acesso selecionados.
+Build, Prisma generate/db push e testes integrados ainda precisam rodar no
+servidor/CI antes de tag ou deploy. Os 20 cenários obrigatórios do contrato N2,
+mais a seleção de múltiplos contratos (21 decisões puras no total), foram
+executados com o Node 24 local e passaram; o comando
+oficial `npm run test:newnet` continua pendente porque este Windows não possui
+npm/ts-node/Prisma instalados.
+
+No companion do ConnectChat, a rota de fechamento idempotente, o evento
+`conversation.closed` e o bloqueio realtime do compositor do cliente estão
+implementados. Build da API e do PWA passaram; os três testes unitários do
+fechamento passaram. A suíte completa tem uma falha preexistente e não relacionada
+em `environment.spec` (fixture não contempla `MEDIA_STORAGE_PATH`) e 28 testes de
+integração foram pulados por ausência de banco. IA Studio e ConnectChat entram
+juntos na candidata `v0.12.35`; a aceitação real continua condicionada ao
+atualizador concluir backup, Prisma, builds, reinícios e smoke com IXC.
 
 ## Frente em desenvolvimento — WhatsApp pela Central Nivoo (2026-10-26)
 

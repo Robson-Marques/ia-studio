@@ -6,6 +6,8 @@ import { rows, projectChamado, projectOrdemServico, projectContrato, projectCone
 import { IncidentLookupService, IncidentInfo } from '../../isp/incident-lookup.service';
 import { isValidSubscriberDocument, normalizeSubscriberDocument } from './subscriber-document';
 import { scopeVerifiedInvoices } from './billing-response';
+import { TechnicalObservation, TechnicalSourceState } from './technical-case-reasoning';
+import { analyzeTechnicalHistory, TechnicalHistoryAnalysis } from './technical-history-analysis';
 
 /**
  * Triagem operacional interna feita após localizar o cadastro pelo documento.
@@ -20,6 +22,7 @@ export interface IdentifiedOperationalSnapshot {
   online: boolean | null;
   blocked: boolean | null;
   multipleAccesses: boolean;
+  sourceStatus: Record<string, TechnicalSourceState>;
 }
 
 /** Evidências restritas ao vínculo confirmado da conversa; nunca recebe
@@ -40,6 +43,8 @@ export interface VerifiedSupportContext {
   blockedContracts: number;
   technology: 'FIBRA' | 'RADIO' | null;
   technologyByContract: Record<string, 'FIBRA' | 'RADIO'>;
+  sourceStatus: Record<string, TechnicalSourceState>;
+  historyAnalysis: TechnicalHistoryAnalysis;
 }
 
 @Injectable()
@@ -53,10 +58,18 @@ export class ConnectchatSupportContextService {
   ) {}
 
   /** Leitura operacional do registro localizado. Não autentica quem digitou o CPF. */
-  async triageIdentifiedCustomer(connectionId: string, customerId: string): Promise<IdentifiedOperationalSnapshot> {
+  async triageIdentifiedCustomer(
+    connectionId: string,
+    customerId: string,
+    selected?: { contractRef?: string | null; accessRef?: string | null },
+  ): Promise<IdentifiedOperationalSnapshot> {
     const unavailable: IdentifiedOperationalSnapshot = {
       status: 'UNAVAILABLE', hasOpenOs: null, hasOpenTicket: null,
       incident: null, online: null, blocked: null, multipleAccesses: false,
+      sourceStatus: {
+        openOs: 'UNAVAILABLE', contracts: 'UNAVAILABLE', accesses: 'UNAVAILABLE',
+        recentTickets: 'UNAVAILABLE', incidents: 'UNAVAILABLE',
+      },
     };
     if (!/^[0-9a-f-]{36}$/i.test(connectionId) || !/^[1-9]\d*$/.test(customerId)) return unavailable;
     const provider = await this.repository.findById(connectionId);
@@ -80,13 +93,17 @@ export class ConnectchatSupportContextService {
         }).then(rows).catch(() => null),
       ]);
       const activeContracts = contracts.map(projectContrato).filter((c) =>
-        String(c['status'] ?? '').toUpperCase() === 'A');
+        String(c['status'] ?? '').toUpperCase() === 'A'
+        && (!selected?.contractRef || String(c['id'] ?? '') === selected.contractRef));
       const blocked = activeContracts.length === 0 ? null
         : activeContracts.some((c) => {
           const state = String(c['status_internet'] ?? '').toUpperCase().trim();
           return !!state && state !== 'A';
         });
-      const activeAccess = accesses.map(projectConexao).filter((a) => a['ativo'] === true);
+      const activeAccess = accesses.map(projectConexao).filter((a) => a['ativo'] === true
+        && (!selected?.contractRef || String(a['id_contrato'] ?? '') === selected.contractRef)
+        && (!selected?.accessRef || String(a['login'] ?? '').toLowerCase()
+          === selected.accessRef.toLowerCase()));
       const logins = activeAccess.map((a) => String(a['login'] ?? '')).filter(Boolean);
       const incidents = await this.incidentLookup.activeForMany(logins.slice(0, 8));
       const outage = incidents.find((i) => i.suppress_os) ?? incidents[0];
@@ -112,11 +129,30 @@ export class ConnectchatSupportContextService {
           })() : null,
         blocked,
         multipleAccesses: activeAccess.length > 1,
+        sourceStatus: {
+          openOs: 'AVAILABLE', contracts: 'AVAILABLE', accesses: 'AVAILABLE',
+          recentTickets: recent === null ? 'UNAVAILABLE' : 'AVAILABLE', incidents: 'AVAILABLE',
+        },
       };
     } catch (error) {
       this.logger.warn(`Triagem de cadastro identificado indisponível: ${(error as Error).message}`);
       return unavailable;
     }
+  }
+
+  observationFromIdentified(snapshot: IdentifiedOperationalSnapshot): TechnicalObservation {
+    return {
+      status: snapshot.status,
+      online: snapshot.online,
+      hasOpenOs: snapshot.hasOpenOs,
+      hasOpenTicket: snapshot.hasOpenTicket,
+      incident: snapshot.incident !== null,
+      blocked: snapshot.blocked,
+      multipleAccesses: snapshot.multipleAccesses,
+      contractCount: null,
+      accessCount: snapshot.multipleAccesses ? 2 : snapshot.online === null ? null : 1,
+      sourceStatus: snapshot.sourceStatus,
+    };
   }
 
   /** Busca CPF somente em cadastro e jamais usa a existência como prova de
@@ -187,10 +223,21 @@ export class ConnectchatSupportContextService {
     }
   }
 
-  async byVerifiedConversation(conversation: ConnectchatConversation): Promise<VerifiedSupportContext> {
+  async byVerifiedConversation(
+    conversation: ConnectchatConversation,
+    reportedProblem = '',
+  ): Promise<VerifiedSupportContext> {
+    const emptyHistory = analyzeTechnicalHistory(reportedProblem, [], [], {
+      recentOsAvailable: false, recentTicketsAvailable: false,
+    });
     const empty: VerifiedSupportContext = {
       available: false, openOs: [], recentOs: [], recentTickets: [], openTickets: [], incidents: [], uncertainTickets: false,
       recurrentWithin48h: false, recurrenceEvidence: [], contracts: [], connections: [], blockedContracts: 0, technology: null, technologyByContract: {},
+      sourceStatus: {
+        openOs: 'UNAVAILABLE', contracts: 'UNAVAILABLE', accesses: 'UNAVAILABLE',
+        incidents: 'UNAVAILABLE', recentOs: 'UNAVAILABLE', recentTickets: 'UNAVAILABLE',
+      },
+      historyAnalysis: emptyHistory,
     };
     if (conversation.businessContact?.status !== 'CUSTOMER'
       || conversation.businessContact.linkStatus !== 'ACTIVE') {
@@ -208,9 +255,11 @@ export class ConnectchatSupportContextService {
     // A falha na busca de OS ABERTA bloqueia conclusões de "não há chamado"
     // e qualquer decisão de abrir outro. Não há fallback otimista.
     let openOs: Record<string, unknown>[];
+    const sourceStatus: Record<string, TechnicalSourceState> = { ...empty.sourceStatus };
     try {
       openOs = rows(await this.connections.execute(connectionId, 'os.listar_abertas',
         { id_cliente: customerId })).slice(0, 10).map(projectOrdemServico);
+      sourceStatus.openOs = 'AVAILABLE';
     } catch (error) {
       this.logger.warn(`Consulta de OS aberta não concluída: ${(error as Error).message}`);
       return { ...empty, reason: 'Não foi possível verificar ordens de serviço abertas' };
@@ -248,6 +297,7 @@ export class ConnectchatSupportContextService {
         return known;
       });
       if (declared.length === 1 && declared[0]) technology = declared[0];
+      sourceStatus.contracts = 'AVAILABLE';
     } catch (error) {
       this.logger.warn(`Consulta de contratos não concluída: ${(error as Error).message}`);
     }
@@ -268,13 +318,14 @@ export class ConnectchatSupportContextService {
           || /^(S|N|SIM|NAO|NÃO|ONLINE|OFFLINE)$/i.test(String(onlineRaw ?? '').trim());
         return {
           id_contrato: row['id_contrato'], online: known ? row['online'] : null,
-          status: row['status'], referencia: row['referencia'],
+          status: row['status'], referencia: row['referencia'], access_ref: row['login'],
         };
       });
       for (const row of active) {
         const login = typeof row['login'] === 'string' ? row['login'] : '';
         if (login) incidentLogins.push(login);
       }
+      sourceStatus.accesses = 'AVAILABLE';
     } catch (error) {
       this.logger.warn(`Consulta de acessos não concluída: ${(error as Error).message}`);
     }
@@ -282,17 +333,26 @@ export class ConnectchatSupportContextService {
     let incidents: IncidentInfo[] = [];
     try {
       incidents = await this.incidentLookup.activeForMany([...new Set(incidentLogins)].slice(0, 8));
+      sourceStatus.incidents = 'AVAILABLE';
     } catch (error) {
       this.logger.warn(`Consulta de incidentes não concluída: ${(error as Error).message}`);
     }
 
     // Histórico complementar: falha não apaga a evidência de OS em andamento.
-    const [os, tickets] = await Promise.all([
+    const [osResult, ticketsResult] = await Promise.all([
       this.connections.execute(connectionId, 'os.listar_recentes',
-        { id_cliente: customerId }).then(rows).then((v) => v.slice(0, 5).map(projectOrdemServico)).catch(() => []),
+        { id_cliente: customerId }).then(rows).then((value) => ({
+          available: true as const, rows: value.slice(0, 5).map(projectOrdemServico),
+        })).catch(() => ({ available: false as const, rows: [] as Record<string, unknown>[] })),
       this.connections.execute(connectionId, 'atendimento.listar_chamados_recentes',
-        { id_cliente: customerId }).then(rows).then((v) => v.slice(0, 5).map(projectChamado)).catch(() => []),
+        { id_cliente: customerId }).then(rows).then((value) => ({
+          available: true as const, rows: value.slice(0, 5).map(projectChamado),
+        })).catch(() => ({ available: false as const, rows: [] as Record<string, unknown>[] })),
     ]);
+    const os = osResult.rows;
+    const tickets = ticketsResult.rows;
+    sourceStatus.recentOs = osResult.available ? 'AVAILABLE' : 'UNAVAILABLE';
+    sourceStatus.recentTickets = ticketsResult.available ? 'AVAILABLE' : 'UNAVAILABLE';
 
     // Estados conhecidos do ticket; situações não classificadas exigem revisão
     // humana antes da criação de outro atendimento.
@@ -301,7 +361,7 @@ export class ConnectchatSupportContextService {
     const openTickets = tickets.filter((t) => openStatuses.has(
       String(t['situacao_interna'] ?? t['status'] ?? '').trim().toUpperCase(),
     ));
-    const uncertainTickets = tickets.some((t) => {
+    const uncertainTickets = !ticketsResult.available || tickets.some((t) => {
       const value = String(t['situacao_interna'] ?? t['status'] ?? '').trim().toUpperCase();
       const closed = t['encerrado_em'];
       if (closed && Number.isFinite(Date.parse(String(closed)))) return false;
@@ -313,24 +373,53 @@ export class ConnectchatSupportContextService {
       return recent && !openStatuses.has(value) && !closedStatuses.has(value);
     });
 
-    const now = Date.now();
-    const evidence: string[] = [];
-    for (const item of [...os, ...tickets]) {
-      const closed = item['concluida_em'] ?? item['encerrado_em'];
-      const opened = item['aberta_em'] ?? item['aberto_em'];
-      const end = typeof closed === 'string' ? Date.parse(closed) : NaN;
-      const start = typeof opened === 'string' ? Date.parse(opened) : NaN;
-      if (!Number.isFinite(end) || end > now || now - end > 48 * 3600000) continue;
-      const id = typeof item['protocolo'] === 'string' ? item['protocolo'] : String(item['id'] ?? '');
-      const elapsed = Number.isFinite(start) && start <= end
-        ? `; duração aproximada: ${Math.round((end - start) / 60000)} min` : '';
-      evidence.push(`Atendimento ${id || 'recente'} concluído nas últimas 48 horas${elapsed}`);
-    }
+    const historyAnalysis = analyzeTechnicalHistory(reportedProblem, os, tickets, {
+      recentOsAvailable: osResult.available,
+      recentTicketsAvailable: ticketsResult.available,
+    });
     return {
       available: true, openOs, recentOs: os, recentTickets: tickets,
       openTickets, uncertainTickets, incidents,
-      recurrentWithin48h: evidence.length > 0, recurrenceEvidence: evidence.slice(0, 5),
+      recurrentWithin48h: historyAnalysis.recurrentWithin48h,
+      recurrenceEvidence: historyAnalysis.similarCases.map((item) =>
+        `${item.kind}:${item.reference}:${item.similarityReasons.join('|')}`).slice(0, 5),
       contracts, connections, blockedContracts, technology, technologyByContract,
+      sourceStatus, historyAnalysis,
+    };
+  }
+
+  async incidentsForSelectedAccess(accessRef: string): Promise<{
+    available: boolean;
+    incidents: IncidentInfo[];
+  }> {
+    if (!accessRef.trim()) return { available: false, incidents: [] };
+    try {
+      const incident = await this.incidentLookup.activeFor(accessRef);
+      return { available: true, incidents: incident ? [incident] : [] };
+    } catch (error) {
+      this.logger.warn(`Consulta de incidente do acesso selecionado não concluída: ${(error as Error).message}`);
+      return { available: false, incidents: [] };
+    }
+  }
+
+  observationFromVerified(context: VerifiedSupportContext): TechnicalObservation {
+    const online = context.connections.length === 1
+      ? context.connections[0]?.['online'] === true ? true
+        : context.connections[0]?.['online'] === false ? false : null
+      : null;
+    return {
+      status: context.available ? 'READY' : 'UNAVAILABLE',
+      online,
+      hasOpenOs: context.sourceStatus.openOs === 'AVAILABLE' ? context.openOs.length > 0 : null,
+      hasOpenTicket: context.sourceStatus.recentTickets === 'AVAILABLE'
+        ? context.openTickets.length > 0 : null,
+      incident: context.incidents.length > 0,
+      blocked: context.sourceStatus.contracts === 'AVAILABLE'
+        ? context.blockedContracts > 0 : null,
+      multipleAccesses: context.connections.length > 1,
+      contractCount: context.sourceStatus.contracts === 'AVAILABLE' ? context.contracts.length : null,
+      accessCount: context.sourceStatus.accesses === 'AVAILABLE' ? context.connections.length : null,
+      sourceStatus: context.sourceStatus,
     };
   }
 }

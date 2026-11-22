@@ -13,6 +13,9 @@ import { SettingsModule } from '../core/settings/settings.module';
 import { ConnectchatAgentController } from './connectchat/connectchat-agent.controller';
 import { ConnectchatAutoResponderService } from './connectchat/connectchat-auto-responder.service';
 import { ConnectchatSupportContextService } from './connectchat/connectchat-support-context.service';
+import { TechnicalCaseRepository } from './connectchat/technical-case.repository';
+import { TechnicalCaseService } from './connectchat/technical-case.service';
+import { TechnicalCasePlannerService } from './connectchat/technical-case-planner.service';
 import { IspRepository } from '../isp/isp.repository';
 import { IncidentLookupService } from '../isp/incident-lookup.service';
 
@@ -139,6 +142,9 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     PromptSecurityService,
     ConnectchatAutoResponderService,
     ConnectchatSupportContextService,
+    TechnicalCaseRepository,
+    TechnicalCaseService,
+    TechnicalCasePlannerService,
     IspRepository,
     IncidentLookupService,
     // Análise de atendimento

@@ -101,6 +101,7 @@ faz parte desta Acceptance.
 | `ia-studio.capability.saas-to-dedicated-installation` | Converter a plataforma compartilhada em aplicação dedicada | `accepted` | `docs/capabilities/saas-to-dedicated-installation.md` |
 | `ia-studio.capability.isp-dedicated-product` | Consolidar uma vertente específica para provedor | `planned` | Depende da conversão; receberá contrato próprio antes de implementação. |
 | `ia-studio.capability.ixc-ticket-analysis` | Consultar e analisar de forma assistida chamados recentes do IXC | `in-progress` | `docs/capabilities/ixc-ticket-analysis.md`; leitura limitada, sem mutação no ERP. |
+| `ia-studio.capability.nete-autonomous-technical-support` | Investigar e conduzir casos técnicos N2 com evidências e experimentos persistentes | `in-progress` | `docs/capabilities/nete-autonomous-technical-support.md`; não inventa telemetria ausente. |
 
 O mapa não afirma que capacidades preexistentes estão aceitas: elas ainda não
 possuem Capability Contract e Acceptance registrados.

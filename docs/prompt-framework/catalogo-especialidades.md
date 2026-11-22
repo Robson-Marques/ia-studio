@@ -2,14 +2,14 @@
 schema: prompt-framework/v1
 id: ia-studio.specialty-catalog
 kind: shared
-version: 1.11.1
+version: 1.12.0
 status: released
 title: Catálogo de especialidades do IA Studio
 owners: [robson]
 reviewers: [robson]
 reviewed_at: "2026-10-05"
 released_at: "2026-10-05"
-change_reason: PATCH. Corrige a especialidade ConnectChat para usar Connection e Secrets Manager do Integration Manager.
+change_reason: MINOR. Adiciona a especialidade de suporte técnico autônomo N2 da Nete.
 ---
 
 # Catálogo de especialidades do IA Studio
@@ -32,6 +32,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 | `ia-studio.local-integrations-configuration` | Engenheiro de integrações locais | Governar providers embarcados, catálogo interno e conexões da instalação dedicada, sem etapa de instalação SaaS. | [local-integrations-configuration.md](especialidades/local-integrations-configuration.md) |
 | `ia-studio.assistant-ticket-analysis` | Engenheiro de runtime assistido e integrações operacionais | Governar consulta delimitada e análise rastreável de chamados IXC pelo assistente, sem mutações no ERP. | [assistant-ticket-analysis.md](especialidades/assistant-ticket-analysis.md) |
 | `ia-studio.connectchat-channel` | Engenheiro de integração de canais de atendimento | Governar o consumo seguro da API ConnectChat no atendimento do IA Studio, sem expor a chave nem alterar o ConnectChat. | [connectchat-channel.md](especialidades/connectchat-channel.md) |
+| `ia-studio.autonomous-technical-support` | Engenheiro de runtime autônomo e suporte ISP | Evoluir a Nete para investigar casos técnicos persistentes, baseados em evidências e experimentos, sem inventar telemetria. | [autonomous-technical-support.md](especialidades/autonomous-technical-support.md) |
 
 ## Critérios de aceite
 
@@ -45,7 +46,7 @@ O alinhador classifica pela **missão, responsabilidade e fronteira técnica** �
 Estas responsabilidades **existem** no IA Studio mas ainda não têm especialidade catalogada — quando o próximo pedido tocar em uma delas, o alinhador retornará `especialidade não catalogada` e recomendará a criação. Ficam registradas aqui como lacuna conhecida:
 
 - **Backend / API dedicada** (`platform-api`): modelagem de domínio local, ACL e eventos. Operação por aplicação/vertente é coberta por `ia-studio.dedicated-instance-operations@2.0.0`.
-- **Runtime de assistentes**: prompts operacionais, tools, knowledge base, memória, workflows — regras próprias, **não confundir** com este framework (que governa pedidos humanos de desenvolvimento).
+- **Runtime genérico de assistentes**: prompts operacionais, knowledge base e workflows fora do suporte técnico N2 — regras próprias, **não confundir** com este framework (que governa pedidos humanos de desenvolvimento).
 - **Novos conectores e contratos externos** (Meta, Google, gateways, etc.) — se surgirem. A decisão vigente de 2026-11-18 permite Meta oficial + WAHA por QR Code com aceite de risco; Baileys e coexistência manual continuam fora do produto.
 - **Segurança / privacidade** (LGPD, retenção, backup, ACL local).
 - **Documentação / continuidade** (handoff, changelog, dívida técnica).
@@ -67,3 +68,4 @@ Estas responsabilidades **existem** no IA Studio mas ainda não têm especialida
 | 1.10.0 | released | Revisado em 2026-10-05 | MINOR. Atualiza `ia-studio.local-integrations-configuration@1.1.0` com a aposentadoria segura de provider sem remoção destrutiva de dados. |
 | 1.11.0 | released | Aprovado por Robson em 2026-10-06 | MINOR. Adiciona `ia-studio.connectchat-channel@1.0.0`, criada após alinhamento aprovado para integrar o canal externo ConnectChat ao atendimento. |
 | 1.11.1 | released | Revisado em 2026-10-06 | PATCH. Atualiza `ia-studio.connectchat-channel@1.0.1`: URL, actor e timeout ficam na Connection; chave técnica no Secrets Manager. |
+| 1.12.0 | released | Aprovado por Robson em 2026-11-21 | MINOR. Adiciona `ia-studio.autonomous-technical-support@1.0.0` para governar o núcleo N2 persistente da Nete. |

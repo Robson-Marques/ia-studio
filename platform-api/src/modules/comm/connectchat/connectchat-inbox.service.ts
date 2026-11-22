@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
 import { ConnectchatConversation, ConnectchatMention, ConnectchatMessage } from '../../../shared/integration/connectchat.client';
@@ -60,6 +61,14 @@ export class ConnectchatInboxService {
   async sendAgentMessage(conversationId: string, body: string, clientMessageId: string) {
     if (!body.trim()) throw new BadRequestException('A IA não gerou texto para enviar.');
     return this.execute('sendMessage', { conversationId, body: body.trim(), clientMessageId });
+  }
+
+  async closeConversation(conversationId: string, actorRef = 'Nete:suporte-n2') {
+    const connectionId = await this.connectionId();
+    return this.connections.execute(connectionId, 'closeConversation', {
+      conversationId,
+      actorRef,
+    });
   }
 
   async listConversations() {
@@ -326,7 +335,69 @@ export class ConnectchatInboxService {
       globalIdentityId: conversation.globalIdentityId,
       actorRef: this.actor(user),
     });
-    return { unlinked: true };
+    const lastSequence = /^\d+$/.test(conversation.lastSequence)
+      ? BigInt(conversation.lastSequence) : 0n;
+    const customerBoundary = (lastSequence + 1n).toString();
+    const settingNames = [
+      'pending_identity', 'document_attempts', 'identification_requested',
+      'technology_requested', 'contract_requested', 'selected_contract', 'selected_access',
+      'greeting',
+    ];
+    await this.prisma.$transaction(async (tx) => {
+      await tx.systemSetting.deleteMany({
+        where: { key: { in: settingNames.map((name) => `ai.connectchat.${name}.${conversationId}`) } },
+      });
+      await tx.systemSetting.deleteMany({
+        where: { key: { startsWith: `ai.connectchat.session_os.${conversationId}.` } },
+      });
+      await tx.systemSetting.deleteMany({
+        where: { key: `ai.connectchat.os_attempt.${conversationId}` },
+      });
+      await tx.systemSetting.upsert({
+        where: { key: `ai.connectchat.recognition.${conversationId}` },
+        create: {
+          key: `ai.connectchat.recognition.${conversationId}`,
+          value: {
+            asked: false, confirmed: false, awaitingOther: false,
+            customerStartSequence: customerBoundary,
+            scopeId: randomUUID(), manualUnlink: true,
+          },
+        },
+        update: {
+          value: {
+            asked: false, confirmed: false, awaitingOther: false,
+            customerStartSequence: customerBoundary,
+            scopeId: randomUUID(), manualUnlink: true,
+          },
+        },
+      });
+
+      const activeCases = await tx.aiTechnicalCase.findMany({
+        where: {
+          conversation_id: conversationId,
+          status: { in: ['INVESTIGATING', 'WAITING_CUSTOMER', 'WAITING_TELEMETRY', 'TESTING'] },
+        },
+        select: { id: true },
+      });
+      const caseIds = activeCases.map((item) => item.id);
+      if (caseIds.length > 0) {
+        await tx.aiDiagnosticExperiment.updateMany({
+          where: {
+            case_id: { in: caseIds },
+            status: { in: ['WAITING_CUSTOMER_OFF', 'WAITING_TELEMETRY_OFF', 'WAITING_CUSTOMER_ON', 'WAITING_TELEMETRY_ON', 'WAITING_CUSTOMER_VALIDATION'] },
+          },
+          data: { status: 'CANCELLED', completed_at: new Date(), result: 'Cliente desvinculado manualmente.' },
+        });
+        await tx.aiTechnicalCase.updateMany({
+          where: { id: { in: caseIds } },
+          data: {
+            status: 'CANCELLED', next_recommended_action: null,
+            resolution_summary: 'Cadastro desvinculado manualmente no atendimento.',
+          },
+        });
+      }
+    });
+    return { unlinked: true, localContextReset: true };
   }
 
   async completeCustomerLink(user: AuthenticatedUser, conversationId: string, requestId: string) {

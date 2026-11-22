@@ -56,6 +56,13 @@ operador recebe `X-ConnectChat-Actor-Ref` derivado do usuário local. Chaves de
 idempotência e `clientMessageId` são estáveis durante retries. A API atual
 fornece `businessContactId` sem nome ou telefone do cliente.
 
+A Nete usa a operação backend-only `closeConversation` depois que o caso N2 é
+resolvido e a mensagem final foi enviada. O ConnectChat preserva o histórico,
+publica `conversation.closed` e bloqueia novas mensagens naquela conversa. A
+ação **Desvincular cliente** é diferente: mantém a conversa aberta, remove o
+cadastro comercial e limpa contrato, acesso, caso e experimento locais para que
+o próximo atendimento não herde o escopo anterior.
+
 ## Endpoints principais
 
 - `GET /comm/whatsapp/scope|chats|chats/:id|chats/:id/messages|chats/:id/window|chats/:id/media/:mediaId`

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, resetConnectchatAiContext, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping } from '../../services/connectchat';
+import { Badge, Button, ConfirmDialog, EmptyState, useToast } from '@studio-ux-ds/react';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, resetConnectchatAiContext, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -88,6 +88,8 @@ export default function ConnectchatConversas() {
   const [sending, setSending] = useState(false);
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [resettingNete, setResettingNete] = useState(false);
+  const [unlinkingCustomer, setUnlinkingCustomer] = useState(false);
+  const [confirmUnlinkCustomer, setConfirmUnlinkCustomer] = useState(false);
   const [customerActivity, setCustomerActivity] = useState(null);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
@@ -260,6 +262,22 @@ export default function ConnectchatConversas() {
     }
   }
 
+  async function unlinkCustomer() {
+    if (!selected) return;
+    setUnlinkingCustomer(true);
+    try {
+      await unlinkConnectchatCustomer(selected.id);
+      stopTyping(selected.id);
+      setConfirmUnlinkCustomer(false);
+      await loadConversations(true);
+      toast.success('Cliente desvinculado. O histórico da conversa foi mantido.');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setUnlinkingCustomer(false);
+    }
+  }
+
   return (
     <div className="flex overflow-hidden" style={{ flex: 1, minHeight: 0, background: 'var(--su-surface-overlay)' }}>
       <aside className={`${selected ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-96 shrink-0 min-h-0`} style={{ borderRight: '1px solid var(--su-border-default)' }}>
@@ -302,7 +320,18 @@ export default function ConnectchatConversas() {
                 </span>
                 {selected.businessContact?.status === 'CUSTOMER' ? <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: 'var(--su-text-muted)' }}>Cliente vinculado</span> : null}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {selected.businessContact?.status === 'CUSTOMER' && canLinkCustomer ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={unlinkingCustomer}
+                    title="Retira o cadastro deste contato sem apagar o histórico da conversa"
+                    onClick={() => setConfirmUnlinkCustomer(true)}
+                  >
+                    Desvincular cliente
+                  </Button>
+                ) : null}
                 {canResetNete ? <Button variant="secondary" size="sm" loading={resettingNete} onClick={resetNete}>Limpar conversa local</Button> : null}
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>
@@ -346,6 +375,15 @@ export default function ConnectchatConversas() {
           <div className="flex-1 flex items-center justify-center"><EmptyState icon="message" title="Escolha uma conversa" description="Selecione uma conversa do ConnectChat para atender." /></div>
         )}
       </main>
+      <ConfirmDialog
+        open={confirmUnlinkCustomer}
+        loading={unlinkingCustomer}
+        title="Desvincular cliente"
+        message={`Desvincular ${selected ? labelForConversation(selected) : 'este cliente'}? A Nete deixará de usar o cadastro atual e pedirá uma nova identificação quando necessário. O histórico da conversa será mantido.`}
+        confirmLabel="Desvincular"
+        onClose={() => { if (!unlinkingCustomer) setConfirmUnlinkCustomer(false); }}
+        onConfirm={unlinkCustomer}
+      />
     </div>
   );
 }

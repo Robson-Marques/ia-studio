@@ -12,7 +12,11 @@
     "start:worker": "node dist/worker.js",
     "test:newnet:documents": "node --require ts-node/register --test src/modules/ai/connectchat/subscriber-document.spec.ts",
     "test:newnet:billing": "node --require ts-node/register --test src/modules/ai/connectchat/billing-response.spec.ts",
-    "test:newnet": "node --require ts-node/register --test src/modules/ai/connectchat/subscriber-document.spec.ts src/modules/ai/connectchat/billing-response.spec.ts"
+    "test:newnet:technical-case": "node --require ts-node/register --test src/modules/ai/connectchat/technical-case-reasoning.spec.ts",
+    "test:newnet:history": "node --require ts-node/register --test src/modules/ai/connectchat/technical-history-analysis.spec.ts",
+    "test:newnet:planner": "node --require ts-node/register --test src/modules/ai/connectchat/technical-case-planner.spec.ts",
+    "test:newnet:acceptance": "node --require ts-node/register --test src/modules/ai/connectchat/technical-support-acceptance.spec.ts",
+    "test:newnet": "node --require ts-node/register --test src/modules/ai/connectchat/subscriber-document.spec.ts src/modules/ai/connectchat/billing-response.spec.ts src/modules/ai/connectchat/technical-history-analysis.spec.ts src/modules/ai/connectchat/technical-case-reasoning.spec.ts src/modules/ai/connectchat/technical-case-planner.spec.ts src/modules/ai/connectchat/technical-support-acceptance.spec.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

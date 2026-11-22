@@ -112,6 +112,16 @@ export class ConnectchatClient {
     return this.mutate('/integration/conversations', { businessContactId }, actorRef) as Promise<ConnectchatConversation>;
   }
 
+  async closeConversation(conversationId: string, actorRef?: string): Promise<ConnectchatConversation> {
+    // A mesma conversa pode ser reaberta no futuro. A chave nasce por tentativa
+    // e permanece estável somente nos retries HTTP internos desta chamada.
+    return this.mutate(
+      `/integration/conversations/${conversationId}/close`,
+      {},
+      actorRef,
+    ) as Promise<ConnectchatConversation>;
+  }
+
   async sendMessage(input: {
     conversationId: string;
     body: string;
@@ -248,11 +258,13 @@ export class ConnectchatClient {
   }
 
   async disconnectContactDirectly(globalIdentityId: string, actorRef?: string): Promise<unknown> {
+    // O contato pode ser vinculado novamente e depois desvinculado outra vez.
+    // Uma chave eterna por identidade devolveria o primeiro sucesso sem executar
+    // o novo desvínculo; o default de mutate é estável apenas durante os retries.
     return this.mutate(
       `/integration/contacts/${globalIdentityId}/disconnect`,
       {},
       actorRef,
-      `ystudio:link-disconnect:${globalIdentityId}`,
     );
   }
 

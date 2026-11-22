@@ -932,6 +932,52 @@ enum AiCollaborationTriggerMode {
   ALWAYS
 }
 
+enum AiTechnicalCaseStatus {
+  INVESTIGATING
+  WAITING_CUSTOMER
+  WAITING_TELEMETRY
+  TESTING
+  RESOLVED
+  ESCALATED
+  CANCELLED
+}
+
+enum AiTechnicalEvidenceStatus {
+  OBSERVED
+  UNAVAILABLE
+  STALE
+}
+
+enum AiDiagnosticHypothesisState {
+  POSSIBLE
+  SUPPORTED
+  CONTRADICTED
+  INCONCLUSIVE
+}
+
+enum AiDiagnosticExperimentKind {
+  ROUTER_RESTART
+}
+
+enum AiDiagnosticExperimentStatus {
+  WAITING_CUSTOMER_OFF
+  WAITING_TELEMETRY_OFF
+  WAITING_CUSTOMER_ON
+  WAITING_TELEMETRY_ON
+  WAITING_CUSTOMER_VALIDATION
+  COMPLETED
+  CANCELLED
+  TIMED_OUT
+}
+
+enum AiTechnicalActionStatus {
+  RECOMMENDED
+  REQUESTED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 enum McpTransport {
   STDIO
   HTTP
@@ -1233,6 +1279,141 @@ model AiMemoryEntry {
   @@unique([profile_id, scope_key, key])
   @@index([profile_id, scope_key])
   @@map("ai_memory_entries")
+}
+
+// Caso tecnico persistente do atendimento N2. O escopo do cliente e um hash
+// deterministico da referencia comercial; CPF/CNPJ nunca e persistido aqui.
+model AiTechnicalCase {
+  id                      String                @id @default(uuid())
+  conversation_id         String
+  customer_scope_key      String
+  connection_id           String?
+  customer_id             String?
+  authenticated_scope     Boolean               @default(false)
+  reported_problem        String
+  problem_category        String?
+  selected_contract_ref   String?
+  selected_access_ref     String?
+  pending_question        String?
+  status                  AiTechnicalCaseStatus @default(INVESTIGATING)
+  next_recommended_action String?
+  last_customer_sequence  String?
+  resolution_summary      String?
+  channel_closed_at       DateTime?
+  channel_close_error     String?
+  opened_at               DateTime              @default(now())
+  last_observed_at        DateTime?
+  last_activity_at        DateTime              @default(now())
+  resolved_at             DateTime?
+  created_at              DateTime              @default(now())
+  updated_at              DateTime              @updatedAt
+
+  evidence    AiTechnicalEvidence[]
+  hypotheses  AiDiagnosticHypothesis[]
+  experiments AiDiagnosticExperiment[]
+  actions     AiTechnicalAction[]
+
+  @@index([conversation_id, status])
+  @@index([customer_scope_key, status])
+  @@map("ai_technical_cases")
+}
+
+// Evidencia projetada e minimizada. `payload` varia por fonte (IXC, cliente,
+// observador de experimento), portanto e deliberadamente schemaless.
+model AiTechnicalEvidence {
+  id              String                    @id @default(uuid())
+  case_id         String
+  correlation_key String
+  kind            String
+  source          String
+  status          AiTechnicalEvidenceStatus @default(OBSERVED)
+  confidence      String
+  contract_ref    String?
+  access_ref      String?
+  payload         Json?
+  error           String?
+  source_at       DateTime?
+  observed_at     DateTime                  @default(now())
+  expires_at      DateTime?
+  created_at      DateTime                  @default(now())
+
+  technical_case AiTechnicalCase @relation(fields: [case_id], references: [id], onDelete: Cascade)
+
+  @@unique([case_id, correlation_key])
+  @@index([case_id, observed_at])
+  @@map("ai_technical_evidence")
+}
+
+model AiDiagnosticHypothesis {
+  id                String                      @id @default(uuid())
+  case_id           String
+  code              String
+  label             String
+  state             AiDiagnosticHypothesisState @default(POSSIBLE)
+  rationale         String?
+  last_evaluated_at DateTime                    @default(now())
+  created_at        DateTime                    @default(now())
+  updated_at        DateTime                    @updatedAt
+
+  technical_case AiTechnicalCase @relation(fields: [case_id], references: [id], onDelete: Cascade)
+
+  @@unique([case_id, code])
+  @@index([case_id, state])
+  @@map("ai_diagnostic_hypotheses")
+}
+
+model AiDiagnosticExperiment {
+  id                       String                       @id @default(uuid())
+  case_id                  String
+  kind                     AiDiagnosticExperimentKind
+  status                   AiDiagnosticExperimentStatus
+  target_kind              String
+  target_ref               String?
+  baseline_online          Boolean?
+  last_observed_online     Boolean?
+  observation_attempts     Int                          @default(0)
+  requested_at             DateTime                     @default(now())
+  customer_confirmed_at    DateTime?
+  observe_after            DateTime?
+  observation_claim_token  String?
+  observation_claim_until  DateTime?
+  expires_at               DateTime
+  completed_at             DateTime?
+  result                   String?
+  last_customer_sequence   String?
+  created_at               DateTime                     @default(now())
+  updated_at               DateTime                     @updatedAt
+
+  technical_case AiTechnicalCase   @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  actions        AiTechnicalAction[]
+
+  @@index([case_id, status])
+  @@index([status, observe_after])
+  @@index([status, observation_claim_until])
+  @@map("ai_diagnostic_experiments")
+}
+
+model AiTechnicalAction {
+  id             String                  @id @default(uuid())
+  case_id        String
+  experiment_id  String?
+  action_type    String
+  status         AiTechnicalActionStatus
+  rationale      String?
+  trace_id       String?
+  sequence       String?
+  details        Json?
+  requested_at   DateTime?
+  completed_at   DateTime?
+  error          String?
+  created_at     DateTime                @default(now())
+
+  technical_case AiTechnicalCase          @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  experiment     AiDiagnosticExperiment?  @relation(fields: [experiment_id], references: [id], onDelete: SetNull)
+
+  @@index([case_id, created_at])
+  @@index([experiment_id])
+  @@map("ai_technical_actions")
 }
 
 // Politica de aprovacao (diretriz 31 — generica). Nasce OFF.

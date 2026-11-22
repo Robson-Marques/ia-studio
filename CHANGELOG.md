@@ -1,6 +1,34 @@
 # Changelog — IA Studio
 
-## Não publicado
+## v0.12.35 - 2026-11-21 (suporte técnico autônomo N2 e desvínculo ConnectChat)
+
+- A Nete passa a manter caso técnico persistente com evidências, hipóteses,
+  ações e experimento de reinicialização assistida. Depois do religamento, a
+  observação da sessão ocorre em segundo plano; resolução exige confirmação de
+  navegação e falha de consulta permanece explícita.
+- A tela ConnectChat → Conversas volta a oferecer **Desvincular cliente** para
+  usuários autorizados, com confirmação. A ação mantém as mensagens, limpa o
+  escopo local da Nete e cancela caso/experimento do cadastro anterior.
+- A análise de histórico deixa de tratar falha na leitura de chamados recentes
+  como lista vazia segura para decisões de abertura de OS.
+- O investigador registra disponibilidade e horário de OS, chamados, incidentes,
+  contratos e acessos; histórico só vira reincidência quando há correlação de
+  sintoma e, para a regra de 48 horas, solução anterior documentada.
+- A IA passa a escolher a próxima ação diagnóstica em JSON estrito dentro de um
+  catálogo sem tools sensíveis. O runtime valida compatibilidade, rejeita dados
+  privados e ações inventadas e aplica fallback determinístico.
+- Múltiplos contratos e acessos exigem seleção explícita. Restrição
+  administrativa, incidente, OS/chamado existente e fonte indisponível bloqueiam
+  abertura indevida; acesso offline e reincidência seguem OS idempotente com as
+  evidências do caso.
+- Experimentos sobrevivem a reinício, usam concessão persistente contra corrida,
+  expiram sem transformar silêncio em resolução e são interrompidos com segurança
+  por troca de assunto, cliente ou vínculo. O acesso técnico selecionado fica no
+  experimento backend-only, permitindo que o observador retome exatamente o
+  mesmo ponto após reinício do serviço.
+- Depois da confirmação de navegação, a Nete encerra o caso, envia a mensagem
+  final e solicita o fechamento idempotente no ConnectChat; sucesso ou falha do
+  canal ficam auditados.
 
 ## v0.12.10 - 2026-11-18 (persistência de mídias WhatsApp sem alterar o atualizador)
 

@@ -27,6 +27,7 @@ export class ConnectchatProvider extends BaseProvider {
         'execute:getMessages',
         'execute:getTyping',
         'execute:openConversation',
+        'execute:closeConversation',
         'execute:sendMessage',
         'execute:sendAttachment',
         'execute:downloadAttachment',
@@ -133,6 +134,8 @@ export class ConnectchatProvider extends BaseProvider {
         return client.getTyping(this.required(p, 'conversationId'));
       case 'openConversation':
         return client.openConversation(this.required(p, 'businessContactId'), actorRef || undefined);
+      case 'closeConversation':
+        return client.closeConversation(this.required(p, 'conversationId'), actorRef || undefined);
       case 'sendMessage':
         return client.sendMessage({
           conversationId: this.required(p, 'conversationId'),
