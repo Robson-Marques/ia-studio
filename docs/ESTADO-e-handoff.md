@@ -6,7 +6,7 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-11-22 (candidata `v0.12.37`; revisão aberta mostrou que o planner era raso e o escalonamento não pausava a automação).
+> Última atualização: 2026-11-22 (candidata `v0.12.38`; validação real da `v0.12.37` revelou perda da transição após a confirmação do cliente habitual e abertura sem acolhimento).
 
 ## Frente em validação: Nete como suporte técnico N2
 
@@ -31,6 +31,15 @@ possuem progressão própria; LOS vermelha não recebe reinício genérico. O IX
 fornece início/fim de sessão e motivo de desconexão, agora preservados como
 evidência minimizada. Ao escalar, a Nete grava handoff local e para de responder
 até o operador limpar o contexto ou o cliente ser trocado/desvinculado.
+
+Uma nova validação real da `v0.12.37` mostrou a abertura “Oi” → “É sobre a
+assinatura de ...?” → “Sim” → “Estou aqui...”. A causa foi localizada no
+condutor: o vínculo era confirmado, mas o mesmo `Sim` continuava no classificador
+como uma intenção geral e podia cair no fallback do modelo. Na candidata
+`v0.12.38`, essa confirmação encerra a transição de identidade de forma
+determinística. A abertura cumprimenta no horário de São Paulo, apresenta a Nete
+e acolhe uma necessidade já relatada. O comunicador também explica a consequência
+técnica de respostas como “em todos”, em vez de apenas repeti-las.
 
 Também foi restaurada na tela de conversas a ação **Desvincular cliente**, que
 o commit `ca1e56a` havia ocultado embora backend e permissão continuassem

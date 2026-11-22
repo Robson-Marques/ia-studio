@@ -253,10 +253,27 @@ export function communicateTechnicalPlan(
     ? ' Não há ordem de serviço, chamado ou incidente ativo para esse acesso.'
     : '';
   const access = observation.online === true
-    ? `Consultei sua conexão: ela aparece online no sistema.${attendance} Esse estado não comprova que a internet esteja funcionando.`
+    ? `Já verifiquei sua conexão: ela aparece online no sistema.${attendance} Esse estado, sozinho, não garante que a internet esteja funcionando.`
     : observation.online === false
-      ? `Consultei sua conexão: o acesso aparece offline no sistema.${attendance}`
-      : `Consultei sua conexão, mas o estado do acesso não veio conclusivo.${attendance}`;
-  return `${access} ${plan.customerMessage}`.replace(/\s+/g, ' ').trim();
+      ? `Já verifiquei sua conexão: o acesso aparece offline no sistema.${attendance}`
+      : `Já verifiquei sua conexão, mas o estado do acesso não veio conclusivo.${attendance}`;
+  const transition = plan.action === 'ASK_DEVICE_SCOPE'
+    ? 'Vou investigar isso com você.'
+    : plan.action === 'ASK_CONNECTION_STATE'
+      ? 'Como a falha atinge os aparelhos conectados, preciso separar uma dificuldade no Wi-Fi de uma conexão sem navegação.'
+      : plan.action === 'ASK_EQUIPMENT_LIGHTS'
+        ? 'Agora preciso de uma observação do equipamento para diferenciar uma falha física das outras causas.'
+        : plan.action === 'REQUEST_SINGLE_DEVICE_CHECK'
+          ? 'Como o problema está isolado em um aparelho, vamos começar por um teste seguro nele.'
+          : plan.action === 'REQUEST_WIFI_PROXIMITY_CHECK'
+            ? 'Esse teste vai ajudar a separar cobertura do Wi-Fi de falha no acesso.'
+            : plan.action === 'ASK_PERFORMANCE_MEDIUM'
+              ? 'Essa diferença ajuda a separar o desempenho do acesso de uma limitação do Wi-Fi.'
+              : plan.action === 'REQUEST_SPEED_TEST'
+                ? 'Com o tipo de conexão confirmado, falta uma medição para avançarmos.'
+                : plan.action === 'ASK_INTERMITTENCE_PATTERN'
+                  ? 'Quero entender o padrão das quedas para não tratar uma ocorrência isolada como recorrente.'
+                  : '';
+  return `${access} ${transition} ${plan.customerMessage}`.replace(/\s+/g, ' ').trim();
 }
 

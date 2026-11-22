@@ -1,5 +1,19 @@
 # Changelog — IA Studio
 
+## v0.12.38 - 2026-11-22 (continuidade humana na abertura do N2)
+
+- A confirmação do cliente habitual passa a ser uma transição determinística:
+  `sim` não é mais reclassificado como assunto geral nem cai na resposta
+  genérica “Estou aqui”. Sem motivo anterior, a Nete agradece e pergunta como
+  ajudar; com problema já relatado, a investigação continua sem repetição.
+- A Nete cumprimenta no horário de São Paulo, apresenta-se antes de confirmar a
+  assinatura e acolhe um problema informado antes dessa confirmação.
+- O comunicador técnico explica por que a resposta do cliente altera a próxima
+  etapa. “Em todos”, por exemplo, avança para separar associação ao Wi-Fi de
+  falta de navegação, em vez de apenas repetir o relato.
+- A suíte Newnet passa a cobrir a abertura humanizada, a transição de
+  confirmação e o avanço conversacional depois da resposta “em todos”.
+
 ## v0.12.37 - 2026-11-22 (playbooks N2 e escalonamento real)
 
 - A investigação deixa de depender de uma pergunta genérica escolhida pelo

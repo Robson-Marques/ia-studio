@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   communicateTechnicalPlan,
+  fallbackTechnicalPlan,
   hasReportedDeviceScope,
   validateTechnicalPlan,
 } from './technical-case-planner';
@@ -59,4 +60,24 @@ test('não repete pergunta de alcance respondida anteriormente no caso', () => {
     ...Array.from({ length: 20 }, (_, index) => `mensagem de acompanhamento ${index + 1}`),
   ];
   assert.equal(hasReportedDeviceScope(messages), true);
+});
+
+test('transforma "em todos" em avanço explicado do diagnóstico, sem ecoar o cliente', () => {
+  const plan = fallbackTechnicalPlan({
+    customerMessages: ['Estou sem conexão', 'Em todos'],
+    assistantMessages: ['A falha acontece em todos os aparelhos ou somente em um?'],
+  });
+  assert.equal(plan.action, 'ASK_CONNECTION_STATE');
+  const message = communicateTechnicalPlan(plan, {
+    status: 'READY', online: true, hasOpenOs: false, hasOpenTicket: false,
+    incident: false,
+    sourceStatus: {
+      openOs: 'AVAILABLE', recentTickets: 'AVAILABLE', incidents: 'AVAILABLE',
+      contracts: 'AVAILABLE', accesses: 'AVAILABLE',
+    },
+  });
+  assert.match(message, /falha atinge os aparelhos/i);
+  assert.match(message, /separar uma dificuldade no Wi-Fi/i);
+  assert.match(message, /entram no Wi-Fi/i);
+  assert.doesNotMatch(message, /^Entendi\. Todos os aparelhos/i);
 });

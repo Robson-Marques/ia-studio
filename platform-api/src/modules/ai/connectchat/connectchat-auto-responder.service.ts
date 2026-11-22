@@ -25,6 +25,11 @@ import { TechnicalCasePlannerService } from './technical-case-planner.service';
 import { communicateTechnicalPlan } from './technical-case-planner';
 import { analyzeTechnicalConversation } from './technical-conversation-state';
 import {
+  greetingForNewnet,
+  habitualCustomerConfirmed,
+  habitualCustomerQuestion,
+} from './customer-dialogue';
+import {
   decideTechnicalGovernance,
   shouldInterruptTechnicalExperiment,
 } from './technical-case-governance';
@@ -415,12 +420,12 @@ export class ConnectchatAutoResponderService {
     step: 'OPENING' | 'REOPENING' | 'IDENTIFICATION' | 'FOLLOW_UP',
   ): Promise<string> {
     const fallback = step === 'OPENING'
-      ? 'Oi! Sou Nete, da Newnet. Como posso ajudar?'
+      ? `${greetingForNewnet()}! Eu sou a Nete, da Newnet. Como posso ajudar você hoje?`
       : step === 'REOPENING'
-        ? 'Como posso ajudar?'
+        ? 'Oi de novo! Como posso ajudar você hoje?'
         : step === 'FOLLOW_UP'
-          ? 'Para continuar, você pode informar o CPF ou CNPJ do titular?'
-          : 'Por favor, informe o CPF ou CNPJ do titular.';
+          ? 'Quero continuar cuidando disso com você. Pode me informar o CPF ou CNPJ do titular?'
+          : 'Entendi. Para eu continuar com você, pode me informar o CPF ou CNPJ do titular?';
     try {
       const history = messages.filter((item) => typeof item.body === 'string' && item.body.trim())
         .slice(-12, -1).map((item) => ({
@@ -436,6 +441,7 @@ export class ConnectchatAutoResponderService {
             : 'O cliente informou sua necessidade. Para prosseguir com atendimento individual, peça CPF/CNPJ do titular de forma simples, sem se reapresentar, sem justificar procedimentos internos ou antecipar diagnóstico.';
       const instructions = [
         'Você é Nete, atendente da Newnet. Conduza conversa natural, breve, contextual e sem frases burocráticas.',
+        `A saudação adequada neste momento é "${greetingForNewnet()}". Use-a no primeiro cumprimento.`,
         'O atendimento segue etapas: acolher -> entender a necessidade -> identificar o titular -> confirmar vínculo -> resolver.',
         'Não volte à saudação quando a necessidade já foi informada. Não repita perguntas já respondidas.',
         'Uma pergunta por resposta; não seja insistente, invasiva nem burocrática. Não pressione quem não informou o documento.',
@@ -917,6 +923,19 @@ export class ConnectchatAutoResponderService {
             ? initial as Record<string, unknown> : {};
           if (typeof prior.reason === 'string' && prior.reason.trim()) {
             await this.settings.set(intentKey, { ...prior, requested: true });
+          } else {
+            // "Sim" responde exclusivamente à confirmação da assinatura. Sem
+            // um motivo anterior para retomar, encerrar este turno aqui evita
+            // que a confirmação seja reclassificada como assunto geral e caia
+            // no fallback genérico do modelo.
+            const customerName = await this.inbox.getLinkedCustomerName(context.conversation);
+            const reply = habitualCustomerConfirmed(customerName);
+            const token = createHash('sha256').update(
+              `newnet-recognized:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+            await this.inbox.sendAgentMessage(
+              conversation.id, reply, `newnet-recognized-${token}`);
+            await this.complete(key, sequence, claim);
+            return;
           }
         } else if (negative || correctionRequested || otherCustomerRequested) {
           await this.settings.set(recognitionKey, {
@@ -946,15 +965,11 @@ export class ConnectchatAutoResponderService {
               `ai.connectchat.identification_requested.${conversation.id}`,
               { requested: true, reason: previousReason },
             );
-            const question = await this.replyWithOperationalEvidence(
-              agent, conversation, context.messages, newest.body,
-              { etapa: 'confirmar_cliente_habitual', nome: customerName, resposta: 'sim_ou_nao' },
-              `É sobre a assinatura de ${customerName}?`,
-            );
+            const question = habitualCustomerQuestion(customerName, newest.body);
             const token = createHash('sha256').update(
               `newnet-recognize:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
             await this.inbox.sendAgentMessage(conversation.id,
-              question.includes('?') ? question : `É sobre a assinatura de ${customerName}?`,
+              question,
               `newnet-recognize-${token}`);
             await this.complete(key, sequence, claim);
             return;
