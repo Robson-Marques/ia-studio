@@ -103,12 +103,26 @@ export class ConnectchatAutoResponderService {
   // Garante o catálogo completo no agente nativo (idempotente: só grava quando
   // falta algo). Preserva quaisquer outras ferramentas já marcadas.
   private async ensureNativeIspTools(agent: AiAgent): Promise<AiAgent> {
-    const has = new Set(agent.allowed_tools);
-    const missing = this.nativeIspTools.filter((key) => !has.has(key));
-    if (missing.length === 0) return agent;
-    return this.repository.update(agent.id, {
-      allowed_tools: [...agent.allowed_tools, ...missing],
-    }) as Promise<AiAgent>;
+    try {
+      const has = new Set(agent.allowed_tools);
+      const missing = this.nativeIspTools.filter((key) => !has.has(key));
+      if (missing.length === 0) return agent;
+      return (await this.repository.update(agent.id, {
+        allowed_tools: [...agent.allowed_tools, ...missing],
+      })) as AiAgent;
+    } catch (error) {
+      this.logger.warn(`ConnectChat: ferramentas do agente nativo nao garantidas: ${(error as Error).message}`);
+      return agent;
+    }
+  }
+
+  // Blindagem: nenhuma etapa auxiliar (leitura de estado no IXC) pode congelar o
+  // atendimento. Se nao responder no tempo, segue sem ela.
+  private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+    ]);
   }
 
   async poll(): Promise<void> {
@@ -1071,12 +1085,17 @@ export class ConnectchatAutoResponderService {
       // Camada 2 (estado do cliente no sistema), recém-lida a cada turno — efêmera
       // da sessão, nunca misturada com a conversa.
       const support = context.verified
-        ? await this.support.byVerifiedConversation(convo, newest.body).catch(() => null)
+        ? await this.withTimeout(this.support.byVerifiedConversation(convo, newest.body), 10000).catch(() => null)
         : null;
       const billing = context.verified
-        ? await this.support.billingForVerifiedConversation(convo).catch(() => null)
+        ? await this.withTimeout(this.support.billingForVerifiedConversation(convo), 8000).catch(() => null)
         : null;
-      const systemMemory = this.buildSystemMemory(identified, support, billing);
+      let systemMemory: string | null = null;
+      try {
+        systemMemory = this.buildSystemMemory(identified, support, billing);
+      } catch (error) {
+        this.logger.warn(`ConnectChat: memoria de sessao indisponivel: ${(error as Error).message}`);
+      }
 
       await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
       const result = await this.runner
