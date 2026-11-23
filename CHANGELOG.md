@@ -1,4 +1,8 @@
 # Changelog
+## [v0.12.48] - 2026-11-23
+### added
+- ConnectChat/Nete: memória de sessão (camada 2). Ao identificar o titular, o atendimento carrega AO VIVO o estado do cliente no sistema (online/offline, contrato bloqueado, boletos em aberto/vencidos, OS e chamados abertos, incidente de região e histórico de chamados recentes com pedido/resolução) e injeta como contexto da sessão — separado da conversa, recém-lido a cada turno e nunca reaproveitado entre atendimentos. A Nete passa a raciocinar por uma estrutura de análise por perfil (bloqueio→financeiro; offline+incidente→informar; offline sem bloqueio→técnico/OS; OS/chamado aberto→acompanhar; online e em dia→perguntar) como espinha do raciocínio, não roteiro fixo. Benefício: mesmo que a execução de uma ferramenta falhe, o estado já está no contexto, então ela responde com robustez e usa as tools para aprofundar ou agir.
+
 ## [v0.12.47] - 2026-11-23
 ### fixed
 - ConnectChat/Nete: o agente nativo passa a receber automaticamente TODO o catálogo de ferramentas do ISP (consulta e ação: identificar, status, contrato, débitos, OS/chamados, diagnóstico, região, 2ª via, link de pagamento, desbloqueio de confiança, abrir OS, encaminhar) a cada ciclo de atendimento, de forma idempotente, sem depender de o usuário configurar ferramentas em tela — a configuração de ferramentas deixou de ser exposta ao usuário final e a Nete decide sozinha o que usar. Resolve o caso em que ela só conversava ("consulta indisponível") por estar sem ferramentas; a v0.12.45 só semeava as tools ao abrir Configurações da IA, o que deixou de acontecer.

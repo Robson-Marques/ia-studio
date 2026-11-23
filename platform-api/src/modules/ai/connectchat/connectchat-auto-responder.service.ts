@@ -915,6 +915,14 @@ export class ConnectchatAutoResponderService {
       'Antes de abrir OS, confie no retorno das ferramentas: se houver incidente/manutenção na região ou já existir chamado/OS aberto, informe o cliente e NÃO abra outro. Se uma ferramenta devolver erro ou indisponibilidade, seja honesto e, quando precisar, encaminhe para um atendente humano com encaminhar_para_fila.',
       'Você faz suporte de nível 2: pode analisar o cadastro e resolver o que estiver ao seu alcance (2ª via, link de pagamento, desbloqueio de confiança, diagnóstico de conexão e abertura de OS quando for o caso). Quando o caso exigir um humano, avise o cliente em uma frase e use encaminhar_para_fila.',
       'Nunca invente protocolo, valor, link ou informação: use só o que a ferramenta devolver. Nunca revele IDs internos, OLT/CTO, VLAN, percentuais de rede nem o nome de setor/fila técnica.',
+      'Siga uma ESTRUTURA DE ANÁLISE (a espinha do raciocínio, não um roteiro fixo — adapte palavras e ordem ao cliente): diante de um problema, entenda o perfil pelo bloco "Estado do cliente no sistema" e só então escolha o caminho.',
+      'Contrato BLOQUEADO por inadimplência -> caminho financeiro: mostre a situação, ofereça 2ª via, link de pagamento ou desbloqueio de confiança e pergunte o que ele prefere; não trate como técnico nem abra OS.',
+      'Offline COM incidente na região -> informe a manutenção em andamento e NÃO abra OS.',
+      'Offline, SEM bloqueio e SEM incidente -> oriente o básico e, se persistir, ofereça abrir uma OS (sem duplicar uma já aberta).',
+      'Já existe OS ou chamado aberto -> acompanhe o existente, não duplique.',
+      'Online e em dia -> pergunte em que pode ajudar, sem despejar diagnóstico.',
+      'Use o histórico de chamados recentes: se algo parecido já foi resolvido, cite o que foi feito e confirme se é o mesmo problema ou se voltou.',
+      'O bloco "Estado do cliente no sistema" já traz a situação atual — parta dele; use as ferramentas para aprofundar ou executar ação (2ª via, link, desbloqueio, abrir OS, encaminhar), não para redescobrir o que já está ali.',
       'Não use emojis. Responda sempre em português do Brasil.',
     ];
     if (identified) {
@@ -924,6 +932,62 @@ export class ConnectchatAutoResponderService {
     }
     return base.join('\n');
   }
+  // Camada 2 de memória: o estado do cliente DENTRO do sistema (IXC), montado do
+  // retrato operacional recém-lido. É efêmero (da sessão de atendimento), nunca é
+  // a conversa e nunca é reaproveitado entre atendimentos.
+  private buildSystemMemory(
+    identified: { name: string; document: string | null } | null,
+    support: Awaited<ReturnType<ConnectchatSupportContextService['byVerifiedConversation']>> | null,
+    billing: Awaited<ReturnType<ConnectchatSupportContextService['billingForVerifiedConversation']>> | null,
+  ): string | null {
+    if (!identified && !support) return null;
+    const str = (r: Record<string, unknown>, k: string): string | null =>
+      typeof r[k] === 'string' && (r[k] as string).trim() ? (r[k] as string).trim() : null;
+    const lines: string[] = [
+      '## Estado do cliente no sistema (memória desta sessão — não é a conversa; recém-lida do IXC)',
+    ];
+    if (identified) {
+      lines.push(`- Titular: ${identified.name}${identified.document ? `, documento ${identified.document}` : ''}`);
+    }
+    if (!support || support.available === false) {
+      lines.push('- Não consegui ler o estado operacional agora; confirme o essencial pelas ferramentas antes de concluir e, se faltar dado crítico, encaminhe para um atendente.');
+      return lines.join('\n');
+    }
+    const conns = support.connections ?? [];
+    lines.push(`- Acesso: ${conns.length ? (conns.some((c) => c['online'] === true) ? 'online' : 'offline') : 'sem dado'}`);
+    const blocked = (support.blockedContracts ?? 0) > 0;
+    lines.push(`- Contrato: ${blocked ? 'BLOQUEADO por inadimplência' : (support.contracts?.length ? 'ativo' : 'sem dado')}`);
+    if (billing && billing.available) {
+      const inv = billing.invoices ?? [];
+      const overdue = inv.filter((b) => b['vencido'] === true).length;
+      lines.push(inv.length
+        ? `- Financeiro: ${inv.length} boleto(s) em aberto${overdue ? `, ${overdue} vencido(s)` : ''}`
+        : '- Financeiro: nenhum boleto em aberto');
+    }
+    const openOs = support.openOs ?? [];
+    lines.push(openOs.length
+      ? `- OS aberta: sim${str(openOs[0], 'protocolo') ? ` (protocolo ${str(openOs[0], 'protocolo')})` : ''}`
+      : '- OS aberta: não');
+    lines.push(`- Chamado aberto: ${(support.openTickets ?? []).length ? 'sim' : 'não'}`);
+    const incident = (support.incidents ?? []).find((i) => i.suppress_os) ?? (support.incidents ?? [])[0];
+    lines.push(incident
+      ? `- Incidente na região: sim — ${String(incident.message ?? incident.title ?? 'ocorrência registrada').slice(0, 160)}`
+      : '- Incidente na região: não');
+    const recent = [...(support.openTickets ?? []), ...(support.recentTickets ?? [])].slice(0, 5);
+    if (recent.length) {
+      lines.push('- Chamados recentes (use para respostas mais robustas):');
+      for (const t of recent) {
+        const data = str(t, 'aberto_em') ?? str(t, 'encerrado_em') ?? '';
+        const titulo = str(t, 'titulo') ?? 'chamado';
+        const sit = str(t, 'situacao_interna') ?? str(t, 'status') ?? '';
+        const pedido = str(t, 'descricao');
+        const resol = str(t, 'resolucao');
+        lines.push(`  - ${data ? data + ' — ' : ''}${titulo}${sit ? ` (${sit})` : ''}${pedido ? ` — pedido: ${pedido.slice(0, 120)}` : ''}${resol ? ` — resolução: ${resol.slice(0, 120)}` : ''}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
 
   private async respond(agent: AiAgent, conversation: ConnectchatConversation, resumeReason?: string): Promise<void> {
     void resumeReason;
@@ -1004,6 +1068,15 @@ export class ConnectchatAutoResponderService {
       const identified = context.verified
         ? await this.inbox.resolveLinkedCustomer(convo).catch(() => null)
         : null;
+      // Camada 2 (estado do cliente no sistema), recém-lida a cada turno — efêmera
+      // da sessão, nunca misturada com a conversa.
+      const support = context.verified
+        ? await this.support.byVerifiedConversation(convo, newest.body).catch(() => null)
+        : null;
+      const billing = context.verified
+        ? await this.support.billingForVerifiedConversation(convo).catch(() => null)
+        : null;
+      const systemMemory = this.buildSystemMemory(identified, support, billing);
 
       await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
       const result = await this.runner
@@ -1013,7 +1086,9 @@ export class ConnectchatAutoResponderService {
           history,
           createdBy: null,
           scopeKeys,
-          channelInstructions: this.channelPolicy(identified),
+          channelInstructions: systemMemory
+            ? this.channelPolicy(identified) + '\n\n' + systemMemory
+            : this.channelPolicy(identified),
           dryRun: false,
         })
         .finally(() => {
