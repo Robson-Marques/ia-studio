@@ -912,6 +912,21 @@ export class ConnectchatAutoResponderService {
     return common / Math.max(ta.size, tb.size, 1) >= 0.80;
   }
 
+  // Leitura em chat: uma frase por linha. Determinístico e conservador — só
+  // quebra após . ! ? seguido de espaço e início de nova frase (maiúscula/acento
+  // /aspas). NÃO quebra decimais, IP, hora (18:35), CPF nem valores (R$ 89,90).
+  // Garante o resultado independentemente de o modelo ter formatado ou não.
+  private breakSentences(text: string): string {
+    if (!text) return text;
+    return text
+      .replace(/\r\n/g, '\n')
+      .split('\n')
+      .map((para) => para.replace(/([.!?])\s+(?=[A-ZÀ-ÖØ-Þ"'])/g, '$1\n').replace(/[ \t]+$/g, ''))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   // ─── Atendimento orientado a INTENÇÃO (Nete / ConnectChat) ──────────────
   // O agente CONDUZ: entende a intenção, usa as ferramentas ISP para descobrir
   // a situação do cliente (vínculo, bloqueio, online/offline, OS/chamados) e
@@ -939,12 +954,13 @@ export class ConnectchatAutoResponderService {
       'Online e em dia -> pergunte em que pode ajudar, sem despejar diagnóstico.',
       'Use o histórico de chamados recentes: se algo parecido já foi resolvido, cite o que foi feito e confirme se é o mesmo problema ou se voltou.',
       'O bloco "Estado do cliente no sistema" já traz a situação atual — parta dele; use as ferramentas para aprofundar ou executar ação (2ª via, link, desbloqueio, abrir OS, encaminhar), não para redescobrir o que já está ali.',
+      'Escreva para leitura em chat: frases curtas e uma ideia por linha. Ao encadear passos ou instruções, quebre a linha a cada frase (após o ponto final) em vez de mandar um bloco único de texto.',
       'Não use emojis. Responda sempre em português do Brasil.',
     ];
     if (identified) {
       base.splice(4, 0, identified.document
-        ? `O titular já está identificado e vinculado: ${identified.name}, documento ${identified.document}. Use esse documento (CPF/CNPJ) diretamente nas ferramentas para consultar conexão, contrato, financeiro, chamados e OS — NÃO peça o CPF de novo ao cliente.`
-        : `O titular já está vinculado (${identified.name}), mas não recuperei o documento automaticamente. Confirme com gentileza o CPF ou CNPJ antes de consultar, sem repetir perguntas já respondidas.`);
+        ? `O titular já está identificado e vinculado: ${identified.name}, documento ${identified.document}. Trate o cliente pelo PRIMEIRO nome dele de forma natural (só o primeiro nome, não o nome completo), demonstrando que você já sabe com quem fala — sem repetir o nome em toda mensagem. Use esse documento (CPF/CNPJ) diretamente nas ferramentas para consultar conexão, contrato, financeiro, chamados e OS — NÃO peça o CPF de novo ao cliente.`
+        : `O titular já está vinculado (${identified.name}), então trate o cliente pelo primeiro nome de forma natural. Não recuperei o documento automaticamente: confirme com gentileza o CPF ou CNPJ antes de consultar, sem repetir perguntas já respondidas.`);
     }
     return base.join('\n');
   }
@@ -1125,8 +1141,8 @@ export class ConnectchatAutoResponderService {
 
       const output = result.status === 'COMPLETED' && typeof result.output === 'string'
         ? result.output.trim() : '';
-      const reply = output
-        || 'Tive uma dificuldade técnica aqui agora para concluir. Vou acionar um atendente para seguir com você.';
+      const reply = this.breakSentences(output
+        || 'Tive uma dificuldade técnica aqui agora para concluir. Vou acionar um atendente para seguir com você.');
       const token = createHash('sha256')
         .update(`newnet-agent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
       await this.sendReply(conversation.id, reply, `newnet-agent-${token}`, key, sequence, claim);

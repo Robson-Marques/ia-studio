@@ -1,4 +1,9 @@
 # Changelog
+## [v0.12.51] - 2026-11-23
+### changed
+- ConnectChat/Nete (comunicação): quando o cliente já está vinculado, a Nete passa a tratá-lo pelo PRIMEIRO nome de forma natural (sem repetir o nome a cada mensagem), demonstrando que já sabe com quem fala — antes ela tinha o nome no contexto mas não o usava.
+- ConnectChat/Nete (legibilidade): a resposta passa a sair com uma frase por linha em vez de um bloco único de texto. Além da instrução na política de atendimento, há uma quebra determinística no envio (`breakSentences`): quebra a linha após `.` `!` `?` seguido de início de nova frase, de forma conservadora — não quebra IP, decimal, hora (18:35), CPF nem valores (R$ 89,90). Garante o resultado independentemente de o modelo ter formatado ou não.
+
 ## [v0.12.50] - 2026-11-23
 ### fixed
 - ConnectChat/Nete: corrige a causa real de a Nete não responder. O decorator `@Interval(5000)` estava na função errada — ao inserir `ensureNativeIspTools` (v0.12.47), ela entrou entre o `@Interval` e o `poll()`, de modo que o agendador passou a chamar a reconciliação de ferramentas (sem argumento, erro engolido pelo try/catch) e o `poll()` ficou SEM agendamento nenhum. Ou seja: o laço que lê mensagens novas e responde nunca era disparado — silêncio total, independente de ferramentas, IXC ou memória de sessão. O `@Interval(5000)` foi devolvido ao `poll()` e a `ensureNativeIspTools` continua sendo chamada de dentro do poll (recebendo o agent). Isso explica por que o hardening da v0.12.49 não surtiu efeito: ele blindava contra travamento, mas o problema era o poll jamais rodar.
