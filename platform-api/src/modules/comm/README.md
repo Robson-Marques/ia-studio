@@ -74,4 +74,10 @@ o próximo atendimento não herde o escopo anterior.
 - `POST /api/webhooks/whatsapp/waha` — webhook público WAHA com HMAC SHA-512.
 - `GET/POST/PATCH /comm/attendance/{teams,queues}` e membros.
 - `GET /comm/connectchat/{health,conversations}` e `GET /comm/connectchat/conversations/:id/messages?after_sequence=`
-- `POST /comm/connectchat/conversations/:id/messages|receipts/{read,delivered}` e `PATCH /comm/connectchat/messages/:id`.
+- `POST /comm/connectchat/conversations/:id/messages|receipts/{read,delivered}` e `PATCH /comm/connectchat/messages/:id`.
+
+## Motor WAHA: NOWEB (Baileys)
+
+O WAHA roda no motor **NOWEB (Baileys)**; o WEBJS foi aposentado e não é mais inicializado. `scripts/waha-container.js` recria o mesmo container (mesmo nome e mesmo volume `${appId}-waha-sessions` em `/app/.sessions`) com `WAHA_ENGINE=NOWEB`, `WHATSAPP_DEFAULT_ENGINE=NOWEB`, `WAHA_NOWEB_WA_VERSION=auto-web`, `WHATSAPP_RESTART_ALL_SESSIONS=True`, `WAHA_AUTO_START_DELAY_SECONDS=5`, `WAHA_WORKER_RESTART_SESSIONS=True`, `--restart unless-stopped` e rotação de log (50m x3). A troca de motor muda o namespace de sessão: os arquivos WEBJS antigos permanecem no volume (não são apagados) mas o NOWEB não os carrega — é necessário **refazer o pareamento por QR uma vez por número**.
+
+Recuperação e diagnóstico (`whatsapp-waha-inbound.service.ts` + `waha-session-diagnostics.ts`): em `FAILED`/`STOPPED`, a sessão é reiniciada automaticamente por `POST /api/sessions/{session}/restart` **sem logout** (preserva a autenticação), no máximo 1x por sessão a cada 5 min, com trava anti-loop. O diagnóstico da queda (`reason`, `event`, mensagem, código e os 3 estados anteriores) é preservado no `config` da conexão, publicado como alerta operacional no Event Bus (`whatsapp.waha.session.alert`) e descrito no `status_detail` por causa — sem reduzir a um "offline" genérico. Causas: `ConnectFailure` (rede/socket, reconecta), `StreamReplaced` (checar 2ª instância), `ClientOutdated` (atualizar imagem; não reinicia), `LoggedOut` (exige QR; não reinicia), `TemporaryBan` (sem logout nem QR; não reinicia).

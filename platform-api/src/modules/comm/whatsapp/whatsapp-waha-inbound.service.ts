@@ -3,9 +3,10 @@ import { CommMessageDirection, Connection, IntegrationDirection, IntegrationLogS
 import { randomUUID } from 'crypto';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import {
-  WahaRefs, encodeWahaMediaRef, getWahaContactName, getWahaPhoneByLid, normalizeWahaChatId, resolveWahaRuntime,
+  WahaRefs, encodeWahaMediaRef, getWahaContactName, getWahaPhoneByLid, normalizeWahaChatId, resolveWahaRuntime, restartWahaSession,
 } from '../../../shared/integration/waha.client';
 import { WhatsappMessageType } from '../../../shared/integration/whatsapp.types';
+import { classifyWahaCause, extractWahaReason, shouldAutoRecover, wahaDownDetail } from './waha-session-diagnostics';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { IntegrationLogsRepository } from '../../integration/connections/integration-logs.repository';
 import { SecretsService } from '../../integration/secrets/secrets.service';
@@ -263,24 +264,90 @@ export class WhatsappWahaInboundService {
   ): Promise<void> {
     const value = String(payload['status'] ?? payload['name'] ?? '');
     const working = value === 'WORKING';
-    const pending = ['STARTING', 'SCAN_QR_CODE', 'PASSKEY_REQUIRED', 'PASSKEY_CONFIRMATION_REQUIRED'].includes(value);
+    const qrPending = ['SCAN_QR_CODE', 'PASSKEY_REQUIRED', 'PASSKEY_CONFIRMATION_REQUIRED'].includes(value);
+    const transient = value === 'STARTING';
+    const down = value === 'FAILED' || value === 'STOPPED';
+
     const current = (connection.config ?? {}) as Record<string, unknown>;
-    const config = { ...current };
+    const config: Record<string, unknown> = { ...current };
     const phone = String(me?.id ?? '').replace(/\D/g, '');
     if (phone) config['phone'] = phone;
     if (me?.pushName) config['display_name'] = me.pushName;
+
+    // Diagnóstico da queda (item 6): preserva reason/event/código e os 3 estados
+    // anteriores; nunca reduz a queda a um "offline" genérico.
+    const diag = extractWahaReason(payload);
+    const previousStates = Array.isArray(current['recent_states'])
+      ? (current['recent_states'] as unknown[]).filter((s): s is string => typeof s === 'string') : [];
+    const priorThree = previousStates.slice(0, 3);
+    config['recent_states'] = [value, ...previousStates].slice(0, 6);
+
+    // Diferenciação de causa (item 7).
+    const cause = classifyWahaCause(diag);
+    config['last_reason'] = diag.reason ?? null;
+    config['last_cause'] = cause;
+
+    // Recuperação automática (item 5): só em FAILED/STOPPED, sem logout, no máximo
+    // 1x por sessão a cada 5 min. LoggedOut exige QR, TemporaryBan não pode
+    // reconectar e ClientOutdated exige atualizar a imagem — esses não reiniciam.
+    const lastRestart = typeof current['last_auto_restart_at'] === 'number'
+      ? (current['last_auto_restart_at'] as number) : 0;
+    const canRestart = Date.now() - lastRestart > 5 * 60 * 1000;
+    const willRecover = down && shouldAutoRecover(cause) && canRestart;
+    if (willRecover) config['last_auto_restart_at'] = Date.now();
+
+    const detail = down ? wahaDownDetail(cause, diag.reason, value)
+      : working ? 'WhatsApp conectado por QR Code.'
+      : qrPending ? 'Aguardando leitura do QR Code.'
+      : transient ? 'Reconectando a sessão WhatsApp…'
+      : `Sessão WAHA: ${value || 'sem estado'}.`;
+
     const data: Prisma.ConnectionUpdateInput = {
-      last_health_at: new Date(), last_health_ok: pending ? null : working,
-      status_detail: working ? 'WhatsApp conectado por QR Code.' : pending ? 'Aguardando leitura do QR Code.' : `Sessão WAHA: ${value || 'sem estado'}.`,
+      last_health_at: new Date(),
+      last_health_ok: working ? true : (qrPending || transient) ? null : false,
+      status_detail: detail,
       config: config as Prisma.InputJsonValue,
     };
     if (!['DISABLED', 'MAINTENANCE'].includes(connection.status)) {
-      data.status = working ? 'ACTIVE' : pending ? 'PENDING_AUTH' : 'ERROR';
+      data.status = working ? 'ACTIVE'
+        : (qrPending || cause === 'LoggedOut') ? 'PENDING_AUTH'
+        : transient ? connection.status
+        : 'ERROR';
       data.is_active = working;
       if (working && !connection.connected_at) data.connected_at = new Date();
     }
     await this.connections.update(connection.id, data);
-    this.logger.log(`WAHA ${connection.id}: ${value}`);
+    this.logger.log(`WAHA ${connection.id}: ${value}${cause ? ` (${cause})` : ''}`);
+
+    // Alerta operacional com o diagnóstico completo (item 6), via Event Bus
+    // (desacoplado — não acopla comm ao Notification Center, evita ciclo).
+    if (down || cause) {
+      await this.events.publish({
+        event: 'whatsapp.waha.session.alert',
+        trace_id: randomUUID(),
+        source_event_id: `waha-session:${connection.id}:${value}:${diag.code ?? diag.event ?? 'na'}`,
+        occurred_at: new Date().toISOString(),
+        payload: {
+          connection_id: connection.id,
+          status: value,
+          cause,
+          reason: diag.reason ?? null,
+          reason_event: diag.event ?? null,
+          reason_message: diag.message ?? null,
+          reason_code: diag.code ?? null,
+          previous_states: priorThree,
+        },
+      }).catch((e) => this.logger.warn(`Alerta WAHA não publicado: ${(e as Error).message}`));
+    }
+
+    if (willRecover) {
+      try {
+        await restartWahaSession(await this.refs(connection));
+        this.logger.log(`WAHA ${connection.id}: restart automático solicitado (${cause ?? value}).`);
+      } catch (error) {
+        this.logger.warn(`WAHA ${connection.id}: restart automático falhou: ${(error as Error).message}`);
+      }
+    }
   }
 
   private typeOf(payload: Record<string, unknown>, mime: string): WhatsappMessageType {

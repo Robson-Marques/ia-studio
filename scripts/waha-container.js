@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Provisiona o WAHA WEBJS local e preserva as sessões em volume Docker. */
+/** Provisiona o WAHA (motor NOWEB/Baileys) local e preserva as sessões em volume Docker. */
 const childProcess = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -34,6 +34,19 @@ function parseEnv(content) {
     if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, '');
   }
   return values;
+}
+
+function migrateEngineInEnv(file) {
+  if (!fs.existsSync(file)) return;
+  const content = fs.readFileSync(file, 'utf8');
+  // Troca de motor: migra WEBJS -> NOWEB automaticamente (idempotente).
+  const migrated = content
+    .replace(/^(\s*WAHA_ENGINE\s*=\s*)WEBJS(\s*)$/gim, '$1NOWEB$2')
+    .replace(/^(\s*WHATSAPP_DEFAULT_ENGINE\s*=\s*)WEBJS(\s*)$/gim, '$1NOWEB$2');
+  if (migrated !== content) {
+    fs.writeFileSync(file, migrated, { mode: 0o600 });
+    fs.chmodSync(file, 0o600);
+  }
 }
 
 function appendMissing(file, additions) {
@@ -84,6 +97,8 @@ function ensureEnvironment() {
   };
   appendMissing(API_ENV_PATH, additions);
   appendMissing(`/etc/iastudio/apps/${appId}.env`, additions);
+  migrateEngineInEnv(API_ENV_PATH);
+  migrateEngineInEnv(`/etc/iastudio/apps/${appId}.env`);
   return { ...current, ...additions, appId };
 }
 
@@ -100,13 +115,18 @@ function ensureDocker(installDocker) {
 function expectedEnvironment(env) {
   return [
     `WAHA_API_KEY=${env.IASTUDIO_WAHA_API_KEY}`,
-    'WHATSAPP_DEFAULT_ENGINE=WEBJS',
+    // Motor NOWEB (Baileys). WEBJS foi aposentado; ver docs de whatsapp-connectors.
+    'WAHA_ENGINE=NOWEB',
+    'WHATSAPP_DEFAULT_ENGINE=NOWEB',
+    'WAHA_NOWEB_WA_VERSION=auto-web',
     'WAHA_PRINT_QR=False',
     'WAHA_DASHBOARD_ENABLED=False',
     'WHATSAPP_SWAGGER_ENABLED=False',
     'WAHA_EVENTS_DOWNLOAD_MEDIA=True',
     'WAHA_API_DOWNLOAD_MEDIA=True',
     'WAHA_WORKER_RESTART_SESSIONS=True',
+    'WHATSAPP_RESTART_ALL_SESSIONS=True',
+    'WAHA_AUTO_START_DELAY_SECONDS=5',
   ];
 }
 
@@ -118,8 +138,13 @@ function inspectContainer(name) {
 function runContainer(env, name, volume) {
   const args = [
     'run', '-d', '--name', name, '--restart', 'unless-stopped',
+    // Rotação dos logs do Docker.
+    '--log-opt', 'max-size=50m', '--log-opt', 'max-file=3',
     '-p', `127.0.0.1:${env.IASTUDIO_WAHA_PORT}:3000`,
     '--add-host', 'host.docker.internal:host-gateway',
+    // Volume de sessoes preservado em /app/.sessions. A troca de motor muda o
+    // namespace: arquivos WEBJS antigos permanecem no volume mas NAO sao
+    // carregados pelo NOWEB (refazer o pareamento por QR uma vez por numero).
     '-v', `${volume}:/app/.sessions`,
   ];
   for (const value of expectedEnvironment(env)) args.push('-e', value);

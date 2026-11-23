@@ -1,4 +1,11 @@
 # Changelog
+## [v0.12.46] - 2026-11-23
+### changed
+- WhatsApp/WAHA: motor migrado definitivamente de WEBJS para NOWEB (Baileys), sem manter WEBJS ativo. O mesmo container (mesmo nome e volume /app/.sessions) é recriado no deploy com WAHA_ENGINE=NOWEB, WHATSAPP_DEFAULT_ENGINE=NOWEB, WAHA_NOWEB_WA_VERSION=auto-web, WHATSAPP_RESTART_ALL_SESSIONS=True, WAHA_AUTO_START_DELAY_SECONDS=5 e rotação de log (50m x3). A troca muda o namespace: sessões WEBJS antigas permanecem no volume (não apagadas) mas não são carregadas pelo NOWEB — refazer o pareamento por QR uma vez por número.
+### fixed
+- WAHA: sessões que caíam sem recuperar agora reiniciam sozinhas em FAILED/STOPPED via POST /restart SEM logout (preserva a autenticação), no máximo 1x por sessão a cada 5 min, com trava anti-loop. LoggedOut exige QR, TemporaryBan não reconecta e ClientOutdated pede atualização de imagem — esses não reiniciam.
+- WAHA: diagnóstico da queda preservado (reason, event, mensagem, código e os 3 estados anteriores) e enviado como alerta operacional no Event Bus; o estado do canal descreve a causa (ConnectFailure, StreamReplaced, ClientOutdated, LoggedOut, TemporaryBan) em vez de um "offline" genérico.
+
 ## [v0.12.45] - 2026-11-23
 ### fixed
 - ConnectChat: a Nete não usava as ferramentas (só conversava e dizia "indisponível") porque o AGENTE NATIVO nascia — e era reusado — com allowed_tools vazio, diferente dos agentes criados pela tela, que já recebem o conjunto de consulta do ISP. Agora o agente nativo é semeado com as ferramentas de consulta (identificar_cliente, status_conexao, consultar_contrato, consultar_os_recentes, consultar_chamados_recentes, diagnosticar_conexao, status_regiao) e um nativo já existente vazio é preenchido automaticamente quando há conexão IXC ativa (só leitura, sem aprovação).
