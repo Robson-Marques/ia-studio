@@ -225,9 +225,7 @@ export class ConnectchatAutoResponderService {
           requestCreatedAt: firstAt, nextAttemptAt: now + 15000,
         });
         const token = createHash('sha256').update(`newnet-link-request:${conversation.id}:${requestId}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(conversation.id,
-          'Enviei a solicitaÃ§Ã£o de vÃ­nculo ao ConnectChat. Confirme na sua conta para continuar o atendimento.',
-          `newnet-link-request-${token}`);
+        const sent = await this.sendReply(conversation.id, , `newnet-link-request-${token}`);
       } catch (error) {
         this.logger.warn(`ConnectChat vÃ­nculo: ${(error as Error).message}`);
         await this.settings.set(key, { ...attemptState, nextAttemptAt: now + 60000 });
@@ -1796,7 +1794,8 @@ export class ConnectchatAutoResponderService {
         await this.pauseForHuman(
           conversation,
           opened ? 'Acesso offline com OS confirmada.' : 'Acesso offline sem confirmaÃ§Ã£o de nova OS.',
-        );
+        , key, sequence, claim);
+        if (!sent) return;
         await this.complete(key, sequence, claim);
         return;
       }
