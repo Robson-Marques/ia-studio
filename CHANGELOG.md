@@ -1,4 +1,8 @@
 # Changelog
+## [v0.12.50] - 2026-11-23
+### fixed
+- ConnectChat/Nete: corrige a causa real de a Nete não responder. O decorator `@Interval(5000)` estava na função errada — ao inserir `ensureNativeIspTools` (v0.12.47), ela entrou entre o `@Interval` e o `poll()`, de modo que o agendador passou a chamar a reconciliação de ferramentas (sem argumento, erro engolido pelo try/catch) e o `poll()` ficou SEM agendamento nenhum. Ou seja: o laço que lê mensagens novas e responde nunca era disparado — silêncio total, independente de ferramentas, IXC ou memória de sessão. O `@Interval(5000)` foi devolvido ao `poll()` e a `ensureNativeIspTools` continua sendo chamada de dentro do poll (recebendo o agent). Isso explica por que o hardening da v0.12.49 não surtiu efeito: ele blindava contra travamento, mas o problema era o poll jamais rodar.
+
 ## [v0.12.49] - 2026-11-23
 ### fixed
 - ConnectChat/Nete: corrige regressão em que a Nete parava de responder. Blindagem — a reconciliação de ferramentas do agente nativo e a leitura do estado do cliente no sistema (camada 2) não podem mais derrubar nem congelar o polling: a reconciliação nunca lança (degrada para o agente como está) e a leitura do IXC passou a ter timeout (10s/8s), então uma consulta lenta ou indisponível não trava o atendimento. A Nete sempre responde, mesmo que a memória de sessão fique indisponível naquele turno.

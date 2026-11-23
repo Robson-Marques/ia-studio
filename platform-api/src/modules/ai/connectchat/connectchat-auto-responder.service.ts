@@ -99,9 +99,9 @@ export class ConnectchatAutoResponderService {
     });
   }
 
-  @Interval(5000)
   // Garante o catálogo completo no agente nativo (idempotente: só grava quando
   // falta algo). Preserva quaisquer outras ferramentas já marcadas.
+  // NAO decorar com @Interval: e chamada de dentro do poll (recebe o agent).
   private async ensureNativeIspTools(agent: AiAgent): Promise<AiAgent> {
     try {
       const has = new Set(agent.allowed_tools);
@@ -125,6 +125,8 @@ export class ConnectchatAutoResponderService {
     ]);
   }
 
+  // Laco de atendimento: acorda a cada 5s para ler mensagens novas e responder.
+  @Interval(5000)
   async poll(): Promise<void> {
     if (!this.enabled() || this.polling) return;
     this.polling = true;
