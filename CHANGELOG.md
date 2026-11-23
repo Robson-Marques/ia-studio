@@ -1,4 +1,8 @@
 # Changelog
+## [v0.12.53] - 2026-11-23
+### changed
+- ConnectChat/Nete (diagnóstico vira descrição, não trava): o que a Nete levanta no diagnóstico (o que funciona, o que o cliente relatou, o que já foi tentado) passa a servir para DESCREVER BEM o chamado/OS e deve ser registrado na abertura — mas coletar essa informação nunca pode travar o andamento. Com o essencial em mãos, ela abre o chamado e segue, sem ficar juntando detalhes a mais. Complementa a v0.12.52 (ser resolutiva).
+
 ## [v0.12.52] - 2026-11-23
 ### changed
 - ConnectChat/Nete (ser resolutiva, menos passos): a política de atendimento passa a pedir que ela resolva em poucos passos em vez de alongar o atendimento. No máximo uma ou duas perguntas de diagnóstico e então AÇÃO — reinício do equipamento, abrir chamado/OS ou oferecer a solução. Proibido mandar o cliente testar em sequência (app por app, dados móveis, navegador).
