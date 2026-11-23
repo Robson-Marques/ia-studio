@@ -13,6 +13,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ToolRegistryService, ToolExecutionContext } from '../ai/tools/tool-registry.service';
 import { ConnectionsService } from '../integration/connections/connections.service';
 import { WhatsappInboxService } from '../comm/whatsapp/whatsapp-inbox.service';
+import { ConnectchatInboxService } from '../comm/connectchat/connectchat-inbox.service';
 import { ChatAssignmentService } from '../comm/attendance/chat-assignment.service';
 import { SettingsService } from '../core/settings/settings.service';
 import { IspOsConfigService } from './isp-os-config.service';
@@ -45,6 +46,7 @@ export class IspTools implements OnModuleInit {
     private readonly lookup: IncidentLookupService,
     private readonly incidents: IspIncidentsService,
     private readonly whatsappInbox: WhatsappInboxService,
+    private readonly connectchatInbox: ConnectchatInboxService,
     private readonly osConfig: IspOsConfigService,
     private readonly chatAssignment: ChatAssignmentService,
     private readonly settings: SettingsService,
@@ -78,6 +80,29 @@ export class IspTools implements OnModuleInit {
     return scope;
   }
 
+  // Canal do run (padrao WhatsApp p/ nao alterar o comportamento existente).
+  private channelKey(ctx: ToolExecutionContext): 'whatsapp' | 'connectchat' {
+    return ctx.scopeKeys?.['channel'] === 'connectchat' ? 'connectchat' : 'whatsapp';
+  }
+
+  // Trava anti-enumeracao por conversa (ConnectChat): no max. 5 buscas por
+  // documento a cada janela de 15 min. Reusa a chave que o reset ja limpa
+  // (document_attempts). Degrada graciosamente (nao e erro).
+  private async documentLookupGuard(session: string): Promise<{ blocked: boolean; motivo?: string }> {
+    const key = `ai.connectchat.document_attempts.${session}`;
+    const raw = await this.settings.getValue(key);
+    const state = raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? raw as Record<string, unknown> : {};
+    const startedAt = typeof state['startedAt'] === 'number' ? state['startedAt'] : 0;
+    const within = Date.now() - startedAt < 15 * 60 * 1000;
+    const count = within && typeof state['count'] === 'number' ? state['count'] : 0;
+    if (count >= 5) {
+      return { blocked: true, motivo: 'Por seguranca, nao consigo fazer mais consultas de cadastro agora. Tente de novo daqui a alguns minutos.' };
+    }
+    await this.settings.set(key, { startedAt: within ? startedAt : Date.now(), count: count + 1 });
+    return { blocked: false };
+  }
+
   onModuleInit(): void {
     // ─── identificar_cliente ──────────────────────────
     this.registry.register({
@@ -98,6 +123,15 @@ export class IspTools implements OnModuleInit {
         const telefone = typeof args['telefone'] === 'string' && args['telefone'].trim() ? args['telefone'].trim() : undefined;
         if (!cpf && !telefone) throw new Error('Informe cpf ou telefone.');
         if (ctx.dryRun) return { simulated: true, cpf, telefone };
+        // Anti-enumeracao (ConnectChat): CPF/CNPJ e dado de busca, mas a conversa
+        // nao pode virar oraculo de cadastro do IXC.
+        if (cpf && this.channelKey(ctx) === 'connectchat') {
+          const sessionGuard = ctx.scopeKeys?.['session'];
+          if (sessionGuard) {
+            const guard = await this.documentLookupGuard(sessionGuard);
+            if (guard.blocked) return { bloqueado: true, motivo: guard.motivo };
+          }
+        }
         const connectionId = await this.connectionId(args, ctx);
         // CPF/CNPJ tem PRECEDENCIA: se o cliente digitou um documento, e ele quem
         // identifica — nunca o telefone. O numero so vale quando NENHUM documento
@@ -118,13 +152,27 @@ export class IspTools implements OnModuleInit {
         const session = ctx.scopeKeys?.['session'];
         if (clientes.length === 1 && session) {
           const c = clientes[0];
-          await this.whatsappInbox
-            .linkCustomer(session, {
-              document: typeof c['cpf_cnpj'] === 'string' ? (c['cpf_cnpj'] as string) : null,
-              name: typeof c['nome'] === 'string' ? (c['nome'] as string) : null,
-              ref: typeof c['id'] === 'string' ? (c['id'] as string) : null,
-            })
-            .catch(() => undefined);
+          if (this.channelKey(ctx) === 'connectchat') {
+            // ConnectChat: o vinculo persiste pelo inbox do proprio canal (o
+            // mesmo que marca a conversa como verificada). Identidade e sequencia
+            // vem do escopo; falha de vinculo nao interrompe a identificacao.
+            const customerId = c['id'] != null ? String(c['id']) : '';
+            const identity = ctx.scopeKeys?.['cc_identity'] ?? '';
+            const seq = ctx.scopeKeys?.['cc_sequence'] ?? '';
+            if (customerId && identity && seq) {
+              await this.connectchatInbox
+                .autoLinkIdentifiedCustomer(session, identity, seq, connectionId, customerId)
+                .catch(() => undefined);
+            }
+          } else {
+            await this.whatsappInbox
+              .linkCustomer(session, {
+                document: typeof c['cpf_cnpj'] === 'string' ? (c['cpf_cnpj'] as string) : null,
+                name: typeof c['nome'] === 'string' ? (c['nome'] as string) : null,
+                ref: typeof c['id'] === 'string' ? (c['id'] as string) : null,
+              })
+              .catch(() => undefined);
+          }
         }
         return { identificado_por: identificadoPor, clientes };
       },
@@ -657,6 +705,23 @@ export class IspTools implements OnModuleInit {
         const chatId = ctx.scopeKeys?.['session'];
         if (!chatId) return { encaminhado: false, motivo: 'Sem conversa em contexto para encaminhar.' };
         if (ctx.dryRun) return { simulated: true, setor };
+        // ConnectChat: handoff humano = pausar a Nete nesta conversa (o operador
+        // assume na UI do ConnectChat). Nao ha fila de setor como no WhatsApp.
+        if (this.channelKey(ctx) === 'connectchat') {
+          const convo = (await this.connectchatInbox.listRawConversations()).find((c) => c.id === chatId);
+          if (!convo) return { encaminhado: false, motivo: 'Conversa nao encontrada para encaminhar.' };
+          const motivoCc = typeof args['motivo'] === 'string' && args['motivo'].trim()
+            ? args['motivo'].trim() : `Encaminhado para ${setor}`;
+          await this.settings.set(`ai.connectchat.human_handoff.${chatId}`, {
+            active: true,
+            customerRef: convo.customerRef ?? null,
+            globalIdentityId: convo.globalIdentityId ?? null,
+            pausedAtSequence: convo.lastSequence,
+            reason: motivoCc.slice(0, 300),
+            pausedAt: new Date().toISOString(),
+          });
+          return { encaminhado: true, setor };
+        }
         const queueId = await this.settings.getValue(ISP_QUEUE_SETTING_KEYS[setor]);
         if (typeof queueId !== 'string' || !queueId) {
           return {

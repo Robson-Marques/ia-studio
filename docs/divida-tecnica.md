@@ -135,6 +135,15 @@ O efeito colateral é que, no tema escuro, o painel fica escuro e a conversa con
 
 Recomendação: (1) — resolve o desconforto sem abrir mão do reconhecimento.
 
+### DT-006 🟡 Fluxo morto do ConnectChat a remover (pós-virada para intenção)
+
+- **Módulo:** `ai/connectchat/connectchat-auto-responder.service.ts` (+ specs da pasta)
+- **Risco:** lixo/manutenção — a virada para atendimento por intenção (v0.12.42) tornou o `respond()` orientado ao AgentRunner; a máquina de estados antiga ficou INERTE no arquivo (não é mais chamada), mas ainda ocupa ~700 linhas e mantém imports/injeções órfãos.
+- **A remover num sweep dedicado (arquivo-por-arquivo, 1 por vez):** métodos `classifyRequest`, `formulateIdentificationReply`, `formulateUnlinkedContinuation`, `maybeOpenSessionOfflineOs`, `maybeOpenVerifiedOfflineOs`, `replyWithOperationalEvidence`, `closeResolvedConversation`, `progressAuthenticatedLink` e a lógica de consent/resume dentro de `poll()`; depois enxugar o construtor (support/toolRegistry/toolsRepository/approvalPolicy/technicalCases/technicalPlanner que sobrarem sem uso) e os imports órfãos; avaliar aposentar os helpers hoje só-deste-fluxo (`customer-dialogue`, `technical-case-governance`, `billing-response`, `technical-conversation-state` e specs correlatas) se nada mais os usar.
+- **Por que não foi junto:** manter o diff da v0.13.0 pequeno e seguro (o build é no servidor via tag, sem compilador local). `noUnusedLocals` está OFF, então o código inerte compila; remover é limpeza, não correção.
+- **Config (não é débito, é operação):** o agente nativo do ConnectChat precisa ter as ferramentas ISP habilitadas em "O que o assistente pode fazer" — sem elas, a Nete vira um chat sem acesso ao IXC.
+- **Esforço:** M · **Dono:** backlog · **Sprint-alvo:** backlog
+
 ## Resolvidos
 
 | ID | Item | Resolvido em |

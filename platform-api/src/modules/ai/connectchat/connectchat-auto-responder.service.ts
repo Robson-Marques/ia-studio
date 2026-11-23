@@ -873,1018 +873,141 @@ export class ConnectchatAutoResponderService {
     return common / Math.max(ta.size, tb.size, 1) >= 0.80;
   }
 
+  // ─── Atendimento orientado a INTENÇÃO (Nete / ConnectChat) ──────────────
+  // O agente CONDUZ: entende a intenção, usa as ferramentas ISP para descobrir
+  // a situação do cliente (vínculo, bloqueio, online/offline, OS/chamados) e
+  // responde de forma humana e variável. O backend mantém os gates — a conexão/
+  // ERP é auto-resolvida pelas tools (a IA nunca escolhe id de infra), o dado
+  // sensível é escopado pela conexão verificada e abrir_os checa incidente e
+  // duplicidade. Aqui NÃO há máquina de estados de atendimento: só o encanamento
+  // do canal (cursor/claim/debounce/dedup) + a chamada ao agente.
+  private channelPolicy(verified: boolean): string {
+    const base = [
+      'Você é a Nete, atendente da Newnet (provedor de internet). Fale como uma pessoa real: natural, acolhedora e objetiva, variando as palavras a cada atendimento — nunca use frases prontas nem repita a mesma mensagem.',
+      'Este é um atendimento de chat. Envie UMA mensagem por vez; o atendimento evolui a cada resposta do cliente. Não faça o cliente repetir o que já disse.',
+      'Quando o cliente só cumprimentar (oi, bom dia), responda à saudação e pergunte, em uma frase, como pode ajudar — sem pedir dados de cara.',
+      'Entenda a intenção do cliente e use suas ferramentas para descobrir a situação ANTES de responder: identifique o titular, veja o contrato (inclusive se está bloqueado por inadimplência), se a conexão está online ou offline, se há chamado ou OS recente e se há ocorrência na região. Só então trate o que o cliente pediu.',
+      'Identificação: para tratar de algo da conta você precisa do titular. Peça o CPF ou CNPJ de forma leve e natural. O documento localiza o cadastro, não prova identidade — não exponha dados de terceiros e, se o documento não bater, peça para o cliente conferir e reenviar.',
+      'Internet que "não funciona" com o contrato BLOQUEADO por inadimplência é financeiro, não técnico: não abra ordem de serviço — ofereça 2ª via, link de pagamento ou desbloqueio de confiança.',
+      'Antes de abrir OS, confie no retorno das ferramentas: se houver incidente/manutenção na região ou já existir chamado/OS aberto, informe o cliente e NÃO abra outro. Se uma ferramenta devolver erro ou indisponibilidade, seja honesto e, quando precisar, encaminhe para um atendente humano com encaminhar_para_fila.',
+      'Você faz suporte de nível 2: pode analisar o cadastro e resolver o que estiver ao seu alcance (2ª via, link de pagamento, desbloqueio de confiança, diagnóstico de conexão e abertura de OS quando for o caso). Quando o caso exigir um humano, avise o cliente em uma frase e use encaminhar_para_fila.',
+      'Nunca invente protocolo, valor, link ou informação: use só o que a ferramenta devolver. Nunca revele IDs internos, OLT/CTO, VLAN, percentuais de rede nem o nome de setor/fila técnica.',
+      'Não use emojis. Responda sempre em português do Brasil.',
+    ];
+    if (verified) {
+      base.splice(4, 0,
+        'Este cliente já está vinculado com segurança a um cadastro. NÃO peça o CPF/CNPJ de novo — se precisar confirmar, apenas verifique se é com esse mesmo cadastro que ele quer seguir.');
+    }
+    return base.join('\n');
+  }
 
   private async respond(agent: AiAgent, conversation: ConnectchatConversation, resumeReason?: string): Promise<void> {
+    void resumeReason;
     const sequence = conversation.lastSequence;
     if (!/^\d+$/.test(sequence) || BigInt(sequence) === 0n) return;
-    const resume = resumeReason !== undefined;
-    const key = resume ? `ai.connectchat.resume.${conversation.id}` : `ai.connectchat.cursor.${conversation.id}`;
+    const key = `ai.connectchat.cursor.${conversation.id}`;
     const raw = await this.settings.getValue(key);
     const current = this.state(raw);
     if (BigInt(current.sequence) >= BigInt(sequence)) return;
-    const after = BigInt(sequence) > 50n ? (BigInt(sequence) - 50n).toString() : '0';
-    const boundary = await this.settings.getValue(`ai.connectchat.reset_boundary.${conversation.id}`);
-    const boundaryRecord = boundary && typeof boundary === 'object' && !Array.isArray(boundary)
-      ? boundary as Record<string, unknown> : {};
+
+    // Fronteira de reset: o operador pode limpar o contexto local da conversa.
+    const boundaryRaw = await this.settings.getValue(`ai.connectchat.reset_boundary.${conversation.id}`);
+    const boundaryRecord = boundaryRaw && typeof boundaryRaw === 'object' && !Array.isArray(boundaryRaw)
+      ? boundaryRaw as Record<string, unknown> : {};
     const boundarySequence = typeof boundaryRecord.sequence === 'string' && /^\d+$/.test(boundaryRecord.sequence)
       ? BigInt(boundaryRecord.sequence) : 0n;
     if (BigInt(sequence) <= boundarySequence) return;
-    const messages = (await this.inbox.getMessages(conversation.id, after, 100) as ConnectchatMessage[])
-      .filter((message) => /^\d+$/.test(message.serverSequence)
-        && BigInt(message.serverSequence) > boundarySequence);
-    const last = resume ? messages.filter((m) => m.senderKind === 'CUSTOMER').at(-1) : messages.at(-1);
-    if (!last || (!resume && last.serverSequence !== sequence)) return;
-    if (last.senderKind !== 'CUSTOMER' || (!resume && !last.body?.trim())) {
+
+    const after = BigInt(sequence) > 50n ? (BigInt(sequence) - 50n).toString() : '0';
+    const windowMessages = (await this.inbox.getMessages(conversation.id, after, 100) as ConnectchatMessage[])
+      .filter((m) => /^\d+$/.test(m.serverSequence) && BigInt(m.serverSequence) > boundarySequence);
+    const last = windowMessages.at(-1);
+    if (!last || last.serverSequence !== sequence) return;
+    if (last.senderKind !== 'CUSTOMER' || !last.body?.trim()) {
       await this.checkpoint(key, sequence);
       return;
     }
     const createdAt = Date.parse(last.createdAt);
     if (!Number.isFinite(createdAt)) return;
-    // Ignora somente o passado anterior Ã  subida do serviÃ§o, nÃ£o a primeira
-    // mensagem de uma conversa nova. Assim o primeiro contato Ã© respondido.
-    if (!resume && !raw && createdAt < this.bootTime - 2000) {
+    // Ignora o passado anterior à subida do serviço, mas responde o 1º contato novo.
+    if (!raw && createdAt < this.bootTime - 2000) {
       await this.checkpoint(key, sequence);
       return;
     }
+    // Debounce: junta o bloco de mensagens seguidas antes de responder.
     const delay = parseConversation(agent.conversation).debounce_seconds * 1000;
-    if (!resume && Date.now() - createdAt < delay) return;
+    if (Date.now() - createdAt < delay) return;
+
     const claim = randomUUID();
     if (!(await this.claim(key, sequence, claim))) return;
 
     try {
-      const fetchedContext = await this.inbox.contextForAgentPreview(conversation.id);
-      const context = {
-        ...fetchedContext,
-        messages: fetchedContext.messages.filter((m) => /^\d+$/.test(m.serverSequence)
-          && BigInt(m.serverSequence) > boundarySequence),
+      const context = await this.inbox.contextForAgentPreview(conversation.id);
+      const messages = context.messages.filter((m) => /^\d+$/.test(m.serverSequence)
+        && BigInt(m.serverSequence) > boundarySequence);
+      const newest = messages.at(-1);
+      if (!newest || newest.serverSequence !== sequence || newest.senderKind !== 'CUSTOMER') {
+        await this.complete(key, sequence, claim);
+        return;
+      }
+
+      // Histórico para dar CONTINUIDADE ao agente (turnos anteriores da conversa).
+      const history = messages
+        .filter((m) => typeof m.body === 'string' && m.body.trim())
+        .slice(-25, -1)
+        .map((m) => ({
+          role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: m.body.slice(0, 4000),
+        }));
+
+      // Escopo do run: canal + conversa. As tools ISP auto-resolvem a conexão/ERP
+      // pela config curada (a IA nunca escolhe id de infra) e usam channel/session
+      // + cc_identity/cc_sequence para vincular o assinante e encaminhar à fila
+      // DESTE canal (ConnectChat), sem tocar no caminho do WhatsApp.
+      const convo = context.conversation;
+      const scopeKeys: Record<string, string> = {
+        channel: 'connectchat',
+        session: conversation.id,
+        connectchat_conversation: await this.aiContextScope(conversation.id),
+        cc_sequence: sequence,
       };
-      const newest = resume
-        ? { ...(context.messages.filter((m) => m.senderKind === 'CUSTOMER').at(-1) || last),
-            body: resumeReason?.trim() || last.body }
-        : context.messages.at(-1);
-      if (!newest || (!resume && newest.serverSequence !== sequence) || newest.senderKind !== 'CUSTOMER') {
-        await this.complete(key, sequence, claim);
-        return;
+      if (typeof convo.globalIdentityId === 'string' && convo.globalIdentityId) {
+        scopeKeys['cc_identity'] = convo.globalIdentityId;
       }
 
-      // Reconhecimento do cliente habitual: confirme a assinatura antes de
-      // aproveitar o vÃ­nculo lembrado em um novo atendimento. Outro CPF
-      // escolhe um novo cadastro sem herdar contexto do titular anterior.
-      const recognitionKey = `ai.connectchat.recognition.${conversation.id}`;
-      const recognitionRaw = await this.settings.getValue(recognitionKey);
-      const recognition = recognitionRaw && typeof recognitionRaw === 'object'
-        && !Array.isArray(recognitionRaw) ? recognitionRaw as Record<string, unknown> : {};
-      const customerStart = typeof recognition.customerStartSequence === 'string'
-        && /^\d+$/.test(recognition.customerStartSequence)
-        ? BigInt(recognition.customerStartSequence) : null;
-      if (customerStart !== null) {
-        context.messages = context.messages.filter((m) => /^\d+$/.test(m.serverSequence)
-          && BigInt(m.serverSequence) >= customerStart);
-      }
-      const newDocument = extractSubscriberDocument(newest.body);
-      const linkedRef = context.conversation.customerRef;
-      const linkedMatch = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(linkedRef || '');
-      const normalizedReply = newest.body.trim().toLowerCase();
-      const affirmative = /^(?:sim|isso|isso mesmo|correto|Ã©|eh|Ã© sim|pode ser)[.!]?$/i.test(normalizedReply);
-      const negative = /^(?:nÃ£o|nao|nÃ£o Ã©|nao Ã©|outro|outra pessoa|outro cliente|nÃ£o Ã© esse|nao e esse)[.!]?$/i.test(normalizedReply);
-      const otherCustomerRequested = recognition.awaitingOther === true;
-      const correctionRequested = /\b(n[aÃ£]o (?:[eÃ©]|era|sou)|outr[oa] (?:cliente|pessoa|assinatura)|cliente errado|cadastro errado)\b/i
-        .test(newest.body.trim());
-      if (context.verified && linkedMatch && !newDocument
-        && (recognition.confirmed !== true || correctionRequested)) {
-        if (recognition.asked === true && affirmative && !otherCustomerRequested) {
-          await this.settings.set(recognitionKey, {
-            ...recognition, confirmed: true, awaitingOther: false,
-            at: new Date().toISOString(),
-          });
-          // A confirmaÃ§Ã£o do cadastro nÃ£o substitui o problema jÃ¡ relatado.
-          const intentKey = `ai.connectchat.identification_requested.${conversation.id}`;
-          const initial = await this.settings.getValue(intentKey);
-          const prior = initial && typeof initial === 'object' && !Array.isArray(initial)
-            ? initial as Record<string, unknown> : {};
-          if (typeof prior.reason === 'string' && prior.reason.trim()) {
-            await this.settings.set(intentKey, { ...prior, requested: true });
-          } else {
-            // "Sim" responde exclusivamente Ã  confirmaÃ§Ã£o da assinatura. Sem
-            // um motivo anterior para retomar, encerrar este turno aqui evita
-            // que a confirmaÃ§Ã£o seja reclassificada como assunto geral e caia
-            // no fallback genÃ©rico do modelo.
-            const customerName = await this.inbox.getLinkedCustomerName(context.conversation);
-            const reply = habitualCustomerConfirmed(customerName);
-            const token = createHash('sha256').update(
-              `newnet-recognized:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(
-              conversation.id, reply, `newnet-recognized-${token}`);
-            await this.complete(key, sequence, claim);
-            return;
-          }
-        } else if (negative || correctionRequested || otherCustomerRequested) {
-          await this.settings.set(recognitionKey, {
-            ...recognition, asked: true, confirmed: false, awaitingOther: true,
-          });
-          const reply = await this.replyWithOperationalEvidence(
-            agent, conversation, context.messages, newest.body,
-            { etapa: 'troca_de_cliente', pedir_documento: true },
-            'Certo, de qual assinatura vamos cuidar? Me informe o CPF ou CNPJ desse cliente.',
-          );
-          const msg = /\b(CPF|CNPJ)\b/i.test(reply) ? reply
-            : 'Tudo bem, me informe o CPF ou CNPJ do outro cliente para continuar.';
-          const token = createHash('sha256').update(
-            `newnet-other-customer:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, msg, `newnet-other-${token}`);
-          await this.complete(key, sequence, claim);
-          return;
-        } else {
-          const customerName = await this.inbox.getLinkedCustomerName(context.conversation);
-          if (customerName) {
-            await this.settings.set(recognitionKey, {
-              asked: true, confirmed: false, awaitingOther: false,
-            });
-            const previousReason = this.classifyRequest(newest.body, context.messages) !== 'GENERAL'
-              ? newest.body.slice(0, 500) : null;
-            if (previousReason) await this.settings.set(
-              `ai.connectchat.identification_requested.${conversation.id}`,
-              { requested: true, reason: previousReason },
-            );
-            const question = habitualCustomerQuestion(customerName, newest.body);
-            const token = createHash('sha256').update(
-              `newnet-recognize:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id,
-              question,
-              `newnet-recognize-${token}`);
-            await this.complete(key, sequence, claim);
-            return;
-          }
-          // Sem nome verificÃ¡vel, nÃ£o atribuir um cliente errado na saudaÃ§Ã£o.
-          await this.settings.set(recognitionKey, { confirmed: true });
-        }
-      }
-
-      // IDENTIFICAÃ‡ÃƒO OBRIGATÃ“RIA: nunca escolher diagnÃ³stico de fibra ou rÃ¡dio
-      // antes de confirmar o cliente no canal. Uma Ãºnica solicitaÃ§Ã£o por conversa;
-      // mensagens seguintes nÃ£o geram variaÃ§Ãµes repetidas da mesma pergunta.
-      if (!context.verified || (newDocument !== null && context.verified)) {
-        // CPF localiza cadastro; jamais comprova identidade nem vincula por si.
-        const pendingKey = `ai.connectchat.pending_identity.${conversation.id}`;
-        const existing = await this.settings.getValue(pendingKey);
-        const pending = existing && typeof existing === 'object' && !Array.isArray(existing)
-          ? existing as Record<string, unknown> : {};
-        const hasNewDocument = extractSubscriberDocument(newest.body) !== null;
-        // O CPF seleciona o cliente da sessÃ£o. NÃ£o existe mais pergunta
-        // Sim/NÃ£o sobre vÃ­nculo, nem uma espera que bloqueie o atendimento.
-        if (typeof pending['customerId'] === 'string' && !hasNewDocument) {
-          const connectionId = typeof pending['connectionId'] === 'string' ? pending['connectionId'] : '';
-          const customerId = pending['customerId'];
-          const operational = connectionId
-            ? await this.support.triageIdentifiedCustomer(connectionId, customerId)
-            : null;
-          const initialReason = typeof pending.reason === 'string' ? pending.reason : '';
-          const decision = operational ? await this.technicalCases.handleTurn({
-            conversationId: conversation.id,
-            customerScopeRef: `ixc:${connectionId}:${customerId}`,
-            connectionId,
-            customerId,
-            authenticatedScope: false,
-            reportedProblem: initialReason,
-            currentMessage: newest.body,
-            recentCustomerMessages: context.messages
-              .filter((message) => message.senderKind === 'CUSTOMER')
-              .slice(-50).map((message) => message.body),
-            customerSequence: sequence,
-            observation: this.support.observationFromIdentified(operational),
-          }) : null;
-          if (operational) {
-            await this.settings.set(pendingKey, { ...pending, operational });
-          }
-          if (decision) {
-            const reply = await this.replyWithOperationalEvidence(
-              agent, conversation, context.messages, newest.body,
-              { etapa: 'caso_tecnico', decisao: decision.kind, ...decision.facts },
-              decision.fallback,
-            );
-            const token = createHash('sha256').update(
-              `newnet-session-case:${conversation.id}:${sequence}:${decision.kind}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-session-case-${token}`);
-            if (decision.kind === 'RESOLVE_CASE') {
-              await this.closeResolvedConversation(conversation.id);
-            }
-            await this.complete(key, sequence, claim);
-            return;
-          }
-          const reply = await this.formulateUnlinkedContinuation(
-            agent, conversation, context.messages, newest.body,
-            initialReason, false,
-            operational ?? (pending.operational && typeof pending.operational === 'object' && !Array.isArray(pending.operational)
-              ? pending.operational as Record<string, unknown> : undefined),
-            pending.osResult && typeof pending.osResult === 'object' && !Array.isArray(pending.osResult)
-              ? pending.osResult as Record<string, unknown> : undefined,
-          );
-          const token = createHash('sha256').update(
-            `newnet-session-followup:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-session-followup-${token}`);
-          await this.complete(key, sequence, claim);
-          return;
-        }
-
-        const candidate = extractSubscriberDocument(newest.body);
-        if (candidate) {
-          // CPF/CNPJ Ã© dado de busca, mas a conversa nÃ£o pode virar
-          // um orÃ¡culo de enumeraÃ§Ã£o de cadastros do IXC.
-          const attemptsKey = `ai.connectchat.document_attempts.${conversation.id}`;
-          const attemptRaw = await this.settings.getValue(attemptsKey);
-          const attemptState = attemptRaw && typeof attemptRaw === 'object' && !Array.isArray(attemptRaw)
-            ? attemptRaw as Record<string, unknown> : {};
-          const startedAt = typeof attemptState.startedAt === 'number' ? attemptState.startedAt : 0;
-          const withinWindow = Date.now() - startedAt < 15 * 60 * 1000;
-          const count = withinWindow && typeof attemptState.count === 'number'
-            ? attemptState.count : 0;
-          if (count >= 5) {
-            const token = createHash('sha256').update(`newnet-doc-limit:${conversation.id}:${startedAt}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id,
-              'Por seguranÃ§a, nÃ£o posso fazer mais consultas de cadastro agora. Tente novamente daqui a alguns minutos.',
-              `newnet-doc-limit-${token}`);
-            await this.complete(key, sequence, claim);
-            return;
-          }
-          await this.settings.set(attemptsKey, {
-            startedAt: withinWindow ? startedAt : Date.now(), count: count + 1,
-          });
-          const found = await this.support.lookupDocument(candidate);
-          const token = createHash('sha256').update(`newnet-document:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-          if (found.status === 'FOUND' && found.customerId) {
-            const noticed = await this.settings.getValue(`ai.connectchat.identification_requested.${conversation.id}`);
-            const previous = noticed && typeof noticed === 'object' && !Array.isArray(noticed)
-              ? noticed as Record<string, unknown> : {};
-            // Preserva o motivo informado junto com o documento sem guardar
-            // CPF/CNPJ no contexto que mais tarde serÃ¡ enviado ao modelo.
-            const reasonWithoutDocument = newest.body.replace(candidate, '').trim().slice(0, 500);
-            const identifiedReason = typeof previous.reason === 'string' && previous.reason.trim()
-              ? previous.reason : reasonWithoutDocument;
-            // CPF informado pelo cliente escolhe o cadastro para esta sessÃ£o
-            // e associa a identidade do canal para facilitar novos contatos.
-            // NÃ£o perguntar sobre vÃ­nculo aqui.
-            let customerName: string | null = null;
-            let linked = false;
-            try {
-              const result = await this.inbox.autoLinkIdentifiedCustomer(
-                conversation.id, conversation.globalIdentityId || '',
-                sequence, found.connectionId!, found.customerId,
-              );
-              customerName = result.customerName;
-              linked = result.linked;
-            } catch (error) {
-              this.logger.warn(`NÃ£o foi possÃ­vel associar o cadastro encontrado: ${(error as Error).message}`);
-              // A indisponibilidade do vÃ­nculo nÃ£o impede a triagem operacional da sessÃ£o.
-            }
-            await this.settings.set(recognitionKey, {
-              asked: false, confirmed: linked, awaitingOther: false,
-              customerRef: `ixc:${found.connectionId}:${found.customerId}`,
-              customerStartSequence: sequence,
-              scopeId: randomUUID(),
-            });
-            await this.settings.set(pendingKey, {
-              customerId: found.customerId, connectionId: found.connectionId,
-              consent: false, requestedAt: new Date().toISOString(),
-              reason: identifiedReason,
-            });
-            const token = createHash('sha256')
-              .update(`newnet-document:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            const receipt = await this.replyWithOperationalEvidence(
-              agent, conversation, context.messages, newest.body,
-              { etapa: 'cadastro_localizado', nome: customerName, proxima_acao: 'investigar_conexao' },
-              customerName
-                ? `Localizei o cadastro de ${customerName}. Vou analisar a situaÃ§Ã£o da conexÃ£o.`
-                : 'Localizei o cadastro. Vou analisar a situaÃ§Ã£o da conexÃ£o.',
-            );
-            await this.inbox.sendAgentMessage(conversation.id, receipt, `newnet-document-${token}`);
-            await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
-            let operational: Awaited<ReturnType<ConnectchatSupportContextService['triageIdentifiedCustomer']>>;
-            try {
-              operational = await this.support.triageIdentifiedCustomer(found.connectionId!, found.customerId);
-            } finally {
-              await this.inbox.setAgentTyping(conversation.id, 'stopped').catch(() => undefined);
-            }
-            const osResult = await this.maybeOpenSessionOfflineOs(
-              agent, conversation, candidate, found.connectionId!,
-              found.customerId, identifiedReason, operational,
-            );
-            await this.settings.set(pendingKey, {
-              customerId: found.customerId, connectionId: found.connectionId,
-              consent: false, requestedAt: new Date().toISOString(),
-              reason: identifiedReason, operational, osResult,
-            });
-            const decision = await this.technicalCases.handleTurn({
-              conversationId: conversation.id,
-              customerScopeRef: `ixc:${found.connectionId}:${found.customerId}`,
-              connectionId: found.connectionId!,
-              customerId: found.customerId,
-              authenticatedScope: linked,
-              reportedProblem: identifiedReason,
-              currentMessage: newest.body,
-              recentCustomerMessages: context.messages
-                .filter((message) => message.senderKind === 'CUSTOMER')
-                .slice(-50).map((message) => message.body),
-              customerSequence: sequence,
-              observation: this.support.observationFromIdentified(operational),
-            });
-            const outcome = decision
-              ? await this.replyWithOperationalEvidence(
-                agent, conversation, context.messages, newest.body,
-                { etapa: 'caso_tecnico', decisao: decision.kind, ...decision.facts },
-                decision.fallback,
-              )
-              : await this.formulateUnlinkedContinuation(
-                agent, conversation, context.messages, newest.body,
-                identifiedReason, false, operational, osResult || undefined,
-              );
-            const outcomeToken = createHash('sha256').update(
-              `newnet-diagnosis:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, outcome, `newnet-diagnosis-${outcomeToken}`);
-            if (decision?.kind === 'RESOLVE_CASE') {
-              await this.closeResolvedConversation(conversation.id);
-            }
-          } else {
-            const fallback = found.status === 'UNAVAILABLE'
-              ? 'NÃ£o consegui acessar o cadastro agora. Podemos tentar novamente em instantes?'
-              : 'NÃ£o encontrei esse CPF ou CNPJ no cadastro. Pode conferir os nÃºmeros e me enviar novamente?';
-            const text = await this.replyWithOperationalEvidence(
-              agent, conversation, context.messages, newest.body,
-              { etapa: 'documento_nao_localizado', consulta: found.status, solicitar_conferencia: true },
-              fallback,
-            );
-            const safeText = /\b(CPF|CNPJ|n[uÃº]meros|dados)\b/i.test(text) ? text : fallback;
-            await this.inbox.sendAgentMessage(conversation.id, safeText, `newnet-document-${token}`);
-          }
-        } else {
-          // Motivo e CPF sÃ£o duas etapas diferentes. "Oi" pede o motivo;
-          // "estou sem internet" aproveita o motivo e pede CPF diretamente.
-          const greetKey = `ai.connectchat.greeting.${conversation.id}`;
-          const noticeKey = `ai.connectchat.identification_requested.${conversation.id}`;
-          const greeted = !!(await this.settings.getValue(greetKey));
-          const isGreetingOnly = /^(oi+|ol[aÃ¡]|bom dia|boa tarde|boa noite|opa|hello)[!., ]*$/i.test(newest.body.trim());
-          const priorNotice = await this.settings.getValue(noticeKey);
-          const noticed = priorNotice && typeof priorNotice === 'object' && !Array.isArray(priorNotice)
-            ? priorNotice as Record<string, unknown> : {};
-          const waitingForDocument = noticed.requested === true;
-          // Cada nova mensagem do cliente gera UMA resposta, inclusive
-          // "oi" quando jÃ¡ hÃ¡ uma identificaÃ§Ã£o pendente. NÃ£o depende de
-          // excluir a conversa ou apagar a chave da pergunta anterior.
-          const step = waitingForDocument ? 'FOLLOW_UP' as const
-            : isGreetingOnly ? (greeted ? 'REOPENING' as const : 'OPENING' as const)
-              : 'IDENTIFICATION' as const;
-          const reply = await this.formulateIdentificationReply(
-            agent, conversation, context.messages, newest.body, step);
-          const token = createHash('sha256').update(
-            `newnet-identification:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-identification-${token}`);
-          if (!waitingForDocument && step === 'IDENTIFICATION') {
-            await this.settings.set(noticeKey, {
-              requested: true, reason: newest.body.slice(0, 500),
-            });
-          }
-          if (!greeted) await this.settings.set(greetKey, { sent: true });
-        }
-        await this.complete(key, sequence, claim);
-        return;
-      }
-
-      // Respostas curtas a perguntas tÃ©cnicas (fibra, rÃ¡dio, nÃºmero do ponto,
-      // sim/nÃ£o) pertencem Ã  triagem anterior, nÃ£o sÃ£o uma nova saudaÃ§Ã£o.
-      const normalizedAnswer = newest.body.trim().toLowerCase();
-      const isShortReply = /^(?:[1-8][.)]?|fibra(?: Ã³ptica)?|radio|rÃ¡dio|nÃ£o sei|nao sei|sim|nÃ£o|nao)[.!]?$/i.test(normalizedAnswer);
-      const techAsked = await this.settings.getValue(`ai.connectchat.technology_requested.${conversation.id}`);
-      const contractAsked = await this.settings.getValue(`ai.connectchat.contract_requested.${conversation.id}`);
-      const savedReason = await this.settings.getValue(`ai.connectchat.identification_requested.${conversation.id}`);
-      const reason = savedReason && typeof savedReason === 'object' && !Array.isArray(savedReason)
-        ? String((savedReason as Record<string, unknown>).reason ?? '') : '';
-      const priorIntent = this.classifyRequest(reason, context.messages);
-      const intent = isShortReply && (techAsked || contractAsked || priorIntent === 'SUPPORT')
-        ? 'SUPPORT' as const
-        : this.classifyRequest(newest.body, context.messages);
-      // Um cliente jÃ¡ vinculado que diga "oi" ou peÃ§a segunda via nÃ£o deve
-      // receber perguntas sobre ONU, rÃ¡dio, fibra ou OS de suporte.
-      if (shouldInterruptTechnicalExperiment(intent)) {
-        await this.technicalCases.interruptForTopicChange(conversation.id, intent);
-        if (intent === 'FINANCE') {
-          // NÃ£o entregar tÃ­tulos financeiros espontaneamente quando o
-          // assinante sÃ³ informou ter pago ou perguntou sobre um assunto geral.
-          const paymentCopyRequested = /\b(boleto|fatura|segunda via|2[Âªa]? via|linha digit[aÃ¡]vel|c[oÃ³]digo de barras|pix|t[iÃ­]tulos? em aberto|contas? a pagar)\b/i.test(newest.body);
-          if (!paymentCopyRequested) {
-            const reply = 'Sobre o financeiro, vocÃª precisa da segunda via de uma fatura, do PIX para pagamento ou de ajuda com um pagamento jÃ¡ realizado?';
-            const token = createHash('sha256').update(`newnet-finance-clarify:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-finance-clarify-${token}`);
-            await this.complete(key, sequence, claim);
-            return;
-          }
-          // Consulta determinÃ­stica, restrita Ã  referÃªncia verificada,
-          // sem ferramenta executÃ¡vel ou CPF controlado pelo modelo.
-          const billing = await this.support.billingForVerifiedConversation(context.conversation);
-          const latest = await this.inbox.contextForAgentPreview(conversation.id);
-          if (!latest.verified || latest.conversation.customerRef !== context.conversation.customerRef
-            || latest.conversation.globalIdentityId !== context.conversation.globalIdentityId
-            || latest.conversation.lastSequence !== sequence || latest.conversation.status !== 'OPEN') {
-            await this.complete(key, sequence, claim);
-            return;
-          }
-          const answer = billing.available
-            ? formatVerifiedInvoices(billing.invoices, billing.total)
-            : 'NÃ£o consegui consultar seus tÃ­tulos neste momento. Nenhum dado de pagamento foi alterado.';
-          const token = createHash('sha256').update(`newnet-billing:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, answer, `newnet-billing-${token}`);
-          await this.complete(key, sequence, claim);
-          return;
-        }
-        const history = context.messages.filter((m) => typeof m.body === 'string' && m.body.trim())
-          .slice(-25, -1).map((m) => ({
-            role: (m.senderKind === 'CUSTOMER' ? 'user' : 'assistant') as 'user' | 'assistant',
-            content: redactSubscriberDocuments(m.body).slice(0, 4000),
-          }));
-        const instructions = [
-          'VocÃª Ã© a Nete, assistente da Newnet. Responda em uma Ãºnica mensagem curta.',
-          'O cliente jÃ¡ estÃ¡ vinculado com seguranÃ§a. NÃ£o peÃ§a CPF novamente.',
-          'Se o motivo ainda nÃ£o foi informado, pergunte de forma breve em que pode ajudar. NÃ£o inicie diagnÃ³stico tÃ©cnico.',
-          'NÃ£o execute ferramentas, nÃ£o prometa operaÃ§Ãµes e nÃ£o repita perguntas respondidas.',
-        ].join('\n');
-        const result = await this.runner.run({
-          agentId: agent.id, input: redactSubscriberDocuments(newest.body).slice(0, 8000), history,
-          createdBy: null, scopeKeys: { connectchat_conversation: await this.aiContextScope(conversation.id) },
-          allowedToolsOverride: [], channelInstructions: instructions, dryRun: false,
-        });
-        const message = result.status === 'COMPLETED' && typeof result.output === 'string'
-          ? result.output.trim() : '';
-        // Falha ou eco do modelo nÃ£o pode transformar uma nova mensagem
-        // do assinante em um turno sem resposta.
-        const reply = !message || this.isRepeat(message, context.messages)
-          ? 'Estou aqui. Pode me contar o que vocÃª precisa agora?'
-          : message;
-        // A inferÃªncia pode demorar; revalidar vÃ­nculo antes de enviar.
-        const fresh = await this.inbox.contextForAgentPreview(conversation.id);
-        if (!fresh.verified || fresh.conversation.status !== 'OPEN'
-          || fresh.conversation.lastSequence !== sequence
-          || fresh.conversation.customerRef !== context.conversation.customerRef
-          || fresh.conversation.globalIdentityId !== context.conversation.globalIdentityId) {
-          await this.complete(key, sequence, claim);
-          return;
-        }
-        const token = createHash('sha256').update(`newnet-general:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(conversation.id, reply, `newnet-general-${token}`);
-        await this.complete(key, sequence, claim);
-        return;
-      }
-
-      // Verifica pendÃªncias e recorrÃªncia ANTES de escolher equipamento.
-      // A evidÃªncia vem exclusivamente do cliente vinculado pelo ConnectChat.
       await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
-      let support: Awaited<ReturnType<ConnectchatSupportContextService['byVerifiedConversation']>>;
-      try {
-        support = await this.support.byVerifiedConversation(
-          context.conversation, reason || newest.body);
-      } finally {
-        await this.inbox.setAgentTyping(conversation.id, 'stopped').catch(() => undefined);
-      }
-      if (!support.available) {
-        const note = 'Seu cadastro estÃ¡ confirmado, mas nÃ£o consegui consultar a situaÃ§Ã£o dos atendimentos agora. Vou precisar do apoio da equipe para continuar com seguranÃ§a.';
-        const token = createHash('sha256').update(`newnet-support-unavailable:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(conversation.id, note, `newnet-support-unavailable-${token}`);
-        await this.complete(key, sequence, claim);
-        return;
-      }
-      const initialGovernance = decideTechnicalGovernance({
-        sourceStatus: support.sourceStatus,
-        openOs: support.openOs.length,
-        openTickets: support.openTickets.length,
-        uncertainTickets: support.uncertainTickets,
-        suppressingIncidents: support.connections.length <= 1
-          ? support.incidents.filter((item) => item.suppress_os).length : 0,
-        blockedContracts: support.blockedContracts,
-        contractCount: support.contracts.length,
-        accessCount: support.connections.length,
-        contractSelected: support.contracts.length <= 1,
-        accessSelected: support.connections.length <= 1,
-        selectedAccessOnline: support.connections.length === 1
-          ? support.connections[0]?.['online'] === true ? true
-            : support.connections[0]?.['online'] === false ? false : null
-          : null,
-        recurrentWithin48h: support.historyAnalysis.recurrentWithin48h,
-        documentedPriorResolution: support.historyAnalysis.previousResolutionHints.length > 0,
-      });
-      const priorReasonSetting = await this.settings.getValue(
-        `ai.connectchat.identification_requested.${conversation.id}`);
-      const priorReasonData = priorReasonSetting && typeof priorReasonSetting === 'object'
-        && !Array.isArray(priorReasonSetting)
-        ? priorReasonSetting as Record<string, unknown> : {};
-      const supportReason = typeof priorReasonData['reason'] === 'string'
-        ? priorReasonData['reason'] : newest.body;
-      const verifiedScope = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(
-        context.conversation.customerRef || '');
-      if (verifiedScope) {
-        await this.technicalCases.recordVerifiedInvestigation({
-          conversationId: conversation.id,
-          customerScopeRef: context.conversation.customerRef!,
-          connectionId: verifiedScope[1],
-          customerId: verifiedScope[2],
-          reportedProblem: supportReason,
-          customerSequence: sequence,
-          sourceStatus: support.sourceStatus,
-          openOs: support.openOs,
-          recentOs: support.recentOs,
-          recentTickets: support.recentTickets,
-          incidents: support.incidents.map((item) => ({
-            incident_id: item.incident_id,
-            suppress_os: item.suppress_os,
-            inform_forecast: item.inform_forecast,
-          })),
-          contracts: support.contracts,
-          connections: support.connections,
-          blockedContracts: support.blockedContracts,
-          historyAnalysis: support.historyAnalysis,
+      const result = await this.runner
+        .run({
+          agentId: agent.id,
+          input: newest.body.slice(0, 8000),
+          history,
+          createdBy: null,
+          scopeKeys,
+          channelInstructions: this.channelPolicy(context.verified),
+          dryRun: false,
+        })
+        .finally(() => {
+          void this.inbox.setAgentTyping(conversation.id, 'stopped').catch(() => undefined);
         });
-      }
-      if (initialGovernance.action === 'MONITOR_EXISTING_OS') {
-        await this.technicalCases.recordGovernedAction(
-          conversation.id, 'MONITOR_EXISTING_OS',
-          'ESCALATED', 'Acompanhar a OS jÃ¡ existente sem duplicar atendimento.',
-          { openOs: support.openOs.length });
-        const open = support.openOs[0];
-        const osRef = String(open['id'] ?? open['protocolo'] ?? 'active');
-        const protocol = typeof open['protocolo'] === 'string' && open['protocolo']
-          ? ` (protocolo ${open['protocolo']})` : '';
-        const message = await this.replyWithOperationalEvidence(
-          agent, conversation, context.messages, newest.body,
-          { etapa: 'os_ja_aberta', protocolo: typeof open['protocolo'] === 'string' ? open['protocolo'] : null },
-          `JÃ¡ hÃ¡ uma OS em andamento${protocol}. Vou manter o atendimento nela para evitar duplicidade.`,
-        );
-        const token = createHash('sha256').update(`newnet-open-os:${conversation.id}:${osRef}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(conversation.id, message, `newnet-open-os-${token}`);
+
+      // A inferência pode demorar: revalida a conversa antes de enviar.
+      const fresh = await this.inbox.contextForAgentPreview(conversation.id);
+      if (fresh.conversation.status !== 'OPEN' || fresh.conversation.lastSequence !== sequence) {
         await this.complete(key, sequence, claim);
         return;
       }
 
-      const outage = support.incidents.find((item) => item.suppress_os);
-      if (initialGovernance.action === 'MONITOR_NETWORK_INCIDENT' && outage) {
-        await this.technicalCases.recordGovernedAction(
-          conversation.id, 'MONITOR_NETWORK_INCIDENT',
-          'ESCALATED', 'Aguardar o tratamento do incidente de rede; OS suprimida.',
-          { incidentRef: outage.incident_id, suppressOs: true });
-        const publicInfo = String(outage.message || outage.title || 'HÃ¡ uma ocorrÃªncia tÃ©cnica registrada para seu acesso.').slice(0, 350);
-        const forecast = outage.inform_forecast && outage.forecast
-          ? ` PrevisÃ£o informada pela equipe: ${String(outage.forecast).slice(0, 100)}.` : '';
-        const message = await this.replyWithOperationalEvidence(
-          agent, conversation, context.messages, newest.body,
-          { etapa: 'incidente_regional', informativo: publicInfo, previsao_autorizada: forecast || null, os_suprimida: true },
-          `HÃ¡ uma ocorrÃªncia tÃ©cnica em andamento que pode afetar sua conexÃ£o. ${publicInfo}${forecast} Nossa equipe estÃ¡ tratando a situaÃ§Ã£o.`,
-        );
-        const token = createHash('sha256').update(`newnet-incident:${conversation.id}:${outage.incident_id}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(conversation.id, message, `newnet-incident-${token}`);
-        await this.complete(key, sequence, claim);
-        return;
-      }
-
-      if (initialGovernance.action === 'MONITOR_EXISTING_TICKET') {
-        await this.technicalCases.recordGovernedAction(
-          conversation.id, 'BLOCK_DUPLICATE_TICKET',
-          'ESCALATED', 'Confirmar o atendimento existente ou a disponibilidade do histÃ³rico.',
-          { openTickets: support.openTickets.length, historyAvailable: support.sourceStatus.recentTickets === 'AVAILABLE' });
-        const historyUnavailable = support.sourceStatus.recentTickets === 'UNAVAILABLE';
-        const message = await this.replyWithOperationalEvidence(
-          agent, conversation, context.messages, newest.body,
-          { etapa: support.openTickets.length ? 'chamado_existente'
-            : historyUnavailable ? 'historico_indisponivel' : 'chamado_status_incerto', os_duplicada_bloqueada: true },
-          support.openTickets.length > 0
-            ? 'JÃ¡ existe um chamado em andamento. Vou evitar abrir outro para o mesmo problema.'
-            : historyUnavailable
-              ? 'NÃ£o consegui confirmar o histÃ³rico de chamados agora. Para evitar duplicidade, nÃ£o vou abrir outro atendimento sem essa verificaÃ§Ã£o.'
-              : 'Encontrei um atendimento recente que precisa de confirmaÃ§Ã£o antes de abrir outro.',
-        );
-        const token = createHash('sha256').update(`newnet-ticket-check:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(conversation.id, message, `newnet-ticket-check-${token}`);
-        await this.complete(key, sequence, claim);
-        return;
-      }
-
-      if (initialGovernance.action === 'ROUTE_ADMINISTRATIVE_RESTRICTION') {
-        await this.technicalCases.recordGovernedAction(
-          conversation.id, 'ROUTE_ADMINISTRATIVE_RESTRICTION',
-          'ESCALATED', 'Tratar a restriÃ§Ã£o administrativa antes de continuar o diagnÃ³stico tÃ©cnico.',
-          { blockedContracts: support.blockedContracts, privateFinancialDetailsExposed: false });
-        const message = await this.replyWithOperationalEvidence(
-          agent, conversation, context.messages, newest.body,
-          {
-            etapa: 'restricao_administrativa',
-            restricao_confirmada: true,
-            detalhes_financeiros_autorizados: false,
-          },
-          'Identifiquei uma restriÃ§Ã£o administrativa que pode impedir o acesso. Primeiro precisamos tratar essa situaÃ§Ã£o; nÃ£o vou expor valores ou dados financeiros sem uma solicitaÃ§Ã£o especÃ­fica.',
-        );
-        const token = createHash('sha256').update(
-          `newnet-administrative-restriction:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(
-          conversation.id, message, `newnet-administrative-restriction-${token}`);
-        await this.complete(key, sequence, claim);
-        return;
-      }
-
-      // O cliente pode ter mais de uma residÃªncia/ponto instalado. NÃ£o escolher
-      // automaticamente qual serviÃ§o diagnosticar. A escolha fica vinculada ao
-      // customerRef verificado para evitar reaproveitamento em outro cadastro.
-      let selectedContractId: string | null = null;
-      if (support.contracts.length > 1) {
-        const selectionKey = `ai.connectchat.selected_contract.${conversation.id}`;
-        const savedRaw = await this.settings.getValue(selectionKey);
-        const saved = savedRaw && typeof savedRaw === 'object' && !Array.isArray(savedRaw)
-          ? savedRaw as Record<string, unknown> : {};
-        const valid = saved.customerRef === context.conversation.customerRef
-          && support.contracts.some((item) => String(item['id']) === saved.contractId);
-        if (valid) {
-          selectedContractId = String(saved.contractId);
-        } else {
-          const number = /^([1-8])\s*[.)]?$/.exec(newest.body.trim());
-          const option = number ? support.contracts[Number(number[1]) - 1] : undefined;
-          if (option && /^[1-9]\d*$/.test(String(option['id'] ?? ''))) {
-            selectedContractId = String(option['id']);
-            await this.settings.set(selectionKey, {
-              contractId: selectedContractId, customerRef: context.conversation.customerRef,
-            });
-          } else {
-            const askKey = `ai.connectchat.contract_requested.${conversation.id}`;
-            const asked = await this.settings.getValue(askKey);
-            const options = support.contracts.slice(0, 8)
-              .map((item, index) => `${index + 1}. ${String(item['plano'] || 'ServiÃ§o')} (contrato ${String(item['id'])})`)
-              .join('\n');
-            const text = asked
-              ? `Para continuar o suporte, escolha o nÃºmero de um destes serviÃ§os:\n${options}`
-              : `Encontrei mais de um serviÃ§o ativo. Qual deles precisa de suporte? Responda com o nÃºmero:\n${options}`;
-            const token = createHash('sha256').update(`newnet-pick-contract:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(conversation.id, text, `newnet-pick-contract-${token}`);
-            if (!asked) await this.settings.set(askKey, { requested: true });
-            await this.complete(key, sequence, claim);
-            return;
-          }
-        }
-      } else if (support.contracts.length === 1) {
-        selectedContractId = String(support.contracts[0]['id'] || '');
-      }
-
-      const contractConnections = selectedContractId
-        ? support.connections.filter((item) => String(item['id_contrato'] ?? '') === selectedContractId)
-        : support.connections;
-      let selectedAccessRef: string | null = null;
-      if (contractConnections.length > 1) {
-        const selectionKey = `ai.connectchat.selected_access.${conversation.id}`;
-        const savedRaw = await this.settings.getValue(selectionKey);
-        const saved = savedRaw && typeof savedRaw === 'object' && !Array.isArray(savedRaw)
-          ? savedRaw as Record<string, unknown> : {};
-        const valid = saved.customerRef === context.conversation.customerRef
-          && contractConnections.some((item) => item['access_ref'] === saved.accessRef);
-        if (valid) {
-          selectedAccessRef = String(saved.accessRef);
-        } else {
-          const number = /^([1-8])\s*[.)]?$/.exec(newest.body.trim());
-          const option = number ? contractConnections[Number(number[1]) - 1] : undefined;
-          if (option && typeof option['access_ref'] === 'string' && option['access_ref']) {
-            selectedAccessRef = option['access_ref'];
-            await this.settings.set(selectionKey, {
-              accessRef: selectedAccessRef,
-              customerRef: context.conversation.customerRef,
-            });
-          } else {
-            const options = contractConnections.slice(0, 8).map((item, index) => {
-              const reference = typeof item['referencia'] === 'string' && item['referencia']
-                ? item['referencia'] : `ponto ${index + 1}`;
-              return `${index + 1}. ${reference}`;
-            }).join('\n');
-            await this.technicalCases.recordGovernedAction(
-              conversation.id, 'REQUEST_ACCESS_SELECTION',
-              'WAITING_CUSTOMER', 'Aguardar o cliente selecionar o acesso afetado.',
-              { pendingQuestion: 'Qual ponto de acesso estÃ¡ com problema?', options: contractConnections.length });
-            const token = createHash('sha256').update(
-              `newnet-pick-access:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-            await this.inbox.sendAgentMessage(
-              conversation.id,
-              `Este serviÃ§o possui mais de um ponto de acesso. Qual estÃ¡ com problema? Responda com o nÃºmero:\n${options}`,
-              `newnet-pick-access-${token}`,
-            );
-            await this.complete(key, sequence, claim);
-            return;
-          }
-        }
-      } else if (contractConnections.length === 1
-        && typeof contractConnections[0]['access_ref'] === 'string') {
-        selectedAccessRef = contractConnections[0]['access_ref'];
-      }
-
-      const selectedConnection = selectedAccessRef
-        ? contractConnections.find((item) => item['access_ref'] === selectedAccessRef)
-        : contractConnections.length === 1 ? contractConnections[0] : undefined;
-      const selectedContract = selectedContractId
-        ? support.contracts.find((item) => String(item['id'] ?? '') === selectedContractId)
-        : support.contracts.length === 1 ? support.contracts[0] : undefined;
-      const selectedBlockedContracts = selectedContract
-        ? (() => {
-          const state = String(selectedContract['status_internet'] ?? '').trim().toUpperCase();
-          return state && state !== 'A' ? 1 : 0;
-        })()
-        : support.blockedContracts;
-      const selectedIncidentLookup = selectedAccessRef
-        ? await this.support.incidentsForSelectedAccess(selectedAccessRef)
-        : { available: support.sourceStatus.incidents === 'AVAILABLE', incidents: support.incidents };
-      const scopedSupport = {
-        ...support,
-        contracts: selectedContract ? [selectedContract] : support.contracts,
-        connections: selectedConnection ? [selectedConnection] : contractConnections,
-        incidents: selectedIncidentLookup.incidents,
-        sourceStatus: {
-          ...support.sourceStatus,
-          incidents: selectedIncidentLookup.available ? 'AVAILABLE' as const : 'UNAVAILABLE' as const,
-        },
-      };
-      const scopedGovernance = decideTechnicalGovernance({
-        sourceStatus: scopedSupport.sourceStatus,
-        openOs: support.openOs.length,
-        openTickets: support.openTickets.length,
-        uncertainTickets: support.uncertainTickets,
-        suppressingIncidents: scopedSupport.incidents.filter((item) => item.suppress_os).length,
-        blockedContracts: selectedBlockedContracts,
-        contractCount: support.contracts.length,
-        accessCount: contractConnections.length,
-        contractSelected: !!selectedContract,
-        accessSelected: !!selectedConnection,
-        selectedAccessOnline: selectedConnection?.['online'] === true ? true
-          : selectedConnection?.['online'] === false ? false : null,
-        recurrentWithin48h: support.historyAnalysis.recurrentWithin48h,
-        documentedPriorResolution: support.historyAnalysis.previousResolutionHints.length > 0,
-      });
-
-      if (verifiedScope) {
-        await this.technicalCases.recordVerifiedInvestigation({
-          conversationId: conversation.id,
-          customerScopeRef: context.conversation.customerRef!,
-          connectionId: verifiedScope[1],
-          customerId: verifiedScope[2],
-          reportedProblem: supportReason,
-          customerSequence: sequence,
-          sourceStatus: scopedSupport.sourceStatus,
-          openOs: support.openOs,
-          recentOs: support.recentOs,
-          recentTickets: support.recentTickets,
-          incidents: scopedSupport.incidents.map((item) => ({
-            incident_id: item.incident_id,
-            suppress_os: item.suppress_os,
-            inform_forecast: item.inform_forecast,
-          })),
-          contracts: support.contracts,
-          connections: support.connections,
-          blockedContracts: support.blockedContracts,
-          historyAnalysis: support.historyAnalysis,
-          selectedContractRef: selectedContractId,
-          selectedAccessRef: selectedAccessRef
-            ? createHash('sha256').update(`access:${selectedAccessRef.toLowerCase()}`).digest('hex') : null,
-        });
-      }
-
-      const scopedOutage = scopedSupport.incidents.find((item) => item.suppress_os);
-      if (scopedGovernance.action === 'MONITOR_NETWORK_INCIDENT' && scopedOutage) {
-        await this.technicalCases.recordGovernedAction(
-          conversation.id, 'MONITOR_NETWORK_INCIDENT',
-          'ESCALATED', 'Aguardar o tratamento do incidente do acesso selecionado; OS suprimida.',
-          { incidentRef: scopedOutage.incident_id, suppressOs: true });
-        const publicInfo = String(scopedOutage.message || scopedOutage.title
-          || 'HÃ¡ uma ocorrÃªncia tÃ©cnica registrada para seu acesso.').slice(0, 350);
-        const forecast = scopedOutage.inform_forecast && scopedOutage.forecast
-          ? ` PrevisÃ£o informada pela equipe: ${String(scopedOutage.forecast).slice(0, 100)}.` : '';
-        const message = await this.replyWithOperationalEvidence(
-          agent, conversation, context.messages, newest.body,
-          { etapa: 'incidente_regional', informativo: publicInfo, previsao_autorizada: forecast || null, os_suprimida: true },
-          `HÃ¡ uma ocorrÃªncia tÃ©cnica em andamento que pode afetar esse acesso. ${publicInfo}${forecast} Nossa equipe estÃ¡ tratando a situaÃ§Ã£o.`,
-        );
-        const token = createHash('sha256').update(
-          `newnet-scoped-incident:${conversation.id}:${scopedOutage.incident_id}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(
-          conversation.id, message, `newnet-scoped-incident-${token}`);
-        await this.complete(key, sequence, claim);
-        return;
-      }
-
-      if (scopedGovernance.action === 'ROUTE_ADMINISTRATIVE_RESTRICTION') {
-        await this.technicalCases.recordGovernedAction(
-          conversation.id, 'ROUTE_ADMINISTRATIVE_RESTRICTION',
-          'ESCALATED', 'Tratar a restriÃ§Ã£o administrativa do serviÃ§o selecionado antes do diagnÃ³stico tÃ©cnico.',
-          { blockedContracts: selectedBlockedContracts, privateFinancialDetailsExposed: false });
-        const message = await this.replyWithOperationalEvidence(
-          agent, conversation, context.messages, newest.body,
-          {
-            etapa: 'restricao_administrativa',
-            restricao_confirmada: true,
-            detalhes_financeiros_autorizados: false,
-          },
-          'Identifiquei uma restriÃ§Ã£o administrativa nesse serviÃ§o que pode impedir o acesso. Primeiro precisamos tratar essa situaÃ§Ã£o; nÃ£o vou expor valores ou dados financeiros sem uma solicitaÃ§Ã£o especÃ­fica.',
-        );
-        const token = createHash('sha256').update(
-          `newnet-scoped-administrative-restriction:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(
-          conversation.id, message, `newnet-scoped-administrative-restriction-${token}`);
-        await this.complete(key, sequence, claim);
-        return;
-      }
-
-      if (scopedGovernance.action === 'ESCALATE_RECURRENT_FAILURE') {
-        const recurrence = support.historyAnalysis.similarCases[0];
-        const recurrenceAttempt = await this.maybeOpenVerifiedOfflineOs(
-          agent, conversation, context.messages, supportReason, scopedSupport, true,
-          { login: selectedAccessRef ?? undefined, contract: selectedContractId ?? undefined },
-          `Falha recorrente correlacionada ao atendimento ${recurrence?.reference ?? 'recente'}. `
-            + `SoluÃ§Ã£o anterior documentada: ${support.historyAnalysis.previousResolutionHints[0]}.`,
-        );
-        if (recurrenceAttempt.attempted && recurrenceAttempt.result) {
-          const opened = recurrenceAttempt.result['os_aberta'] === true;
-          await this.technicalCases.recordGovernedAction(
-            conversation.id, opened ? 'OPEN_OS_FOR_RECURRENT_FAILURE' : 'RECURRENT_FAILURE_NOT_OPENED',
-            'ESCALATED', opened
-              ? 'Acompanhar a nova OS aberta com o histÃ³rico correlacionado.'
-              : 'Encaminhar a reincidÃªncia com o histÃ³rico correlacionado para avaliaÃ§Ã£o.',
-            {
-              priorReference: recurrence?.reference ?? null,
-              previousResolutionKnown: true,
-              osOpened: opened,
-            });
-          const message = opened
-            ? 'Esse problema Ã© compatÃ­vel com uma ocorrÃªncia recente jÃ¡ tratada. Registrei uma nova ordem de serviÃ§o com o histÃ³rico anterior para a equipe nÃ£o reiniciar a investigaÃ§Ã£o do zero.'
-            : 'Esse problema Ã© compatÃ­vel com uma ocorrÃªncia recente jÃ¡ tratada. Registrei a reincidÃªncia e o resultado anterior no caso, mas nÃ£o vou afirmar uma nova OS sem confirmaÃ§Ã£o do sistema.';
-          const token = createHash('sha256').update(
-            `newnet-recurrence:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(conversation.id, message, `newnet-recurrence-${token}`);
-          await this.pauseForHuman(
-            conversation,
-            opened ? 'ReincidÃªncia com nova OS confirmada.' : 'ReincidÃªncia exige avaliaÃ§Ã£o humana.',
-          );
-          await this.complete(key, sequence, claim);
-          return;
-        }
-      }
-
-      if (verifiedScope) {
-        const decision = await this.technicalCases.handleTurn({
-          conversationId: conversation.id,
-          customerScopeRef: context.conversation.customerRef!,
-          connectionId: verifiedScope[1],
-          customerId: verifiedScope[2],
-          authenticatedScope: true,
-          reportedProblem: supportReason,
-          currentMessage: newest.body,
-          recentCustomerMessages: context.messages
-            .filter((message) => message.senderKind === 'CUSTOMER')
-            .slice(-50).map((message) => message.body),
-          customerSequence: sequence,
-          observation: this.support.observationFromVerified(scopedSupport),
-          selectedContractRef: selectedContractId,
-          selectedAccessRef,
-        });
-        if (decision) {
-          const diagnosticOs = decision.kind === 'ESCALATE_CASE'
-            ? await this.maybeOpenVerifiedOfflineOs(
-              agent, conversation, context.messages, supportReason, scopedSupport, true,
-              { login: selectedAccessRef ?? undefined, contract: selectedContractId ?? undefined })
-            : { attempted: false, result: null };
-          const osOpened = diagnosticOs.result?.['os_aberta'] === true;
-          const fallback = osOpened
-            ? 'O teste confirmou que a sessÃ£o voltou, mas a navegaÃ§Ã£o nÃ£o. Registrei uma ordem de serviÃ§o com essas evidÃªncias para a equipe tÃ©cnica.'
-            : decision.fallback;
-          const response = await this.replyWithOperationalEvidence(
-            agent, conversation, context.messages, newest.body,
-            {
-              etapa: 'caso_tecnico', decisao: decision.kind, ...decision.facts,
-              abertura_os: diagnosticOs.attempted ? {
-                confirmada: osOpened,
-                motivo: String(diagnosticOs.result?.['motivo'] ?? '').slice(0, 200),
-              } : null,
-            },
-            fallback,
-          );
-          const token = createHash('sha256').update(
-            `newnet-technical-case-scoped:${conversation.id}:${sequence}:${decision.kind}`).digest('hex').slice(0, 32);
-          await this.inbox.sendAgentMessage(
-            conversation.id, response, `newnet-technical-case-scoped-${token}`);
-          if (decision.kind === 'RESOLVE_CASE') {
-            await this.closeResolvedConversation(conversation.id);
-          } else if (decision.kind === 'ESCALATE_CASE') {
-            await this.pauseForHuman(conversation, 'Experimento concluÃ­do sem restabelecer a navegaÃ§Ã£o.');
-          }
-          await this.complete(key, sequence, claim);
-          return;
-        }
-      }
-
-      const scopedOsAttempt = scopedGovernance.action === 'OPEN_OS_FOR_OFFLINE_ACCESS'
-        ? await this.maybeOpenVerifiedOfflineOs(
-          agent, conversation, context.messages, supportReason, scopedSupport, false,
-          { login: selectedAccessRef ?? undefined, contract: selectedContractId ?? undefined })
-        : { attempted: false, result: null };
-      if (scopedOsAttempt.attempted && scopedOsAttempt.result) {
-        const opened = scopedOsAttempt.result['os_aberta'] === true;
-        await this.technicalCases.recordGovernedAction(
-          conversation.id, opened ? 'OPEN_OFFLINE_OS' : 'OFFLINE_OS_NOT_OPENED',
-          'ESCALATED', opened ? 'Acompanhar a OS aberta.' : 'Conferir por que a OS nÃ£o foi confirmada.',
-          { osOpened: opened, selectedContract: !!selectedContractId, selectedAccess: !!selectedAccessRef });
-        const message = opened
-          ? 'O acesso selecionado estÃ¡ offline e a ordem de serviÃ§o foi registrada para a equipe tÃ©cnica acompanhar.'
-          : 'O acesso selecionado estÃ¡ offline, mas nÃ£o consegui confirmar uma nova ordem de serviÃ§o. Registrei o motivo no caso para evitar uma abertura duplicada.';
-        const token = createHash('sha256').update(
-          `newnet-scoped-os-result:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
-        await this.inbox.sendAgentMessage(conversation.id, message, `newnet-scoped-os-result-${token}`);
-        await this.pauseForHuman(
-          conversation,
-          opened ? 'Acesso offline com OS confirmada.' : 'Acesso offline sem confirmaÃ§Ã£o de nova OS.',
-        , key, sequence, claim);
-        if (!sent) return;
-        await this.complete(key, sequence, claim);
-        return;
-      }
-
-      const planObservation = this.support.observationFromVerified(scopedSupport);
-      const plan = await this.technicalPlanner.plan({
-        agentId: agent.id,
-        conversationScope: await this.aiContextScope(conversation.id),
-        reportedProblem: supportReason,
-        currentMessage: newest.body,
-        recentCustomerMessages: context.messages
-          .filter((message) => message.senderKind === 'CUSTOMER')
-          .slice(-50).map((message) => message.body),
-        recentAssistantMessages: context.messages
-          .filter((message) => message.senderKind === 'BUSINESS')
-          .slice(-20).map((message) => message.body),
-        observation: planObservation,
-        historyAnalysis: support.historyAnalysis,
-      });
-      const conversationState = analyzeTechnicalConversation(
-        [
-          ...context.messages.filter((message) => message.senderKind === 'CUSTOMER')
-            .slice(-50).map((message) => message.body),
-          newest.body,
-        ],
-        context.messages.filter((message) => message.senderKind === 'BUSINESS')
-          .slice(-20).map((message) => message.body),
-      );
-      const escalationOs = plan.action === 'ESCALATE_WITH_EVIDENCE'
-        && conversationState.scope === 'ALL'
-        && ['NO_CONNECTIVITY', 'SLOWNESS', 'INTERMITTENCE'].includes(conversationState.symptom)
-        ? await this.maybeOpenVerifiedOfflineOs(
-          agent, conversation, context.messages, supportReason, scopedSupport, true,
-          { login: selectedAccessRef ?? undefined, contract: selectedContractId ?? undefined },
-          `DiagnÃ³stico conversacional concluÃ­do. Sintoma: ${conversationState.symptom}. `
-            + `Escopo: ${conversationState.scope}. Luzes: ${conversationState.equipmentLights}. `
-            + `Motivo tÃ©cnico: ${plan.reasoning}`,
-        )
-        : { attempted: false, result: null };
-      const escalationOpened = escalationOs.result?.['os_aberta'] === true;
-      const communicatedPlan = communicateTechnicalPlan(plan, planObservation);
-      const customerPlanMessage = plan.action === 'ESCALATE_WITH_EVIDENCE'
-        ? escalationOpened
-          ? `${communicatedPlan} A ordem de serviÃ§o foi registrada, e o atendimento ficarÃ¡ aberto para a equipe continuar por aqui.`
-          : `${communicatedPlan} O atendimento ficarÃ¡ aberto para a equipe continuar por aqui; nÃ£o vou repetir os mesmos testes.`
-        : communicatedPlan;
-      await this.technicalCases.recordGovernedAction(
-        conversation.id, plan.action,
-        plan.action === 'ESCALATE_WITH_EVIDENCE' ? 'ESCALATED' : 'WAITING_CUSTOMER',
-        plan.reasoning,
-        {
-          pendingQuestion: plan.action === 'ESCALATE_WITH_EVIDENCE' ? null : customerPlanMessage,
-          symptoms: plan.symptoms,
-          modelSelected: plan.modelSelected,
-          osAttempted: escalationOs.attempted,
-          osOpened: escalationOpened,
-          humanHandoff: plan.action === 'ESCALATE_WITH_EVIDENCE',
-        },
-      );
-      const freshPlanContext = await this.inbox.contextForAgentPreview(conversation.id);
-      const finalPlanMessage = freshPlanContext.messages.at(-1);
-      if (!finalPlanMessage || finalPlanMessage.serverSequence !== sequence
-        || (!resume && finalPlanMessage.senderKind !== 'CUSTOMER')
-        || freshPlanContext.conversation.status !== 'OPEN'
-        || !freshPlanContext.verified
-        || freshPlanContext.conversation.customerRef !== context.conversation.customerRef
-        || freshPlanContext.conversation.globalIdentityId !== context.conversation.globalIdentityId) {
-        await this.complete(key, sequence, claim);
-        return;
-      }
-      const planToken = createHash('sha256').update(
-        `newnet-plan:${conversation.id}:${sequence}:${plan.action}`).digest('hex').slice(0, 32);
-      await this.inbox.sendAgentMessage(
-        conversation.id, customerPlanMessage, `newnet-plan-${planToken}`);
-      if (plan.action === 'ESCALATE_WITH_EVIDENCE') {
-        await this.pauseForHuman(conversation, plan.reasoning);
-      }
+      const output = result.status === 'COMPLETED' && typeof result.output === 'string'
+        ? result.output.trim() : '';
+      const reply = output
+        || 'Tive uma dificuldade técnica aqui agora para concluir. Vou acionar um atendente para seguir com você.';
+      const token = createHash('sha256')
+        .update(`newnet-agent:${conversation.id}:${sequence}`).digest('hex').slice(0, 32);
+      await this.sendReply(conversation.id, reply, `newnet-agent-${token}`, key, sequence, claim);
       await this.complete(key, sequence, claim);
-      return;
-
     } catch (error) {
-      // Sem checkpoint se falhar antes do envio; retries usam clientMessageId
-      // determinÃ­stico para nÃ£o repetir mensagem em falha de rede/timeout.
-      // Se o erro ocorreu ANTES do envio, o clientMessageId determinÃ­stico
-      // garante idempotÃªncia no retry. AvanÃ§ar o cursor aqui evita duplicatas.
-      await this.complete(key, sequence, claim).catch(() => undefined);
       this.logger.warn(`Resposta ConnectChat ${conversation.id}: ${(error as Error).message}`);
+      await this.complete(key, sequence, claim).catch(() => undefined);
     }
   }
 }
-
-
