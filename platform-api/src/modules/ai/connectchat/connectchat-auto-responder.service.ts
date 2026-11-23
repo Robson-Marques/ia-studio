@@ -46,6 +46,15 @@ export class ConnectchatAutoResponderService {
   private readonly logger = new Logger(ConnectchatAutoResponderService.name);
   private polling = false;
   private readonly bootTime = Date.now();
+  // A Nete vem com TODO o catálogo do ISP disponível — o usuário final não
+  // configura ferramentas; ela decide sozinha o que usar. Inclui consulta e
+  // ação (2ª via, link de pagamento, desbloqueio, abrir OS, encaminhar).
+  private readonly nativeIspTools = [
+    'identificar_cliente', 'consultar_os_recentes', 'consultar_chamados_recentes',
+    'diagnosticar_conexao', 'consultar_debitos', 'consultar_contrato', 'status_conexao',
+    'status_regiao', 'segunda_via_boleto', 'gerar_link_pagamento', 'desbloqueio_confianca',
+    'abrir_os', 'encaminhar_para_fila',
+  ];
 
   constructor(
     private readonly settings: SettingsService,
@@ -91,6 +100,17 @@ export class ConnectchatAutoResponderService {
   }
 
   @Interval(5000)
+  // Garante o catálogo completo no agente nativo (idempotente: só grava quando
+  // falta algo). Preserva quaisquer outras ferramentas já marcadas.
+  private async ensureNativeIspTools(agent: AiAgent): Promise<AiAgent> {
+    const has = new Set(agent.allowed_tools);
+    const missing = this.nativeIspTools.filter((key) => !has.has(key));
+    if (missing.length === 0) return agent;
+    return this.repository.update(agent.id, {
+      allowed_tools: [...agent.allowed_tools, ...missing],
+    }) as Promise<AiAgent>;
+  }
+
   async poll(): Promise<void> {
     if (!this.enabled() || this.polling) return;
     this.polling = true;
@@ -99,8 +119,9 @@ export class ConnectchatAutoResponderService {
       const native = raw && typeof raw === 'object' && !Array.isArray(raw)
         ? raw as Record<string, unknown> : {};
       if (typeof native.id !== 'string') return;
-      const agent = await this.repository.findById(native.id);
-      if (!agent?.is_active || !parseConversation(agent.conversation).auto_reply) return;
+      const loaded = await this.repository.findById(native.id);
+      if (!loaded?.is_active || !parseConversation(loaded.conversation).auto_reply) return;
+      const agent = await this.ensureNativeIspTools(loaded);
       const conversations = await this.inbox.listRawConversations();
       for (const conversation of conversations.filter((c) => c.status === 'OPEN')) {
         try {

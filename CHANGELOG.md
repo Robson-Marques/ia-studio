@@ -1,4 +1,8 @@
 # Changelog
+## [v0.12.47] - 2026-11-23
+### fixed
+- ConnectChat/Nete: o agente nativo passa a receber automaticamente TODO o catálogo de ferramentas do ISP (consulta e ação: identificar, status, contrato, débitos, OS/chamados, diagnóstico, região, 2ª via, link de pagamento, desbloqueio de confiança, abrir OS, encaminhar) a cada ciclo de atendimento, de forma idempotente, sem depender de o usuário configurar ferramentas em tela — a configuração de ferramentas deixou de ser exposta ao usuário final e a Nete decide sozinha o que usar. Resolve o caso em que ela só conversava ("consulta indisponível") por estar sem ferramentas; a v0.12.45 só semeava as tools ao abrir Configurações da IA, o que deixou de acontecer.
+
 ## [v0.12.46] - 2026-11-23
 ### changed
 - WhatsApp/WAHA: motor migrado definitivamente de WEBJS para NOWEB (Baileys), sem manter WEBJS ativo. O mesmo container (mesmo nome e volume /app/.sessions) é recriado no deploy com WAHA_ENGINE=NOWEB, WHATSAPP_DEFAULT_ENGINE=NOWEB, WAHA_NOWEB_WA_VERSION=auto-web, WHATSAPP_RESTART_ALL_SESSIONS=True, WAHA_AUTO_START_DELAY_SECONDS=5 e rotação de log (50m x3). A troca muda o namespace: sessões WEBJS antigas permanecem no volume (não apagadas) mas não são carregadas pelo NOWEB — refazer o pareamento por QR uma vez por número.
