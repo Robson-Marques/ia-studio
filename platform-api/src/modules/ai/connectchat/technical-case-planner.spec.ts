@@ -47,10 +47,12 @@ test('comunica a investigação confirmada antes da pergunta técnica', () => {
       contracts: 'AVAILABLE', accesses: 'AVAILABLE',
     },
   });
-  assert.match(message, /^Consultei sua conexão:/);
+  assert.match(message, /^Já verifiquei sua conexão:/);
   assert.match(message, /online no sistema/i);
-  assert.match(message, /não comprova/i);
+  assert.match(message, /não garante/i);
   assert.match(message, /todos os aparelhos/i);
+  assert.match(message, /sistema\.\n\nNo momento, não há ordem/);
+  assert.match(message, /funcionando\.\n\nVou investigar/);
 });
 
 test('não repete pergunta de alcance respondida anteriormente no caso', () => {
@@ -80,4 +82,5 @@ test('transforma "em todos" em avanço explicado do diagnóstico, sem ecoar o cl
   assert.match(message, /separar uma dificuldade no Wi-Fi/i);
   assert.match(message, /entram no Wi-Fi/i);
   assert.doesNotMatch(message, /^Entendi\. Todos os aparelhos/i);
+  assert.match(message, /navegação\.\n\nOs aparelhos/);
 });

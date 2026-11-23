@@ -15,7 +15,7 @@ test('cumprimenta no horário local da Newnet', () => {
 test('saúda e se apresenta antes de confirmar o cliente habitual', () => {
   assert.equal(
     habitualCustomerQuestion('Edimarcia Medeiros da Rocha', 'Oi', new Date('2026-11-22T22:30:00Z')),
-    'Boa noite! Eu sou a Nete, da Newnet. Antes de começarmos, é sobre a assinatura de Edimarcia Medeiros da Rocha?',
+    'Boa noite! Eu sou a Nete, da Newnet.\n\nO atendimento é sobre a conexão de Edimarcia Medeiros da Rocha?',
   );
 });
 
@@ -29,6 +29,11 @@ test('acolhe o problema já informado antes da confirmação', () => {
 test('confirma de forma acolhedora e não reclassifica o sim como nova intenção', () => {
   assert.equal(
     habitualCustomerConfirmed('Edimarcia Medeiros da Rocha'),
-    'Perfeito, Edimarcia. Obrigada por confirmar. Como posso ajudar você hoje?',
+    'Perfeito, Edimarcia. Obrigada por confirmar.\n\nComo posso ajudar você hoje?',
   );
+});
+
+test('separa a composição da abertura em parágrafos legíveis', () => {
+  assert.match(habitualCustomerQuestion('Edimarcia', 'Oi'), /Newnet\.\n\nO atendimento é sobre a conexão/);
+  assert.match(habitualCustomerConfirmed('Edimarcia'), /confirmar\.\n\nComo posso/);
 });

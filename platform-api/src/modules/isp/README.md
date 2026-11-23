@@ -201,11 +201,13 @@ pergunta necessária. O escopo atual considera as respostas anteriores do client
 para não repetir a pergunta sobre um ou vários aparelhos.
 
 A abertura da conversa também é uma transição governada: a Nete cumprimenta no
-horário de São Paulo, apresenta-se e confirma a assinatura de forma contextual.
+horário de São Paulo, apresenta-se e confirma a conexão de forma contextual.
 Uma resposta curta como `sim` pertence exclusivamente a essa confirmação; ela
 não é reclassificada como uma nova intenção. Sem problema anterior para retomar,
 a Nete agradece a confirmação e pergunta como pode ajudar. Se o problema já foi
 relatado, o caso técnico continua sem obrigar o cliente a repeti-lo.
+As mensagens se referem à conexão do cliente, não à “assinatura”, e separam
+acolhimento, evidência, limite e próxima pergunta com uma linha em branco.
 
 Ao escalar, o runtime grava `ai.connectchat.human_handoff.<conversationId>` e
 interrompe novas respostas automáticas para o mesmo cliente. A conversa continua

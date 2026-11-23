@@ -6,7 +6,7 @@
 > (1) `git log --oneline -3` e `git tag`, (2) este arquivo, (3) `CLAUDE.md`,
 > (4) a spec da frente atual. Ao terminar uma frente, ATUALIZAR este arquivo.
 >
-> Última atualização: 2026-11-22 (candidata `v0.12.38`; validação real da `v0.12.37` revelou perda da transição após a confirmação do cliente habitual e abertura sem acolhimento).
+> Última atualização: 2026-11-22 (candidata `v0.12.39`; a `v0.12.38` corrigiu a transição, mas a validação visual pediu linguagem de conexão e parágrafos reais).
 
 ## Frente em validação: Nete como suporte técnico N2
 
@@ -40,6 +40,13 @@ como uma intenção geral e podia cair no fallback do modelo. Na candidata
 determinística. A abertura cumprimenta no horário de São Paulo, apresenta a Nete
 e acolhe uma necessidade já relatada. O comunicador também explica a consequência
 técnica de respostas como “em todos”, em vez de apenas repeti-las.
+
+Na validação visual seguinte, “é sobre a assinatura de...” e a resposta técnica
+em bloco único ainda soaram artificiais. A candidata `v0.12.39` pergunta se “o
+atendimento é sobre a conexão de...” e compõe saudação, confirmação, evidência,
+limite e pergunta em parágrafos separados por `\n\n`. Tanto o painel do IA
+Studio (`white-space: pre-wrap`) quanto a PWA do ConnectChat já renderizam essas
+quebras; não foi necessária alteração de interface.
 
 Também foi restaurada na tela de conversas a ação **Desvincular cliente**, que
 o commit `ca1e56a` havia ocultado embora backend e permissão continuassem

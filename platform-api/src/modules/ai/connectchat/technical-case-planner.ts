@@ -249,14 +249,17 @@ export function communicateTechnicalPlan(
   const noActiveAttendance = observation.hasOpenOs === false
     && observation.hasOpenTicket === false
     && observation.incident === false;
-  const attendance = noActiveAttendance
-    ? ' Não há ordem de serviço, chamado ou incidente ativo para esse acesso.'
-    : '';
   const access = observation.online === true
-    ? `Já verifiquei sua conexão: ela aparece online no sistema.${attendance} Esse estado, sozinho, não garante que a internet esteja funcionando.`
+    ? 'Já verifiquei sua conexão: ela aparece online no sistema.'
     : observation.online === false
-      ? `Já verifiquei sua conexão: o acesso aparece offline no sistema.${attendance}`
-      : `Já verifiquei sua conexão, mas o estado do acesso não veio conclusivo.${attendance}`;
+      ? 'Já verifiquei sua conexão: o acesso aparece offline no sistema.'
+      : 'Já verifiquei sua conexão, mas o estado do acesso não veio conclusivo.';
+  const attendance = noActiveAttendance
+    ? 'No momento, não há ordem de serviço, chamado ou incidente ativo para esse acesso.'
+    : '';
+  const limitation = observation.online === true
+    ? 'Esse status, sozinho, não garante que a internet esteja funcionando.'
+    : '';
   const transition = plan.action === 'ASK_DEVICE_SCOPE'
     ? 'Vou investigar isso com você.'
     : plan.action === 'ASK_CONNECTION_STATE'
@@ -274,6 +277,7 @@ export function communicateTechnicalPlan(
                 : plan.action === 'ASK_INTERMITTENCE_PATTERN'
                   ? 'Quero entender o padrão das quedas para não tratar uma ocorrência isolada como recorrente.'
                   : '';
-  return `${access} ${transition} ${plan.customerMessage}`.replace(/\s+/g, ' ').trim();
+  return [access, attendance, limitation, transition, plan.customerMessage]
+    .filter(Boolean).join('\n\n');
 }
 

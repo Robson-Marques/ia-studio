@@ -1,5 +1,15 @@
 # Changelog — IA Studio
 
+## v0.12.39 - 2026-11-22 (composição conversacional em parágrafos)
+
+- A confirmação inicial deixa de perguntar pela “assinatura de” e passa a usar
+  a formulação natural “o atendimento é sobre a conexão de”.
+- Saudação, confirmação, leitura operacional, limite da leitura e próxima
+  pergunta são separados por linhas em branco reais (`\n\n`). O painel e a PWA
+  já preservavam essas quebras; a correção passa a produzi-las no backend.
+- A resposta de investigação deixa de ser um bloco corrido e ganha composição
+  escaneável, com uma ideia por parágrafo.
+
 ## v0.12.38 - 2026-11-22 (continuidade humana na abertura do N2)
 
 - A confirmação do cliente habitual passa a ser uma transição determinística:

@@ -18,16 +18,16 @@ export function habitualCustomerQuestion(
   at: Date = new Date(),
 ): string {
   if (GREETING_ONLY.test(incoming.trim())) {
-    return `${greetingForNewnet(at)}! Eu sou a Nete, da Newnet. `
-      + `Antes de começarmos, é sobre a assinatura de ${customerName}?`;
+    return `${greetingForNewnet(at)}! Eu sou a Nete, da Newnet.\n\n`
+      + `O atendimento é sobre a conexão de ${customerName}?`;
   }
-  return `Entendi. Vou cuidar disso com você. Antes de continuar, só preciso confirmar: `
-    + `é sobre a assinatura de ${customerName}?`;
+  return `Entendi. Vou cuidar disso com você.\n\n`
+    + `Antes de continuar, preciso confirmar: o atendimento é sobre a conexão de ${customerName}?`;
 }
 
 export function habitualCustomerConfirmed(customerName: string | null): string {
   const firstName = customerName?.trim().split(/\s+/)[0];
   return firstName
-    ? `Perfeito, ${firstName}. Obrigada por confirmar. Como posso ajudar você hoje?`
-    : 'Perfeito, obrigada por confirmar. Como posso ajudar você hoje?';
+    ? `Perfeito, ${firstName}. Obrigada por confirmar.\n\nComo posso ajudar você hoje?`
+    : 'Perfeito, obrigada por confirmar.\n\nComo posso ajudar você hoje?';
 }
