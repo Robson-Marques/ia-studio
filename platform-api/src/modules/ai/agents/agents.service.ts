@@ -70,6 +70,27 @@ export class AgentsService {
    * O lock transacional impede duplicações em acessos simultâneos.
    * Nenhuma ferramenta que escreve dados é concedida automaticamente.
    */
+  // Ferramentas de CONSULTA do ISP que o agente nativo do ConnectChat precisa
+  // para atender (o motor por intenção usa as tools). O nativo nascia com [];
+  // aqui ele é semeado e, se um nativo já existe vazio, é preenchido — só
+  // leitura, sem aprovação, e apenas quando há conexão IXC ativa.
+  private readonly NATIVE_ISP_READ_TOOLS = [
+    'identificar_cliente', 'consultar_chamados_recentes', 'consultar_os_recentes',
+    'diagnosticar_conexao', 'consultar_contrato', 'status_conexao', 'status_regiao',
+  ];
+
+  private async backfillNativeIspTools(
+    tx: Prisma.TransactionClient, agent: AiAgent,
+  ): Promise<AiAgent> {
+    if (Array.isArray(agent.allowed_tools) && agent.allowed_tools.length > 0) return agent;
+    const ixcActive = await tx.connection.count({ where: { provider_key: 'ixc', status: 'ACTIVE' } });
+    if (ixcActive === 0) return agent;
+    return tx.aiAgent.update({
+      where: { id: agent.id },
+      data: { allowed_tools: this.NATIVE_ISP_READ_TOOLS },
+    });
+  }
+
   async ensureNativeAgent(createdBy: string | null) {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(741192, 2026)::text AS acquired`;
@@ -85,13 +106,13 @@ export class AgentsService {
               select: { id: true },
             });
             if (codex.length === 1) {
-              return tx.aiAgent.update({
+              return this.backfillNativeIspTools(tx, await tx.aiAgent.update({
                 where: { id: existing.id },
                 data: { connection_id: codex[0].id },
-              });
+              }));
             }
           }
-          return existing;
+          return this.backfillNativeIspTools(tx, existing);
         }
       }
 
@@ -137,7 +158,7 @@ export class AgentsService {
         create: { key: settingKey, value: { id: agent.id } },
         update: { value: { id: agent.id } },
       });
-      return readyAgent;
+      return this.backfillNativeIspTools(tx, readyAgent);
     });
   }
 
