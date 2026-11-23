@@ -1,4 +1,9 @@
 # Changelog
+## [v0.12.52] - 2026-11-23
+### changed
+- ConnectChat/Nete (ser resolutiva, menos passos): a política de atendimento passa a pedir que ela resolva em poucos passos em vez de alongar o atendimento. No máximo uma ou duas perguntas de diagnóstico e então AÇÃO — reinício do equipamento, abrir chamado/OS ou oferecer a solução. Proibido mandar o cliente testar em sequência (app por app, dados móveis, navegador).
+- ConnectChat/Nete (lentidão): novo caminho explícito na estrutura de análise. Acesso online e sem bloqueio com lentidão -> pede UM reinício do equipamento (se o cliente ainda não fez) e, persistindo, abre um chamado de lentidão para a equipe avaliar — sem ficar testando indefinidamente. O caminho offline também foi encurtado para um reinício + OS, sem encadear testes.
+
 ## [v0.12.51] - 2026-11-23
 ### changed
 - ConnectChat/Nete (comunicação): quando o cliente já está vinculado, a Nete passa a tratá-lo pelo PRIMEIRO nome de forma natural (sem repetir o nome a cada mensagem), demonstrando que já sabe com quem fala — antes ela tinha o nome no contexto mas não o usava.
