@@ -1837,6 +1837,9 @@ export class ConnectchatAutoResponderService {
     } catch (error) {
       // Sem checkpoint se falhar antes do envio; retries usam clientMessageId
       // determinístico para não repetir mensagem em falha de rede/timeout.
+      // Se o erro ocorreu ANTES do envio, o clientMessageId determinístico
+      // garante idempotência no retry. Avançar o cursor aqui evita duplicatas.
+      await this.complete(key, sequence, claim).catch(() => undefined);
       this.logger.warn(`Resposta ConnectChat ${conversation.id}: ${(error as Error).message}`);
     }
   }
