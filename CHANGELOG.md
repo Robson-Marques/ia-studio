@@ -1,4 +1,14 @@
 # Changelog
+## [v0.12.54] - 2026-11-23
+### changed
+- ConnectChat/Nete (comportamento: analisar o sistema primeiro): a política de atendimento passa a mandar ANALISAR O CADASTRO ANTES DE PERGUNTAR ao cliente. Assim que tem o titular, a Nete roda a rotina sobre o estado do cliente (bloqueio/financeiro, online/offline, incidente, OS/chamado aberto, histórico de chamados) — mesmo que o cliente já tenha dito o problema. O sistema descobre a causa; o cliente só confirma ou completa o que faltou. Uma ou duas perguntas no máximo, nunca interrogatório.
+- ConnectChat/Nete (identificação): cliente vinculado -> confirma se o atendimento é para esse titular; se não for, pede o CPF/CNPJ do cliente certo antes de seguir. Sem vínculo -> pede o documento logo no início.
+- ConnectChat/Nete (reincidência): nova regra + sinal determinístico. A memória de sessão passa a marcar "Reincidência: N chamados recentes" (contagem feita no código, não pelo modelo); a política manda tratar com prioridade e REGISTRAR na descrição da OS que é cliente reincidente, para o técnico dar solução definitiva.
+- ConnectChat/Nete (online que diz "não funciona"): orientação explícita de que, se o acesso está online, a causa costuma ser local (roteador/aparelho travado) -> um reinício e, persistindo, OS (pode exigir visita).
+
+### note
+- Este é o refino OBJETIVO da linha de comportamento pedida pelo Robson. A versão PLENAMENTE determinística (o código decidir o caminho, não o modelo) é a frente estrutural documentada em `docs/nete-base-comportamento.md` — próximo checkpoint.
+
 ## [v0.12.53] - 2026-11-23
 ### changed
 - ConnectChat/Nete (diagnóstico vira descrição, não trava): o que a Nete levanta no diagnóstico (o que funciona, o que o cliente relatou, o que já foi tentado) passa a servir para DESCREVER BEM o chamado/OS e deve ser registrado na abertura — mas coletar essa informação nunca pode travar o andamento. Com o essencial em mãos, ela abre o chamado e segue, sem ficar juntando detalhes a mais. Complementa a v0.12.52 (ser resolutiva).
