@@ -93,6 +93,30 @@ export class ConnectchatInboxService {
     return this.resolveCustomerDisplayName(conversation.customerRef);
   }
 
+  /** Resolve nome + documento (CPF/CNPJ) do titular vinculado, para o condutor
+   *  da IA entregar a identidade ao agente sem pedir o CPF de novo ao cliente. */
+  async resolveLinkedCustomer(conversation: ConnectchatConversation): Promise<{ name: string; document: string | null } | null> {
+    const customerRef = conversation.customerRef;
+    if (!customerRef) return null;
+    const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(customerRef);
+    if (!match) return null;
+    const [, connectionId, customerId] = match;
+    const connection = await this.connections.findById(connectionId).catch(() => null);
+    if (!connection || connection.provider_key !== 'ixc' || connection.status !== 'ACTIVE') return null;
+    try {
+      const result = await this.connections.execute(connection.id, 'cliente.identificacao', { customerId }) as {
+        data?: Array<{ name?: unknown; document?: unknown }>;
+      };
+      const row = result.data?.[0];
+      const name = typeof row?.name === 'string' && row.name.trim() ? row.name.trim() : null;
+      if (!name) return null;
+      const document = typeof row?.document === 'string' && row.document.trim() ? row.document.trim() : null;
+      return { name, document };
+    } catch {
+      return null;
+    }
+  }
+
   private async resolveCustomerDisplayName(customerRef: string | null): Promise<string | null> {
     if (!customerRef) return null;
     const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(customerRef);

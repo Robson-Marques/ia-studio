@@ -345,7 +345,7 @@ export default function ConnectchatConversas() {
                 const receipt = receiptMark(message);
                 return (
                   <div key={message.id} className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`}>
-                    <div style={{ maxWidth: '80%', padding: 'var(--su-space-3)', borderRadius: 'var(--su-radius-md)', background: outgoing ? 'var(--su-action)' : 'var(--su-surface-raised)', color: outgoing ? 'var(--su-action-contrast)' : 'var(--su-text-primary)', boxShadow: 'var(--su-shadow-sm)' }}>
+                    <div style={{ maxWidth: '80%', padding: 'var(--su-space-3)', borderRadius: 'var(--su-radius-md)', background: outgoing ? 'var(--su-action, var(--ap-accent, #6366f1))' : 'var(--su-surface-raised)', color: outgoing ? 'var(--su-action-contrast, #ffffff)' : 'var(--su-text-primary)', boxShadow: 'var(--su-shadow-sm)' }}>
                       {message.body ? <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{message.body}</p> : null}
                       {message.attachments?.map((attachment) => <MessageAttachment key={attachment.id} attachment={attachment} />)}
                       <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 10, opacity: 0.82 }}>

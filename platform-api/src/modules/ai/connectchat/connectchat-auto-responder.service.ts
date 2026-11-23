@@ -883,7 +883,7 @@ export class ConnectchatAutoResponderService {
   // sensível é escopado pela conexão verificada e abrir_os checa incidente e
   // duplicidade. Aqui NÃO há máquina de estados de atendimento: só o encanamento
   // do canal (cursor/claim/debounce/dedup) + a chamada ao agente.
-  private channelPolicy(verified: boolean): string {
+  private channelPolicy(identified: { name: string; document: string | null } | null): string {
     const base = [
       'Você é a Nete, atendente da Newnet (provedor de internet). Fale como uma pessoa real: natural, acolhedora e objetiva, variando as palavras a cada atendimento — nunca use frases prontas nem repita a mesma mensagem.',
       'Este é um atendimento de chat. Envie UMA mensagem por vez; o atendimento evolui a cada resposta do cliente. Não faça o cliente repetir o que já disse.',
@@ -896,9 +896,10 @@ export class ConnectchatAutoResponderService {
       'Nunca invente protocolo, valor, link ou informação: use só o que a ferramenta devolver. Nunca revele IDs internos, OLT/CTO, VLAN, percentuais de rede nem o nome de setor/fila técnica.',
       'Não use emojis. Responda sempre em português do Brasil.',
     ];
-    if (verified) {
-      base.splice(4, 0,
-        'Este cliente já está vinculado com segurança a um cadastro. NÃO peça o CPF/CNPJ de novo — se precisar confirmar, apenas verifique se é com esse mesmo cadastro que ele quer seguir.');
+    if (identified) {
+      base.splice(4, 0, identified.document
+        ? `O titular já está identificado e vinculado: ${identified.name}, documento ${identified.document}. Use esse documento (CPF/CNPJ) diretamente nas ferramentas para consultar conexão, contrato, financeiro, chamados e OS — NÃO peça o CPF de novo ao cliente.`
+        : `O titular já está vinculado (${identified.name}), mas não recuperei o documento automaticamente. Confirme com gentileza o CPF ou CNPJ antes de consultar, sem repetir perguntas já respondidas.`);
     }
     return base.join('\n');
   }
@@ -977,6 +978,12 @@ export class ConnectchatAutoResponderService {
         scopeKeys['cc_identity'] = convo.globalIdentityId;
       }
 
+      // Cliente vinculado: resolve o titular (nome + CPF/CNPJ) para o agente
+      // consultar o IXC sem pedir o documento de novo ao cliente.
+      const identified = context.verified
+        ? await this.inbox.resolveLinkedCustomer(convo).catch(() => null)
+        : null;
+
       await this.inbox.setAgentTyping(conversation.id, 'started').catch(() => undefined);
       const result = await this.runner
         .run({
@@ -985,7 +992,7 @@ export class ConnectchatAutoResponderService {
           history,
           createdBy: null,
           scopeKeys,
-          channelInstructions: this.channelPolicy(context.verified),
+          channelInstructions: this.channelPolicy(identified),
           dryRun: false,
         })
         .finally(() => {

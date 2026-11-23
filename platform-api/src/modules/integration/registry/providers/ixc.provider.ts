@@ -451,7 +451,8 @@ export class IxcProvider extends BaseProvider {
     return rows.slice(0, 1).flatMap((row) => {
       const id = this.str(row, 'id');
       const name = this.firstLabel(row, ['razao', 'fantasia']);
-      return id && name ? [{ id, name }] : [];
+      const document = this.str(row, 'cnpj_cpf');
+      return id && name ? [{ id, name, ...(document ? { document } : {}) }] : [];
     });
   }
 
