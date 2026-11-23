@@ -27,6 +27,7 @@ export class ConnectchatProvider extends BaseProvider {
         'execute:getMessages',
         'execute:getTyping',
         'execute:openConversation',
+        'execute:closeConversation',
         'execute:sendMessage',
         'execute:sendAttachment',
         'execute:downloadAttachment',
@@ -133,6 +134,8 @@ export class ConnectchatProvider extends BaseProvider {
         return client.getTyping(this.required(p, 'conversationId'));
       case 'openConversation':
         return client.openConversation(this.required(p, 'businessContactId'), actorRef || undefined);
+      case 'closeConversation':
+        return client.closeConversation(this.required(p, 'conversationId'), actorRef || undefined);
       case 'sendMessage':
         return client.sendMessage({
           conversationId: this.required(p, 'conversationId'),
@@ -176,7 +179,7 @@ export class ConnectchatProvider extends BaseProvider {
       case 'disconnectContactDirectly':
         return client.disconnectContactDirectly(this.required(p, 'globalIdentityId'), actorRef || undefined);
       case 'createLinkRequest':
-        return client.createLinkRequest(this.required(p, 'globalIdentityId'), this.required(p, 'purpose'), this.string(p, 'customerRef') || undefined, this.optionalNumber(p, 'ttlSeconds'), actorRef || undefined);
+        return client.createLinkRequest(this.required(p, 'globalIdentityId'), this.required(p, 'purpose'), this.string(p, 'customerRef') || undefined, this.optionalNumber(p, 'ttlSeconds'), actorRef || undefined, this.string(p, 'requestKey') || undefined);
       case 'completeLinkRequest':
         return client.completeLinkRequest(this.required(p, 'requestId'), this.required(p, 'globalIdentityId'), actorRef || undefined);
       case 'exchangeLinkProof':

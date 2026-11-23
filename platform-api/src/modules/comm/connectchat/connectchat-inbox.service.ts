@@ -1,14 +1,17 @@
+import { randomUUID } from 'crypto';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { AuthenticatedUser } from '../../../shared/auth/auth.types';
-import { ConnectchatConversation, ConnectchatMention } from '../../../shared/integration/connectchat.client';
+import { ConnectchatConversation, ConnectchatMention, ConnectchatMessage } from '../../../shared/integration/connectchat.client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
+import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 @Injectable()
 export class ConnectchatInboxService {
   constructor(
     private readonly connectionsRepository: ConnectionsRepository,
     private readonly connections: ConnectionsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async connectionId(): Promise<string> {
@@ -48,6 +51,26 @@ export class ConnectchatInboxService {
     return this.connections.test(await this.connectionId());
   }
 
+  /** Leitura interna, sem enriquecimento/mutação de contatos, para o condutor IA. */
+  async listRawConversations(): Promise<ConnectchatConversation[]> {
+    return this.execute('listConversations') as Promise<ConnectchatConversation[]>;
+  }
+
+  /** Envio do agente pela identidade técnica da conexão, idempotente por
+   * clientMessageId. Não se faz passar por um usuário humano. */
+  async sendAgentMessage(conversationId: string, body: string, clientMessageId: string) {
+    if (!body.trim()) throw new BadRequestException('A IA não gerou texto para enviar.');
+    return this.execute('sendMessage', { conversationId, body: body.trim(), clientMessageId });
+  }
+
+  async closeConversation(conversationId: string, actorRef = 'Nete:suporte-n2') {
+    const connectionId = await this.connectionId();
+    return this.connections.execute(connectionId, 'closeConversation', {
+      conversationId,
+      actorRef,
+    });
+  }
+
   async listConversations() {
     const conversations = await this.execute('listConversations') as ConnectchatConversation[];
     return Promise.all(conversations.map((conversation) => this.presentConversation(conversation)));
@@ -55,22 +78,9 @@ export class ConnectchatInboxService {
 
   private async presentConversation(conversation: ConnectchatConversation) {
     const customerDisplayName = await this.resolveCustomerDisplayName(conversation.customerRef);
-    // Vínculos anteriores ao retrato comercial não carregam o nome seguro que
-    // a PWA apresenta. Ao consultar a Central, completa-se esse único campo
-    // diretamente no ConnectChat; nas próximas leituras não há nova gravação.
-    if (
-      customerDisplayName
-      && conversation.customerRef
-      && conversation.globalIdentityId
-      && conversation.businessContact?.customerDisplayName !== customerDisplayName
-    ) {
-      await this.execute('linkContactDirectly', {
-        globalIdentityId: conversation.globalIdentityId,
-        customerRef: conversation.customerRef,
-        customerDisplayName,
-      });
-      if (conversation.businessContact) conversation.businessContact.customerDisplayName = customerDisplayName;
-    }
+    // Consulta de caixa de mensagens é estritamente leitura. Nunca chamar
+    // linkContactDirectly para completar o nome visual: isso contornaria o
+    // fluxo de prova aprovado pelo próprio assinante.
     const { customerRef: _customerRef, globalIdentityId: _globalIdentityId, ...safeConversation } = conversation;
     return customerDisplayName ? { ...safeConversation, customerDisplayName } : safeConversation;
   }
@@ -79,6 +89,10 @@ export class ConnectchatInboxService {
    * customerRef é opaco para o ConnectChat. Nesta vertente, o IA Studio emite
    * `ixc:<connection-id>:<customer-id>` e só ele pode interpretá-lo.
    */
+  async getLinkedCustomerName(conversation: ConnectchatConversation): Promise<string | null> {
+    return this.resolveCustomerDisplayName(conversation.customerRef);
+  }
+
   private async resolveCustomerDisplayName(customerRef: string | null): Promise<string | null> {
     if (!customerRef) return null;
     const match = /^ixc:([0-9a-f-]{36}):([1-9]\d*)$/i.exec(customerRef);
@@ -100,12 +114,55 @@ export class ConnectchatInboxService {
     }
   }
 
-  getMessages(conversationId: string, afterSequence?: string, limit?: number) {
+  /**
+   * Leitura para SIMULAÇÃO da IA. Não marca mensagens como lidas, não envia
+   * mensagens e não altera o vínculo. A identidade é considerada confirmada
+   * apenas quando a própria Central mantém vínculo ACTIVE + CUSTOMER.
+   */
+  async contextForAgentPreview(conversationId: string): Promise<{
+    conversation: ConnectchatConversation;
+    messages: ConnectchatMessage[];
+    verified: boolean;
+  }> {
+    const conversations = await this.execute('listConversations') as ConnectchatConversation[];
+    const conversation = conversations.find((row) => row.id === conversationId);
+    if (!conversation) throw new BadRequestException('Conversa não encontrada no ConnectChat.');
+    // O ConnectChat usa cursor crescente. Ler desde 0 retornaria o começo da
+    // conversa longa; o teste precisa do contexto mais recente.
+    const lastSequence = typeof conversation.lastSequence === 'string'
+      && /^\d+$/.test(conversation.lastSequence)
+      ? BigInt(conversation.lastSequence) : 0n;
+    const after = lastSequence > 100n ? (lastSequence - 100n).toString() : '0';
+    const messages = await this.getMessages(conversationId, after, 100) as ConnectchatMessage[];
+    const verified = conversation.businessContact?.status === 'CUSTOMER'
+      && conversation.businessContact?.linkStatus === 'ACTIVE'
+      && typeof conversation.customerRef === 'string'
+      && /^ixc:[0-9a-f-]{36}:[1-9]\d*$/i.test(conversation.customerRef);
+    return { conversation, messages, verified };
+  }
+
+  async getMessages(conversationId: string, afterSequence?: string, limit?: number): Promise<ConnectchatMessage[]> {
     if (afterSequence !== undefined && !/^\d+$/.test(afterSequence)) {
       throw new BadRequestException('A sequência de mensagens é inválida.');
     }
     const safeLimit = Number.isInteger(limit) && limit! >= 1 && limit! <= 100 ? limit! : 50;
-    return this.execute('getMessages', { conversationId, afterSequence: afterSequence ?? '0', limit: safeLimit });
+    // O corte é LOCAL ao IA Studio: evita reexibir mensagens anteriores
+    // ao reset, sem enviar nenhum DELETE para o ConnectChat de origem.
+    const reset = await this.prisma.systemSetting.findUnique({
+      where: { key: `ai.connectchat.reset_boundary.${conversationId}` },
+    });
+    const boundaryData = reset?.value && typeof reset.value === 'object' && !Array.isArray(reset.value)
+      ? reset.value as Record<string, unknown> : {};
+    const boundary = typeof boundaryData['sequence'] === 'string'
+      && /^\d+$/.test(boundaryData['sequence'])
+      ? BigInt(boundaryData['sequence'] as string) : 0n;
+    const requested = BigInt(afterSequence ?? '0');
+    const effectiveAfter = (requested > boundary ? requested : boundary).toString();
+    const messages = await this.execute('getMessages', {
+      conversationId, afterSequence: effectiveAfter, limit: safeLimit,
+    }) as ConnectchatMessage[];
+    return messages.filter((m) => /^\d+$/.test(m.serverSequence)
+      && BigInt(m.serverSequence) > boundary);
   }
 
   getTyping(conversationId: string) {
@@ -145,6 +202,11 @@ export class ConnectchatInboxService {
     return this.execute('editMessage', { messageId, body: body.trim(), actorRef: this.actor(user) });
   }
 
+  /** Presença do assistente técnico; não personifica um operador humano. */
+  async setAgentTyping(conversationId: string, status: 'started' | 'stopped'): Promise<void> {
+    await this.execute('setTyping', { conversationId, status });
+  }
+
   setTyping(user: AuthenticatedUser, conversationId: string, status: 'started' | 'stopped') {
     return this.execute('setTyping', { conversationId, status, actorRef: this.actor(user) });
   }
@@ -155,6 +217,93 @@ export class ConnectchatInboxService {
 
   markDelivered(user: AuthenticatedUser, conversationId: string, sequence: string) {
     return this.execute('acknowledgeDelivered', { conversationId, sequence, actorRef: this.actor(user) });
+  }
+
+  /**
+   * Cria pedido de vínculo na identidade REAL da sessão ConnectChat.
+   * Não confunde consentimento/CPF com prova de identidade. A aprovação é
+   * feita pelo próprio assinante na PWA; este método não conclui vínculo.
+   */
+  async createAuthenticatedLinkRequest(conversationId: string, customerRef: string, purpose: string, requestKey: string, expectedIdentityId: string) {
+    const conversation = await this.conversation(conversationId);
+    if (conversation.status !== 'OPEN' || !expectedIdentityId
+      || conversation.globalIdentityId !== expectedIdentityId
+      || conversation.businessContact?.linkStatus === 'ACTIVE') {
+      throw new ConflictException('Identidade ou situação da conversa mudou; pedido não emitido.');
+    }
+    if (!/^ixc:[0-9a-f-]{36}:[1-9]\d*$/i.test(customerRef)) {
+      throw new BadRequestException('Referência do assinante inválida.');
+    }
+    if (!purpose || purpose.length > 80 || !/^[A-Za-z0-9._:-]+$/.test(purpose)) {
+      throw new BadRequestException('Finalidade de vínculo não configurada.');
+    }
+    return this.execute('createLinkRequest', {
+      globalIdentityId: conversation.globalIdentityId,
+      purpose,
+      customerRef,
+      ttlSeconds: 600,
+      requestKey,
+    });
+  }
+
+  /**
+   * Apenas conclui pedido APROVADO pelo ConnectChat; o próprio ConnectChat
+   * rejeita pedidos pendentes, expirados ou pertencentes a outra identidade.
+   */
+  async completeAuthenticatedLinkRequest(conversationId: string, requestId: string, expectedIdentityId: string) {
+    const conversation = await this.conversation(conversationId);
+    if (conversation.status !== 'OPEN' || !expectedIdentityId
+      || conversation.globalIdentityId !== expectedIdentityId
+      || conversation.businessContact?.linkStatus === 'ACTIVE') {
+      throw new ConflictException('Identidade ou situação da conversa mudou; vínculo não concluído.');
+    }
+    if (!/^[A-Za-z0-9_-]{8,120}$/.test(requestId)) throw new BadRequestException('Pedido de vínculo inválido.');
+    return this.execute('completeLinkRequest', {
+      globalIdentityId: conversation.globalIdentityId,
+      requestId,
+    });
+  }
+
+  /**
+   * Associação automática solicitada pelo fluxo Nete depois que o CPF foi
+   * informado no chat e retornou um único cliente IXC. Nunca aceita ID do LLM.
+   * Este método não altera outros cadastros ou identidade de outras sessões.
+   */
+  async autoLinkIdentifiedCustomer(
+    conversationId: string, expectedIdentityId: string, expectedSequence: string,
+    connectionId: string, customerId: string,
+  ): Promise<{ linked: boolean; customerName: string | null }> {
+    if (!/^[0-9a-f-]{36}$/i.test(connectionId) || !/^[1-9]\d*$/.test(customerId)) {
+      throw new BadRequestException('Cadastro inválido para associação.');
+    }
+    const conversations = await this.listRawConversations();
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (!conversation || conversation.status !== 'OPEN'
+      || !expectedIdentityId || conversation.globalIdentityId !== expectedIdentityId
+      || conversation.lastSequence !== expectedSequence) {
+      throw new ConflictException('A identidade ou conversa mudou durante a identificação.');
+    }
+    const ixc = await this.connections.findById(connectionId);
+    if (!ixc || ixc.provider_key !== 'ixc' || ixc.status !== 'ACTIVE' || !ixc.is_active) {
+      throw new ConflictException('Conexão IXC indisponível para associação.');
+    }
+    const identification = await this.connections.execute(connectionId, 'cliente.identificacao', { customerId }) as {
+      data?: Array<{ name?: unknown }>;
+    };
+    const name = identification.data?.[0]?.name;
+    const customerName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 100) : null;
+    if (!customerName) throw new ConflictException('Nome do cadastro não confirmado pelo IXC.');
+    const customerRef = `ixc:${connectionId}:${customerId}`;
+    if (conversation.customerRef === customerRef && conversation.businessContact?.linkStatus === 'ACTIVE') {
+      return { linked: true, customerName };
+    }
+    await this.execute('linkContactDirectly', {
+      globalIdentityId: expectedIdentityId,
+      customerRef,
+      customerDisplayName: customerName,
+      actorRef: 'ystudio:nete:automatic-identification',
+    });
+    return { linked: true, customerName };
   }
 
   async requestCustomerLink(user: AuthenticatedUser, conversationId: string, customerId: string) {
@@ -186,7 +335,69 @@ export class ConnectchatInboxService {
       globalIdentityId: conversation.globalIdentityId,
       actorRef: this.actor(user),
     });
-    return { unlinked: true };
+    const lastSequence = /^\d+$/.test(conversation.lastSequence)
+      ? BigInt(conversation.lastSequence) : 0n;
+    const customerBoundary = (lastSequence + 1n).toString();
+    const settingNames = [
+      'pending_identity', 'document_attempts', 'identification_requested',
+      'technology_requested', 'contract_requested', 'selected_contract', 'selected_access',
+      'greeting', 'human_handoff',
+    ];
+    await this.prisma.$transaction(async (tx) => {
+      await tx.systemSetting.deleteMany({
+        where: { key: { in: settingNames.map((name) => `ai.connectchat.${name}.${conversationId}`) } },
+      });
+      await tx.systemSetting.deleteMany({
+        where: { key: { startsWith: `ai.connectchat.session_os.${conversationId}.` } },
+      });
+      await tx.systemSetting.deleteMany({
+        where: { key: `ai.connectchat.os_attempt.${conversationId}` },
+      });
+      await tx.systemSetting.upsert({
+        where: { key: `ai.connectchat.recognition.${conversationId}` },
+        create: {
+          key: `ai.connectchat.recognition.${conversationId}`,
+          value: {
+            asked: false, confirmed: false, awaitingOther: false,
+            customerStartSequence: customerBoundary,
+            scopeId: randomUUID(), manualUnlink: true,
+          },
+        },
+        update: {
+          value: {
+            asked: false, confirmed: false, awaitingOther: false,
+            customerStartSequence: customerBoundary,
+            scopeId: randomUUID(), manualUnlink: true,
+          },
+        },
+      });
+
+      const activeCases = await tx.aiTechnicalCase.findMany({
+        where: {
+          conversation_id: conversationId,
+          status: { in: ['INVESTIGATING', 'WAITING_CUSTOMER', 'WAITING_TELEMETRY', 'TESTING'] },
+        },
+        select: { id: true },
+      });
+      const caseIds = activeCases.map((item) => item.id);
+      if (caseIds.length > 0) {
+        await tx.aiDiagnosticExperiment.updateMany({
+          where: {
+            case_id: { in: caseIds },
+            status: { in: ['WAITING_CUSTOMER_OFF', 'WAITING_TELEMETRY_OFF', 'WAITING_CUSTOMER_ON', 'WAITING_TELEMETRY_ON', 'WAITING_CUSTOMER_VALIDATION'] },
+          },
+          data: { status: 'CANCELLED', completed_at: new Date(), result: 'Cliente desvinculado manualmente.' },
+        });
+        await tx.aiTechnicalCase.updateMany({
+          where: { id: { in: caseIds } },
+          data: {
+            status: 'CANCELLED', next_recommended_action: null,
+            resolution_summary: 'Cadastro desvinculado manualmente no atendimento.',
+          },
+        });
+      }
+    });
+    return { unlinked: true, localContextReset: true };
   }
 
   async completeCustomerLink(user: AuthenticatedUser, conversationId: string, requestId: string) {

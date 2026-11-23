@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge, Button, EmptyState, useToast } from '@studio-ux-ds/react';
-import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, requestConnectchatCustomerLink, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
+import { Badge, Button, ConfirmDialog, EmptyState, useToast } from '@studio-ux-ds/react';
+import { getConnectchatAttachment, getConnectchatTyping, listConnectchatConversations, listConnectchatMessages, markConnectchatDelivered, markConnectchatRead, resetConnectchatAiContext, sendConnectchatAttachment, sendConnectchatMessage, setConnectchatTyping, unlinkConnectchatCustomer } from '../../services/connectchat';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const POLL_MS = 5000;
@@ -77,6 +77,9 @@ function MessageAttachment({ attachment }) {
 export default function ConnectchatConversas() {
   const toast = useToast();
   const { can } = usePermissions();
+  const canLinkCustomer = can('comm.connectchat.link.customer');
+  const canWriteChat = can('comm.connectchat.write');
+  const canResetNete = can('ai.agents.write');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -84,9 +87,9 @@ export default function ConnectchatConversas() {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendingAttachment, setSendingAttachment] = useState(false);
-  const [customerId, setCustomerId] = useState('');
-  const [linking, setLinking] = useState(false);
-  const [unlinking, setUnlinking] = useState(false);
+  const [resettingNete, setResettingNete] = useState(false);
+  const [unlinkingCustomer, setUnlinkingCustomer] = useState(false);
+  const [confirmUnlinkCustomer, setConfirmUnlinkCustomer] = useState(false);
   const [customerActivity, setCustomerActivity] = useState(null);
   const selectedRef = useRef(null);
   const messagesRef = useRef([]);
@@ -124,13 +127,13 @@ export default function ConnectchatConversas() {
       if (selectedRef.current?.id !== conversation.id) return;
       setMessages((current) => mergeMessages(initial ? [] : current, incoming));
       const lastSequence = incoming.at(-1)?.serverSequence ?? (initial ? undefined : afterSequence);
-      if (lastSequence && lastSequence !== '0' && can('comm.connectchat.write')) {
+      if (lastSequence && lastSequence !== '0' && canWriteChat) {
         void markConnectchatDelivered(conversation.id, lastSequence).then(() => markConnectchatRead(conversation.id, lastSequence));
       }
     } catch (error) {
       if (!silent) toast.error(error.message);
     }
-  }, [can, toast]);
+  }, [canWriteChat, toast]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
@@ -200,8 +203,24 @@ export default function ConnectchatConversas() {
     setSelected(conversation);
     setMessages([]);
     setCustomerActivity(null);
-    setCustomerId('');
     await loadMessages(conversation, true);
+  }
+
+  async function resetNete() {
+    if (!selected || resettingNete) return;
+    if (!window.confirm('Limpar esta conversa no IA Studio e reiniciar a Nete? A conversa aparecerá vazia aqui e a próxima mensagem iniciará uma nova interação. O histórico original do ConnectChat não será alterado.')) return;
+    setResettingNete(true);
+    try {
+      await resetConnectchatAiContext(selected.id);
+      setMessages([]);
+      messagesRef.current = [];
+      setText('');
+      toast.success('Conversa local limpa e contexto da Nete reiniciado.');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setResettingNete(false);
+    }
   }
 
   async function send() {
@@ -243,37 +262,19 @@ export default function ConnectchatConversas() {
     }
   }
 
-  async function requestCustomerLink() {
-    if (!selected || !/^[1-9]\d*$/.test(customerId.trim())) {
-      toast.error('Informe o código numérico do cliente no IXC.');
-      return;
-    }
-    setLinking(true);
-    try {
-      const request = await requestConnectchatCustomerLink(selected.id, customerId.trim());
-      setCustomerId('');
-      await loadConversations(true);
-      toast.success(`${request.customerName} foi vinculado ao atendimento.`);
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLinking(false);
-    }
-  }
-
   async function unlinkCustomer() {
     if (!selected) return;
-    setUnlinking(true);
+    setUnlinkingCustomer(true);
     try {
       await unlinkConnectchatCustomer(selected.id);
       stopTyping(selected.id);
+      setConfirmUnlinkCustomer(false);
       await loadConversations(true);
-      await loadMessages(selected, true, true);
-      toast.success('Cliente desvinculado. A conversa permanece ativa e registrada.');
+      toast.success('Cliente desvinculado. O histórico da conversa foi mantido.');
     } catch (error) {
       toast.error(error.message);
     } finally {
-      setUnlinking(false);
+      setUnlinkingCustomer(false);
     }
   }
 
@@ -319,19 +320,25 @@ export default function ConnectchatConversas() {
                 </span>
                 {selected.businessContact?.status === 'CUSTOMER' ? <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: 'var(--su-text-muted)' }}>Cliente vinculado</span> : null}
               </div>
-              <div className="flex items-center gap-2">
-                {selected.businessContact?.status !== 'CUSTOMER' && can('comm.connectchat.link.customer') ? (
-                  <div className="flex items-center gap-2">
-                    <input aria-label="Código do cliente no IXC" className="su-input" value={customerId} onChange={(event) => setCustomerId(event.target.value)} inputMode="numeric" placeholder="Código IXC" disabled={linking} style={{ width: 118 }} />
-                    <Button variant="secondary" size="sm" loading={linking} onClick={requestCustomerLink}>Vincular cliente</Button>
-                  </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {selected.businessContact?.status === 'CUSTOMER' && canLinkCustomer ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={unlinkingCustomer}
+                    title="Retira o cadastro deste contato sem apagar o histórico da conversa"
+                    onClick={() => setConfirmUnlinkCustomer(true)}
+                  >
+                    Desvincular cliente
+                  </Button>
                 ) : null}
-                {selected.businessContact?.status === 'CUSTOMER' && can('comm.connectchat.link.customer') ? (
-                  <Button variant="ghost" size="sm" loading={unlinking} onClick={unlinkCustomer}>Desvincular cliente</Button>
-                ) : null}
+                {canResetNete ? <Button variant="secondary" size="sm" loading={resettingNete} onClick={resetNete}>Limpar conversa local</Button> : null}
                 <div className="md:hidden"><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Voltar</Button></div>
               </div>
             </header>
+            <div style={{ padding: '6px 14px', fontSize: 12, borderBottom: '1px solid var(--su-border-default)', color: 'var(--su-text-secondary)' }}>
+              IA Newnet integrada ao ConnectChat · As mensagens recebem resposta automaticamente quando a opção está ligada em Configurações da IA.
+            </div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2" style={{ padding: 'var(--su-space-4)', background: 'var(--su-surface-subtle)' }}>
               {messages.length === 0 ? <EmptyState icon="message" title="Sem mensagens" description="Ainda não há mensagens para mostrar nesta conversa." /> : messages.map((message) => {
                 const outgoing = message.senderKind === 'BUSINESS';
@@ -368,6 +375,15 @@ export default function ConnectchatConversas() {
           <div className="flex-1 flex items-center justify-center"><EmptyState icon="message" title="Escolha uma conversa" description="Selecione uma conversa do ConnectChat para atender." /></div>
         )}
       </main>
+      <ConfirmDialog
+        open={confirmUnlinkCustomer}
+        loading={unlinkingCustomer}
+        title="Desvincular cliente"
+        message={`Desvincular ${selected ? labelForConversation(selected) : 'este cliente'}? A Nete deixará de usar o cadastro atual e pedirá uma nova identificação quando necessário. O histórico da conversa será mantido.`}
+        confirmLabel="Desvincular"
+        onClose={() => { if (!unlinkingCustomer) setConfirmUnlinkCustomer(false); }}
+        onConfirm={unlinkCustomer}
+      />
     </div>
   );
 }

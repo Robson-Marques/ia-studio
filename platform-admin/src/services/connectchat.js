@@ -1,5 +1,26 @@
 import api, { extractErrorMessage } from '../lib/api';
 
+export async function getConnectchatAgentBinding() {
+  try {
+    const { data } = await api.get('/ai/connectchat/agent');
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível carregar o agente do ConnectChat')); }
+}
+
+export async function setConnectchatAgentBinding(agentId, enabled, includeTicketHistory = true) {
+  try {
+    const { data } = await api.put('/ai/connectchat/agent', { agentId: agentId || null, enabled: !!enabled, includeTicketHistory: !!includeTicketHistory });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível vincular o assistente ao ConnectChat')); }
+}
+
+export async function previewConnectchatAgent(conversationId) {
+  try {
+    const { data } = await api.post(`/ai/connectchat/conversations/${conversationId}/preview`);
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Não foi possível testar o assistente nesta conversa')); }
+}
+
 export async function listConnectchatConversations() {
   try {
     const { data } = await api.get('/comm/connectchat/conversations');
@@ -92,4 +113,14 @@ export async function completeConnectchatCustomerLink(conversationId, requestId)
     const { data } = await api.post(`/comm/connectchat/conversations/${conversationId}/customer-link-requests/complete`, { requestId });
     return data;
   } catch (err) { throw new Error(extractErrorMessage(err, 'O cliente ainda não confirmou o vínculo')); }
+}
+
+/** Reinicia somente a memória/estado da Nete; não apaga mensagens do ConnectChat. */
+export async function resetConnectchatAiContext(conversationId) {
+  try {
+    const { data } = await api.post(`/ai/connectchat/conversations/${conversationId}/reset-context`);
+    return data;
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, 'Não foi possível reiniciar o contexto da Nete'));
+  }
 }

@@ -9,6 +9,15 @@ import { Module } from '@nestjs/common';
 import { IntegrationModule } from '../integration/integration.module';
 import { CommModule } from '../comm/comm.module';
 import { AutomationModule } from '../automation/automation.module';
+import { SettingsModule } from '../core/settings/settings.module';
+import { ConnectchatAgentController } from './connectchat/connectchat-agent.controller';
+import { ConnectchatAutoResponderService } from './connectchat/connectchat-auto-responder.service';
+import { ConnectchatSupportContextService } from './connectchat/connectchat-support-context.service';
+import { TechnicalCaseRepository } from './connectchat/technical-case.repository';
+import { TechnicalCaseService } from './connectchat/technical-case.service';
+import { TechnicalCasePlannerService } from './connectchat/technical-case-planner.service';
+import { IspRepository } from '../isp/isp.repository';
+import { IncidentLookupService } from '../isp/incident-lookup.service';
 
 // Providers (LLM)
 import { LlmProviderRegistryService } from './providers/llm-provider-registry.service';
@@ -81,7 +90,7 @@ import { AiSeedRepository } from './seed/ai-seed.repository';
 import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
 
 @Module({
-  imports: [IntegrationModule, CommModule, AutomationModule],
+  imports: [IntegrationModule, CommModule, AutomationModule, SettingsModule],
   controllers: [
     MemoryController,
     KnowledgeController,
@@ -90,6 +99,7 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     CollaborationController,
     McpController,
     AgentsController,
+    ConnectchatAgentController,
     AttendanceAnalysisController,
     ContentReviewController,
   ],
@@ -130,6 +140,13 @@ import { AiProvidersSeedService } from './seed/ai-providers-seed.service';
     AgentsService,
     AgentRunnerService,
     PromptSecurityService,
+    ConnectchatAutoResponderService,
+    ConnectchatSupportContextService,
+    TechnicalCaseRepository,
+    TechnicalCaseService,
+    TechnicalCasePlannerService,
+    IspRepository,
+    IncidentLookupService,
     // Análise de atendimento
     AttendanceAnalysisRepository,
     AttendanceAnalysisService,
