@@ -225,7 +225,9 @@ export class ConnectchatAutoResponderService {
           requestCreatedAt: firstAt, nextAttemptAt: now + 15000,
         });
         const token = createHash('sha256').update(`newnet-link-request:${conversation.id}:${requestId}`).digest('hex').slice(0, 32);
-        const sent = await this.sendReply(conversation.id, , `newnet-link-request-${token}`);
+        await this.inbox.sendAgentMessage(conversation.id,
+          'Enviei um pedido de confirmacao de vinculo. Confirme na sua area de acesso para seguirmos.',
+          `newnet-link-request-${token}`);
       } catch (error) {
         this.logger.warn(`ConnectChat vÃ­nculo: ${(error as Error).message}`);
         await this.settings.set(key, { ...attemptState, nextAttemptAt: now + 60000 });
