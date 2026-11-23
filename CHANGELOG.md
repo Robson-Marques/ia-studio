@@ -1,8 +1,28 @@
-# Changelog — IA Studio
+﻿# Changelog — IA Studio
 
 ## Não publicado
 
-## v0.12.8 - 2026-11-18 (mídia WAHA reconciliada pelo evento canônico)
+## v0.12.40 - 2026-11-23 (evita resposta duplicada no ConnectChat)
+
+- Corrige a IA 'Nete' repetindo a mesma pergunta no ConnectChat: no \catch\ do
+  método \espond()\ em \ConnectchatAutoResponderService\, o \complete(key,
+  sequence, claim)\ agora é chamado mesmo quando ocorre erro após o
+  \sendAgentMessage\, avançando o cursor e evitando reprocessamento da mesma
+  mensagem no próximo poll (5s).
+- Remove repositório embutido \Connect-Nivoo\ e pasta \Claude outputs\ do
+  versionamento.
+
+## v0.12.39 - 2026-11-22 (composição conversacional em parágrafos)
+
+- A confirmação inicial deixa de perguntar pela 'assinatura de' e passa a usar
+  a formulação natural 'o atendimento é sobre a conexão de'.
+- Saudação, confirmação, leitura operacional, limite da leitura e próxima
+  pergunta são separadas por linhas em branco reais (\\n\n\). O painel e a PWA
+  já preservavam essas quebras; a correção passa a produzi-las no backend.
+- A resposta de investigação deixa de ser um bloco corrido e ganha composição
+  escaneável, com uma ideia por parágrafo.
+
+v0.12.8 - 2026-11-18 (mídia WAHA reconciliada pelo evento canônico)
 
 - Corrige o download de imagem, figurinha, áudio, vídeo e documento enviados pelo painel: o eco `message.any` agora substitui a referência provisória pelo `chatId+messageId` definitivo publicado pela própria WAHA.
 - Mensagens de mídia já gravadas por versões anteriores são recuperadas sem migração de banco: o proxy reconstrói o descritor com o endereço técnico observado na conversa e mantém o descritor original como fallback auditável.
