@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConnectchatConversation } from '../../../shared/integration/connectchat.client';
 import { ConnectionsRepository } from '../../integration/connections/connections.repository';
 import { ConnectionsService } from '../../integration/connections/connections.service';
-import { rows, projectChamado, projectOrdemServico, projectContrato, projectConexao, projectBoleto, limitBoletos } from '../../isp/isp-projections';
+import { rows, projectChamado, projectOrdemServico, projectContrato, projectConexao, projectBoleto, limitBoletos, projectSessaoRadacct } from '../../isp/isp-projections';
 import { IncidentLookupService, IncidentInfo } from '../../isp/incident-lookup.service';
 import { isValidSubscriberDocument, normalizeSubscriberDocument } from './subscriber-document';
 import { scopeVerifiedInvoices } from './billing-response';
@@ -45,6 +45,15 @@ export interface VerifiedSupportContext {
   technologyByContract: Record<string, 'FIBRA' | 'RADIO'>;
   sourceStatus: Record<string, TechnicalSourceState>;
   historyAnalysis: TechnicalHistoryAnalysis;
+  /** Quedas/instabilidade recentes do login (radacct). `anomalia` é o sinal que
+   *  a Nete informa ao cliente (sem números); os contadores são para a OS. */
+  linkHistory: {
+    available: boolean;
+    anomalia: boolean;
+    quedas24h: number;
+    quedas7d: number;
+    ultimoMotivo: string | null;
+  };
 }
 
 @Injectable()
@@ -238,6 +247,7 @@ export class ConnectchatSupportContextService {
         incidents: 'UNAVAILABLE', recentOs: 'UNAVAILABLE', recentTickets: 'UNAVAILABLE',
       },
       historyAnalysis: emptyHistory,
+      linkHistory: { available: false, anomalia: false, quedas24h: 0, quedas7d: 0, ultimoMotivo: null },
     };
     if (conversation.businessContact?.status !== 'CUSTOMER'
       || conversation.businessContact.linkStatus !== 'ACTIVE') {
@@ -343,6 +353,37 @@ export class ConnectchatSupportContextService {
       this.logger.warn(`Consulta de incidentes não concluída: ${(error as Error).message}`);
     }
 
+    // Quedas/instabilidade recentes do login (radacct). Só com UM login ativo
+    // (sem ambiguidade de qual sessão ler); múltiplos ativos vão para atendente.
+    // Falha aqui não bloqueia: "sem histórico de quedas" não é "sem quedas".
+    let linkHistory = empty.linkHistory;
+    const singleLogin = connections.length === 1
+      ? String(connections[0]?.['access_ref'] ?? '') : '';
+    if (singleLogin) {
+      try {
+        const sessoes = rows(await this.connections.execute(connectionId, 'conexao.historico',
+          { login: singleLogin })).map(projectSessaoRadacct);
+        const now = Date.now();
+        const within = (value: unknown, ms: number): boolean => {
+          const time = Date.parse(String(value ?? ''));
+          return Number.isFinite(time) && time <= now && now - time <= ms;
+        };
+        const encerradas = sessoes.filter((s) => typeof s['fim'] === 'string');
+        const quedas24h = encerradas.filter((s) => within(s['fim'], 86_400_000)).length;
+        const quedas7d = encerradas.filter((s) => within(s['fim'], 7 * 86_400_000)).length;
+        const ultimo = encerradas.find((s) => typeof s['motivo'] === 'string');
+        linkHistory = {
+          available: true,
+          anomalia: quedas24h >= 3 || quedas7d >= 5,
+          quedas24h,
+          quedas7d,
+          ultimoMotivo: ultimo ? String(ultimo['motivo']).slice(0, 80) : null,
+        };
+      } catch (error) {
+        this.logger.warn(`Histórico de conexão (radacct) não concluído: ${(error as Error).message}`);
+      }
+    }
+
     // Histórico complementar: falha não apaga a evidência de OS em andamento.
     const [osResult, ticketsResult] = await Promise.all([
       this.connections.execute(connectionId, 'os.listar_recentes',
@@ -389,7 +430,7 @@ export class ConnectchatSupportContextService {
       recurrenceEvidence: historyAnalysis.similarCases.map((item) =>
         `${item.kind}:${item.reference}:${item.similarityReasons.join('|')}`).slice(0, 5),
       contracts, connections, blockedContracts, technology, technologyByContract,
-      sourceStatus, historyAnalysis,
+      sourceStatus, historyAnalysis, linkHistory,
     };
   }
 

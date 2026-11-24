@@ -58,6 +58,7 @@ const T = {
   contrato: 'cliente_contrato',
   areceber: 'fn_areceber',
   radusuarios: 'radusuarios',
+  radacct: 'radacct',
   os: 'su_oss_chamado',
   osAssunto: 'su_oss_assunto',
   // O campo `setor` da OS (su_oss_chamado) referencia empresa_setor.id — NÃO
@@ -95,6 +96,7 @@ const OPERATIONS = [
   'os.encerrar',
   'os.analisar',
   'conexao.desconectar',
+  'conexao.historico',
   'cliente.tecnologia',
   // Extensão IXC: histórico limitado para análise assistida. Não é operação
   // do contrato comum de atendimento; a tool que a usa força uma conexão IXC.
@@ -286,6 +288,9 @@ export class IxcProvider extends BaseProvider {
 
       case 'conexao.desconectar':
         return this.desconectarCliente(ctx, token, args);
+
+      case 'conexao.historico':
+        return { data: await this.conexaoHistorico(ctx, token, args) };
 
       case 'cliente.tecnologia':
         return this.tecnologiaCliente(ctx, token, args);
@@ -791,6 +796,30 @@ export class IxcProvider extends BaseProvider {
       oper: '=',
       rp: '5',
       sortname: `${T.os}.id`,
+      sortorder: 'desc',
+    });
+  }
+
+  /**
+   * Histórico de sessões RADIUS (radacct) do login, para detectar quedas e
+   * instabilidade recentes da conexão. Filtra por username (o login do cliente),
+   * em ordem decrescente; limite fechado no provider. Não inferimos nada aqui —
+   * só devolvemos as sessões; a análise (quantas quedas, instabilidade) é feita
+   * no support-context.
+   */
+  private async conexaoHistorico(
+    ctx: ProviderContext,
+    token: string,
+    args: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
+    const login = this.str(args, 'login');
+    if (!login) return [];
+    return this.list(ctx, token, T.radacct, {
+      qtype: `${T.radacct}.username`,
+      query: login,
+      oper: '=',
+      rp: '40',
+      sortname: `${T.radacct}.radacctid`,
       sortorder: 'desc',
     });
   }

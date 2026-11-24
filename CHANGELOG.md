@@ -1,4 +1,16 @@
 # Changelog
+## [v0.12.66] - 2026-11-24
+### changed
+- ConnectChat/Nete (quedas do login via radacct; cliente-mínimo vs OS-detalhe; desarma reinício de sistema; múltiplos ativos → atendente): rodada de lapidação do atendimento técnico.
+  - **Desarmado o reinício/desconexão por sistema**: `reiniciar_conexao` sai da lista de tools do agente (`connectchat-auto-responder.service.ts`) — era ele que gerava "não consegui reiniciar a conexão por aqui", e depende de outra ferramenta que ainda não existe. O reinício passa a ser sempre PEDIDO ao cliente (religar o equipamento da tomada), nunca prometido como ação do sistema. Religamos esse caminho mais à frente.
+  - **Histórico de quedas do login (radacct)**: nova ação `conexao.historico` no `ixc.provider.ts` (lista `radacct` por `username`), projeção `projectSessaoRadacct` (`isp-projections.ts`, sem IP/MAC/NAS), e análise no `connectchat-support-context.service.ts` — só com UM login ativo: calcula quedas 24h/7d e o sinal de `anomalia`. **Para o cliente**, a Nete informa apenas que "verificou uma anomalia/instabilidade na conexão" — nunca números/horários; os contadores vão só para a OS.
+  - **Fluxo online**: informa a anomalia (se houver) → pede ao cliente para religar o equipamento (confirmando que está em casa) → se não puder ou não resolver, abre OS e encaminha para a equipe. Sem reinício por sistema.
+  - **OS detalhada e SINTETIZADA**: nova instrução — ao abrir OS, a Nete escreve um resumo compreendido (não recortado) para o técnico: evolução dos atendimentos dos últimos 30 dias (quantos, o que houve em cada, como o último fechou, o que ocorreu entre eles) + resumo das quedas. Para o cliente, o mínimo; na OS, o detalhe. Reincidência passa a ser janela de **30 dias**.
+  - **Múltiplos contratos/logins ATIVOS → atendente**: a Nete não tenta adivinhar qual. Abre uma OS SIMPLES (motivo do contato + nota de que havia múltiplos cadastros e não deu para identificar qual) e avisa o cliente, de forma seca e gentil, que um atendente vai contatar para confirmar a instalação. Sem análise/quedas/reinício. (Ativo-only já era filtrado: cancelado/inativo descarta, bloqueado-ativo consulta.)
+
+### note
+- Fora de escopo por ora (pedido do Robson): desconectar login / caminho de outra tecnologia / outro sistema — religamos depois. Ler TODAS as mensagens internas de uma mesma OS (atualização/ausência linha a linha) depende de outro endpoint do IXC ainda não fornecido; com o que há, a evolução sai da lista de OS/chamados recentes. Backend puro, sem schema/ACL. Typecheck: arquivos tocados sem erro novo (restam só os ambientais conhecidos: @types/node, PrismaService, lib es2022).
+
 ## [v0.12.65] - 2026-11-24
 ### changed
 - ConnectChat/Nete (ENTENDER, não copiar: resumir o fechamento em linguagem simples, sem vazar interno): a v0.12.64 fez a Nete ler a finalização da OS, mas ela passou a REPRODUZIR o texto literal ao cliente ("o fechamento foi registrado assim: 'TROCADO A ONU. MARCOS E EMANUEL'") — copiar e colar, não entender, e ainda expondo nome de técnico. Corrige um exagero da v0.12.62 (que mandava "citar as palavras exatas, entre aspas" para travar alucinação). Ajuste:

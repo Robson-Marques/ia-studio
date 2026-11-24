@@ -203,3 +203,15 @@ export function projectChamado(row: Record<string, unknown>): Record<string, unk
     resolucao: excerpt(row['solucao'] ?? row['resposta'] ?? row['parecer']),
   });
 }
+
+/** Uma sessão RADIUS (radacct) do login. `fim` ausente = sessão ainda em curso
+ *  (conexão atual). Cada sessão encerrada é uma (re)conexão após uma queda.
+ *  Sem IP/MAC/NAS — dado interno não vai para a análise do modelo. */
+export function projectSessaoRadacct(row: Record<string, unknown>): Record<string, unknown> {
+  return compact({
+    inicio: firstString(row, ['acctstarttime']),
+    fim: firstString(row, ['acctstoptime']),
+    duracao_seg: str(row['acctsessiontime']),
+    motivo: firstString(row, ['acctterminatecause']),
+  });
+}

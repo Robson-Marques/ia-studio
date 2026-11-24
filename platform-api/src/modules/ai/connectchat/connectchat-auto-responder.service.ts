@@ -55,7 +55,10 @@ export class ConnectchatAutoResponderService {
     'identificar_cliente', 'consultar_os_recentes', 'consultar_chamados_recentes',
     'diagnosticar_conexao', 'consultar_debitos', 'consultar_contrato', 'status_conexao',
     'status_regiao', 'segunda_via_boleto', 'gerar_link_pagamento', 'desbloqueio_confianca',
-    'abrir_os', 'encerrar_os', 'reiniciar_conexao', 'identificar_tecnologia', 'encaminhar_para_fila',
+    // reiniciar_conexao/desconexão desarmados por ora (dependem de outra ferramenta;
+    // seguimos esse caminho mais à frente). Religar o equipamento é pedido ao cliente
+    // na conversa, não via tool de sistema.
+    'abrir_os', 'encerrar_os', 'identificar_tecnologia', 'encaminhar_para_fila',
   ];
 
   constructor(
