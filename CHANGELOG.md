@@ -1,4 +1,13 @@
 # Changelog
+## [v0.12.65] - 2026-11-24
+### changed
+- ConnectChat/Nete (ENTENDER, não copiar: resumir o fechamento em linguagem simples, sem vazar interno): a v0.12.64 fez a Nete ler a finalização da OS, mas ela passou a REPRODUZIR o texto literal ao cliente ("o fechamento foi registrado assim: 'TROCADO A ONU. MARCOS E EMANUEL'") — copiar e colar, não entender, e ainda expondo nome de técnico. Corrige um exagero da v0.12.62 (que mandava "citar as palavras exatas, entre aspas" para travar alucinação). Ajuste:
+  - **`connectchat-attendance-protocol.ts`**: a regra de citação literal vira "ENTENDA, não copie" — a Nete LÊ o texto do sistema para compreender, mas conta ao cliente o SENTIDO em linguagem simples, sem acrescentar fato/causa que não esteja escrito e sem reproduzir o texto (ex.: "TROCADO A ONU. MARCOS E EMANUEL" → "foi feita a troca de um equipamento"). "Nome de técnico" e "modelo/código de equipamento" entram na lista do que nunca se expõe ao cliente. O núcleo anti-invenção (só afirmar o que está escrito; "não tenho esse dado" é válido) permanece.
+  - **`connectchat-diagnosis.ts`**: as linhas do driver de conduta e o cabeçalho do histórico trocam "cite a DATA e o fechamento literais" por "diga a DATA e RESUMA em linguagem simples o que foi feito, sem copiar o texto nem expor detalhe interno". O histórico continua literal no que a Nete LÊ; muda só o que ela FALA.
+
+### note
+- Fecha o ciclo do grounding sem virar copiadora: ler literal (não inventa) + resumir o sentido (entende, não cola) + não vazar interno. Backend puro, sem schema/ACL/tool/endpoint. Typecheck: os dois arquivos com zero erro novo.
+
 ## [v0.12.64] - 2026-11-24
 ### changed
 - ConnectChat/Nete (lê a FINALIZAÇÃO da OS, não só a abertura; e saudação obrigatória): com a v0.12.63 a Nete já citava a OS certa e datada, mas (1) lia só o relato de ABERTURA e perguntava ao cliente o que tinha sido feito — em vez de ler a resposta de fechamento que está no sistema; e (2) não cumprimentava. Correções:

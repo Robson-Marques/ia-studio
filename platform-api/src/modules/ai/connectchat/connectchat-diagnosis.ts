@@ -94,17 +94,17 @@ export function buildDiagnosis(
     const fech = (d.fechamento ?? d.relato ?? '').slice(0, 160);
     const citacao = fech ? ` fechada com: "${fech}"` : ' (sem texto de fechamento registrado)';
     if (history.driverKind === 'CAMPO') {
-      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. Da última vez a solução foi INTERVENÇÃO DA EQUIPE em campo (troca de equipamento/cabo/sinal). USE isso para decidir como um atendente faria — você NÃO está preso a um caminho: se o acesso está online e o cliente está em casa, pode pedir para ele desligar/ligar o equipamento da tomada e ver se persiste; OU já abrir OS para a equipe verificar, marcando a reincidência. Julgue pelo relato atual. Ao falar com ele, cite a DATA e o fechamento literais.`);
+      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. Da última vez a solução foi INTERVENÇÃO DA EQUIPE em campo (troca de equipamento/cabo/sinal). USE isso para decidir como um atendente faria — você NÃO está preso a um caminho: se o acesso está online e o cliente está em casa, pode pedir para ele desligar/ligar o equipamento da tomada e ver se persiste; OU já abrir OS para a equipe verificar, marcando a reincidência. Julgue pelo relato atual. Ao falar com ele, diga a DATA e RESUMA o que foi feito em linguagem simples (ex.: "foi feita a troca de um equipamento") — sem copiar o texto nem citar nome de técnico/código.`);
     } else if (history.driverKind === 'FORA_DA_REDE') {
-      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. A resolução aponta causa FORA da nossa rede (TV/IPTV/app/equipamento do cliente). Confirme pelo relato atual se é o mesmo caso antes de tratar como problema de rede; se confirmar, conduza por isso. Cite a DATA e o fechamento literais.`);
+      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. A resolução aponta causa FORA da nossa rede (TV/IPTV/app/equipamento do cliente). Confirme pelo relato atual se é o mesmo caso antes de tratar como problema de rede; se confirmar, conduza por isso. Diga a DATA e resuma em linguagem simples o que foi constatado — sem copiar o texto nem expor detalhe interno.`);
     } else {
-      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. A resolução não deixa claro o que foi feito: peça a informação que falta para descrever bem antes de decidir a conduta. Cite a DATA e o fechamento literais, sem completar o que não está escrito.`);
+      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. A resolução não deixa claro o que foi feito: peça a informação que falta para descrever bem antes de decidir a conduta. Diga a DATA e resuma em linguagem simples o que consta, sem copiar o texto e sem completar o que não está escrito.`);
     }
   }
   lines.push('- REGRA DESTE DIAGNÓSTICO: afirme sobre o cliente SÓ o que está escrito aqui. O que não está — quedas, ou o que foi feito num registro sem resolução escrita — você NÃO sabe; não invente nem repita como fato do sistema o que o cliente disse. "Não tenho esse dado" é válido.');
   lines.push('- Na PRIMEIRA resposta, relate com naturalidade só o que está no diagnóstico e conduza. Não acrescente nenhum fato que não esteja aqui.');
   if (history.entries.length) {
-    lines.push('- Histórico recente do cliente (ESTE é o real — cite só o que está aqui, SEMPRE com a DATA, literal; registros marcados [interno] são de teste/processo e NÃO contam como histórico do cliente):');
+    lines.push('- Histórico recente do cliente (ESTE é o real, que você LÊ para ENTENDER; ao falar com o cliente, conte o SENTIDO em linguagem simples, com a DATA, SEM copiar o texto e SEM expor detalhe interno como nome de técnico; não vá além do que está aqui; registros marcados [interno] são de teste/processo e NÃO contam como histórico do cliente):');
     for (const e of history.entries) {
       const data = e.data ?? 'sem data';
       const marca = e.interno ? ' [interno — desconsidere]' : '';
