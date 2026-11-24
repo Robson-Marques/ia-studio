@@ -1,4 +1,13 @@
 # Changelog
+## [v0.12.67] - 2026-11-24
+### changed
+- ConnectChat/Nete (análise-primeiro restaurada + fala humanizada): dois ajustes que ficaram de fora da v0.12.66 (a tag foi criada em `5ddf2ff`, antes destes commits).
+  - **Correção de regressão (análise-primeiro)** — `connectchat-diagnosis.ts`: a v0.12.66 passou a PULAR a análise e ir direto ao "reinicie o equipamento". Causa: na reescrita eu troquei a instrução "relate o que verificou e conduza" por "ao cliente, o mínimo", e o modelo encurtou demais. Restaurado: na primeira resposta ela RELATA o que verificou (online/offline, anomalia se houver, o que foi feito no atendimento anterior se relevante) ANTES de pedir o reinício; a ramificação online não lidera mais com o pedido de reinício. Mantida a regra de não despejar dado interno.
+  - **Humanização (temperatura)** — `connectchat-auto-responder.service.ts`: `prepareNativeAgent` (antes `ensureNativeIspTools`) aplica um piso de temperatura de **0.6** ao agente nativo do ConnectChat, em memória (não grava no banco; respeita valor maior configurado pelo usuário). A temperatura varia só o COMO falar — o grounding (não inventar, só o que está no diagnóstico/ferramenta) trava a fuga de contexto por mais alta que ela seja, então não reabre alucinação.
+
+### note
+- A v0.12.66 saiu com a regressão de análise-primeiro e sem a humanização — publicar a v0.12.67. Backend puro, sem schema/ACL. Typecheck: arquivos tocados sem erro novo (restam só os ambientais: @types/node, PrismaService, lib es2022).
+
 ## [v0.12.66] - 2026-11-24
 ### changed
 - ConnectChat/Nete (quedas do login via radacct; cliente-mínimo vs OS-detalhe; desarma reinício de sistema; múltiplos ativos → atendente): rodada de lapidação do atendimento técnico.
@@ -8,7 +17,6 @@
   - **OS detalhada e SINTETIZADA**: nova instrução — ao abrir OS, a Nete escreve um resumo compreendido (não recortado) para o técnico: evolução dos atendimentos dos últimos 30 dias (quantos, o que houve em cada, como o último fechou, o que ocorreu entre eles) + resumo das quedas. Para o cliente, o mínimo; na OS, o detalhe. Reincidência passa a ser janela de **30 dias**.
   - **Múltiplos contratos/logins ATIVOS → atendente**: a Nete não tenta adivinhar qual. Abre uma OS SIMPLES (motivo do contato + nota de que havia múltiplos cadastros e não deu para identificar qual) e avisa o cliente, de forma seca e gentil, que um atendente vai contatar para confirmar a instalação. Sem análise/quedas/reinício. (Ativo-only já era filtrado: cancelado/inativo descarta, bloqueado-ativo consulta.)
   - **Filtro de ruído do histórico (`connectchat-recent-history.ts`)**: registros de sistema ("Alteração de dados da O.S.", mudança de setor) e stubs de abertura por processo sem fechamento passam a ser marcados `[interno]` e descartados do histórico do cliente. Corrigido um bug: "OPA SUITE"/"disparando do processo" NÃO marcam mais sozinhos — a OS real criada por processo abre com esse cabeçalho, então a regra antiga corria o risco de descartar OS real finalizada; agora só é ruído quando é a ABERTURA por processo, sem fechamento e não encerrada.
-  - **Humanização da fala da Nete (temperatura)**: o atendimento estava robótico/previsível (temperatura 0.3). `prepareNativeAgent` (antes `ensureNativeIspTools`) passa a aplicar um piso de temperatura de **0.6** ao agente nativo do ConnectChat, em memória (não grava no banco; respeita valor maior configurado pelo usuário). A temperatura varia só o COMO falar — o grounding (não inventar, só o que está no diagnóstico/ferramenta) trava a fuga de contexto por mais alta que ela seja, então não reabre alucinação. A análise-primeiro (relatar o que verificou antes de pedir reinício) foi restaurada no diagnóstico.
 
 ### note
 - Fora de escopo por ora (pedido do Robson): desconectar login / caminho de outra tecnologia / outro sistema — religamos depois. A evolução dos atendimentos sai da própria listagem de OS/chamados recentes (a "mensagem" que importa é a finalizada, `mensagem_resposta`); as linhas de atualização/ausência/mudança de setor são descartadas como ruído, e o teor de ausência fica no corpo da própria OS. Backend puro, sem schema/ACL. Typecheck: arquivos tocados sem erro novo (restam só os ambientais conhecidos: @types/node, PrismaService, lib es2022).
