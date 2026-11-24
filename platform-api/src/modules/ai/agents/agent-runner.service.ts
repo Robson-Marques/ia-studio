@@ -93,7 +93,9 @@ export class AgentRunnerService {
     this.promptSecurity.inspect(params.input);
 
     const systemPrompt = await this.buildSystemPrompt(agent, params.input, traceId)
-      + (params.channelInstructions ? '\n\n## Restrições deste teste supervisionado\n' + params.channelInstructions : '');
+      + (params.channelInstructions
+        ? '\n\n## Instruções obrigatórias deste atendimento (seguir à risca; têm prioridade sobre a persona)\n' + params.channelInstructions
+        : '');
     const llmTools = await this.buildTools(agent, params.allowedToolsOverride);
     const permittedTools = llmTools.map((tool) => tool.name);
 

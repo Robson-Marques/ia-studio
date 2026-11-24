@@ -15,6 +15,8 @@ import { AgentRunnerService } from '../agents/agent-runner.service';
 import { AgentsRepository } from '../agents/agents.repository';
 import { parseConversation } from '../agents/agent-conversation';
 import { ConnectchatSupportContextService, IdentifiedOperationalSnapshot } from './connectchat-support-context.service';
+import { buildAttendanceProtocol } from './connectchat-attendance-protocol';
+import { buildDiagnosis } from './connectchat-diagnosis';
 import { extractSubscriberDocument, redactSubscriberDocuments } from './subscriber-document';
 import { formatVerifiedInvoices } from './billing-response';
 import { ToolRegistryService } from '../tools/tool-registry.service';
@@ -928,143 +930,14 @@ export class ConnectchatAutoResponderService {
   }
 
   // ─── Atendimento orientado a INTENÇÃO (Nete / ConnectChat) ──────────────
-  // O agente CONDUZ: entende a intenção, usa as ferramentas ISP para descobrir
-  // a situação do cliente (vínculo, bloqueio, online/offline, OS/chamados) e
-  // responde de forma humana e variável. O backend mantém os gates — a conexão/
-  // ERP é auto-resolvida pelas tools (a IA nunca escolhe id de infra), o dado
-  // sensível é escopado pela conexão verificada e abrir_os checa incidente e
-  // duplicidade. Aqui NÃO há máquina de estados de atendimento: só o encanamento
-  // do canal (cursor/claim/debounce/dedup) + a chamada ao agente.
-  private channelPolicy(identified: { name: string; document: string | null } | null): string {
-    const base = [
-      'Você é a Nete, atendente da Newnet (provedor de internet). Fale como uma pessoa real: natural, acolhedora e objetiva, variando as palavras a cada atendimento — nunca use frases prontas nem repita a mesma mensagem.',
-      'Este é um atendimento de chat. Envie UMA mensagem por vez; o atendimento evolui a cada resposta do cliente. Não faça o cliente repetir o que já disse.',
-      'Quando o cliente só cumprimentar (oi, bom dia), responda à saudação e pergunte, em uma frase, como pode ajudar — sem pedir dados de cara.',
-      'Entenda a intenção do cliente e use suas ferramentas para descobrir a situação ANTES de responder: identifique o titular, veja o contrato (inclusive se está bloqueado por inadimplência), se a conexão está online ou offline, se há chamado ou OS recente e se há ocorrência na região. Só então trate o que o cliente pediu.',
-      'Identificação: para tratar de algo da conta você precisa do titular. Se já houver cliente vinculado, confirme com naturalidade se o atendimento é para esse titular; se NÃO for, peça o CPF/CNPJ do cliente correto antes de seguir. Se não houver vínculo, peça o CPF ou CNPJ logo no início, de forma leve, para localizar o cadastro. O documento localiza o cadastro, não prova identidade — não exponha dados de terceiros e, se não bater, peça para conferir e reenviar.',
-      'Internet que "não funciona" com o contrato BLOQUEADO por inadimplência é financeiro, não técnico: não abra ordem de serviço — ofereça 2ª via, link de pagamento ou desbloqueio de confiança.',
-      'Antes de abrir OS, confie no retorno das ferramentas: se houver incidente/manutenção na região ou já existir chamado/OS aberto, informe o cliente e NÃO abra outro. Se uma ferramenta devolver erro ou indisponibilidade, seja honesto e, quando precisar, encaminhe para um atendente humano com encaminhar_para_fila.',
-      'Você faz suporte de nível 2: pode analisar o cadastro e resolver o que estiver ao seu alcance (2ª via, link de pagamento, desbloqueio de confiança, diagnóstico de conexão e abertura de OS quando for o caso). Quando o caso exigir um humano, avise o cliente em uma frase e use encaminhar_para_fila.',
-      'Nunca invente protocolo, valor, link ou informação: use só o que a ferramenta devolver. Nunca revele IDs internos, OLT/CTO, VLAN, percentuais de rede nem o nome de setor/fila técnica.',
-      'Seja RESOLUTIVA: o atendimento é para resolver rápido, não é interrogatório. Faça no máximo uma ou duas perguntas de diagnóstico e então AJA — oriente um reinício do equipamento, abra um chamado/OS ou ofereça a solução. Não peça ao cliente para ficar testando em sequência (app por app, dados móveis, navegador): cansa e alonga o atendimento sem necessidade.',
-      'O que você levanta no diagnóstico (o que funciona, o que o cliente relatou, o que já foi tentado) serve para DESCREVER BEM o chamado/OS — registre esses detalhes na abertura. Mas coletar essa informação nunca pode travar o andamento: com o essencial em mãos, abra o chamado e siga, sem ficar juntando detalhes a mais.',
-      'ANALISE O SISTEMA ANTES DE PERGUNTAR AO CLIENTE. Assim que tiver o titular, rode a rotina sobre o cadastro pelo bloco "Estado do cliente no sistema" (bloqueio/financeiro, online/offline, incidente na região, OS/chamado aberto, histórico de chamados recentes) — mesmo que o cliente já tenha dito qual é o problema. O SISTEMA descobre a causa; o cliente só confirma ou completa o que o sistema não mostrou. Faça uma ou duas perguntas no máximo, e só sobre o que o sistema não respondeu — nunca um interrogatório.',
-      'REINCIDÊNCIA: antes de orientar, veja o histórico de chamados. Se o cliente já abriu chamado recente sobre o MESMO caso, trate com prioridade e, ao abrir a OS, REGISTRE na descrição que é um cliente reincidente (quantas vezes, que já houve atendimento no local) para o técnico dar solução definitiva. Essa informação vai no chamado, não só na conversa.',
-      'Cliente online que diz "não funciona"/"sem conexão": o acesso aparece online, então a causa costuma ser local (roteador ou aparelho do cliente travado). Você pode REINICIAR A CONEXÃO dele pelo sistema (reiniciar_conexao) — força a reconexão sem depender de ele mexer no equipamento; ou orientar um reinício do roteador/aparelho. Se persistir, abra OS (pode exigir visita técnica).',
-      'Siga essa ESTRUTURA DE ANÁLISE como espinha do raciocínio (não roteiro fixo — adapte palavras e ordem):',
-      'Contrato BLOQUEADO por inadimplência -> caminho financeiro: mostre a situação, ofereça 2ª via, link de pagamento ou desbloqueio de confiança e pergunte o que ele prefere; não trate como técnico nem abra OS.',
-      'Offline COM incidente na região -> informe a manutenção em andamento e NÃO abra OS.',
-      'Offline, SEM bloqueio e SEM incidente -> NÃO mande reiniciar às cegas (reinício não resolve quem está offline). Entenda o porquê: confirme com o cliente se os equipamentos estão ligados (luzes/cabos) e peça uma FOTO dos equipamentos. Identifique a tecnologia pelo sistema (identificar_tecnologia): se for RÁDIO, lembre que há o rádio no poste/torre além do roteador — os dois precisam estar ligados. Se não for algo simples no local, abra OS para a equipe verificar a estrutura/sinal.',
-      'Lentidão (acesso online, sem bloqueio) -> se o cliente ainda não reiniciou, peça UM reinício do equipamento; se continuar lento, abra um chamado de lentidão para a equipe avaliar. Não fique testando app por app, dados móveis nem navegador — resolva em poucos passos.',
-      'Já existe OS ou chamado aberto -> acompanhe o existente, não duplique.',
-      'Se o cliente disser que NORMALIZOU/voltou ao normal e houver O.S./chamado aberto deste caso, confirme com ele e ENCERRE com a ferramenta de encerramento, registrando que ele confirmou a solução. Só encerre com a confirmação do cliente; se houver mais de uma O.S. aberta, pergunte qual antes de encerrar.',
-      'Online e em dia -> pergunte em que pode ajudar, sem despejar diagnóstico.',
-      'Use o histórico de chamados recentes: se algo parecido já foi resolvido, cite o que foi feito e confirme se é o mesmo problema ou se voltou.',
-      'O bloco "Estado do cliente no sistema" já traz a situação atual — parta dele; use as ferramentas para aprofundar ou executar ação (2ª via, link, desbloqueio, abrir OS, encaminhar), não para redescobrir o que já está ali.',
-      'Escreva para leitura em chat: frases curtas e uma ideia por linha. Ao encadear passos ou instruções, quebre a linha a cada frase (após o ponto final) em vez de mandar um bloco único de texto.',
-      'Não use emojis. Responda sempre em português do Brasil.',
-    ];
-    if (identified) {
-      base.splice(4, 0, identified.document
-        ? `O titular já está identificado e vinculado: ${identified.name}, documento ${identified.document}. Trate o cliente pelo PRIMEIRO nome dele de forma natural (só o primeiro nome, não o nome completo), demonstrando que você já sabe com quem fala — sem repetir o nome em toda mensagem. Use esse documento (CPF/CNPJ) diretamente nas ferramentas para consultar conexão, contrato, financeiro, chamados e OS — NÃO peça o CPF de novo ao cliente.`
-        : `O titular já está vinculado (${identified.name}), então trate o cliente pelo primeiro nome de forma natural. Não recuperei o documento automaticamente: confirme com gentileza o CPF ou CNPJ antes de consultar, sem repetir perguntas já respondidas.`);
-    }
-    return base.join('\n');
-  }
-  // Camada 2 de memória: o estado do cliente DENTRO do sistema (IXC), montado do
-  // retrato operacional recém-lido. É efêmero (da sessão de atendimento), nunca é
-  // a conversa e nunca é reaproveitado entre atendimentos.
-  private buildSystemMemory(
-    identified: { name: string; document: string | null } | null,
-    support: Awaited<ReturnType<ConnectchatSupportContextService['byVerifiedConversation']>> | null,
-    billing: Awaited<ReturnType<ConnectchatSupportContextService['billingForVerifiedConversation']>> | null,
-  ): string | null {
-    if (!identified && !support) return null;
-    const str = (r: Record<string, unknown>, k: string): string | null =>
-      typeof r[k] === 'string' && (r[k] as string).trim() ? (r[k] as string).trim() : null;
-    const lines: string[] = [
-      '## Estado do cliente no sistema (memória desta sessão — não é a conversa; recém-lida do IXC)',
-    ];
-    if (identified) {
-      lines.push(`- Titular: ${identified.name}${identified.document ? `, documento ${identified.document}` : ''}`);
-    }
-    if (!support || support.available === false) {
-      lines.push('- Não consegui ler o estado operacional agora; confirme o essencial pelas ferramentas antes de concluir e, se faltar dado crítico, encaminhe para um atendente.');
-      return lines.join('\n');
-    }
-    const conns = support.connections ?? [];
-    lines.push(`- Acesso: ${conns.length ? (conns.some((c) => c['online'] === true) ? 'online' : 'offline') : 'sem dado'}`);
-    const tecnologia = support.technology; // 'FIBRA' | 'RADIO' | null — já lido do cadastro
-    lines.push(`- Tecnologia de acesso: ${tecnologia === 'FIBRA' ? 'FIBRA' : tecnologia === 'RADIO' ? 'RÁDIO' : 'sem dado'}`);
-    const blocked = (support.blockedContracts ?? 0) > 0;
-    lines.push(`- Contrato: ${blocked ? 'BLOQUEADO por inadimplência' : (support.contracts?.length ? 'ativo' : 'sem dado')}`);
-    if (billing && billing.available) {
-      const inv = billing.invoices ?? [];
-      const overdue = inv.filter((b) => b['vencido'] === true).length;
-      lines.push(inv.length
-        ? `- Financeiro: ${inv.length} boleto(s) em aberto${overdue ? `, ${overdue} vencido(s)` : ''}`
-        : '- Financeiro: nenhum boleto em aberto');
-    }
-    const openOs = support.openOs ?? [];
-    lines.push(openOs.length
-      ? `- OS aberta: sim${str(openOs[0], 'protocolo') ? ` (protocolo ${str(openOs[0], 'protocolo')})` : ''}`
-      : '- OS aberta: não');
-    lines.push(`- Chamado aberto: ${(support.openTickets ?? []).length ? 'sim' : 'não'}`);
-    const incident = (support.incidents ?? []).find((i) => i.suppress_os) ?? (support.incidents ?? [])[0];
-    lines.push(incident
-      ? `- Incidente na região: sim — ${String(incident.message ?? incident.title ?? 'ocorrência registrada').slice(0, 160)}`
-      : '- Incidente na região: não');
-    const recent = [...(support.openTickets ?? []), ...(support.recentTickets ?? [])].slice(0, 5);
-    // Diagnóstico determinístico: o SISTEMA decide o caminho; o modelo RELATA e
-    // segue, não escolhe outro. É o que resolve o "às vezes diagnostica, às vezes não".
-    const online = conns.some((c) => c['online'] === true);
-    const hist = support.historyAnalysis;
-    const reincidente = hist && !hist.unavailable ? (hist.recurrent || hist.recurrentWithin48h) : recent.length >= 2;
-    const radio = tecnologia === 'RADIO';
-    const fibra = tecnologia === 'FIBRA';
-    lines.push('');
-    lines.push('## Diagnóstico (determinístico — RELATE ao cliente e siga este caminho; não escolha outro)');
-    if (blocked) {
-      lines.push('- Contrato BLOQUEADO por inadimplência: trate pelo financeiro (desbloqueio de confiança quando permitido, 2ª via ou link). NÃO trate como problema técnico.');
-    } else if (incident && incident.suppress_os) {
-      lines.push('- INCIDENTE na região cobrindo este cliente: informe a manutenção (e a previsão, se houver). NÃO abra OS.');
-    } else if (!online) {
-      lines.push(`- Acesso OFFLINE, sem bloqueio: NÃO mande reiniciar às cegas (reinício não resolve quem está offline). Entenda o PORQUÊ — pode ser estrutura/rede externa (confira incidente na região). Confirme com o cliente se os equipamentos estão ligados (luzes/cabos) e peça uma FOTO.${radio ? ' Este cliente é RÁDIO: há o rádio no poste/torre além do roteador — os dois precisam estar ligados.' : fibra ? ' Este cliente é FIBRA: confira a luz/sinal da ONU.' : ''} Se não for algo simples no local, abra OS para a equipe verificar a estrutura/sinal.`);
-    } else {
-      lines.push(`- Acesso ONLINE, sem bloqueio: a causa costuma ser local (roteador/aparelho).${radio ? ' Como é RÁDIO, considere também o rádio no poste/torre.' : ''} Você pode REINICIAR A CONEXÃO pelo sistema (reiniciar_conexao); se persistir, abra OS.`);
-    }
-    const resolTxt = [...(hist?.previousResolutionHints ?? []), ...(support.recurrenceEvidence ?? [])].join(' ').toLowerCase();
-    const foraDaRede = /iptv|\btv\b|televis|aplicativo|\bapp\b|streaming|smart ?tv|aparelho do cliente|equipamento do cliente|roteador pr[oó]prio|sem garantia/.test(resolTxt);
-    if (reincidente) {
-      lines.push('- Cliente REINCIDENTE no mesmo problema. NÃO repita às cegas o passo que já foi tentado: leia a RESOLUÇÃO dos chamados anteriores (abaixo) e conduza por ela. Se o mesmo procedimento já falhou antes, ESCALE / abra OS marcando reincidência, em vez de mandar o mesmo de novo.');
-    }
-    if (foraDaRede) {
-      lines.push('- ATENÇÃO (histórico): a causa já identificada antes aponta FORA da rede (TV/IPTV/app/equipamento do cliente). Conduza por isso — não trate como problema da internet nem repita reinício de roteador por padrão.');
-    }
-    if (hist && hist.previousResolutionHints && hist.previousResolutionHints.length) {
-      lines.push(`- O que já resolveu antes (USE para decidir a conduta, não só mencione): ${hist.previousResolutionHints.slice(0, 3).join(' | ').slice(0, 300)}`);
-    }
-    if (support.recurrenceEvidence && support.recurrenceEvidence.length) {
-      lines.push(`- Histórico semelhante: ${support.recurrenceEvidence.slice(0, 3).join(' | ').slice(0, 300)}`);
-    }
-    lines.push('- O cliente quase não mexe em nada: as únicas ações dele são desligar/ligar o equipamento e conferir cabos/tomada. A ANÁLISE é SUA — verifique o sistema primeiro e deixe o que você viu MUDAR a conduta (reincidência, histórico, tecnologia), não só enfeitar a mensagem.');
-    lines.push('- Antes de pedir um reinício, CONFIRME se dá para fazer agora: "você está em casa e consegue desligar o roteador uns 30s pra gente acompanhar?". Se não puder, ajuste em vez de insistir.');
-    lines.push('- Na PRIMEIRA resposta, relate com naturalidade só o essencial do que você viu (online/offline, chamado recente) e já conduza pela análise. Não despeje dado nem pule o diagnóstico.');
-    if (recent.length) {
-      lines.push('- Chamados recentes (use para respostas mais robustas):');
-      for (const t of recent) {
-        const data = str(t, 'aberto_em') ?? str(t, 'encerrado_em') ?? '';
-        const titulo = str(t, 'titulo') ?? 'chamado';
-        const sit = str(t, 'situacao_interna') ?? str(t, 'status') ?? '';
-        const pedido = str(t, 'descricao');
-        const resol = str(t, 'resolucao');
-        lines.push(`  - ${data ? data + ' — ' : ''}${titulo}${sit ? ` (${sit})` : ''}${pedido ? ` — pedido: ${pedido.slice(0, 120)}` : ''}${resol ? ` — resolução: ${resol.slice(0, 120)}` : ''}`);
-      }
-    }
-    return lines.join('\n');
-  }
-
-
+  // O agente CONDUZ: entende a intenção, usa as ferramentas ISP e responde de
+  // forma humana e variável. A IDENTIDADE/princípios da Nete vivem em
+  // `connectchat-attendance-protocol.ts`; o DIAGNÓSTICO determinístico do cliente
+  // (estado + conduta por estado) em `connectchat-diagnosis.ts`. O backend mantém
+  // os gates — conexão/ERP auto-resolvida pelas tools (a IA nunca escolhe id de
+  // infra), dado sensível escopado pela conexão verificada. Aqui NÃO há máquina de
+  // estados de atendimento: só o encanamento do canal (cursor/claim/debounce/dedup)
+  // e a montagem de protocolo + diagnóstico como instruções do atendimento.
   private async respond(agent: AiAgent, conversation: ConnectchatConversation, resumeReason?: string): Promise<void> {
     void resumeReason;
     const sequence = conversation.lastSequence;
@@ -1154,7 +1027,7 @@ export class ConnectchatAutoResponderService {
         : null;
       let systemMemory: string | null = null;
       try {
-        systemMemory = this.buildSystemMemory(identified, support, billing);
+        systemMemory = buildDiagnosis(identified, support, billing);
       } catch (error) {
         this.logger.warn(`ConnectChat: memoria de sessao indisponivel: ${(error as Error).message}`);
       }
@@ -1168,8 +1041,8 @@ export class ConnectchatAutoResponderService {
           createdBy: null,
           scopeKeys,
           channelInstructions: systemMemory
-            ? this.channelPolicy(identified) + '\n\n' + systemMemory
-            : this.channelPolicy(identified),
+            ? buildAttendanceProtocol(identified) + '\n\n' + systemMemory
+            : buildAttendanceProtocol(identified),
           dryRun: false,
         })
         .finally(() => {

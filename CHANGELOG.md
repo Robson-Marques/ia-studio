@@ -1,4 +1,15 @@
 # Changelog
+## [v0.12.61] - 2026-11-24
+### changed
+- ConnectChat/Nete (reestruturação do organismo de prompt — causa raiz de "o diagnóstico é decoração"): o protocolo de atendimento e o diagnóstico estavam empilhados dentro de `connectchat-auto-responder.service.ts` e chegavam ao modelo sob o cabeçalho `## Restrições deste teste supervisionado` — ou seja, rotulados como andaime de teste e colados no rodapé do prompt, abaixo da persona. O modelo tratava tudo como secundário. Correções, seguindo o STUDIO-WORKFLOW (uma frente estrutural, cada organismo em seu arquivo):
+  - **Runner (`agent-runner.service.ts`)**: o cabeçalho de `channelInstructions` passa de "Restrições deste teste supervisionado" para `## Instruções obrigatórias deste atendimento (seguir à risca; têm prioridade sobre a persona)`. `channelInstructions` é usado só pelo ConnectChat (6 callsites, todos operacionais) — a mudança os reforça, não os quebra. Esta é a causa raiz: o diagnóstico perfeito não adiantava num slot que o código mandava despriorizar.
+  - **Novo `connectchat-attendance-protocol.ts`**: identidade e princípios da Nete (função pura `buildAttendanceProtocol`), sem os caminhos por estado.
+  - **Novo `connectchat-diagnosis.ts`**: estado + diagnóstico determinístico por cliente (função pura `buildDiagnosis`), com a conduta por estado CONSOLIDADA (sem duplicar o protocolo). Inclui a correção do caminho OFFLINE (não é reinício às cegas — confirmar offline, perguntar se está em casa, pedir foto; rádio/fibra), o acompanhamento/encerramento de OS aberta, reincidência real e causa-fora-da-rede.
+  - **Responder**: passa a importar e chamar os dois módulos; `channelPolicy()` e `buildSystemMemory()` inline foram REMOVIDOS (nada de código empilhado/duplicado).
+
+### note
+- Refatoração estrutural + a correção de enquadramento que a torna efetiva; sem nova feature de comportamento (a conduta foi realocada e de-duplicada, não inventada). Typecheck: os 3 arquivos ConnectChat com zero erro novo; o runner só com 2 implicit-any pré-existentes (deslocados pela edição). Falta o log de conexão RADIUS/flapping (frente futura). Plano aprovado via Relatório de alinhamento do STUDIO-WORKFLOW.
+
 ## [v0.12.60] - 2026-11-24
 ### changed
 - ConnectChat/Nete (a informação precisa MUDAR a conduta, não enfeitar): mencionar "você teve um chamado recente" é alegórico se não muda a ação. O diagnóstico passa a transformar o histórico em DECISÃO:
