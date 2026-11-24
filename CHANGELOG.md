@@ -1,4 +1,14 @@
 # Changelog
+## [v0.12.63] - 2026-11-24
+### changed
+- ConnectChat/Nete (o fechamento da OS INFORMA a conduta; histórico datado e literal): a Nete tinha os dados certos sendo buscados, mas o diagnóstico só imprimia CHAMADOS (tickets) — as ORDENS DE SERVIÇO (`su_oss_chamado`, onde mora o fechamento real, ex.: "TROCADO A ONU" de 21/11) eram lidas e descartadas num resumo opaco. Resultado: ela referenciava um registro vago (ou o de TESTE do dia 23) em vez do fechamento real. Correções:
+  - **Novo `connectchat-recent-history.ts`** (função pura `buildRecentHistory`): normaliza OS + chamados num histórico único, LITERAL e DATADO (mais recente primeiro); marca registro interno/de teste (`teste`, `opa suite`, `disparando do processo`...) para desconsiderar; e aponta o registro FECHADO relevante (não interno) que deve informar a conduta, com classificação grosseira e determinística da resolução: `CAMPO` (intervenção da equipe — troca de equipamento/cabo/sinal), `FORA_DA_REDE` (TV/IPTV/app/equipamento do cliente) ou `INCONCLUSIVO`.
+  - **`connectchat-diagnosis.ts`**: passa a imprimir esse histórico com a DATA sempre na frente e o fechamento entre aspas. REMOVIDO o branch rígido anterior ("reincidente → não reinicia / abre OS") — no lugar, o fechamento do registro relevante é entregue como INSUMO de decisão e a Nete INTERPRETA (ex.: OS de 21/11 fechada com troca de equipamento → ela pode pedir para religar o equipamento OU abrir OS para a equipe, ela julga). O código informa os fatos; a decisão é dela, como um atendente — não fluxo fixo.
+  - Guardrails duros mantidos: offline não reinicia; IDs de infra vêm da config; cite só o literal, com a data.
+
+### note
+- Fecha o gap "ela não leu o fechamento da OS": a OS real agora chega escrita e datada no diagnóstico, e o registro de teste sai marcado `[interno]` sem ser escondido. Backend puro, sem schema/ACL/tool/endpoint. Typecheck: os dois arquivos ConnectChat com zero erro novo. Plano aprovado via Relatório de alinhamento do STUDIO-WORKFLOW.
+
 ## [v0.12.62] - 2026-11-24
 ### changed
 - ConnectChat/Nete (anti-alucinação / grounding duro): a Nete estava gerando NARRATIVA CONVINCENTE — afirmava como fato do sistema coisas que não estavam no dado (ex.: "reiniciar já não resolveu a lentidão no chamado anterior" sem isso constar na resolução; "você está tendo quedas" apenas repetindo o cliente). Correções:

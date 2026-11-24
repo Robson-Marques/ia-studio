@@ -9,6 +9,7 @@
 
 import type { AttendanceIdentity } from './connectchat-attendance-protocol';
 import type { ConnectchatSupportContextService, VerifiedSupportContext } from './connectchat-support-context.service';
+import { buildRecentHistory } from './connectchat-recent-history';
 
 type BillingContext = Awaited<ReturnType<ConnectchatSupportContextService['billingForVerifiedConversation']>>;
 
@@ -56,12 +57,15 @@ export function buildDiagnosis(
     ? `- Incidente na região: sim — ${String(incident.message ?? incident.title ?? 'ocorrência registrada').slice(0, 160)}`
     : '- Incidente na região: não');
   lines.push('- Instabilidade/quedas do login: SEM DADO (log de conexão ainda não carregado) — NÃO afirme que a conexão caiu nem que não caiu; isso você não verificou.');
-  const recent = [...openTickets, ...(support.recentTickets ?? [])].slice(0, 5);
+  // Histórico recente REAL (OS + chamados), literal e datado; e o registro
+  // fechado que deve INFORMAR a conduta. O código entrega os fatos; a Nete
+  // interpreta e decide — não é fluxo fixo.
+  const history = buildRecentHistory(support.recentOs ?? [], support.recentTickets ?? []);
 
-  // Diagnóstico determinístico: o SISTEMA decide o caminho; o modelo RELATA e
-  // conduz por ele, não escolhe outro.
+  // Guardrails determinísticos (bloqueio, incidente, offline); a conduta a partir
+  // do histórico é da Nete, com os fatos na frente.
   const hist = support.historyAnalysis;
-  const reincidente = hist && !hist.unavailable ? (hist.recurrent || hist.recurrentWithin48h) : recent.length >= 2;
+  const reincidente = hist && !hist.unavailable ? (hist.recurrent || hist.recurrentWithin48h) : history.entries.length >= 2;
   const radio = tecnologia === 'RADIO';
   const fibra = tecnologia === 'FIBRA';
   const temOsAberta = openOs.length > 0 || openTickets.length > 0;
@@ -79,25 +83,36 @@ export function buildDiagnosis(
   if (temOsAberta) {
     lines.push('- Já existe OS/chamado aberto deste cliente: ACOMPANHE o existente, não duplique. Se o cliente disser que NORMALIZOU/voltou, confirme e ENCERRE o chamado (ferramenta de encerramento), registrando que ele confirmou a solução; se houver mais de uma O.S. aberta, pergunte qual antes.');
   }
-  const resolTxt = [...(hist?.previousResolutionHints ?? []), ...(support.recurrenceEvidence ?? [])].join(' ').toLowerCase();
-  const foraDaRede = /iptv|\btv\b|televis|aplicativo|\bapp\b|streaming|smart ?tv|aparelho do cliente|equipamento do cliente|roteador pr[oó]prio|sem garantia/.test(resolTxt);
   if (reincidente) {
-    lines.push('- Cliente REINCIDENTE: o sistema detectou chamado recente do mesmo tipo. Trate com prioridade e NÃO repita às cegas. Só afirme o que já foi tentado/resolvido antes se estiver ESCRITO na resolução dos chamados listados abaixo (cite entre aspas). Se a resolução não diz, NÃO invente que "já tentaram X": diga que há chamado anterior do mesmo caso e trate como reincidência (escalar / abrir OS marcando), sem afirmar o que foi feito.');
+    lines.push('- Cliente REINCIDENTE: o sistema detectou registro recente do mesmo tipo. Trate com PRIORIDADE e não repita às cegas o que já foi feito.');
   }
-  if (foraDaRede) {
-    lines.push('- POSSÍVEL causa fora da rede: a resolução de algum chamado abaixo menciona TV/IPTV/app/equipamento do cliente. CONFIRME lendo a resolução literal antes de concluir; se confirmar, conduza por isso, não como problema de rede.');
+  // O fechamento do registro relevante INFORMA a decisão; quem decide é a Nete.
+  // O código não escolhe o caminho — oferece os fatos e as opções plausíveis.
+  if (history.driver) {
+    const d = history.driver;
+    const quando = d.data ? `em ${d.data}` : 'recente';
+    const fech = (d.fechamento ?? d.relato ?? '').slice(0, 160);
+    const citacao = fech ? ` fechada com: "${fech}"` : ' (sem texto de fechamento registrado)';
+    if (history.driverKind === 'CAMPO') {
+      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. Da última vez a solução foi INTERVENÇÃO DA EQUIPE em campo (troca de equipamento/cabo/sinal). USE isso para decidir como um atendente faria — você NÃO está preso a um caminho: se o acesso está online e o cliente está em casa, pode pedir para ele desligar/ligar o equipamento da tomada e ver se persiste; OU já abrir OS para a equipe verificar, marcando a reincidência. Julgue pelo relato atual. Ao falar com ele, cite a DATA e o fechamento literais.`);
+    } else if (history.driverKind === 'FORA_DA_REDE') {
+      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. A resolução aponta causa FORA da nossa rede (TV/IPTV/app/equipamento do cliente). Confirme pelo relato atual se é o mesmo caso antes de tratar como problema de rede; se confirmar, conduza por isso. Cite a DATA e o fechamento literais.`);
+    } else {
+      lines.push(`- Há ${d.tipo} anterior relevante (${quando})${citacao}. A resolução não deixa claro o que foi feito: peça a informação que falta para descrever bem antes de decidir a conduta. Cite a DATA e o fechamento literais, sem completar o que não está escrito.`);
+    }
   }
-  lines.push('- REGRA DESTE DIAGNÓSTICO: afirme sobre o cliente SÓ o que está escrito aqui. O que não está — quedas, ou o que foi feito num chamado cuja resolução não está registrada — você NÃO sabe; não invente nem repita como fato do sistema o que o cliente disse. "Não tenho esse dado" é válido.');
+  lines.push('- REGRA DESTE DIAGNÓSTICO: afirme sobre o cliente SÓ o que está escrito aqui. O que não está — quedas, ou o que foi feito num registro sem resolução escrita — você NÃO sabe; não invente nem repita como fato do sistema o que o cliente disse. "Não tenho esse dado" é válido.');
   lines.push('- Na PRIMEIRA resposta, relate com naturalidade só o que está no diagnóstico e conduza. Não acrescente nenhum fato que não esteja aqui.');
-  if (recent.length) {
-    lines.push('- Chamados recentes do cliente (ESTE é o histórico real — cite só o que está aqui, literal; "resolução" é o que de fato foi feito):');
-    for (const t of recent) {
-      const data = str(t, 'aberto_em') ?? str(t, 'encerrado_em') ?? '';
-      const titulo = str(t, 'titulo') ?? 'chamado';
-      const sit = str(t, 'situacao_interna') ?? str(t, 'status') ?? '';
-      const pedido = str(t, 'descricao');
-      const resol = str(t, 'resolucao');
-      lines.push(`  - ${data ? data + ' — ' : ''}${titulo}${sit ? ` (${sit})` : ''}${pedido ? ` — pedido: ${pedido.slice(0, 120)}` : ''}${resol ? ` — resolução: ${resol.slice(0, 120)}` : ''}`);
+  if (history.entries.length) {
+    lines.push('- Histórico recente do cliente (ESTE é o real — cite só o que está aqui, SEMPRE com a DATA, literal; registros marcados [interno] são de teste/processo e NÃO contam como histórico do cliente):');
+    for (const e of history.entries) {
+      const data = e.data ?? 'sem data';
+      const marca = e.interno ? ' [interno — desconsidere]' : '';
+      const rel = e.relato ? ` — relato: "${e.relato.slice(0, 120)}"` : '';
+      const fec = e.fechamento
+        ? ` — fechamento: "${e.fechamento.slice(0, 120)}"`
+        : (e.encerrada ? ' — fechamento: sem texto registrado' : '');
+      lines.push(`  - ${data} — ${e.tipo}: ${e.titulo}${marca}${rel}${fec}`);
     }
   }
   return lines.join('\n');
