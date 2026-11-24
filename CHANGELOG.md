@@ -1,4 +1,12 @@
 # Changelog
+## [v0.12.56] - 2026-11-23
+### changed
+- ConnectChat/Nete (FRENTE DE COMPORTAMENTO CONSOLIDADA — deployar como um todo): esta versão fecha, num estado coeso e compilando, a base de comportamento determinística construída ao longo do dia (v0.12.50–v0.12.55). O código monta o bloco de diagnóstico e decide o caminho; o modelo relata e segue. Caminhos: BLOQUEADO → financeiro (2ª via/link/desbloqueio de confiança), nunca técnico; INCIDENTE na região → informar, não abrir OS; ONLINE que diz "não funciona" → causa local provável → um reinício → OS; LENTIDÃO → um reinício → OS de lentidão; REINCIDENTE → prioridade + registro na descrição da OS. Identidade: vinculado confirma titular (senão pede o doc do certo), sem vínculo pede o doc. Analisar o sistema antes de perguntar; poucas perguntas; relato do diagnóstico na primeira resposta.
+- ConnectChat/Nete (correção do caminho OFFLINE): offline NÃO leva a reinício às cegas (reiniciar não resolve quem está offline). A Nete passa a entender o porquê (estrutura/rede externa → incidente), confirmar com o cliente se os equipamentos estão ligados (luzes/cabos), pedir FOTO dos equipamentos e, se não for simples no local, abrir OS para a equipe verificar a estrutura/sinal. (Funções de fibra — provisionar/reiniciar ONU remoto — ficam para uma frente futura, outro departamento.)
+
+### note
+- Fora deste pacote, de propósito: ENCERRAMENTO de chamado (cliente diz que normalizou → fechar) é escrita no IXC (`os.encerrar`/finalizar), que precisa de iteração contra o servidor real como o `abrir_os` precisou — não dá para entregar às cegas. É a próxima frente focada. Ver `docs/nete-base-comportamento.md`.
+
 ## [v0.12.55] - 2026-11-23
 ### changed
 - ConnectChat/Nete (diagnóstico determinístico — 1º degrau do classificador): o `buildSystemMemory()` passa a montar EM CÓDIGO um bloco "## Diagnóstico (determinístico)" que decide o caminho a partir do estado já lido (BLOQUEADO → financeiro; INCIDENTE → informar/não abrir OS; OFFLINE → reinício → OS; ONLINE → causa local → reinício → OS) e marca reincidência. Inclui a ordem explícita de RELATAR ao cliente, na primeira resposta, o que foi visto no sistema antes de pedir qualquer coisa. Objetivo: matar o "às vezes diagnostica, às vezes não" — o sistema decide, o modelo relata e segue, não escolhe outro caminho.

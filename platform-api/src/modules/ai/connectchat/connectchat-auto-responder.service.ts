@@ -954,7 +954,7 @@ export class ConnectchatAutoResponderService {
       'Siga essa ESTRUTURA DE ANÁLISE como espinha do raciocínio (não roteiro fixo — adapte palavras e ordem):',
       'Contrato BLOQUEADO por inadimplência -> caminho financeiro: mostre a situação, ofereça 2ª via, link de pagamento ou desbloqueio de confiança e pergunte o que ele prefere; não trate como técnico nem abra OS.',
       'Offline COM incidente na região -> informe a manutenção em andamento e NÃO abra OS.',
-      'Offline, SEM bloqueio e SEM incidente -> peça UM reinício do equipamento (se ainda não fez) e, se persistir, abra uma OS (sem duplicar uma já aberta). Não encadeie vários testes.',
+      'Offline, SEM bloqueio e SEM incidente -> NÃO mande reiniciar às cegas (reinício não resolve quem está offline). Entenda o porquê: confirme com o cliente se os equipamentos estão ligados (luzes/cabos) e peça uma FOTO dos equipamentos; se não for algo simples no local, abra OS para a equipe verificar a estrutura/sinal. (No futuro, cliente de fibra terá função de provisionar/reiniciar a ONU remotamente — outro departamento.)',
       'Lentidão (acesso online, sem bloqueio) -> se o cliente ainda não reiniciou, peça UM reinício do equipamento; se continuar lento, abra um chamado de lentidão para a equipe avaliar. Não fique testando app por app, dados móveis nem navegador — resolva em poucos passos.',
       'Já existe OS ou chamado aberto -> acompanhe o existente, não duplique.',
       'Online e em dia -> pergunte em que pode ajudar, sem despejar diagnóstico.',
@@ -1023,7 +1023,7 @@ export class ConnectchatAutoResponderService {
     } else if (incident && incident.suppress_os) {
       lines.push('- INCIDENTE na região cobrindo este cliente: informe a manutenção (e a previsão, se houver). NÃO abra OS.');
     } else if (!online) {
-      lines.push('- Acesso OFFLINE, sem bloqueio: oriente UM reinício do equipamento; se não voltar, abra OS.');
+      lines.push('- Acesso OFFLINE, sem bloqueio: NÃO mande reiniciar às cegas (reinício não resolve quem está offline). Entenda o PORQUÊ — pode ser estrutura/rede externa (confira incidente na região). Investigue com o cliente se os equipamentos estão ligados (luzes/cabos) e peça uma FOTO dos equipamentos para confirmar. Se não for incidente e não for algo simples no local, abra OS para a equipe verificar a estrutura/sinal.');
     } else {
       lines.push('- Acesso ONLINE, sem bloqueio: a causa costuma ser local (roteador/aparelho). Oriente UM reinício; se persistir, abra OS.');
     }
