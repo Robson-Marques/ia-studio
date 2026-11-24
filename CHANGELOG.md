@@ -1,4 +1,13 @@
 # Changelog
+## [v0.12.64] - 2026-11-24
+### changed
+- ConnectChat/Nete (lê a FINALIZAÇÃO da OS, não só a abertura; e saudação obrigatória): com a v0.12.63 a Nete já citava a OS certa e datada, mas (1) lia só o relato de ABERTURA e perguntava ao cliente o que tinha sido feito — em vez de ler a resposta de fechamento que está no sistema; e (2) não cumprimentava. Correções:
+  - **`isp-projections.ts` (`projectOrdemServico`)**: o campo de fechamento passa a ler `mensagem_resposta` como fonte primária (a resposta/finalização da O.S. no `su_oss_chamado`), antes de `solucao`/`parecer`/`observacao_tecnica`. Era o campo que faltava — por isso o fechamento ("TROCADO A ONU") não chegava e a classificação da resolução caía em inconclusivo. A listagem de OS recentes já trazia a coluna; só a projeção descartava.
+  - **`connectchat-attendance-protocol.ts`**: saudação obrigatória na primeira mensagem do atendimento, com "Bom dia/Boa tarde/Boa noite" resolvido deterministicamente pelo horário local (America/Sao_Paulo) — mesmo que o cliente não tenha cumprimentado nem dito "oi". `buildAttendanceProtocol` passa a aceitar `now` opcional (testável); a chamada no responder segue igual.
+
+### note
+- Com o `mensagem_resposta` na projeção, o fechamento real alimenta o driver de conduta do diagnóstico (v0.12.63): "TROCADO A ONU" → resolução de CAMPO → a Nete afirma o que foi feito (entre aspas) e decide, em vez de perguntar ao cliente. Backend puro, sem schema/ACL/tool/endpoint. Typecheck: os dois arquivos com zero erro novo.
+
 ## [v0.12.63] - 2026-11-24
 ### changed
 - ConnectChat/Nete (o fechamento da OS INFORMA a conduta; histórico datado e literal): a Nete tinha os dados certos sendo buscados, mas o diagnóstico só imprimia CHAMADOS (tickets) — as ORDENS DE SERVIÇO (`su_oss_chamado`, onde mora o fechamento real, ex.: "TROCADO A ONU" de 21/11) eram lidas e descartadas num resumo opaco. Resultado: ela referenciava um registro vago (ou o de TESTE do dia 23) em vez do fechamento real. Correções:
