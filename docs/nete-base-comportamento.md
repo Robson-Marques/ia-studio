@@ -80,6 +80,17 @@ de forma natural e acolhedora." Ele não pode escolher outro caminho.
   snapshot "online agora". Expor o log de sessões/quedas desbloqueia DUAS coisas:
   (a) verificar se o login caiu e voltou após o reinício; (b) detectar quem está
   conectado mas caindo toda hora (flapping) e abrir chamado de instabilidade.
+- **Encerramento de chamado** (tool nova — não existe hoje): quando o cliente diz
+  que normalizou/voltou e há OS/chamado aberto do caso, a Nete deve ENCERRAR o
+  chamado confirmando a solução. Hoje o IXC só expõe `os.cadastrar`/`listar_abertas`
+  /`listar_recentes` — falta `os.encerrar` no provider + uma tool `encerrar_os`.
+  Até existir, a Nete NÃO deve dizer que fechou (evitar alucinação de ferramenta).
+- **Diagnóstico determinístico (parcial, feito 2026-11-23 v0.12.55)**: o
+  `buildSystemMemory()` passou a montar, em código, um bloco "## Diagnóstico
+  (determinístico)" com o caminho (bloqueado/incidente/offline/online + reincidência)
+  e a ordem de RELATAR na primeira resposta. É o 1º degrau real do classificador.
+  Falta o degrau pleno: o código TEMPLATAR a 1ª mensagem (não depender de o modelo
+  seguir a diretriz).
 - **Base de comportamento determinística** (ESTE documento): a frente estrutural
   que torna tudo acima consistente. É o que o Robson chama de "ficar robusto como
   no Aquapark". Fazer PORTANDO o padrão do Aquapark, não do zero.

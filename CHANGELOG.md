@@ -1,4 +1,11 @@
 # Changelog
+## [v0.12.55] - 2026-11-23
+### changed
+- ConnectChat/Nete (diagnóstico determinístico — 1º degrau do classificador): o `buildSystemMemory()` passa a montar EM CÓDIGO um bloco "## Diagnóstico (determinístico)" que decide o caminho a partir do estado já lido (BLOQUEADO → financeiro; INCIDENTE → informar/não abrir OS; OFFLINE → reinício → OS; ONLINE → causa local → reinício → OS) e marca reincidência. Inclui a ordem explícita de RELATAR ao cliente, na primeira resposta, o que foi visto no sistema antes de pedir qualquer coisa. Objetivo: matar o "às vezes diagnostica, às vezes não" — o sistema decide, o modelo relata e segue, não escolhe outro caminho.
+
+### note
+- Degrau parcial: a diretriz de relato ainda é seguida pelo modelo. O degrau pleno (código TEMPLATAR a 1ª mensagem de diagnóstico, sem depender do modelo) e o ENCERRAMENTO de chamado quando o cliente diz que normalizou (precisa de `os.encerrar` no provider + tool `encerrar_os`, inexistentes hoje) estão em `docs/nete-base-comportamento.md`.
+
 ## [v0.12.54] - 2026-11-23
 ### changed
 - ConnectChat/Nete (comportamento: analisar o sistema primeiro): a política de atendimento passa a mandar ANALISAR O CADASTRO ANTES DE PERGUNTAR ao cliente. Assim que tem o titular, a Nete roda a rotina sobre o estado do cliente (bloqueio/financeiro, online/offline, incidente, OS/chamado aberto, histórico de chamados) — mesmo que o cliente já tenha dito o problema. O sistema descobre a causa; o cliente só confirma ou completa o que faltou. Uma ou duas perguntas no máximo, nunca interrogatório.

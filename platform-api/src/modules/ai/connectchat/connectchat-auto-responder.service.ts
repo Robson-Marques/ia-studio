@@ -1012,9 +1012,25 @@ export class ConnectchatAutoResponderService {
       ? `- Incidente na região: sim — ${String(incident.message ?? incident.title ?? 'ocorrência registrada').slice(0, 160)}`
       : '- Incidente na região: não');
     const recent = [...(support.openTickets ?? []), ...(support.recentTickets ?? [])].slice(0, 5);
-    if (recent.length >= 2) {
-      lines.push(`- Reincidência: ${recent.length} chamados recentes — se forem do mesmo caso, trate com prioridade e registre na OS que é cliente reincidente.`);
+    // Diagnóstico determinístico: o SISTEMA decide o caminho; o modelo RELATA e
+    // segue, não escolhe outro. É o que resolve o "às vezes diagnostica, às vezes não".
+    const online = conns.some((c) => c['online'] === true);
+    const reincidente = recent.length >= 2;
+    lines.push('');
+    lines.push('## Diagnóstico (determinístico — RELATE ao cliente e siga este caminho; não escolha outro)');
+    if (blocked) {
+      lines.push('- Contrato BLOQUEADO por inadimplência: trate pelo financeiro (desbloqueio de confiança quando permitido, 2ª via ou link). NÃO trate como problema técnico.');
+    } else if (incident && incident.suppress_os) {
+      lines.push('- INCIDENTE na região cobrindo este cliente: informe a manutenção (e a previsão, se houver). NÃO abra OS.');
+    } else if (!online) {
+      lines.push('- Acesso OFFLINE, sem bloqueio: oriente UM reinício do equipamento; se não voltar, abra OS.');
+    } else {
+      lines.push('- Acesso ONLINE, sem bloqueio: a causa costuma ser local (roteador/aparelho). Oriente UM reinício; se persistir, abra OS.');
     }
+    if (reincidente) {
+      lines.push(`- Cliente REINCIDENTE (${recent.length} chamados recentes): trate com prioridade e registre na descrição da OS que já houve atendimentos sobre o mesmo caso, para solução definitiva.`);
+    }
+    lines.push('- Na PRIMEIRA resposta, relate ao cliente com naturalidade o que você viu no sistema (ex.: "sua conexão aparece online", "vi um chamado recente sobre isso") ANTES de pedir qualquer coisa. Não pule o diagnóstico.');
     if (recent.length) {
       lines.push('- Chamados recentes (use para respostas mais robustas):');
       for (const t of recent) {
