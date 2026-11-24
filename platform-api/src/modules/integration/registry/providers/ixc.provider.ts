@@ -93,6 +93,9 @@ const OPERATIONS = [
   'os.listar_abertas',
   'os.listar_recentes',
   'os.encerrar',
+  'os.analisar',
+  'conexao.desconectar',
+  'cliente.tecnologia',
   // Extensão IXC: histórico limitado para análise assistida. Não é operação
   // do contrato comum de atendimento; a tool que a usa força uma conexão IXC.
   'atendimento.listar_chamados_recentes',
@@ -277,6 +280,15 @@ export class IxcProvider extends BaseProvider {
 
       case 'os.encerrar':
         return this.encerrarOs(ctx, token, args);
+
+      case 'os.analisar':
+        return this.analisarOs(ctx, token, args);
+
+      case 'conexao.desconectar':
+        return this.desconectarCliente(ctx, token, args);
+
+      case 'cliente.tecnologia':
+        return this.tecnologiaCliente(ctx, token, args);
 
       case 'atendimento.listar_chamados_recentes':
         return { data: await this.chamadosRecentes(ctx, token, args) };
@@ -1031,18 +1043,82 @@ export class IxcProvider extends BaseProvider {
     const idChamado = this.str(args, 'id_chamado') ?? this.str(args, 'id_os') ?? this.str(args, 'id');
     if (!idChamado) throw new BadRequestException('Informe "id_chamado" (id da O.S. a encerrar).');
     const agora = this.agoraIxc();
+    const mensagem = this.str(args, 'mensagem') ?? 'Encerrada pelo atendimento: cliente confirmou a normalização.';
+    const idTecnico = this.str(args, 'id_tecnico');
+    const idSetor = this.str(args, 'id_setor') ?? this.str(args, 'setor');
+    // Pré-requisito do workflow IXC: quando há técnico/setor curados, coloca a O.S.
+    // em ANÁLISE antes de finalizar. Best-effort: se já estiver assumida/em análise,
+    // a análise falha e segue para o fechamento (que é a etapa autoritativa).
+    if (idTecnico && idSetor) {
+      try {
+        await this.analisarOs(ctx, token, { id_chamado: idChamado, id_setor: idSetor, id_tecnico: idTecnico, mensagem });
+      } catch { /* O.S. já em análise/assumida: segue para o fechamento. */ }
+    }
     const body: Record<string, unknown> = {
       id_chamado: idChamado,
       data_inicio: this.str(args, 'data_inicio') ?? agora,
       data_final: this.str(args, 'data_final') ?? agora,
-      mensagem: this.str(args, 'mensagem') ?? 'Encerrada pelo atendimento: cliente confirmou a normalização.',
+      mensagem,
       gera_comissao: 'N',
       finaliza_processo: 'S',
       status: 'F',
-      ...(this.str(args, 'id_tecnico') ? { id_tecnico: this.str(args, 'id_tecnico') } : {}),
+      ...(idTecnico ? { id_tecnico: idTecnico } : {}),
       ...(this.str(args, 'id_su_diagnostico') ? { id_su_diagnostico: this.str(args, 'id_su_diagnostico') } : {}),
     };
     return this.write(ctx, token, 'POST', 'su_oss_chamado_fechar', body);
+  }
+
+  /** Coloca a O.S. em ANÁLISE (status 'AN'). Requer técnico e setor curados (infra). */
+  private async analisarOs(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
+    const idChamado = this.str(args, 'id_chamado') ?? this.str(args, 'id_os') ?? this.str(args, 'id');
+    const idSetor = this.str(args, 'id_setor') ?? this.str(args, 'setor');
+    const idTecnico = this.str(args, 'id_tecnico');
+    if (!idChamado || !idSetor || !idTecnico) {
+      throw new BadRequestException('Para analisar a O.S. informe id_chamado, id_setor e id_tecnico.');
+    }
+    const agora = this.agoraIxc();
+    const body: Record<string, unknown> = {
+      id_setor: idSetor,
+      id_chamado: idChamado,
+      status: 'AN',
+      id_tecnico: idTecnico,
+      mensagem: this.str(args, 'mensagem') ?? 'Em análise pelo atendimento.',
+      data_inicio: this.str(args, 'data_inicio') ?? agora,
+      data_final: this.str(args, 'data_final') ?? agora,
+    };
+    return this.write(ctx, token, 'POST', 'su_oss_chamado_analisar', body);
+  }
+
+  /** Força a reconexão do login (desconecta no concentrador). id do login OU cpf. */
+  private async desconectarCliente(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
+    const idArg = this.str(args, 'id_login') ?? this.str(args, 'id') ?? this.str(args, 'login');
+    let loginId = idArg && /^\d+$/.test(idArg) ? idArg : undefined;
+    if (!loginId) {
+      const idCliente = this.str(args, 'id_cliente')
+        ?? (this.str(args, 'cpf') ? String((await this.clienteRow(ctx, token, this.str(args, 'cpf')))['id']) : undefined);
+      const login = await this.resolveLogin(ctx, token, idArg, idCliente);
+      loginId = login?.id;
+    }
+    if (!loginId) throw new BadRequestException('Login não localizado para desconectar.');
+    return this.callListar(ctx, token, 'desconectar_clientes', { id: loginId });
+  }
+
+  /** Identifica a tecnologia de acesso do login: fibra (está na tabela de fibra) ou rádio. */
+  private async tecnologiaCliente(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
+    const idCliente = this.str(args, 'id_cliente')
+      ?? (this.str(args, 'cpf') ? String((await this.clienteRow(ctx, token, this.str(args, 'cpf')))['id']) : undefined);
+    const login = await this.resolveLogin(ctx, token, this.str(args, 'id_login') ?? this.str(args, 'login'), idCliente);
+    if (!login) return { tecnologia: 'desconhecida', fibra: false, motivo: 'Login não localizado.' };
+    const rows = await this.list(ctx, token, FIBRA_TABLE, {
+      qtype: `${FIBRA_TABLE}.id_login`,
+      query: login.id,
+      oper: '=',
+      rp: '1',
+      sortname: `${FIBRA_TABLE}.id`,
+      sortorder: 'desc',
+    });
+    const fibra = rows.length > 0;
+    return { tecnologia: fibra ? 'fibra' : 'radio', fibra, id_login: login.id };
   }
 
   // ─── Helpers ────────────────────────────────────────

@@ -90,6 +90,20 @@ export async function savePlantaoConfig(cfg) {
   } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar a config do plantão')); }
 }
 
+export async function getEncerramentoTecnico() {
+  try {
+    const { data } = await api.get('/isp/os-config/encerramento-tecnico');
+    return data || { tecnico_id: null };
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao carregar o técnico do encerramento')); }
+}
+
+export async function saveEncerramentoTecnico(tecnicoId) {
+  try {
+    const { data } = await api.put('/isp/os-config/encerramento-tecnico', { tecnico_id: tecnicoId });
+    return data;
+  } catch (err) { throw new Error(extractErrorMessage(err, 'Erro ao salvar o técnico do encerramento')); }
+}
+
 // Público (sem auth): dados da página /pagar/:token.
 export async function getPublicPayment(token) {
   try {

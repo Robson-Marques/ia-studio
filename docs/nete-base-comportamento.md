@@ -87,11 +87,18 @@ de forma natural e acolhedora." Ele não pode escolher outro caminho.
   PENDENTE de smoke test ao vivo: se o workflow exigir `su_oss_chamado_analisar`
   (status `AN`, técnico/setor) antes de fechar, ou um técnico fixo, encaixar com
   config curada.
-- **Ações IXC mapeadas para roadmap** (do manual, ainda não implementadas):
-  `desconectar_clientes` (GET, id do login) = reiniciar a conexão PPPoE do cliente
-  pela própria Nete (nível 2); `radpop_radio_cliente_fibra` (GET) = identificar se
-  o cliente é fibra/rádio no login (destrava a distinção fibra/rádio e as funções
-  de ONU); `su_oss_chamado_analisar` (POST, status `AN`) = mover a O.S. para análise.
+- **Ações IXC implementadas** (FEITO 2026-11-23 v0.12.58, do manual oficial):
+  - `desconectar_clientes` (GET, id do login) → tool `reiniciar_conexao`: a Nete
+    força a reconexão PPPoE do cliente (nível 2).
+  - `radpop_radio_cliente_fibra` (GET) → tool `identificar_tecnologia`: fibra/rádio
+    lido do sistema; usado no caminho offline (rádio: rádio no poste além do roteador).
+  - `su_oss_chamado_analisar` (POST, status `AN`) → ação `os.analisar`, encadeada
+    DENTRO do `encerrar_os` quando há técnico curado (pré-requisito do fechar).
+  - Config: campo "Técnico do encerramento" na tela ISP > Abertura de Chamado
+    (`isp.encerramento.tecnico_id`). Vazio = encerra direto.
+  - PENDENTE de smoke test ao vivo (são escrita/leitura no IXC): confirmar que o
+    fechar funciona (com/sem análise), que o desconectar reconecta, e que a
+    tecnologia bate. Provisionar/reiniciar ONU de fibra segue como frente futura.
 - **Diagnóstico determinístico (parcial, feito 2026-11-23 v0.12.55)**: o
   `buildSystemMemory()` passou a montar, em código, um bloco "## Diagnóstico
   (determinístico)" com o caminho (bloqueado/incidente/offline/online + reincidência)

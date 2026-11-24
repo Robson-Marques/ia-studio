@@ -19,6 +19,7 @@ import {
   ISP_PLANTAO_TEMPLATE_SETTING_KEY,
   ISP_PLANTAO_COOLDOWN_SETTING_KEY,
   ISP_PLANTAO_COOLDOWN_DEFAULT,
+  ISP_ENCERRAMENTO_TECNICO_SETTING_KEY,
 } from './isp.constants';
 
 export interface PlantaoConfig {
@@ -149,6 +150,20 @@ export class IspOsConfigService {
       await this.settings.set(ISP_PLANTAO_COOLDOWN_SETTING_KEY, String(n));
     }
     return this.getPlantaoConfig();
+  }
+
+  /** Id do técnico curado para analisar/finalizar a O.S. no encerramento. Null = encerra direto. */
+  async getEncerramentoTecnico(): Promise<string | null> {
+    const raw = await this.settings.getValue(ISP_ENCERRAMENTO_TECNICO_SETTING_KEY);
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+  }
+
+  /** Grava o técnico do encerramento. Vazio/null = limpar (passa a encerrar direto). */
+  async setEncerramentoTecnico(tecnicoId: string | null): Promise<string | null> {
+    const v = (tecnicoId ?? '').trim();
+    if (v && !/^\d+$/.test(v)) throw new BadRequestException('Id do técnico deve ser numérico.');
+    await this.settings.set(ISP_ENCERRAMENTO_TECNICO_SETTING_KEY, v);
+    return this.getEncerramentoTecnico();
   }
 
   private async resolveConnectionId(connectionId?: string): Promise<string> {

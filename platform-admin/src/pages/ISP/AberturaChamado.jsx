@@ -6,6 +6,7 @@ import {
   getBoletoMax, saveBoletoMax,
   getPagamentoConfig, savePagamentoConfig,
   getPlantaoConfig, savePlantaoConfig,
+  getEncerramentoTecnico, saveEncerramentoTecnico,
 } from '../../services/isp';
 import { listQueues, listTeams } from '../../services/whatsapp';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -61,6 +62,10 @@ export default function AberturaChamado() {
   const [plantao, setPlantao] = useState({ team_id: '', limiar_pct: 40, template: '', cooldown_min: 60 });
   const [savingPlantao, setSavingPlantao] = useState(false);
 
+  // Técnico do encerramento de O.S.
+  const [encTecnico, setEncTecnico] = useState('');
+  const [savingEncTecnico, setSavingEncTecnico] = useState(false);
+
   async function load() {
     setLoading(true);
     try {
@@ -72,8 +77,8 @@ export default function AberturaChamado() {
         const cfg = await getOsConfig(disc.connection_id);
         setPairs((cfg || []).map((c) => ({ setor_id: c.setor_id, assunto_id: c.assunto_id, is_default: !!c.is_default })));
       }
-      const [qs, map, bmax, pag, tms, plt] = await Promise.all([
-        listQueues(), getFilaMapping(), getBoletoMax(), getPagamentoConfig(), listTeams(), getPlantaoConfig(),
+      const [qs, map, bmax, pag, tms, plt, enc] = await Promise.all([
+        listQueues(), getFilaMapping(), getBoletoMax(), getPagamentoConfig(), listTeams(), getPlantaoConfig(), getEncerramentoTecnico(),
       ]);
       setQueues(qs || []);
       setFilaSuporte(map?.suporte || '');
@@ -88,6 +93,7 @@ export default function AberturaChamado() {
         template: plt?.template || '',
         cooldown_min: plt?.cooldown_min ?? 60,
       });
+      setEncTecnico(enc?.tecnico_id || '');
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -148,6 +154,18 @@ export default function AberturaChamado() {
       toast.success('Limite de boletos salvo.');
     } catch (err) { toast.error(err.message); }
     finally { setSavingBoleto(false); }
+  }
+
+  async function handleSaveEncTecnico() {
+    const v = String(encTecnico || '').trim();
+    if (v && !/^\d+$/.test(v)) { toast.error('O id do técnico deve ser numérico.'); return; }
+    setSavingEncTecnico(true);
+    try {
+      const saved = await saveEncerramentoTecnico(v || null);
+      setEncTecnico(saved?.tecnico_id || '');
+      toast.success('Técnico do encerramento salvo.');
+    } catch (err) { toast.error(err.message); }
+    finally { setSavingEncTecnico(false); }
   }
 
   async function handleSavePag() {
@@ -391,6 +409,35 @@ export default function AberturaChamado() {
             <div className="flex justify-end">
               <Button variant="primary" icon="check" loading={savingBoleto} onClick={handleSaveBoleto}>
                 {savingBoleto ? 'Salvando…' : 'Salvar limite'}
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* ── Técnico do encerramento ── */}
+      <Card>
+        <div style={{ padding: 20 }} className="space-y-4">
+          <div>
+            <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--su-text-primary)' }}>
+              Técnico do encerramento
+            </h2>
+            <p style={{ fontSize: 12, color: 'var(--su-text-muted)', margin: '4px 0 0' }}>
+              Quando o cliente confirma que normalizou, o assistente finaliza a ordem de serviço. Informe o id do
+              técnico do IXC que responde pela finalização. Deixe em branco para encerrar direto, sem passar por análise.
+            </p>
+          </div>
+
+          <div style={{ maxWidth: 280 }}>
+            <Field label="Id do técnico (IXC)">
+              <Input value={encTecnico} disabled={!canManage} onChange={(e) => setEncTecnico(e.target.value)} placeholder="ex.: 4" />
+            </Field>
+          </div>
+
+          {canManage && (
+            <div className="flex justify-end">
+              <Button variant="primary" icon="check" loading={savingEncTecnico} onClick={handleSaveEncTecnico}>
+                {savingEncTecnico ? 'Salvando…' : 'Salvar técnico'}
               </Button>
             </div>
           )}

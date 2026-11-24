@@ -54,6 +54,11 @@ export const ISP_PLANTAO_TEMPLATE_SETTING_KEY = 'isp.incidente.template';
 export const ISP_PLANTAO_COOLDOWN_SETTING_KEY = 'isp.incidente.cooldown_min';
 export const ISP_PLANTAO_COOLDOWN_DEFAULT = 60;
 
+// Técnico curado usado para ANALISAR/FINALIZAR a O.S. no encerramento (infra id —
+// o modelo nunca escolhe). Vazio = encerra direto (sem passo de análise). O setor
+// reaproveita o par padrão de abertura de O.S.
+export const ISP_ENCERRAMENTO_TECNICO_SETTING_KEY = 'isp.encerramento.tecnico_id';
+
 /**
  * ERP de provedor embarcado nesta vertente. O contrato canônico permanece no
  * módulo ISP para que cada tool dependa de operações, não de HTTP ou de IDs.

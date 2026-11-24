@@ -120,4 +120,22 @@ export class IspOsConfigController {
   ) {
     return this.service.setPlantaoConfig(body ?? {});
   }
+
+  /** Técnico curado usado para analisar/finalizar a O.S. no encerramento (vazio = encerra direto). */
+  @Get('encerramento-tecnico')
+  @ApiOperation({ summary: 'Técnico do encerramento de O.S.' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_READ)
+  async getEncerramentoTecnico() {
+    return { tecnico_id: await this.service.getEncerramentoTecnico() };
+  }
+
+  /** Salva o técnico do encerramento (id numérico do IXC, ou vazio para encerrar direto). */
+  @Put('encerramento-tecnico')
+  @ApiOperation({ summary: 'Salva o técnico do encerramento de O.S.' })
+  @RequirePermissions(PERMISSIONS.ISP_INCIDENTS_WRITE)
+  async setEncerramentoTecnico(
+    @Body() body: { tecnico_id?: string | null },
+  ) {
+    return { tecnico_id: await this.service.setEncerramentoTecnico(body?.tecnico_id ?? null) };
+  }
 }

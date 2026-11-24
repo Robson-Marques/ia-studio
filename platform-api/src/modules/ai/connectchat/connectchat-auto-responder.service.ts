@@ -53,7 +53,7 @@ export class ConnectchatAutoResponderService {
     'identificar_cliente', 'consultar_os_recentes', 'consultar_chamados_recentes',
     'diagnosticar_conexao', 'consultar_debitos', 'consultar_contrato', 'status_conexao',
     'status_regiao', 'segunda_via_boleto', 'gerar_link_pagamento', 'desbloqueio_confianca',
-    'abrir_os', 'encerrar_os', 'encaminhar_para_fila',
+    'abrir_os', 'encerrar_os', 'reiniciar_conexao', 'identificar_tecnologia', 'encaminhar_para_fila',
   ];
 
   constructor(
@@ -950,11 +950,11 @@ export class ConnectchatAutoResponderService {
       'O que você levanta no diagnóstico (o que funciona, o que o cliente relatou, o que já foi tentado) serve para DESCREVER BEM o chamado/OS — registre esses detalhes na abertura. Mas coletar essa informação nunca pode travar o andamento: com o essencial em mãos, abra o chamado e siga, sem ficar juntando detalhes a mais.',
       'ANALISE O SISTEMA ANTES DE PERGUNTAR AO CLIENTE. Assim que tiver o titular, rode a rotina sobre o cadastro pelo bloco "Estado do cliente no sistema" (bloqueio/financeiro, online/offline, incidente na região, OS/chamado aberto, histórico de chamados recentes) — mesmo que o cliente já tenha dito qual é o problema. O SISTEMA descobre a causa; o cliente só confirma ou completa o que o sistema não mostrou. Faça uma ou duas perguntas no máximo, e só sobre o que o sistema não respondeu — nunca um interrogatório.',
       'REINCIDÊNCIA: antes de orientar, veja o histórico de chamados. Se o cliente já abriu chamado recente sobre o MESMO caso, trate com prioridade e, ao abrir a OS, REGISTRE na descrição que é um cliente reincidente (quantas vezes, que já houve atendimento no local) para o técnico dar solução definitiva. Essa informação vai no chamado, não só na conversa.',
-      'Cliente online que diz "não funciona"/"sem conexão": o acesso aparece online, então a causa costuma ser local (roteador ou aparelho do cliente travado). Oriente UM reinício do equipamento e, se fizer sentido, do próprio aparelho dele; se persistir, abra OS (pode exigir visita técnica).',
+      'Cliente online que diz "não funciona"/"sem conexão": o acesso aparece online, então a causa costuma ser local (roteador ou aparelho do cliente travado). Você pode REINICIAR A CONEXÃO dele pelo sistema (reiniciar_conexao) — força a reconexão sem depender de ele mexer no equipamento; ou orientar um reinício do roteador/aparelho. Se persistir, abra OS (pode exigir visita técnica).',
       'Siga essa ESTRUTURA DE ANÁLISE como espinha do raciocínio (não roteiro fixo — adapte palavras e ordem):',
       'Contrato BLOQUEADO por inadimplência -> caminho financeiro: mostre a situação, ofereça 2ª via, link de pagamento ou desbloqueio de confiança e pergunte o que ele prefere; não trate como técnico nem abra OS.',
       'Offline COM incidente na região -> informe a manutenção em andamento e NÃO abra OS.',
-      'Offline, SEM bloqueio e SEM incidente -> NÃO mande reiniciar às cegas (reinício não resolve quem está offline). Entenda o porquê: confirme com o cliente se os equipamentos estão ligados (luzes/cabos) e peça uma FOTO dos equipamentos; se não for algo simples no local, abra OS para a equipe verificar a estrutura/sinal. (No futuro, cliente de fibra terá função de provisionar/reiniciar a ONU remotamente — outro departamento.)',
+      'Offline, SEM bloqueio e SEM incidente -> NÃO mande reiniciar às cegas (reinício não resolve quem está offline). Entenda o porquê: confirme com o cliente se os equipamentos estão ligados (luzes/cabos) e peça uma FOTO dos equipamentos. Identifique a tecnologia pelo sistema (identificar_tecnologia): se for RÁDIO, lembre que há o rádio no poste/torre além do roteador — os dois precisam estar ligados. Se não for algo simples no local, abra OS para a equipe verificar a estrutura/sinal.',
       'Lentidão (acesso online, sem bloqueio) -> se o cliente ainda não reiniciou, peça UM reinício do equipamento; se continuar lento, abra um chamado de lentidão para a equipe avaliar. Não fique testando app por app, dados móveis nem navegador — resolva em poucos passos.',
       'Já existe OS ou chamado aberto -> acompanhe o existente, não duplique.',
       'Se o cliente disser que NORMALIZOU/voltou ao normal e houver O.S./chamado aberto deste caso, confirme com ele e ENCERRE com a ferramenta de encerramento, registrando que ele confirmou a solução. Só encerre com a confirmação do cliente; se houver mais de uma O.S. aberta, pergunte qual antes de encerrar.',

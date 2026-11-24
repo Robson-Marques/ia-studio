@@ -739,15 +739,94 @@ export class IspTools implements OnModuleInit {
           idOs = String(abertas[0]['id']);
         }
 
+        // Técnico curado (opcional): se configurado, a O.S. passa por ANÁLISE
+        // antes de finalizar (pré-requisito do workflow IXC). Setor vem do par
+        // padrão de abertura. Sem técnico, encerra direto. A IA não escolhe ids.
+        const tecnicoId = await this.osConfig.getEncerramentoTecnico().catch(() => null);
+        const cfg = tecnicoId ? await this.osConfig.defaultForSupport(connectionId).catch(() => null) : null;
         try {
           const resultado = await this.connections.execute(connectionId, 'os.encerrar', {
             id_chamado: idOs,
             ...(mensagem ? { mensagem } : {}),
+            ...(tecnicoId ? { id_tecnico: tecnicoId } : {}),
+            ...(cfg?.setor_id ? { id_setor: cfg.setor_id } : {}),
           });
           return { encerrada: true, id_os: idOs, resultado };
         } catch (e) {
           this.logger.warn(`encerrar_os: falha ao encerrar O.S. ${idOs}: ${(e as Error).message}`);
           return { encerrada: false, motivo: 'Não consegui encerrar a O.S. por aqui agora. Vou encaminhar para um atendente finalizar.' };
+        }
+      },
+    });
+
+    // ─── reiniciar_conexao (força a reconexão do login no concentrador) ──
+    this.registry.register({
+      key: 'reiniciar_conexao',
+      name: 'Reiniciar a conexão do cliente (ISP)',
+      description:
+        'Força a reconexão do login do cliente no concentrador (desconecta; o roteador reconecta em seguida). ' +
+        'Use para um cliente ONLINE com problema que um reinício de conexão costuma resolver, sem depender de ele mexer no equipamento. NÃO resolve quem está OFFLINE por falta de sinal.',
+      category: 'isp',
+      requires_approval: false,
+      input_schema: {
+        type: 'object',
+        properties: {
+          cpf: { type: 'string', description: 'CPF/CNPJ do titular já identificado.' },
+          login: { type: 'string', description: 'Login da conexão (quando houver mais de uma).' },
+        },
+        required: ['cpf'],
+      },
+      handler: async (args, ctx) => {
+        const cpf = typeof args['cpf'] === 'string' && args['cpf'].trim() ? args['cpf'].trim() : undefined;
+        const customerId = typeof args['customer_id'] === 'string' && /^[1-9]\d*$/.test(args['customer_id']) ? args['customer_id'] : undefined;
+        if (!cpf && !customerId) throw new Error('Informe o cliente verificado.');
+        const login = typeof args['login'] === 'string' && args['login'].trim() ? args['login'].trim() : undefined;
+        if (ctx.dryRun) return { simulated: true, cpf };
+        const connectionId = await this.connectionId(args, ctx);
+        try {
+          const resultado = await this.connections.execute(connectionId, 'conexao.desconectar', {
+            ...(customerId ? { id_cliente: customerId } : { cpf }),
+            ...(login ? { login } : {}),
+          });
+          return { reiniciada: true, resultado };
+        } catch (e) {
+          this.logger.warn(`reiniciar_conexao: falha: ${(e as Error).message}`);
+          return { reiniciada: false, motivo: 'Não consegui reiniciar a conexão por aqui agora. Oriente o cliente a reiniciar o equipamento ou encaminhe para um atendente.' };
+        }
+      },
+    });
+
+    // ─── identificar_tecnologia (fibra x rádio, lido do sistema) ──
+    this.registry.register({
+      key: 'identificar_tecnologia',
+      name: 'Identificar tecnologia de acesso (fibra/rádio) (ISP)',
+      description:
+        'Diz se o acesso do cliente é FIBRA ou RÁDIO, lendo do sistema. Use para adaptar a orientação (ex.: rádio costuma ter o rádio no poste/torre além do roteador). Não pergunte ao cliente o que o sistema pode responder.',
+      category: 'isp',
+      requires_approval: false,
+      input_schema: {
+        type: 'object',
+        properties: {
+          cpf: { type: 'string', description: 'CPF/CNPJ do titular já identificado.' },
+          login: { type: 'string', description: 'Login da conexão (quando houver mais de uma).' },
+        },
+        required: ['cpf'],
+      },
+      handler: async (args, ctx) => {
+        const cpf = typeof args['cpf'] === 'string' && args['cpf'].trim() ? args['cpf'].trim() : undefined;
+        const customerId = typeof args['customer_id'] === 'string' && /^[1-9]\d*$/.test(args['customer_id']) ? args['customer_id'] : undefined;
+        if (!cpf && !customerId) throw new Error('Informe o cliente verificado.');
+        const login = typeof args['login'] === 'string' && args['login'].trim() ? args['login'].trim() : undefined;
+        if (ctx.dryRun) return { simulated: true, cpf };
+        const connectionId = await this.connectionId(args, ctx);
+        try {
+          return await this.connections.execute(connectionId, 'cliente.tecnologia', {
+            ...(customerId ? { id_cliente: customerId } : { cpf }),
+            ...(login ? { login } : {}),
+          });
+        } catch (e) {
+          this.logger.warn(`identificar_tecnologia: falha: ${(e as Error).message}`);
+          return { tecnologia: 'desconhecida', motivo: 'Não consegui identificar a tecnologia agora.' };
         }
       },
     });

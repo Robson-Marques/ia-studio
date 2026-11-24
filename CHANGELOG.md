@@ -1,4 +1,16 @@
 # Changelog
+## [v0.12.58] - 2026-11-23
+### added
+- IXC + ConnectChat/Nete — três ações do manual oficial da API, num update só (para testar o fluxo inteiro):
+  - **Encerramento com ANÁLISE encadeada**: o `encerrar_os` agora, quando há um técnico curado, coloca a O.S. em análise (`su_oss_chamado_analisar`, status `AN`) antes de finalizar (`su_oss_chamado_fechar`) — pré-requisito do workflow IXC. Best-effort: se já estiver assumida/em análise, segue direto para o fechamento. Sem técnico configurado, encerra direto como antes.
+  - **Reiniciar conexão** (`reiniciar_conexao` → `desconectar_clientes`): a Nete força a reconexão do login do cliente no concentrador, sem depender de ele mexer no equipamento. Para cliente ONLINE com problema; não resolve quem está OFFLINE por falta de sinal.
+  - **Identificar fibra/rádio** (`identificar_tecnologia` → `radpop_radio_cliente_fibra`): lê do sistema se o acesso é fibra ou rádio. No caminho offline, a Nete usa isso para adaptar a orientação (rádio: há o rádio no poste/torre além do roteador) em vez de só perguntar.
+- Config (tela **ISP > Abertura de Chamado**): novo campo **Técnico do encerramento** (id do técnico do IXC, curado — o modelo nunca escolhe id de infra). Vazio = encerra direto; preenchido = encadeia a análise antes de finalizar. Setor reaproveita o par padrão de abertura.
+- Provider IXC: ações `os.analisar`, `conexao.desconectar`, `cliente.tecnologia`. Tools `reiniciar_conexao` e `identificar_tecnologia` na lista nativa da Nete; `encerrar_os` passa o técnico/setor curados.
+
+### note
+- Todas são escrita/leitura no IXC: compilam limpo aqui (tsc), mas só se provam contra o servidor real — é o smoke test do fluxo inteiro. Degradação graciosa em todas (falha não vira erro críptico). Ver `docs/nete-base-comportamento.md`.
+
 ## [v0.12.57] - 2026-11-23
 ### added
 - ConnectChat/Nete (ENCERRAMENTO de chamado): quando o cliente confirma que normalizou/voltou e há O.S. aberta do caso, a Nete finaliza a O.S. em vez de deixar aberta. Baseado no manual oficial da API IXC: endpoint dedicado `POST su_oss_chamado_fechar` com `finaliza_processo: 'S'` (finaliza o workflow) e `status: 'F'`.
