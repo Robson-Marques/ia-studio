@@ -55,6 +55,7 @@ export function buildDiagnosis(
   lines.push(incident
     ? `- Incidente na região: sim — ${String(incident.message ?? incident.title ?? 'ocorrência registrada').slice(0, 160)}`
     : '- Incidente na região: não');
+  lines.push('- Instabilidade/quedas do login: SEM DADO (log de conexão ainda não carregado) — NÃO afirme que a conexão caiu nem que não caiu; isso você não verificou.');
   const recent = [...openTickets, ...(support.recentTickets ?? [])].slice(0, 5);
 
   // Diagnóstico determinístico: o SISTEMA decide o caminho; o modelo RELATA e
@@ -81,20 +82,15 @@ export function buildDiagnosis(
   const resolTxt = [...(hist?.previousResolutionHints ?? []), ...(support.recurrenceEvidence ?? [])].join(' ').toLowerCase();
   const foraDaRede = /iptv|\btv\b|televis|aplicativo|\bapp\b|streaming|smart ?tv|aparelho do cliente|equipamento do cliente|roteador pr[oó]prio|sem garantia/.test(resolTxt);
   if (reincidente) {
-    lines.push('- Cliente REINCIDENTE no mesmo problema. NÃO repita às cegas o passo que já foi tentado: leia a RESOLUÇÃO dos chamados anteriores (abaixo) e conduza por ela. Se o mesmo procedimento já falhou antes, ESCALE / abra OS marcando reincidência, em vez de mandar o mesmo de novo.');
+    lines.push('- Cliente REINCIDENTE: o sistema detectou chamado recente do mesmo tipo. Trate com prioridade e NÃO repita às cegas. Só afirme o que já foi tentado/resolvido antes se estiver ESCRITO na resolução dos chamados listados abaixo (cite entre aspas). Se a resolução não diz, NÃO invente que "já tentaram X": diga que há chamado anterior do mesmo caso e trate como reincidência (escalar / abrir OS marcando), sem afirmar o que foi feito.');
   }
   if (foraDaRede) {
-    lines.push('- ATENÇÃO (histórico): a causa já identificada antes aponta FORA da rede (TV/IPTV/app/equipamento do cliente). Conduza por isso — não trate como problema da internet nem repita reinício de roteador por padrão.');
+    lines.push('- POSSÍVEL causa fora da rede: a resolução de algum chamado abaixo menciona TV/IPTV/app/equipamento do cliente. CONFIRME lendo a resolução literal antes de concluir; se confirmar, conduza por isso, não como problema de rede.');
   }
-  if (hist && hist.previousResolutionHints && hist.previousResolutionHints.length) {
-    lines.push(`- O que já resolveu antes (USE para decidir a conduta, não só mencione): ${hist.previousResolutionHints.slice(0, 3).join(' | ').slice(0, 300)}`);
-  }
-  if (support.recurrenceEvidence && support.recurrenceEvidence.length) {
-    lines.push(`- Histórico semelhante: ${support.recurrenceEvidence.slice(0, 3).join(' | ').slice(0, 300)}`);
-  }
-  lines.push('- Na PRIMEIRA resposta, relate com naturalidade só o essencial do que você viu e já conduza pela análise. Não despeje dado nem pule o diagnóstico.');
+  lines.push('- REGRA DESTE DIAGNÓSTICO: afirme sobre o cliente SÓ o que está escrito aqui. O que não está — quedas, ou o que foi feito num chamado cuja resolução não está registrada — você NÃO sabe; não invente nem repita como fato do sistema o que o cliente disse. "Não tenho esse dado" é válido.');
+  lines.push('- Na PRIMEIRA resposta, relate com naturalidade só o que está no diagnóstico e conduza. Não acrescente nenhum fato que não esteja aqui.');
   if (recent.length) {
-    lines.push('- Chamados recentes (leia a resolução para conduzir):');
+    lines.push('- Chamados recentes do cliente (ESTE é o histórico real — cite só o que está aqui, literal; "resolução" é o que de fato foi feito):');
     for (const t of recent) {
       const data = str(t, 'aberto_em') ?? str(t, 'encerrado_em') ?? '';
       const titulo = str(t, 'titulo') ?? 'chamado';

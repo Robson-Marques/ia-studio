@@ -1,4 +1,13 @@
 # Changelog
+## [v0.12.62] - 2026-11-24
+### changed
+- ConnectChat/Nete (anti-alucinação / grounding duro): a Nete estava gerando NARRATIVA CONVINCENTE — afirmava como fato do sistema coisas que não estavam no dado (ex.: "reiniciar já não resolveu a lentidão no chamado anterior" sem isso constar na resolução; "você está tendo quedas" apenas repetindo o cliente). Correções:
+  - Protocolo (`connectchat-attendance-protocol.ts`): regra dura — a Nete só pode AFIRMAR sobre conexão/contrato/histórico/o-que-foi-feito o que está ESCRITO no diagnóstico ou no retorno de uma ferramenta. Se não está lá, não sabe: não supõe, não monta história plausível, não repete como fato do sistema o que o cliente disse. Resolução de chamado citada com as palavras exatas, entre aspas. "Não tenho esse dado" é resposta válida; inventar é proibido.
+  - Diagnóstico (`connectchat-diagnosis.ts`): marca o DESCONHECIDO explícito ("Instabilidade/quedas do login: SEM DADO — não afirme que caiu nem que não caiu"); remove o material processado que convidava narração (dicas de resolução/evidência soltas); aponta para a resolução LITERAL dos chamados recentes como única fonte do "o que foi feito antes"; reincidência afirma só o que está escrito (há chamado do mesmo tipo), sem alegar o procedimento tentado quando a resolução não registra.
+
+### note
+- Grounding no nível do prompt (o mais forte sem reescrever o fluxo). Se ainda escapar, o passo garantido é o código MONTAR a frase factual (o modelo não gera fato). Falta o log de conexão RADIUS para a Nete verificar quedas de verdade — até lá, ela não pode afirmar quedas.
+
 ## [v0.12.61] - 2026-11-24
 ### changed
 - ConnectChat/Nete (reestruturação do organismo de prompt — causa raiz de "o diagnóstico é decoração"): o protocolo de atendimento e o diagnóstico estavam empilhados dentro de `connectchat-auto-responder.service.ts` e chegavam ao modelo sob o cabeçalho `## Restrições deste teste supervisionado` — ou seja, rotulados como andaime de teste e colados no rodapé do prompt, abaixo da persona. O modelo tratava tudo como secundário. Correções, seguindo o STUDIO-WORKFLOW (uma frente estrutural, cada organismo em seu arquivo):
