@@ -1033,16 +1033,23 @@ export class ConnectchatAutoResponderService {
     } else {
       lines.push(`- Acesso ONLINE, sem bloqueio: a causa costuma ser local (roteador/aparelho).${radio ? ' Como é RÁDIO, considere também o rádio no poste/torre.' : ''} Você pode REINICIAR A CONEXÃO pelo sistema (reiniciar_conexao); se persistir, abra OS.`);
     }
+    const resolTxt = [...(hist?.previousResolutionHints ?? []), ...(support.recurrenceEvidence ?? [])].join(' ').toLowerCase();
+    const foraDaRede = /iptv|\btv\b|televis|aplicativo|\bapp\b|streaming|smart ?tv|aparelho do cliente|equipamento do cliente|roteador pr[oó]prio|sem garantia/.test(resolTxt);
     if (reincidente) {
-      lines.push('- Cliente REINCIDENTE no mesmo problema: trate com PRIORIDADE e registre na descrição da OS que já houve atendimentos sobre o mesmo caso, para solução definitiva.');
+      lines.push('- Cliente REINCIDENTE no mesmo problema. NÃO repita às cegas o passo que já foi tentado: leia a RESOLUÇÃO dos chamados anteriores (abaixo) e conduza por ela. Se o mesmo procedimento já falhou antes, ESCALE / abra OS marcando reincidência, em vez de mandar o mesmo de novo.');
+    }
+    if (foraDaRede) {
+      lines.push('- ATENÇÃO (histórico): a causa já identificada antes aponta FORA da rede (TV/IPTV/app/equipamento do cliente). Conduza por isso — não trate como problema da internet nem repita reinício de roteador por padrão.');
     }
     if (hist && hist.previousResolutionHints && hist.previousResolutionHints.length) {
-      lines.push(`- O que já resolveu antes (use no diagnóstico): ${hist.previousResolutionHints.slice(0, 3).join(' | ').slice(0, 300)}`);
+      lines.push(`- O que já resolveu antes (USE para decidir a conduta, não só mencione): ${hist.previousResolutionHints.slice(0, 3).join(' | ').slice(0, 300)}`);
     }
     if (support.recurrenceEvidence && support.recurrenceEvidence.length) {
       lines.push(`- Histórico semelhante: ${support.recurrenceEvidence.slice(0, 3).join(' | ').slice(0, 300)}`);
     }
-    lines.push('- Na PRIMEIRA resposta, relate ao cliente com naturalidade o que você viu no sistema (online/offline, tecnologia fibra/rádio, chamado recente) ANTES de pedir qualquer coisa. Não pule o diagnóstico.');
+    lines.push('- O cliente quase não mexe em nada: as únicas ações dele são desligar/ligar o equipamento e conferir cabos/tomada. A ANÁLISE é SUA — verifique o sistema primeiro e deixe o que você viu MUDAR a conduta (reincidência, histórico, tecnologia), não só enfeitar a mensagem.');
+    lines.push('- Antes de pedir um reinício, CONFIRME se dá para fazer agora: "você está em casa e consegue desligar o roteador uns 30s pra gente acompanhar?". Se não puder, ajuste em vez de insistir.');
+    lines.push('- Na PRIMEIRA resposta, relate com naturalidade só o essencial do que você viu (online/offline, chamado recente) e já conduza pela análise. Não despeje dado nem pule o diagnóstico.');
     if (recent.length) {
       lines.push('- Chamados recentes (use para respostas mais robustas):');
       for (const t of recent) {

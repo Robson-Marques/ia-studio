@@ -1,4 +1,15 @@
 # Changelog
+## [v0.12.60] - 2026-11-24
+### changed
+- ConnectChat/Nete (a informação precisa MUDAR a conduta, não enfeitar): mencionar "você teve um chamado recente" é alegórico se não muda a ação. O diagnóstico passa a transformar o histórico em DECISÃO:
+  - REINCIDENTE -> não repetir às cegas o passo já tentado; ler a RESOLUÇÃO dos chamados anteriores e conduzir por ela; se o mesmo procedimento já falhou, escalar / abrir OS marcando reincidência em vez de repetir.
+  - Flag determinística **causa fora da rede**: se as resoluções anteriores apontam TV/IPTV/app/equipamento do cliente, o diagnóstico avisa para NÃO tratar como problema de rede nem repetir reinício de roteador por padrão.
+  - A análise é da IA, não do cliente: o cliente só desliga/liga o equipamento e confere cabos; a IA verifica o sistema primeiro e deixa isso mudar a conduta.
+  - Antes de orientar um reinício, CONFIRMAR se o cliente consegue fazer agora ("está em casa, consegue desligar uns 30s pra acompanhar?") em vez de insistir.
+
+### note
+- Ainda falta o LOG DE CONEXÃO do login (RADIUS/radacct) para a Nete ver quedas recorrentes de minutos (flapping) e agir sobre isso — precisa do endpoint do manual IXC.
+
 ## [v0.12.59] - 2026-11-24
 ### fixed
 - ConnectChat/Nete (diagnóstico raso — a causa real de "ela não olha nada"): o estado operacional já carregava AUTOMATICAMENTE a **tecnologia** (fibra/rádio, lida do cadastro), a **análise de histórico** (`historyAnalysis`: reincidência real, casos semelhantes e o que resolveu antes) e a **evidência de reincidência** — mas o `buildSystemMemory` descartava tudo isso antes de montar o diagnóstico que vai para o modelo. Resultado: a Nete só usava o que estava no diagnóstico (online, chamado recente) e ignorava fibra/rádio e o histórico, porque eles nunca chegavam a ela. Corrigido: o diagnóstico agora mostra:
