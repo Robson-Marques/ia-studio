@@ -681,6 +681,77 @@ export class IspTools implements OnModuleInit {
       },
     });
 
+    // ─── encerrar_os (finaliza a O.S. quando o cliente confirma normalização) ──
+    this.registry.register({
+      key: 'encerrar_os',
+      name: 'Encerrar ordem de serviço (ISP)',
+      description:
+        'Encerra (finaliza) uma O.S. ABERTA do cliente quando ELE confirma que o problema normalizou/voltou ao normal. ' +
+        'Localiza a O.S. aberta do cliente e a finaliza registrando a resolução. Se houver mais de uma O.S. aberta, NÃO encerra sozinha — devolve a lista para confirmar qual.',
+      category: 'isp',
+      // Finaliza direto (decisão do operador, como o abrir_os). O id da O.S. vem de
+      // os.listar_abertas — o modelo não escolhe id de infra.
+      requires_approval: false,
+      input_schema: {
+        type: 'object',
+        properties: {
+          cpf: { type: 'string', description: 'CPF/CNPJ do titular já identificado.' },
+          id_os: { type: 'string', description: 'Id da O.S. a encerrar (use quando já souber qual; senão a ferramenta localiza a aberta do cliente).' },
+          login: { type: 'string', description: 'Login da conexão (quando houver mais de uma), para localizar a O.S. certa.' },
+          mensagem: { type: 'string', description: 'Resumo da resolução para registrar no encerramento (ex.: cliente confirmou que normalizou após o reinício).' },
+        },
+        required: ['cpf'],
+      },
+      handler: async (args, ctx) => {
+        const cpf = typeof args['cpf'] === 'string' && args['cpf'].trim() ? args['cpf'].trim() : undefined;
+        const customerId = typeof args['customer_id'] === 'string' && /^[1-9]\d*$/.test(args['customer_id']) ? args['customer_id'] : undefined;
+        if (!cpf && !customerId) throw new Error('Informe o cliente verificado.');
+        const login = typeof args['login'] === 'string' && args['login'].trim() ? args['login'].trim() : undefined;
+        const mensagem = typeof args['mensagem'] === 'string' && args['mensagem'].trim() ? args['mensagem'].trim() : undefined;
+        if (ctx.dryRun) return { simulated: true, cpf };
+        const connectionId = await this.connectionId(args, ctx);
+
+        let idOs = typeof args['id_os'] === 'string' && /^\d+$/.test(args['id_os']) ? args['id_os'] : undefined;
+        if (!idOs) {
+          let abertas: Record<string, unknown>[] = [];
+          try {
+            abertas = rows(
+              await this.connections.execute(connectionId, 'os.listar_abertas', {
+                ...(customerId ? { id_cliente: customerId } : { cpf }),
+                ...(login ? { id_login: login } : {}),
+              }),
+            );
+          } catch (e) {
+            this.logger.warn(`encerrar_os: consulta de O.S. aberta indisponível: ${(e as Error).message}`);
+            return { encerrada: false, motivo: 'Não consegui consultar as O.S. abertas agora. Tente de novo em instantes ou encaminhe para um atendente.' };
+          }
+          if (abertas.length === 0) {
+            return { encerrada: false, motivo: 'Não há O.S. aberta para encerrar.' };
+          }
+          if (abertas.length > 1) {
+            return {
+              encerrada: false,
+              varias: true,
+              motivo: 'Há mais de uma O.S. aberta; confirme com o cliente qual encerrar.',
+              os_abertas: abertas.map((o) => ({ id: o['id'] ?? null, status: o['status'] ?? null, assunto: o['id_assunto'] ?? null })),
+            };
+          }
+          idOs = String(abertas[0]['id']);
+        }
+
+        try {
+          const resultado = await this.connections.execute(connectionId, 'os.encerrar', {
+            id_chamado: idOs,
+            ...(mensagem ? { mensagem } : {}),
+          });
+          return { encerrada: true, id_os: idOs, resultado };
+        } catch (e) {
+          this.logger.warn(`encerrar_os: falha ao encerrar O.S. ${idOs}: ${(e as Error).message}`);
+          return { encerrada: false, motivo: 'Não consegui encerrar a O.S. por aqui agora. Vou encaminhar para um atendente finalizar.' };
+        }
+      },
+    });
+
     // ─── encaminhar_para_fila (handoff bot → fila de setor) ──
     this.registry.register({
       key: 'encaminhar_para_fila',

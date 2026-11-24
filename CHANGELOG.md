@@ -1,4 +1,14 @@
 # Changelog
+## [v0.12.57] - 2026-11-23
+### added
+- ConnectChat/Nete (ENCERRAMENTO de chamado): quando o cliente confirma que normalizou/voltou e há O.S. aberta do caso, a Nete finaliza a O.S. em vez de deixar aberta. Baseado no manual oficial da API IXC: endpoint dedicado `POST su_oss_chamado_fechar` com `finaliza_processo: 'S'` (finaliza o workflow) e `status: 'F'`.
+  - Provider IXC: nova ação `os.encerrar` (`encerrarOs`) + helper de data no padrão do IXC (`DD/MM/AAAA HH:mm:ss`, America/Sao_Paulo). `id_chamado` vem de `os.listar_abertas` — a IA não escolhe id de infra.
+  - Tool `encerrar_os`: localiza a O.S. aberta do cliente e finaliza com mensagem de resolução. Se houver mais de uma O.S. aberta, NÃO encerra sozinha — devolve a lista para confirmar qual. Degradação graciosa: falha na consulta ou no fechamento não vira erro críptico — encaminha para um atendente.
+  - Comportamento: só encerra com a confirmação do cliente; registrada na lista de ferramentas nativas da Nete.
+
+### note
+- O fechamento é uma ESCRITA no IXC: compila limpo aqui, mas é a parte que só se exercita contra o servidor real. Se o workflow do IXC exigir "analisar/assumir" (`su_oss_chamado_analisar`, status `AN`, com técnico/setor) antes de finalizar, ou um id de técnico fixo, ajusta-se com config curada — ver `docs/nete-base-comportamento.md`. Roadmap de ações IXC já mapeadas: `desconectar_clientes` (reiniciar conexão do login) e `radpop_radio_cliente_fibra` (identificar fibra/rádio).
+
 ## [v0.12.56] - 2026-11-23
 ### changed
 - ConnectChat/Nete (FRENTE DE COMPORTAMENTO CONSOLIDADA — deployar como um todo): esta versão fecha, num estado coeso e compilando, a base de comportamento determinística construída ao longo do dia (v0.12.50–v0.12.55). O código monta o bloco de diagnóstico e decide o caminho; o modelo relata e segue. Caminhos: BLOQUEADO → financeiro (2ª via/link/desbloqueio de confiança), nunca técnico; INCIDENTE na região → informar, não abrir OS; ONLINE que diz "não funciona" → causa local provável → um reinício → OS; LENTIDÃO → um reinício → OS de lentidão; REINCIDENTE → prioridade + registro na descrição da OS. Identidade: vinculado confirma titular (senão pede o doc do certo), sem vínculo pede o doc. Analisar o sistema antes de perguntar; poucas perguntas; relato do diagnóstico na primeira resposta.

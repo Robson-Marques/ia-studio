@@ -92,6 +92,7 @@ const OPERATIONS = [
   'os.cadastrar',
   'os.listar_abertas',
   'os.listar_recentes',
+  'os.encerrar',
   // Extensão IXC: histórico limitado para análise assistida. Não é operação
   // do contrato comum de atendimento; a tool que a usa força uma conexão IXC.
   'atendimento.listar_chamados_recentes',
@@ -273,6 +274,9 @@ export class IxcProvider extends BaseProvider {
 
       case 'os.listar_recentes':
         return { data: await this.osRecentes(ctx, token, args) };
+
+      case 'os.encerrar':
+        return this.encerrarOs(ctx, token, args);
 
       case 'atendimento.listar_chamados_recentes':
         return { data: await this.chamadosRecentes(ctx, token, args) };
@@ -1004,6 +1008,41 @@ export class IxcProvider extends BaseProvider {
     });
     this.assertOk(res.status, res.data, path);
     return res.data;
+  }
+
+  /** Data/hora atual no padrão do IXC: DD/MM/AAAA HH:mm:ss (America/Sao_Paulo). */
+  private agoraIxc(): string {
+    const fmt = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    });
+    const p: Record<string, string> = {};
+    for (const part of fmt.formatToParts(new Date())) p[part.type] = part.value;
+    return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
+  }
+
+  /**
+   * Encerra (finaliza) uma O.S. pelo endpoint dedicado `su_oss_chamado_fechar`.
+   * `finaliza_processo: 'S'` finaliza o workflow; `status: 'F'` marca como finalizada.
+   * O id da O.S. (`id_chamado`) vem de os.listar_abertas — a IA não o escolhe sozinha.
+   */
+  private async encerrarOs(ctx: ProviderContext, token: string, args: Record<string, unknown>): Promise<unknown> {
+    const idChamado = this.str(args, 'id_chamado') ?? this.str(args, 'id_os') ?? this.str(args, 'id');
+    if (!idChamado) throw new BadRequestException('Informe "id_chamado" (id da O.S. a encerrar).');
+    const agora = this.agoraIxc();
+    const body: Record<string, unknown> = {
+      id_chamado: idChamado,
+      data_inicio: this.str(args, 'data_inicio') ?? agora,
+      data_final: this.str(args, 'data_final') ?? agora,
+      mensagem: this.str(args, 'mensagem') ?? 'Encerrada pelo atendimento: cliente confirmou a normalização.',
+      gera_comissao: 'N',
+      finaliza_processo: 'S',
+      status: 'F',
+      ...(this.str(args, 'id_tecnico') ? { id_tecnico: this.str(args, 'id_tecnico') } : {}),
+      ...(this.str(args, 'id_su_diagnostico') ? { id_su_diagnostico: this.str(args, 'id_su_diagnostico') } : {}),
+    };
+    return this.write(ctx, token, 'POST', 'su_oss_chamado_fechar', body);
   }
 
   // ─── Helpers ────────────────────────────────────────

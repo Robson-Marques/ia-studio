@@ -80,11 +80,18 @@ de forma natural e acolhedora." Ele não pode escolher outro caminho.
   snapshot "online agora". Expor o log de sessões/quedas desbloqueia DUAS coisas:
   (a) verificar se o login caiu e voltou após o reinício; (b) detectar quem está
   conectado mas caindo toda hora (flapping) e abrir chamado de instabilidade.
-- **Encerramento de chamado** (tool nova — não existe hoje): quando o cliente diz
-  que normalizou/voltou e há OS/chamado aberto do caso, a Nete deve ENCERRAR o
-  chamado confirmando a solução. Hoje o IXC só expõe `os.cadastrar`/`listar_abertas`
-  /`listar_recentes` — falta `os.encerrar` no provider + uma tool `encerrar_os`.
-  Até existir, a Nete NÃO deve dizer que fechou (evitar alucinação de ferramenta).
+- **Encerramento de chamado** (FEITO 2026-11-23 v0.12.57): a partir do manual
+  oficial da API IXC — `POST su_oss_chamado_fechar` com `finaliza_processo: 'S'` +
+  `status: 'F'`. Provider: `os.encerrar`; tool: `encerrar_os` (localiza a O.S.
+  aberta, finaliza com mensagem, degrada gracioso, não encerra se houver várias).
+  PENDENTE de smoke test ao vivo: se o workflow exigir `su_oss_chamado_analisar`
+  (status `AN`, técnico/setor) antes de fechar, ou um técnico fixo, encaixar com
+  config curada.
+- **Ações IXC mapeadas para roadmap** (do manual, ainda não implementadas):
+  `desconectar_clientes` (GET, id do login) = reiniciar a conexão PPPoE do cliente
+  pela própria Nete (nível 2); `radpop_radio_cliente_fibra` (GET) = identificar se
+  o cliente é fibra/rádio no login (destrava a distinção fibra/rádio e as funções
+  de ONU); `su_oss_chamado_analisar` (POST, status `AN`) = mover a O.S. para análise.
 - **Diagnóstico determinístico (parcial, feito 2026-11-23 v0.12.55)**: o
   `buildSystemMemory()` passou a montar, em código, um bloco "## Diagnóstico
   (determinístico)" com o caminho (bloqueado/incidente/offline/online + reincidência)
