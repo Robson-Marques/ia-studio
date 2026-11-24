@@ -48,8 +48,28 @@ const firstStr = (record: Record<string, unknown>, keys: string[]): string | nul
   return null;
 };
 
-// Marcadores literais de registro interno/de teste (não é adivinhação: lê o texto).
-const INTERNO = /\bteste\b|\btestes\b|opa ?suite|disparando do processo|homolog|sandbox/;
+// Registro interno/ruído a descartar (não é adivinhação: lê o texto literal).
+// Teste/homologação; linha de "alteração de dados/mudança de setor" (ruído de
+// sistema). OPA SUITE / "disparando do processo" NÃO marcam sozinhos: a OS real
+// criada por processo também abre com esse cabeçalho — só é stub de ruído quando
+// é a ABERTURA por processo SEM fechamento e não encerrada.
+const TEST_LIKE = /\bteste\b|\btestes\b|sandbox|homolog/;
+const DATA_CHANGE = /alteracao de dados|mudanca de setor|alteracao de setor/;
+const OPENING_STUB = /processo:? ?o\.?s\.?|disparando do processo/;
+
+/** Decide se o registro é interno/ruído (não conta como histórico do cliente). */
+function isInterno(
+  titulo: string,
+  relato: string | null,
+  fechamento: string | null,
+  encerrada: boolean,
+): boolean {
+  const full = norm([titulo, relato ?? '', fechamento ?? ''].join(' '));
+  if (TEST_LIKE.test(full) || DATA_CHANGE.test(full)) return true;
+  // Stub de abertura por processo: só é ruído se não há fechamento e não encerrou.
+  const head = norm([titulo, relato ?? ''].join(' '));
+  return OPENING_STUB.test(head) && !fechamento && !encerrada;
+}
 // Causa fora da nossa rede (checada primeiro por ser o sinal mais específico).
 const FORA_DA_REDE = /iptv|\btv\b|televis|aplicativo|\bapp\b|streaming|smart ?tv|aparelho do cliente|equipamento do cliente|roteador propr|sem garantia/;
 // Intervenção física da equipe em campo.
@@ -87,14 +107,15 @@ export function buildRecentHistory(
     const dataAbertura = firstStr(record, ['aberta_em']);
     const status = (str(record, 'status') ?? '').toUpperCase();
     const titulo = firstStr(record, ['assunto']) ?? 'ordem de serviço';
+    const encerrada = !!dataFechamento || CLOSED.has(status);
     entries.push({
       tipo: 'OS',
       data: dataFechamento ?? dataAbertura,
       titulo,
       relato,
       fechamento,
-      encerrada: !!dataFechamento || CLOSED.has(status),
-      interno: INTERNO.test(norm([titulo, relato ?? '', fechamento ?? ''].join(' '))),
+      encerrada,
+      interno: isInterno(titulo, relato, fechamento, encerrada),
     });
   }
 
@@ -105,14 +126,15 @@ export function buildRecentHistory(
     const dataAbertura = firstStr(record, ['aberto_em']);
     const situacao = (firstStr(record, ['situacao_interna', 'status']) ?? '').toUpperCase();
     const titulo = firstStr(record, ['titulo']) ?? 'chamado';
+    const encerrada = !!dataFechamento || CLOSED.has(situacao);
     entries.push({
       tipo: 'chamado',
       data: dataFechamento ?? dataAbertura,
       titulo,
       relato,
       fechamento,
-      encerrada: !!dataFechamento || CLOSED.has(situacao),
-      interno: INTERNO.test(norm([titulo, relato ?? '', fechamento ?? ''].join(' '))),
+      encerrada,
+      interno: isInterno(titulo, relato, fechamento, encerrada),
     });
   }
 
