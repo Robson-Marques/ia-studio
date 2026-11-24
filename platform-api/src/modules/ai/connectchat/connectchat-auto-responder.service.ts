@@ -107,17 +107,29 @@ export class ConnectchatAutoResponderService {
   // Garante o catálogo completo no agente nativo (idempotente: só grava quando
   // falta algo). Preserva quaisquer outras ferramentas já marcadas.
   // NAO decorar com @Interval: e chamada de dentro do poll (recebe o agent).
-  private async ensureNativeIspTools(agent: AiAgent): Promise<AiAgent> {
+  // Humaniza a fala da Nete: a temperatura varia só o COMO falar, não os fatos —
+  // o grounding (não invente, só o que está no diagnóstico/ferramenta) é que trava
+  // a fuga de contexto, por mais alta que ela seja. Piso aplicado em memória (não
+  // grava no banco), respeitando um valor maior que o usuário tenha configurado.
+  private static readonly NETE_TEMPERATURE = 0.6;
+
+  // Prepara o agente nativo para um turno do ConnectChat: garante as ferramentas
+  // ISP nativas e aplica o piso de temperatura humanizadora.
+  private async prepareNativeAgent(agent: AiAgent): Promise<AiAgent> {
+    const humanize = (a: AiAgent): AiAgent => ({
+      ...a,
+      temperature: Math.max(a.temperature, ConnectchatAutoResponderService.NETE_TEMPERATURE),
+    });
     try {
       const has = new Set(agent.allowed_tools);
       const missing = this.nativeIspTools.filter((key) => !has.has(key));
-      if (missing.length === 0) return agent;
-      return (await this.repository.update(agent.id, {
+      if (missing.length === 0) return humanize(agent);
+      return humanize((await this.repository.update(agent.id, {
         allowed_tools: [...agent.allowed_tools, ...missing],
-      })) as AiAgent;
+      })) as AiAgent);
     } catch (error) {
       this.logger.warn(`ConnectChat: ferramentas do agente nativo nao garantidas: ${(error as Error).message}`);
-      return agent;
+      return humanize(agent);
     }
   }
 
@@ -142,7 +154,7 @@ export class ConnectchatAutoResponderService {
       if (typeof native.id !== 'string') return;
       const loaded = await this.repository.findById(native.id);
       if (!loaded?.is_active || !parseConversation(loaded.conversation).auto_reply) return;
-      const agent = await this.ensureNativeIspTools(loaded);
+      const agent = await this.prepareNativeAgent(loaded);
       const conversations = await this.inbox.listRawConversations();
       for (const conversation of conversations.filter((c) => c.status === 'OPEN')) {
         try {
