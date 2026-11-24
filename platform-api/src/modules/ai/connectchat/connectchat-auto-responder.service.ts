@@ -994,6 +994,8 @@ export class ConnectchatAutoResponderService {
     }
     const conns = support.connections ?? [];
     lines.push(`- Acesso: ${conns.length ? (conns.some((c) => c['online'] === true) ? 'online' : 'offline') : 'sem dado'}`);
+    const tecnologia = support.technology; // 'FIBRA' | 'RADIO' | null — já lido do cadastro
+    lines.push(`- Tecnologia de acesso: ${tecnologia === 'FIBRA' ? 'FIBRA' : tecnologia === 'RADIO' ? 'RÁDIO' : 'sem dado'}`);
     const blocked = (support.blockedContracts ?? 0) > 0;
     lines.push(`- Contrato: ${blocked ? 'BLOQUEADO por inadimplência' : (support.contracts?.length ? 'ativo' : 'sem dado')}`);
     if (billing && billing.available) {
@@ -1016,7 +1018,10 @@ export class ConnectchatAutoResponderService {
     // Diagnóstico determinístico: o SISTEMA decide o caminho; o modelo RELATA e
     // segue, não escolhe outro. É o que resolve o "às vezes diagnostica, às vezes não".
     const online = conns.some((c) => c['online'] === true);
-    const reincidente = recent.length >= 2;
+    const hist = support.historyAnalysis;
+    const reincidente = hist && !hist.unavailable ? (hist.recurrent || hist.recurrentWithin48h) : recent.length >= 2;
+    const radio = tecnologia === 'RADIO';
+    const fibra = tecnologia === 'FIBRA';
     lines.push('');
     lines.push('## Diagnóstico (determinístico — RELATE ao cliente e siga este caminho; não escolha outro)');
     if (blocked) {
@@ -1024,14 +1029,20 @@ export class ConnectchatAutoResponderService {
     } else if (incident && incident.suppress_os) {
       lines.push('- INCIDENTE na região cobrindo este cliente: informe a manutenção (e a previsão, se houver). NÃO abra OS.');
     } else if (!online) {
-      lines.push('- Acesso OFFLINE, sem bloqueio: NÃO mande reiniciar às cegas (reinício não resolve quem está offline). Entenda o PORQUÊ — pode ser estrutura/rede externa (confira incidente na região). Investigue com o cliente se os equipamentos estão ligados (luzes/cabos) e peça uma FOTO dos equipamentos para confirmar. Se não for incidente e não for algo simples no local, abra OS para a equipe verificar a estrutura/sinal.');
+      lines.push(`- Acesso OFFLINE, sem bloqueio: NÃO mande reiniciar às cegas (reinício não resolve quem está offline). Entenda o PORQUÊ — pode ser estrutura/rede externa (confira incidente na região). Confirme com o cliente se os equipamentos estão ligados (luzes/cabos) e peça uma FOTO.${radio ? ' Este cliente é RÁDIO: há o rádio no poste/torre além do roteador — os dois precisam estar ligados.' : fibra ? ' Este cliente é FIBRA: confira a luz/sinal da ONU.' : ''} Se não for algo simples no local, abra OS para a equipe verificar a estrutura/sinal.`);
     } else {
-      lines.push('- Acesso ONLINE, sem bloqueio: a causa costuma ser local (roteador/aparelho). Oriente UM reinício; se persistir, abra OS.');
+      lines.push(`- Acesso ONLINE, sem bloqueio: a causa costuma ser local (roteador/aparelho).${radio ? ' Como é RÁDIO, considere também o rádio no poste/torre.' : ''} Você pode REINICIAR A CONEXÃO pelo sistema (reiniciar_conexao); se persistir, abra OS.`);
     }
     if (reincidente) {
-      lines.push(`- Cliente REINCIDENTE (${recent.length} chamados recentes): trate com prioridade e registre na descrição da OS que já houve atendimentos sobre o mesmo caso, para solução definitiva.`);
+      lines.push('- Cliente REINCIDENTE no mesmo problema: trate com PRIORIDADE e registre na descrição da OS que já houve atendimentos sobre o mesmo caso, para solução definitiva.');
     }
-    lines.push('- Na PRIMEIRA resposta, relate ao cliente com naturalidade o que você viu no sistema (ex.: "sua conexão aparece online", "vi um chamado recente sobre isso") ANTES de pedir qualquer coisa. Não pule o diagnóstico.');
+    if (hist && hist.previousResolutionHints && hist.previousResolutionHints.length) {
+      lines.push(`- O que já resolveu antes (use no diagnóstico): ${hist.previousResolutionHints.slice(0, 3).join(' | ').slice(0, 300)}`);
+    }
+    if (support.recurrenceEvidence && support.recurrenceEvidence.length) {
+      lines.push(`- Histórico semelhante: ${support.recurrenceEvidence.slice(0, 3).join(' | ').slice(0, 300)}`);
+    }
+    lines.push('- Na PRIMEIRA resposta, relate ao cliente com naturalidade o que você viu no sistema (online/offline, tecnologia fibra/rádio, chamado recente) ANTES de pedir qualquer coisa. Não pule o diagnóstico.');
     if (recent.length) {
       lines.push('- Chamados recentes (use para respostas mais robustas):');
       for (const t of recent) {

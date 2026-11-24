@@ -1,4 +1,15 @@
 # Changelog
+## [v0.12.59] - 2026-11-24
+### fixed
+- ConnectChat/Nete (diagnóstico raso — a causa real de "ela não olha nada"): o estado operacional já carregava AUTOMATICAMENTE a **tecnologia** (fibra/rádio, lida do cadastro), a **análise de histórico** (`historyAnalysis`: reincidência real, casos semelhantes e o que resolveu antes) e a **evidência de reincidência** — mas o `buildSystemMemory` descartava tudo isso antes de montar o diagnóstico que vai para o modelo. Resultado: a Nete só usava o que estava no diagnóstico (online, chamado recente) e ignorava fibra/rádio e o histórico, porque eles nunca chegavam a ela. Corrigido: o diagnóstico agora mostra:
+  - **Tecnologia de acesso** (FIBRA/RÁDIO) — e adapta a orientação: offline de rádio lembra o rádio no poste/torre; fibra lembra a luz/sinal da ONU.
+  - **Reincidência real** (`historyAnalysis.recurrent`/`recurrentWithin48h`) em vez da contagem crua de chamados.
+  - **O que já resolveu antes** (`previousResolutionHints`) e **histórico semelhante** (`recurrenceEvidence`).
+  É a aplicação concreta do princípio determinístico (`docs/nete-base-comportamento.md`): o sistema já investigou; o diagnóstico entrega tudo pronto, o modelo só relata. Sem novas chamadas ao IXC — o dado já vinha sendo lido.
+
+### note
+- O "extrato de acesso" no sentido de LOG DE CONEXÃO do login (várias quedas de minutos no mesmo dia / flapping) é outro conjunto de dados (RADIUS/radacct) e ainda NÃO é carregado — precisa do endpoint do manual IXC. É a última peça para o diagnóstico ficar completo.
+
 ## [v0.12.58] - 2026-11-23
 ### added
 - IXC + ConnectChat/Nete — três ações do manual oficial da API, num update só (para testar o fluxo inteiro):
