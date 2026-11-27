@@ -7,6 +7,8 @@
 // decide a conduta — a decisão é da Nete, a partir destes fatos. O código informa
 // ("OS de 21/11 fechada com troca de equipamento"); ela interpreta e conduz.
 
+import { parseIxcDate } from './connectchat-link-history';
+
 export type ResolutionKind = 'CAMPO' | 'FORA_DA_REDE' | 'INCONCLUSIVO';
 
 export interface RecentHistoryEntry {
@@ -18,6 +20,8 @@ export interface RecentHistoryEntry {
   relato: string | null;
   /** Resolução/parecer de fechamento (literal da fonte). */
   fechamento: string | null;
+  /** Equipe/setor técnico que fechou a OS, quando o IXC devolve o nome. */
+  equipeTecnica: string | null;
   encerrada: boolean;
   /** Registro de teste/processo interno — não conta como histórico do cliente. */
   interno: boolean;
@@ -88,8 +92,7 @@ function resolutionKind(text: string): ResolutionKind {
 }
 
 function timeOf(entry: RecentHistoryEntry): number {
-  const time = Date.parse(entry.data ?? '');
-  return Number.isFinite(time) ? time : -Infinity;
+  return parseIxcDate(entry.data) ?? -Infinity;
 }
 
 /** Normaliza OS (projectOrdemServico) + chamados (projectChamado) num histórico
@@ -103,6 +106,9 @@ export function buildRecentHistory(
   for (const record of recentOs ?? []) {
     const relato = firstStr(record, ['relato']);
     const fechamento = firstStr(record, ['parecer']);
+    const equipeTecnica = firstStr(record, [
+      'equipe_tecnica', 'equipe_nome', 'equipe', 'setor_nome', 'nome_setor', 'setor_descricao',
+    ]);
     const dataFechamento = firstStr(record, ['concluida_em']);
     const dataAbertura = firstStr(record, ['aberta_em']);
     const status = (str(record, 'status') ?? '').toUpperCase();
@@ -114,6 +120,7 @@ export function buildRecentHistory(
       titulo,
       relato,
       fechamento,
+      equipeTecnica,
       encerrada,
       interno: isInterno(titulo, relato, fechamento, encerrada),
     });
@@ -122,6 +129,9 @@ export function buildRecentHistory(
   for (const record of recentTickets ?? []) {
     const relato = firstStr(record, ['descricao']);
     const fechamento = firstStr(record, ['resolucao']);
+    const equipeTecnica = firstStr(record, [
+      'equipe_tecnica', 'equipe_nome', 'equipe', 'setor_nome', 'nome_setor', 'setor_descricao',
+    ]);
     const dataFechamento = firstStr(record, ['encerrado_em']);
     const dataAbertura = firstStr(record, ['aberto_em']);
     const situacao = (firstStr(record, ['situacao_interna', 'status']) ?? '').toUpperCase();
@@ -133,6 +143,7 @@ export function buildRecentHistory(
       titulo,
       relato,
       fechamento,
+      equipeTecnica,
       encerrada,
       interno: isInterno(titulo, relato, fechamento, encerrada),
     });

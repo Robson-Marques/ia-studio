@@ -187,6 +187,9 @@ export function projectOrdemServico(row: Record<string, unknown>): Record<string
     concluida_em: firstString(row, ['data_fechamento', 'data_finalizacao', 'data_conclusao']),
     relato: excerpt(row['mensagem'] ?? row['menssagem'] ?? row['descricao'] ?? row['observacao']),
     parecer: excerpt(row['mensagem_resposta'] ?? row['solucao'] ?? row['parecer'] ?? row['observacao_tecnica']),
+    equipe_tecnica: firstString(row, [
+      'equipe_tecnica', 'equipe_nome', 'equipe', 'setor_nome', 'nome_setor', 'setor_descricao',
+    ]),
   });
 }
 

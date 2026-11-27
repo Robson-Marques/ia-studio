@@ -24,7 +24,9 @@ import { IspDiagnosisService } from './isp-diagnosis.service';
 import { IncidentLookupService } from './incident-lookup.service';
 import { IspIncidentsService } from './isp-incidents.service';
 import { SCOPE_KEYS, ISP_QUEUE_SETTING_KEYS, IspQueueSetor } from './isp.constants';
-import { projectBoleto, projectChamado, projectOrdemServico, projectCliente, projectConexao, projectContrato, rows, limitBoletos } from './isp-projections';
+import { projectBoleto, projectChamado, projectOrdemServico, projectCliente, projectConexao, projectContrato, projectSessaoRadacct, rows, limitBoletos } from './isp-projections';
+import { buildRecentHistory } from '../ai/connectchat/connectchat-recent-history';
+import { analyzeLinkHistory } from '../ai/connectchat/connectchat-link-history';
 
 function asString(value: unknown, field: string): string {
   if (typeof value !== 'string' || !value.trim()) {
@@ -83,6 +85,69 @@ export class IspTools implements OnModuleInit {
   // Canal do run (padrao WhatsApp p/ nao alterar o comportamento existente).
   private channelKey(ctx: ToolExecutionContext): 'whatsapp' | 'connectchat' {
     return ctx.scopeKeys?.['channel'] === 'connectchat' ? 'connectchat' : 'whatsapp';
+  }
+
+  /**
+   * Acrescenta fatos técnicos verificados à descrição da OS. O modelo pode
+   * resumir a conversa, mas não deve ser a única fonte de dados operacionais:
+   * equipe do último fechamento e flapping do login entram na OS de forma
+   * determinística, sem aparecerem para o cliente.
+   */
+  private async technicalOsAppendix(
+    connectionId: string,
+    customerId: string | undefined,
+    cpf: string | undefined,
+    login: string | undefined,
+  ): Promise<string | null> {
+    const parts: string[] = [];
+    try {
+      const recent = rows(await this.connections.execute(connectionId, 'os.listar_recentes', {
+        ...(customerId ? { id_cliente: customerId } : { cpf }),
+      })).slice(0, 5).map(projectOrdemServico);
+      const history = buildRecentHistory(recent, []);
+      if (history.driver?.equipeTecnica) {
+        parts.push(`Equipe técnica responsável pelo último fechamento: ${history.driver.equipeTecnica}.`);
+      }
+    } catch (error) {
+      this.logger.warn(`abrir_os: histórico de equipe técnica indisponível: ${(error as Error).message}`);
+    }
+
+    let loginToRead = login;
+    if (!loginToRead && customerId) {
+      try {
+        const accesses = rows(await this.connections.execute(connectionId, 'ixc.listar', {
+          tabela: 'radusuarios',
+          qtype: 'radusuarios.id_cliente', query: customerId, oper: '=', rp: '30',
+          sortname: 'radusuarios.id', sortorder: 'asc',
+        })).map(projectConexao).filter((access) => access['ativo'] === true);
+        if (accesses.length === 1 && typeof accesses[0]?.['login'] === 'string') {
+          loginToRead = accesses[0]['login'] as string;
+        }
+      } catch (error) {
+        this.logger.warn(`abrir_os: login único indisponível para análise de quedas: ${(error as Error).message}`);
+      }
+    }
+
+    if (loginToRead) {
+      try {
+        const sessions = rows(await this.connections.execute(connectionId, 'conexao.historico', {
+          login: loginToRead,
+        })).map(projectSessaoRadacct);
+        const link = analyzeLinkHistory(sessions);
+        if (link.anomalia) {
+          parts.push(
+            `Flapping confirmado no log do login: ${link.quedas24h} queda(s) nas últimas 24h, `
+            + `${link.quedas48h} em 48h e ${link.quedas7d} em 7 dias; `
+            + `${link.sessoesCurtas24h} sessão(ões) de até 10 minutos nas últimas 24h`
+            + (link.ultimoMotivo ? `; último motivo técnico: ${link.ultimoMotivo}.` : '.'),
+          );
+        }
+      } catch (error) {
+        this.logger.warn(`abrir_os: histórico de desconexões indisponível: ${(error as Error).message}`);
+      }
+    }
+
+    return parts.length ? `[Contexto técnico automático — uso interno]\n${parts.map((part) => `- ${part}`).join('\n')}` : null;
   }
 
   // Trava anti-enumeracao por conversa (ConnectChat): no max. 5 buscas por
@@ -621,6 +686,8 @@ export class IspTools implements OnModuleInit {
         if (ctx.dryRun) return { simulated: true, cpf };
 
         const connectionId = await this.connectionId(args, ctx);
+        const technicalAppendix = await this.technicalOsAppendix(connectionId, customerId, cpf, login);
+        const descricaoDaOs = technicalAppendix ? `${descricao}\n\n${technicalAppendix}` : descricao;
 
         // 2) Setor + assunto da CONFIG curada (a IA não chuta ids). Override
         //    opcional se a IA mandar setor/id_assunto explicitamente.
@@ -671,7 +738,7 @@ export class IspTools implements OnModuleInit {
         // 4) Abre a OS com o que a IA sabe + a config.
         const os = await this.connections.execute(connectionId, 'os.cadastrar', {
           ...(customerId ? { id_cliente: customerId } : { cpf }),
-          descricao,
+          descricao: descricaoDaOs,
           setor,
           id_assunto: idAssunto,
           ...(login ? { id_login: login } : {}),

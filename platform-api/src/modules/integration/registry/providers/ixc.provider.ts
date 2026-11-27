@@ -790,13 +790,55 @@ export class IxcProvider extends BaseProvider {
       const cliente = await this.clienteRow(ctx, token, this.str(args, 'cpf', true)!);
       idCliente = String(cliente['id']);
     }
-    return this.list(ctx, token, T.os, {
+    const records = await this.list(ctx, token, T.os, {
       qtype: `${T.os}.id_cliente`,
       query: String(idCliente),
       oper: '=',
       rp: '5',
       sortname: `${T.os}.id`,
       sortorder: 'desc',
+    });
+    return this.enrichOsTeamNames(ctx, token, records);
+  }
+
+  /**
+   * O histórico da OS costuma trazer apenas `setor` (id de empresa_setor).
+   * Resolve o nome no próprio IXC e o entrega como dado interno projetável;
+   * sem isso a Nete só consegue repetir um id e não sabe qual equipe atuou.
+   */
+  private async enrichOsTeamNames(
+    ctx: ProviderContext,
+    token: string,
+    records: Record<string, unknown>[],
+  ): Promise<Record<string, unknown>[]> {
+    const names = new Map<string, string>();
+    const setorIds = [...new Set(records.map((row) => this.str(row, 'setor'))
+      .filter((value): value is string => !!value && /^\d+$/.test(value)))];
+
+    await Promise.all(setorIds.map(async (id) => {
+      try {
+        const setorRows = await this.list(ctx, token, T.osSetor, {
+          qtype: `${T.osSetor}.id`, query: id, oper: '=', rp: '1',
+          sortname: `${T.osSetor}.id`, sortorder: 'asc',
+        });
+        const row = setorRows[0];
+        const name = row && (this.str(row, 'setor') ?? this.str(row, 'nome') ?? this.str(row, 'descricao'));
+        if (name && !/^\d+$/.test(name)) names.set(id, name);
+      } catch (error) {
+        this.logger.warn(`IXC: nome do setor técnico ${id} indisponível: ${(error as Error).message}`);
+      }
+    }));
+
+    return records.map((row) => {
+      const direct = this.str(row, 'equipe_tecnica')
+        ?? this.str(row, 'equipe_nome')
+        ?? this.str(row, 'equipe')
+        ?? this.str(row, 'setor_nome')
+        ?? this.str(row, 'nome_setor')
+        ?? this.str(row, 'setor_descricao');
+      const setor = this.str(row, 'setor');
+      const name = direct ?? (setor && !/^\d+$/.test(setor) ? setor : undefined) ?? (setor ? names.get(setor) : undefined);
+      return name ? { ...row, equipe_tecnica: name } : row;
     });
   }
 
@@ -818,8 +860,11 @@ export class IxcProvider extends BaseProvider {
       qtype: `${T.radacct}.username`,
       query: login,
       oper: '=',
+      // O ID não é uma garantia suficiente de ordem temporal em todas as
+      // instalações. O IXC deve devolver as últimas 40 sessões pela hora em
+      // que terminaram; a análise ainda reordena e valida as datas recebidas.
       rp: '40',
-      sortname: `${T.radacct}.radacctid`,
+      sortname: `${T.radacct}.acctstoptime`,
       sortorder: 'desc',
     });
   }

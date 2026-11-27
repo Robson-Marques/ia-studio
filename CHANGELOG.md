@@ -1,4 +1,9 @@
 # Changelog
+## [v0.12.68] - 2026-11-27
+### fixed
+- IXC/ConnectChat: o histórico de `radacct` passa a pedir as 40 sessões mais recentes ordenadas por `acctstoptime`, reordená-las por data real e analisar janelas de 24h, 48h e 7 dias, incluindo sessões muito curtas para detectar flapping. A Nete passa a registrar esse diagnóstico na OS.
+- IXC/ConnectChat: o histórico de OS resolve o nome do setor/equipe técnica responsável pelo último fechamento e o acrescenta ao contexto interno da nova OS, sem expor o nome ao cliente.
+
 ## [v0.12.67] - 2026-11-24
 ### changed
 - ConnectChat/Nete (análise-primeiro restaurada + fala humanizada): dois ajustes que ficaram de fora da v0.12.66 (a tag foi criada em `5ddf2ff`, antes destes commits).

@@ -8,6 +8,7 @@ import { isValidSubscriberDocument, normalizeSubscriberDocument } from './subscr
 import { scopeVerifiedInvoices } from './billing-response';
 import { TechnicalObservation, TechnicalSourceState } from './technical-case-reasoning';
 import { analyzeTechnicalHistory, TechnicalHistoryAnalysis } from './technical-history-analysis';
+import { analyzeLinkHistory } from './connectchat-link-history';
 
 /**
  * Triagem operacional interna feita após localizar o cadastro pelo documento.
@@ -51,7 +52,9 @@ export interface VerifiedSupportContext {
     available: boolean;
     anomalia: boolean;
     quedas24h: number;
+    quedas48h: number;
     quedas7d: number;
+    sessoesCurtas24h: number;
     ultimoMotivo: string | null;
   };
 }
@@ -247,7 +250,10 @@ export class ConnectchatSupportContextService {
         incidents: 'UNAVAILABLE', recentOs: 'UNAVAILABLE', recentTickets: 'UNAVAILABLE',
       },
       historyAnalysis: emptyHistory,
-      linkHistory: { available: false, anomalia: false, quedas24h: 0, quedas7d: 0, ultimoMotivo: null },
+      linkHistory: {
+        available: false, anomalia: false, quedas24h: 0, quedas48h: 0, quedas7d: 0,
+        sessoesCurtas24h: 0, ultimoMotivo: null,
+      },
     };
     if (conversation.businessContact?.status !== 'CUSTOMER'
       || conversation.businessContact.linkStatus !== 'ACTIVE') {
@@ -363,22 +369,7 @@ export class ConnectchatSupportContextService {
       try {
         const sessoes = rows(await this.connections.execute(connectionId, 'conexao.historico',
           { login: singleLogin })).map(projectSessaoRadacct);
-        const now = Date.now();
-        const within = (value: unknown, ms: number): boolean => {
-          const time = Date.parse(String(value ?? ''));
-          return Number.isFinite(time) && time <= now && now - time <= ms;
-        };
-        const encerradas = sessoes.filter((s) => typeof s['fim'] === 'string');
-        const quedas24h = encerradas.filter((s) => within(s['fim'], 86_400_000)).length;
-        const quedas7d = encerradas.filter((s) => within(s['fim'], 7 * 86_400_000)).length;
-        const ultimo = encerradas.find((s) => typeof s['motivo'] === 'string');
-        linkHistory = {
-          available: true,
-          anomalia: quedas24h >= 3 || quedas7d >= 5,
-          quedas24h,
-          quedas7d,
-          ultimoMotivo: ultimo ? String(ultimo['motivo']).slice(0, 80) : null,
-        };
+        linkHistory = analyzeLinkHistory(sessoes);
       } catch (error) {
         this.logger.warn(`Histórico de conexão (radacct) não concluído: ${(error as Error).message}`);
       }

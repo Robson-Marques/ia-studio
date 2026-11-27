@@ -61,7 +61,7 @@ export function buildDiagnosis(
   if (!link || !link.available) {
     lines.push('- Quedas do login: SEM DADO (não foi possível ler o log de conexão agora) — NÃO afirme que caiu nem que não caiu.');
   } else if (link.anomalia) {
-    lines.push(`- Quedas/instabilidade do login: SIM — há anomalia real registrada no log. PARA O CLIENTE: diga apenas que verificou uma anomalia/instabilidade na conexão dele; NUNCA passe números, horários ou quantidade. (Só para a OS: quedas 24h=${link.quedas24h}, 7d=${link.quedas7d}${link.ultimoMotivo ? `, último motivo técnico "${link.ultimoMotivo}"` : ''}.)`);
+    lines.push(`- Quedas/instabilidade do login: SIM — há anomalia real registrada no log. PARA O CLIENTE: diga apenas que verificou uma anomalia/instabilidade na conexão dele; NUNCA passe números, horários ou quantidade. (Só para a OS: quedas 24h=${link.quedas24h}, 48h=${link.quedas48h}, 7d=${link.quedas7d}, sessões de até 10 min em 24h=${link.sessoesCurtas24h}${link.ultimoMotivo ? `, último motivo técnico "${link.ultimoMotivo}"` : ''}.)`);
   } else {
     lines.push('- Quedas/instabilidade do login: sem quedas recentes registradas no log. Se o cliente disser que cai, você pode dizer que não vê quedas recentes no sistema — não invente instabilidade.');
   }
@@ -111,17 +111,20 @@ export function buildDiagnosis(
     const d = history.driver;
     const quando = d.data ? `em ${d.data}` : 'recente';
     if (history.driverKind === 'CAMPO') {
-      lines.push(`- Registro anterior relevante (${quando}): da última vez a solução foi INTERVENÇÃO DA EQUIPE em campo (troca de equipamento/cabo/sinal). Ao cliente, resuma em linguagem simples (ex.: "da última vez foi feita a troca de um equipamento"), com a data — sem copiar o texto nem citar técnico/código. Use na decisão: pode valer o religar do equipamento antes, ou já abrir OS marcando a reincidência; você julga.`);
+      const equipe = d.equipeTecnica ? ` Equipe técnica que fechou a OS: "${d.equipeTecnica}" — dado interno para registrar na próxima OS, não diga esse nome ao cliente.` : '';
+      lines.push(`- Registro anterior relevante (${quando}): da última vez a solução foi INTERVENÇÃO DA EQUIPE em campo (troca de equipamento/cabo/sinal).${equipe} Ao cliente, resuma em linguagem simples (ex.: "da última vez foi feita a troca de um equipamento"), com a data — sem copiar o texto nem citar técnico/código. Use na decisão: pode valer o religar do equipamento antes, ou já abrir OS marcando a reincidência; você julga.`);
     } else if (history.driverKind === 'FORA_DA_REDE') {
-      lines.push(`- Registro anterior relevante (${quando}): a resolução aponta causa FORA da nossa rede (TV/IPTV/app/equipamento do cliente). Confirme pelo relato atual se é o mesmo caso antes de tratar como problema de rede. Ao cliente, resuma simples o que foi, com a data — sem copiar nem expor interno.`);
+      const equipe = d.equipeTecnica ? ` Equipe técnica que fechou a OS: "${d.equipeTecnica}" — dado interno para registrar na próxima OS, não diga esse nome ao cliente.` : '';
+      lines.push(`- Registro anterior relevante (${quando}): a resolução aponta causa FORA da nossa rede (TV/IPTV/app/equipamento do cliente).${equipe} Confirme pelo relato atual se é o mesmo caso antes de tratar como problema de rede. Ao cliente, resuma simples o que foi, com a data — sem copiar nem expor interno.`);
     } else {
-      lines.push(`- Registro anterior relevante (${quando}): a resolução não deixa claro o que foi feito. Ao cliente, resuma simples o que consta (com a data), sem completar o que não está escrito.`);
+      const equipe = d.equipeTecnica ? ` Equipe técnica que fechou a OS: "${d.equipeTecnica}" — dado interno para registrar na próxima OS, não diga esse nome ao cliente.` : '';
+      lines.push(`- Registro anterior relevante (${quando}): a resolução não deixa claro o que foi feito.${equipe} Ao cliente, resuma simples o que consta (com a data), sem completar o que não está escrito.`);
     }
   }
 
   lines.push('- REGRA DESTE DIAGNÓSTICO: afirme sobre o cliente SÓ o que está escrito aqui. O que não está — você NÃO sabe; não invente nem repita como fato do sistema o que o cliente disse. "Não tenho esse dado" é válido.');
   lines.push('- NA PRIMEIRA resposta, RELATE com naturalidade o que você verificou no sistema (online/offline; a anomalia, se houver; e o que foi feito no atendimento anterior, se for relevante ao caso de hoje) e conduza a partir disso. Relatar o que encontrou NÃO é opcional — NÃO vá direto para "reinicie o equipamento" sem antes dizer o que viu. Fale simples e interpretado, SEM dado interno (números de quedas, horários, nome de técnico, código, ID ou trecho copiado do sistema).');
-  lines.push('- PARA A ORDEM DE SERVIÇO (quando abrir — detalhe ao técnico, SINTETIZADO): escreva um resumo que o técnico entenda — o motivo do contato de hoje; a EVOLUÇÃO dos atendimentos dos últimos 30 dias (quantos houve, o que ocorreu em cada e como o último foi resolvido), resumindo o que aconteceu ENTRE eles sem transcrever fechamento (inclua atualizações/ausências do cliente quando houver); e, havendo anomalia, o resumo das quedas de conexão. É COMPREENSÃO, não recorte: nada de colar trechos entre aspas. Todo esse detalhe vai só na OS — ao cliente, o mínimo.');
+  lines.push('- PARA A ORDEM DE SERVIÇO (quando abrir — detalhe ao técnico, SINTETIZADO): escreva um resumo que o técnico entenda — o motivo do contato de hoje; a EVOLUÇÃO dos atendimentos dos últimos 30 dias (quantos houve, o que ocorreu em cada e como o último foi resolvido), resumindo o que aconteceu ENTRE eles sem transcrever fechamento (inclua atualizações/ausências do cliente quando houver); a EQUIPE TÉCNICA que fechou o último atendimento, quando informada; e, havendo anomalia, o resumo das quedas de conexão nas últimas 24h, 48h e 7 dias. É COMPREENSÃO, não recorte: nada de colar trechos entre aspas. Todo esse detalhe vai só na OS — ao cliente, o mínimo.');
 
   if (history.entries.length) {
     lines.push('- Histórico recente do cliente (você LÊ para ENTENDER e sintetizar; registros [interno] são teste/processo e NÃO contam):');
@@ -132,7 +135,8 @@ export function buildDiagnosis(
       const fec = e.fechamento
         ? ` — fechamento: "${e.fechamento.slice(0, 120)}"`
         : (e.encerrada ? ' — fechamento: sem texto registrado' : '');
-      lines.push(`  - ${data} — ${e.tipo}: ${e.titulo}${marca}${rel}${fec}`);
+      const equipe = e.equipeTecnica ? ` — equipe técnica: "${e.equipeTecnica}" [somente para a OS]` : '';
+      lines.push(`  - ${data} — ${e.tipo}: ${e.titulo}${marca}${rel}${fec}${equipe}`);
     }
   }
   return lines.join('\n');

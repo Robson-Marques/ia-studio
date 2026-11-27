@@ -76,8 +76,10 @@ de forma natural e acolhedora." Ele não pode escolher outro caminho.
 - **#3 — abrir OS**: era CONFIG faltando, não bug. Resolvido pelo operador em
   2026-11-23 (par **Suporte / LENTIDÃO** marcado como padrão). Validar que a Nete
   passa a abrir sozinha.
-- **#4 — histórico de conexão do login** (plumbing no provider IXC): hoje só há o
-  snapshot "online agora". Expor o log de sessões/quedas desbloqueia DUAS coisas:
+- **#4 — histórico de conexão do login** (plumbing no provider IXC): o provider
+  busca as 40 sessões mais recentes do `radacct` ordenadas por `acctstoptime` e o
+  runtime reordena por data/hora real. A análise cobre 24h, 48h e 7 dias, além
+  de sessões muito curtas, para detectar flapping. Isso desbloqueia DUAS coisas:
   (a) verificar se o login caiu e voltou após o reinício; (b) detectar quem está
   conectado mas caindo toda hora (flapping) e abrir chamado de instabilidade.
 - **Encerramento de chamado** (FEITO 2026-11-23 v0.12.57): a partir do manual
